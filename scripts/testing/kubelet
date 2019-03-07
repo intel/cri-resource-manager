@@ -1,0 +1,32 @@
+#!/bin/bash
+
+case $1 in
+    -n|--dry-run) xeq=echo; shift;;
+    *)            xeq=""
+esac
+
+SCRIPT=$(realpath ${0%/*})
+
+if [ -z "$KUBELET" ]; then
+    case $SCRIPT in
+        */go/packages/src/*)
+            GOPKGS=${SCRIPT%%/packages/src*}/packages/src
+            if [ -d $GOPKGS/k8s.io/kubernetes ]; then
+                export PATH="$GOPKGS/k8s.io/kubernetes/_output/local/bin/linux/amd64:$PATH"
+            fi
+            ;;
+    esac
+    if [ -n "$(which kubelet)" ]; then
+        KUBELET=$(which kubelet)
+    else
+        KUBELET=kubelet
+    fi
+fi
+
+if [ -z "$NOSUDO"]; then
+    SUDO="sudo"
+else
+    SUDO=""
+fi
+
+$xeq $SUDO $KUBELET --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.1 --container-runtime=remote --container-runtime-endpoint=unix:///var/run/cri-relay.sock --image-service-endpoint=unix:///var/run/dockershim.sock $@

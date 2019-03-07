@@ -1,0 +1,11 @@
+#!/bin/sh
+
+dir=$(dirname $0)
+cfg=$dir/prometheus.yaml
+
+cmd="docker run -p 9090:9090 \
+    -v $cfg:/etc/prometheus/prometheus.yml \
+    prom/prometheus --config.file=/etc/prometheus/prometheus.yml $*"
+
+echo "Running command $cmd..."
+$cmd

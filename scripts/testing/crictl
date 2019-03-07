@@ -1,0 +1,9 @@
+#!/bin/sh
+
+
+RELAY_SOCKET=unix:///var/run/cri-relay.sock
+if [ -z "$CRICTL" ]; then
+    CRICTL=crictl
+fi
+
+sudo $CRICTL -i $RELAY_SOCKET -r $RELAY_SOCKET $@

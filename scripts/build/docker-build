@@ -1,0 +1,134 @@
+#!/bin/bash
+
+# usage: docker-image [--image name] [ --tag tag ] [--registry registry] dir-with-Dockerfile
+
+DIR=""
+TAG="latest"
+
+print_usage () {
+    echo "usage: $0 [--image name] [--tag tag] [--registry docker-registry ] dir-with-Dockerfile"
+    exit ${1:-1}
+}
+
+parse_commandline () {
+    while [ -n "$1" ]; do
+        case $1 in
+            --image|-i)
+                IMAGE="$2"
+                shift 2
+                ;;
+            --tag|-t)
+                TAG="$2"
+                shift 2
+                ;;
+            --registry|-r)
+                REGISTRY="$2"
+                shift 2
+                ;;
+            --quiet|-q)
+                Q="-q"
+                shift
+                ;;
+            --help|-h)
+                print_usage 0
+                ;;
+            --trace|--debug)
+                set -x
+                shift
+                ;;
+            --*)
+                print_usage
+                ;;
+            *)
+                if [ -n "$DIR" ]; then
+                    print_usage
+                fi
+                DIR="$1"
+                shift
+                ;;
+        esac
+    done
+
+    if [ -z "$DIR" ]; then
+        print_usage
+    fi
+}
+
+check_dockerfile () {
+    DOCKERFILE=$DIR/Dockerfile
+    if [ ! -e $DOCKERFILE ]; then
+        echo "Dockerfile $DOCKERFILE not found."
+        print_usage
+    fi
+}
+
+check_deployment_file () {
+    for yaml in $DIR/*deployment*.yaml; do
+        case $yaml in
+            *'*') return 1;;
+            *)    break;;
+        esac
+    done
+    IMAGE=$(cat $yaml | tr -s '\t' ' ' | \
+                sed 's/#.*$//g' | \
+                grep 'image:' | sed 's/^ *image: *//')
+    case $IMAGE in
+        */*:*)
+            registry=${IMAGE%%/*}; IMAGE=${IMAGE#*/}
+            TAG=${IMAGE##*:}
+            IMAGE=${IMAGE%:*}
+            if [ -z "$REGISTRY" ]; then
+                REGISTRY="$registry"
+            fi
+            ;;
+        *:*)
+            TAG=${IMAGE##*:}
+            IMAGE=${IMAGE%:*}
+            ;;
+        */*)
+            registry=${IMAGE%%/*}
+            IMAGE=${IMAGE#*/}
+        ;;
+        *)
+        ;;
+    esac
+
+    if [ -z "$REGISTRY" -a -n "$registry" ]; then
+        REGISTRY="$registry"
+    fi
+}
+
+check_imagename () {
+    if [ -z "$IMAGE" ]; then
+        if ! check_deployment_file; then
+            IMAGE=${DIR##*/}
+        fi
+    fi
+}
+
+show_summary () {
+    echo "[docker-build] * Generating docker image $IMAGE:$TAG..."
+    echo "[docker-build]     - Dockerfile: $DOCKERFILE"
+    echo "[docker-build]     - publishing: ${REGISTRY}"
+}
+
+docker_build () {
+    cmd="docker build -f $DOCKERFILE -t $IMAGE:$TAG . $Q"
+    echo "[docker-build] building images $IMAGE:$TAG (\"$cmd\")..."
+    $cmd || exit 1
+}
+
+docker_publish () {
+    if [ -n "$REGISTRY" -a "$REGISTRY" != "-" ]; then
+        cmd="docker tag $IMAGE:$TAG $REGISTRY/$IMAGE:$TAG"
+        echo "[docker-build] publishing built image $IMAGE:$TAG to $REGISTRY (\"$cmd\")..."
+        $cmd || exit 1
+    fi
+}
+
+parse_commandline $*
+check_dockerfile
+check_imagename
+show_summary
+docker_build
+docker_publish

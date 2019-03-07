@@ -1,0 +1,33 @@
+#!/bin/bash
+
+case $1 in
+    -n|--dry-run) xeq=echo; shift;;
+    *)            xeq=""
+esac
+
+SCRIPT=$(realpath ${0%/*})
+
+if [ -z "$KUBELET" ]; then
+    case $SCRIPT in
+        */go/packages/src/*)
+            GOPKGS=${SCRIPT%%/packages/src*}/packages/src
+            if [ -d $GOPKGS/k8s.io/kubernetes ]; then
+                export PATH="$GOPKGS/k8s.io/kubernetes/_output/local/bin/linux/amd64:$PATH"
+            fi
+            ;;
+    esac
+    if [ -n "$(which kubelet)" ]; then
+        KUBELET=$(which kubelet)
+    else
+        KUBELET=kubelet
+    fi
+fi
+
+if [ -z "$NOSUDO"]; then
+    SUDO="sudo"
+else
+    SUDO=""
+fi
+
+$xeq $SUDO $KUBELET --experimental-dockershim --port 11250 \
+        --cgroup-driver systemd -v 99 $@

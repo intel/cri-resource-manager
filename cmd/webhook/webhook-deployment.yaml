@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cri-resmgr
+  labels:
+    name: cri-resmgr
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cri-resmgr-webhook
+  namespace: cri-resmgr
+  labels:
+    app: cri-resmgr-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cri-resmgr-webhook
+  template:
+    metadata:
+      labels:
+        app: cri-resmgr-webhook
+    spec:
+      containers:
+      - name: cri-resmgr-webhook
+        # with this 'make images'/docker-build tries to build, tag, and push...
+        # image: my-docker-registry:5000/cri-resmgr-webhook:testing
+        # with this 'make images'/docker-build builds and tags...
+        image: cri-resmgr-webhook:testing
+        # Convenience pull policy for development
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 443
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Equal"
+          value: ""
+          effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cri-resmgr-webhook
+  namespace: cri-resmgr
+spec:
+  selector:
+    app: cri-resmgr-webhook
+  ports:
+  - port: 443
+    protocol: TCP
+

@@ -1,0 +1,65 @@
+/*
+Copyright 2019 Intel Corporation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+syntax = "proto3";
+
+package v1;
+option go_package = "v1";
+
+service Agent{
+    rpc GetNode(GetNodeRequest) returns (GetNodeReply) {}
+    rpc PatchNode(PatchNodeRequest) returns (PatchNodeReply) {}
+    rpc UpdateNodeCapacity(UpdateNodeCapacityRequest) returns (UpdateNodeCapacityReply) {}
+    rpc GetConfig(GetConfigRequest) returns (GetConfigReply) {}
+}
+
+message GetNodeRequest {
+}
+
+message GetNodeReply {
+    string node = 1;
+}
+
+// JsonPatch holds on JSON patch
+message JsonPatch {
+    string op = 1;
+    string path = 2;
+    string value = 3;
+}
+
+message PatchNodeRequest {
+    // List of JSON patches to apply on the node
+    repeated JsonPatch patches = 1;
+}
+
+message PatchNodeReply {
+}
+
+message UpdateNodeCapacityRequest {
+    // Name-value map of status.capacity to update
+    map<string, string> capacities = 1;
+}
+
+message UpdateNodeCapacityReply {
+}
+
+message GetConfigRequest {
+}
+
+message GetConfigReply {
+    string node_name = 1;
+    map<string, string> config = 2;
+}

@@ -1,0 +1,4 @@
+*~
+cmd/cri-resmgr/cri-resmgr
+cmd/cri-resmgr-agent/cri-resmgr-agent
+cmd/webhook/webhook
