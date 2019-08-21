@@ -4,6 +4,11 @@ metadata:
   name: cri-resmgr-config
   namespace: kube-system
 data:
+  policy.topology-aware: |+
+    PinCPU: true
+    PinMemory: true
+    PreferIsolatedCPUs: true
+    PreferSharedCPUs: false
   policy.static: |
     RelaxedIsolation: true
   policy.stp: |+
