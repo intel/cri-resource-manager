@@ -124,6 +124,25 @@ func MergeTopologyHints(org, hints TopologyHints) (res TopologyHints) {
 	return
 }
 
+// String returns the hints as a string.
+func (h *TopologyHint) String() string {
+	cpus, nodes, sockets, sep := "", "", "", ""
+
+	if h.CPUs != "" {
+		cpus = "CPUs:" + h.CPUs
+		sep = ", "
+	}
+	if h.NUMAs != "" {
+		nodes = sep + "NUMAs:" + h.NUMAs
+		sep = ", "
+	}
+	if h.Sockets != "" {
+		sockets = sep + "sockets:" + h.Sockets
+	}
+
+	return "<hints " + cpus + nodes + sockets + " (from " + h.Provider + ")>"
+}
+
 // FindSysFsDevice for given argument returns physical device where it is linked to.
 // For device nodes it will return path for device itself. For regular files or directories
 // this function returns physical device where this inode resides (storage device).

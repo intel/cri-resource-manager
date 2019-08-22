@@ -17,7 +17,9 @@ package sysfs
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -48,7 +50,7 @@ const (
 	// DiscoverAll requests full supported discovery.
 	DiscoverAll DiscoveryFlag = 0xffffffff
 	// DiscoverDefault is the default set of discovery flags.
-	DiscoverDefault DiscoveryFlag = DiscoverCpuTopology
+	DiscoverDefault DiscoveryFlag = (DiscoverCpuTopology | DiscoverMemTopology)
 )
 
 // System devices
@@ -62,6 +64,7 @@ type System struct {
 	cache         map[Id]*Cache   // Cache
 	offline       IdSet           // offlined CPUs
 	isolated      IdSet           // isolated CPUs
+	threads       int             // hyperthreads per core
 }
 
 // Package is a physical package (a collection of CPUs).
@@ -75,9 +78,9 @@ type Package struct {
 type Node struct {
 	path     string // sysfs path
 	id       Id     // node id
+	pkg      Id     // package id
 	cpus     IdSet  // cpus in this node
 	distance []int  // distance/cost to other NUMA nodes
-	memory   IdSet  // memory in this node
 }
 
 // Cpu is a CPU core.
@@ -97,6 +100,13 @@ type CpuFreq struct {
 	min uint64   // minimum frequency (kHz)
 	max uint64   // maximum frequency (kHz)
 	all []uint64 // discrete set of frequencies if applicable/known
+}
+
+// MemInfo contains data read from a NUMA node meminfo file.
+type MemInfo struct {
+	MemTotal uint64
+	MemFree  uint64
+	MemUsed  uint64
 }
 
 // CPU cache.
@@ -173,6 +183,16 @@ func (sys *System) Discover(flags DiscoveryFlag) error {
 		}
 	}
 
+	if len(sys.nodes) > 0 {
+		for _, pkg := range sys.packages {
+			for _, nodeId := range pkg.nodes.SortedMembers() {
+				if node, ok := sys.nodes[nodeId]; ok {
+					node.pkg = pkg.id
+				}
+			}
+		}
+	}
+
 	if sys.DebugEnabled() {
 		for id, pkg := range sys.packages {
 			sys.Info("package #%d:", id)
@@ -183,7 +203,6 @@ func (sys *System) Discover(flags DiscoveryFlag) error {
 		for id, node := range sys.nodes {
 			sys.Debug("node #%d:", id)
 			sys.Debug("      cpus: %s", node.cpus)
-			sys.Debug("    memory: %s", node.memory)
 			sys.Debug("  distance: %v", node.distance)
 		}
 
@@ -280,6 +299,11 @@ func (sys *System) PackageIds() []Id {
 		ids[idx] = id
 		idx++
 	}
+
+	sort.Slice(ids, func(i, j int) bool {
+		return int(ids[i]) < int(ids[j])
+	})
+
 	return ids
 }
 
@@ -291,6 +315,11 @@ func (sys *System) NodeIds() []Id {
 		ids[idx] = id
 		idx++
 	}
+
+	sort.Slice(ids, func(i, j int) bool {
+		return int(ids[i]) < int(ids[j])
+	})
+
 	return ids
 }
 
@@ -302,7 +331,41 @@ func (sys *System) CpuIds() []Id {
 		ids[idx] = id
 		idx++
 	}
+
+	sort.Slice(ids, func(i, j int) bool {
+		return int(ids[i]) < int(ids[j])
+	})
+
 	return ids
+}
+
+// PackageCount returns the number of discovered CPU packages (sockets).
+func (sys *System) PackageCount() int {
+	return len(sys.packages)
+}
+
+// SocketCount returns the number of discovered CPU packages (sockets).
+func (sys *System) SocketCount() int {
+	return len(sys.packages)
+}
+
+// CpuCount resturns the number of discovered CPUs/cores.
+func (sys *System) CpuCount() int {
+	return len(sys.cpus)
+}
+
+// NUMANodeCount returns the number of discovered NUMA nodes.
+func (sys *System) NUMANodeCount() int {
+	cnt := len(sys.nodes)
+	if cnt < 1 {
+		cnt = 1
+	}
+	return cnt
+}
+
+// ThreadCount returns the number of threads per core discovered.
+func (sys *System) ThreadCount() int {
+	return sys.threads
 }
 
 // CPUSet gets the ids of all CPUs present in the system as a CPUSet.
@@ -384,6 +447,13 @@ func (sys *System) discoverCpu(path string) error {
 	}
 	if node, _ := filepath.Glob(filepath.Join(path, "node[0-9]*")); len(node) == 1 {
 		cpu.node = getEnumeratedId(node[0])
+	}
+
+	if sys.threads < 1 {
+		sys.threads = cpu.threads.Size()
+	}
+	if sys.threads < 1 {
+		sys.threads = 1
 	}
 
 	sys.cpus[cpu.id] = cpu
@@ -500,15 +570,6 @@ func (sys *System) discoverNode(path string) error {
 		return err
 	}
 
-	if (sys.flags & DiscoverMemTopology) != 0 {
-		node.memory = NewIdSet()
-
-		entries, _ := filepath.Glob(filepath.Join(path, "memory[0-9]*"))
-		for _, entry := range entries {
-			node.memory.Add(getEnumeratedId(entry))
-		}
-	}
-
 	sys.nodes[node.id] = node
 
 	return nil
@@ -517,6 +578,11 @@ func (sys *System) discoverNode(path string) error {
 // Id returns id of this node.
 func (n *Node) Id() Id {
 	return n.id
+}
+
+// PackageId returns the id of this node.
+func (n *Node) PackageId() Id {
+	return n.pkg
 }
 
 // CPUSet returns the CPUSet for all cores/threads in this node.
@@ -536,6 +602,37 @@ func (n *Node) DistanceFrom(id Id) int {
 	}
 
 	return -1
+}
+
+// MemoryInfo memory info for the node (partial content from the meminfo sysfs entry).
+func (n *Node) MemoryInfo() (*MemInfo, error) {
+	meminfo := filepath.Join(n.path, "meminfo")
+	buf := &MemInfo{}
+	err := ParseFileEntries(meminfo,
+		map[string]interface{}{
+			"MemTotal:": &buf.MemTotal,
+			"MemFree:":  &buf.MemFree,
+			"MemUsed:":  &buf.MemUsed,
+		},
+		func(line string) (string, string, error) {
+			fields := strings.Fields(strings.TrimSpace(line))
+			if len(fields) < 4 {
+				return "", "", sysfsError(meminfo, "failed to parse entry: '%s'", line)
+			}
+			key := fields[2]
+			val := fields[3]
+			if len(fields) == 5 {
+				val += " " + fields[4]
+			}
+			return key, val, nil
+		},
+	)
+
+	if err != nil {
+		return nil, err
+	} else {
+		return buf, nil
+	}
 }
 
 // Discover physical packages (CPU sockets) present in the system.
@@ -571,6 +668,11 @@ func (p *Package) Id() Id {
 // CPUSet returns the CPUSet for all cores/threads in this package.
 func (p *Package) CPUSet() cpuset.CPUSet {
 	return p.cpus.CPUSet()
+}
+
+// NodeIds returns the NUMA node ids for this package.
+func (p *Package) NodeIds() []Id {
+	return p.nodes.SortedMembers()
 }
 
 // Discover cache associated with the given CPU.

@@ -225,6 +225,9 @@ func parseValueList(str, sep string, valuep interface{}) error {
 	}
 
 	for _, s := range strings.Split(str, sep) {
+		if s == "" {
+			break
+		}
 		switch value.(type) {
 		case IdSet:
 			if rng := strings.Split(s, "-"); len(rng) == 1 {
