@@ -1,0 +1,25 @@
+language: go
+
+dist: bionic
+
+go:
+  - 1.12.x
+
+sudo: required
+
+before_install:
+  ## checkers
+  - go get -v golang.org/x/lint/golint
+  - go get -v github.com/fzipp/gocyclo
+  - go get -v golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
+
+script:
+  - make format
+  # - make lint
+  # - make vet
+  # - make cyclomatic-check
+  - make
+  #- make test
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
