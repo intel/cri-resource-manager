@@ -5,6 +5,10 @@ dist: bionic
 go:
   - 1.12.x
 
+cache:
+  directories:
+    - $GOPATH/pkg/mod
+
 sudo: required
 
 before_install:
