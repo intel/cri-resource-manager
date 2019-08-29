@@ -225,22 +225,22 @@ type Container interface {
 
 // A cached container.
 type container struct {
-	cache         *cache               // our cache of objects
-	Id            string               // container runtime id
-	PodId         string               // associate pods runtime id
-	CacheId       string               // our cache id
-	Name          string               // container name
-	Namespace     string               // container namespace
-	State         ContainerState       // created/running/exited/unknown
-	Image         string               // containers image
-	Command       []string             // command to run in container
-	Args          []string             // arguments for command
-	Labels        map[string]string    // container labels
-	Annotations   map[string]string    // container annotations
-	Env           map[string]string    // environment variables
-	Mounts        map[string]*Mount    // mounts
-	Devices       map[string]*Device   // devices
-	TopologyHints []sysfs.TopologyHint // Set of topology hints for all containers within Pod
+	cache         *cache              // our cache of objects
+	Id            string              // container runtime id
+	PodId         string              // associate pods runtime id
+	CacheId       string              // our cache id
+	Name          string              // container name
+	Namespace     string              // container namespace
+	State         ContainerState      // created/running/exited/unknown
+	Image         string              // containers image
+	Command       []string            // command to run in container
+	Args          []string            // arguments for command
+	Labels        map[string]string   // container labels
+	Annotations   map[string]string   // container annotations
+	Env           map[string]string   // environment variables
+	Mounts        map[string]*Mount   // mounts
+	Devices       map[string]*Device  // devices
+	TopologyHints sysfs.TopologyHints // Set of topology hints for all containers within Pod
 
 	Resources v1.ResourceRequirements // container resources (from webhook annotation)
 	LinuxReq  *cri.LinuxContainerResources

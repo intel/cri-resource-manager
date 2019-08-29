@@ -142,6 +142,7 @@ func (m *resmgr) filterWithSyntheticResponse(ctx context.Context, method string,
 
 	switch req.(type) {
 	case *api.UpdateContainerResourcesRequest:
+		// TODO: we need to update container resources and TopologyHints in our cache (VPA)
 		return &api.UpdateContainerResourcesResponse{}, nil
 	}
 

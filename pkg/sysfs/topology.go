@@ -26,22 +26,32 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	// ProviderKubelet is a constant to distinguish that topology hint comes
+	// from parameters passed to CRI create/update requests from Kubelet
+	ProviderKubelet = "kubelet"
+)
+
 // TopologyHint represents various hints that can be detected from sysfs for the device
 type TopologyHint struct {
-	SysFsPath string
-	CPUs      string
-	NUMAs     string
-	Sockets   string
+	Provider string
+	CPUs     string
+	NUMAs    string
+	Sockets  string
 }
 
+// TopologyHints represents set of hints collected from multiple providers
+type TopologyHints map[string]TopologyHint
+
 // NewTopologyHints return array of hints for the device and its slaves (e.g. RAID).
-func NewTopologyHints(devPath string) (hints []TopologyHint, err error) {
+func NewTopologyHints(devPath string) (hints TopologyHints, err error) {
+	hints = make(TopologyHints)
 	realDevPath, err := filepath.EvalSymlinks(devPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed get realpath for %s", devPath)
 	}
 	for p := realDevPath; strings.HasPrefix(p, "/sys/devices/"); p = filepath.Dir(p) {
-		hint := TopologyHint{SysFsPath: p}
+		hint := TopologyHint{Provider: p}
 		fileMap := map[string]*string{
 			"local_cpulist": &hint.CPUs,
 			"numa_node":     &hint.NUMAs,
@@ -83,7 +93,7 @@ func NewTopologyHints(devPath string) (hints []TopologyHint, err error) {
 			}
 		}
 		if hint.CPUs != "" || hint.NUMAs != "" || hint.Sockets != "" {
-			hints = append(hints, hint)
+			hints[hint.Provider] = hint
 			break
 		}
 	}
@@ -93,20 +103,23 @@ func NewTopologyHints(devPath string) (hints []TopologyHint, err error) {
 		if er != nil {
 			return nil, er
 		}
-		hints = append(hints, slaveHints...)
+		hints = MergeTopologyHints(hints, slaveHints)
 	}
-	hints = DeDuplicateTopologyHints(hints)
 	return
 }
 
-// DeDuplicateTopologyHints helper which removes duplicate hint entries from hints array
-func DeDuplicateTopologyHints(hints []TopologyHint) (ret []TopologyHint) {
-	seen := make(map[string]int)
-	for _, hint := range hints {
-		if _, exist := seen[hint.SysFsPath]; !exist {
-			seen[hint.SysFsPath] = 1
-			ret = append(ret, hint)
+// MergeTopologyHints combines org and hints.
+func MergeTopologyHints(org, hints TopologyHints) (res TopologyHints) {
+	if org != nil {
+		res = org
+	} else {
+		res = make(TopologyHints)
+	}
+	for k, v := range hints {
+		if _, ok := res[k]; ok {
+			continue
 		}
+		res[k] = v
 	}
 	return
 }
