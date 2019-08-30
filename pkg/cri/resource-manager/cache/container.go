@@ -70,7 +70,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Propagation: MountType(m.Propagation),
 		}
 		if hints := getTopologyHints(m.HostPath, m.ContainerPath); len(hints) > 0 {
-			c.TopologyHints = append(c.TopologyHints, hints...)
+			c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, hints)
 		}
 	}
 
@@ -82,14 +82,14 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Permissions: d.Permissions,
 		}
 		if hints := getTopologyHints(d.HostPath, d.ContainerPath); len(hints) > 0 {
-			c.TopologyHints = append(c.TopologyHints, hints...)
+			c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, hints)
 		}
 	}
 
 	// if we get more than one hint, check that there are no duplicates
-	if len(c.TopologyHints) > 1 {
-		c.TopologyHints = sysfs.DeDuplicateTopologyHints(c.TopologyHints)
-	}
+	// if len(c.TopologyHints) > 1 {
+	// 	c.TopologyHints = sysfs.DeDuplicateTopologyHints(c.TopologyHints)
+	// }
 
 	c.LinuxReq = cfg.GetLinux().GetResources()
 
@@ -102,6 +102,8 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			c.Resources = c.estimateResources()
 		}
 	}
+
+	c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
 
 	return nil
 }
@@ -642,7 +644,7 @@ func quotaToMilliCpu(quota, period int64) int64 {
 	return milliCpu
 }
 
-func getTopologyHints(hostPath, containerPath string) (ret []sysfs.TopologyHint) {
+func getTopologyHints(hostPath, containerPath string) (ret sysfs.TopologyHints) {
 	// ignore topology information for small files in /etc, service files in /var/lib/kubelet and host libraries mounts
 	ignoredTopologyHostPaths := []string{"/etc/", "/var/lib/kubelet/", "/lib/", "/lib64/", "/usr/lib/", "/usr/lib32/", "/usr/lib64/"}
 
@@ -653,8 +655,19 @@ func getTopologyHints(hostPath, containerPath string) (ret []sysfs.TopologyHint)
 	}
 	if devPath, err := sysfs.FindSysFsDevice(hostPath); err == nil {
 		if hints, err := sysfs.NewTopologyHints(devPath); err == nil && len(hints) > 0 {
-			ret = append(ret, hints...)
+			ret = sysfs.MergeTopologyHints(ret, hints)
 		}
+	}
+	return
+}
+
+func getKubeletHint(cpus, mems string) (ret sysfs.TopologyHints) {
+	if cpus != "" || mems != "" {
+		ret = sysfs.TopologyHints{
+			sysfs.ProviderKubelet: sysfs.TopologyHint{
+				Provider: sysfs.ProviderKubelet,
+				CPUs:     cpus,
+				NUMAs:    mems}}
 	}
 	return
 }
