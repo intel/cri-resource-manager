@@ -16,8 +16,8 @@ limitations under the License.
 
 package config
 
-//  RawConfig represents the resource manager config data in unparsed form, as
-//  received from the agent
+// RawConfig represents the resource manager config data in unparsed form, as
+// received from the agent
 type RawConfig struct {
 	NodeName string
 	Data     map[string]string

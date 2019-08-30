@@ -22,6 +22,7 @@ import (
 
 var _ json.Marshaler = &JsonPatch{}
 
+// MarshalJSON marshals JsonPatch to valid Json
 func (j *JsonPatch) MarshalJSON() ([]byte, error) {
 	// Don't really encode anything. Op and Path are ascii strings and value
 	// is assumed to be in marshaled format

@@ -30,7 +30,7 @@ import (
 )
 
 // Function to run when shutting down instrumentation.
-var shutdown func() = func() {}
+var shutdown = func() {}
 
 // IsEnabled returns true if tracing is enabled.
 func IsEnabled() bool {

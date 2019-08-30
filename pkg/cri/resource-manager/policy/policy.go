@@ -32,8 +32,8 @@ import (
 type Domain string
 
 const (
-	// DomainCpu is the CPU resource domain.
-	DomainCpu Domain = "cpu"
+	// DomainCPU is the CPU resource domain.
+	DomainCPU Domain = "cpu"
 	// DomainMemory is the memory resource domain.
 	DomainMemory Domain = "memory"
 	// DomainHugePage is the hugepages resource domain.
@@ -47,19 +47,20 @@ const (
 // Constraint describes, per hardware domain, the resources available for a policy.
 type Constraint map[Domain]interface{}
 
-type PolicyOpts struct {
+// Options describes policy options
+type Options struct {
 	// Resource availibility constraint
 	Available Constraint
 	// Resource reservation constraint
 	Reserved Constraint
 	// Client interface to cri-resmgr agent
-	AgentCli agent.AgentInterface
+	AgentCli agent.Interface
 	// Policy configuration data
 	Config string
 }
 
 // CreateFn is the type for functions used to create a policy instance.
-type CreateFn func(*PolicyOpts) Backend
+type CreateFn func(*Options) Backend
 
 // DataSyntax defines the syntax used to export data to a container.
 type DataSyntax string
@@ -144,7 +145,7 @@ func ActivePolicy() string {
 }
 
 // NewPolicy creates a policy instance using the selected backend.
-func NewPolicy(resmgrCfg *config.RawConfig, a agent.AgentInterface) (Policy, error) {
+func NewPolicy(resmgrCfg *config.RawConfig, a agent.Interface) (Policy, error) {
 	if opt.policy == NullPolicy {
 		return nil, nil
 	}
@@ -178,7 +179,7 @@ func NewPolicy(resmgrCfg *config.RawConfig, a agent.AgentInterface) (Policy, err
 		p.Warn("received empty policy configuration")
 	}
 
-	policyOpts := &PolicyOpts{
+	policyOpts := &Options{
 		Available: opt.available,
 		Reserved:  opt.reserved,
 		AgentCli:  a,
@@ -234,7 +235,7 @@ func (p *policy) CommitDecisions() []cache.Container {
 
 	for _, c := range updated {
 		if data := p.backend.ExportResourceData(c, ExportShell); data != nil {
-			p.cache.WriteFile(c.GetCacheId(), ExportedResources, 0644, data)
+			p.cache.WriteFile(c.GetCacheID(), ExportedResources, 0644, data)
 		}
 	}
 

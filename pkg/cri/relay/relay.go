@@ -70,7 +70,7 @@ func NewRelay(options Options) (Relay, error) {
 		options: options,
 	}
 
-	cltopts := client.ClientOptions{
+	cltopts := client.Options{
 		ImageSocket:   r.options.ImageSocket,
 		RuntimeSocket: r.options.RuntimeSocket,
 	}
@@ -78,7 +78,7 @@ func NewRelay(options Options) (Relay, error) {
 		return nil, relayError("failed to create relay client: %v", err)
 	}
 
-	srvopts := server.ServerOptions{
+	srvopts := server.Options{
 		Socket: r.options.RelaySocket,
 	}
 	if r.server, err = server.NewServer(srvopts); err != nil {

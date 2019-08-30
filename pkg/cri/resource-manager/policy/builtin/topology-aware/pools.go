@@ -41,8 +41,8 @@ func (p *policy) buildPoolsByTopology() error {
 	}
 
 	// create nodes for sockets
-	sockets := make(map[system.Id]Node, socketCnt)
-	for _, id := range p.sys.PackageIds() {
+	sockets := make(map[system.ID]Node, socketCnt)
+	for _, id := range p.sys.PackageIDs() {
 		if socketCnt > 1 {
 			n = p.NewSocketNode(id, p.root)
 		} else {
@@ -55,8 +55,8 @@ func (p *policy) buildPoolsByTopology() error {
 
 	// create nodes for NUMA nodes
 	if nodeCnt > 0 {
-		for _, id := range p.sys.NodeIds() {
-			n = p.NewNumaNode(id, sockets[p.sys.Node(id).PackageId()])
+		for _, id := range p.sys.NodeIDs() {
+			n = p.NewNumaNode(id, sockets[p.sys.Node(id).PackageID()])
 			p.nodes[n.Name()] = n
 		}
 	}
@@ -71,7 +71,7 @@ func (p *policy) buildPoolsByTopology() error {
 			p.depth = n.(*node).depth
 		}
 
-		n.DiscoverCpu()
+		n.DiscoverCPU()
 		n.DiscoverMemset()
 
 		return nil
@@ -81,21 +81,21 @@ func (p *policy) buildPoolsByTopology() error {
 }
 
 // Pick a pool and allocate resource from it to the container.
-func (p *policy) allocatePool(container cache.Container) (CpuGrant, error) {
-	log.Debug("* allocating resources for %s", container.GetCacheId())
+func (p *policy) allocatePool(container cache.Container) (CPUGrant, error) {
+	log.Debug("* allocating resources for %s", container.GetCacheID())
 
-	request := newCpuRequest(container)
+	request := newCPURequest(container)
 	scores, pools := p.sortPoolsByScore(request)
 
 	if log.DebugEnabled() {
 		for idx, n := range pools {
 			log.Debug("* fitting %s: #%d: node %s, score %f",
-				request.String(), idx, n.Name(), scores[n.NodeId()])
+				request.String(), idx, n.Name(), scores[n.NodeID()])
 		}
 	}
 
 	pool := pools[0]
-	cpus := pool.FreeCpu()
+	cpus := pool.FreeCPU()
 
 	grant, err := cpus.Allocate(request)
 	if err != nil {
@@ -103,19 +103,19 @@ func (p *policy) allocatePool(container cache.Container) (CpuGrant, error) {
 			request.String(), cpus.String(), err)
 	}
 
-	p.allocations.Cpu[container.GetCacheId()] = grant
+	p.allocations.CPU[container.GetCacheID()] = grant
 	p.saveAllocations()
 
 	return grant, nil
 }
 
 // Apply the result of allocation to the requesting container.
-func (p *policy) applyGrant(grant CpuGrant) error {
+func (p *policy) applyGrant(grant CPUGrant) error {
 	log.Debug("* applying grant %s", grant.String())
 
 	container := grant.GetContainer()
-	exclusive := grant.ExclusiveCpus()
-	shared := grant.SharedCpus()
+	exclusive := grant.ExclusiveCPUs()
+	shared := grant.SharedCPUs()
 	portion := grant.SharedPortion()
 
 	cpus := ""
@@ -137,7 +137,7 @@ func (p *policy) applyGrant(grant CpuGrant) error {
 		mems = node.GetMemset().String()
 	}
 
-	if opt.PinCpu {
+	if opt.PinCPU {
 		if cpus != "" {
 			log.Debug("  => pinning to (%s) cpuset %s", kind, cpus)
 		} else {
@@ -145,7 +145,7 @@ func (p *policy) applyGrant(grant CpuGrant) error {
 		}
 		container.SetCpusetCpus(cpus)
 		if exclusive.IsEmpty() {
-			container.SetCpuShares(int64(cache.MilliCPUToShares(portion)))
+			container.SetCPUShares(int64(cache.MilliCPUToShares(portion)))
 		} else {
 			// Notes:
 			//   Hmm... I think setting CPU shares according to the normal formula
@@ -159,7 +159,7 @@ func (p *policy) applyGrant(grant CpuGrant) error {
 			//   itself to the shared subset will not get properly weighted wrt. other
 			//   processes sharing the same CPUs.
 			//
-			container.SetCpuShares(int64(cache.MilliCPUToShares(portion)))
+			container.SetCPUShares(int64(cache.MilliCPUToShares(portion)))
 		}
 	}
 
@@ -173,10 +173,10 @@ func (p *policy) applyGrant(grant CpuGrant) error {
 }
 
 // Release resources allocated by this grant.
-func (p *policy) releasePool(container cache.Container) (CpuGrant, bool, error) {
-	log.Debug("* releasing resources allocated to %s", container.GetCacheId())
+func (p *policy) releasePool(container cache.Container) (CPUGrant, bool, error) {
+	log.Debug("* releasing resources allocated to %s", container.GetCacheID())
 
-	grant, ok := p.allocations.Cpu[container.GetCacheId()]
+	grant, ok := p.allocations.CPU[container.GetCacheID()]
 	if !ok {
 		log.Debug("  => no grant found, nothing to do...")
 		return nil, false, nil
@@ -185,27 +185,27 @@ func (p *policy) releasePool(container cache.Container) (CpuGrant, bool, error) 
 	log.Debug("  => releasing grant %s...", grant.String())
 
 	pool := grant.GetNode()
-	cpus := pool.FreeCpu()
+	cpus := pool.FreeCPU()
 
 	cpus.Release(grant)
-	delete(p.allocations.Cpu, container.GetCacheId())
+	delete(p.allocations.CPU, container.GetCacheID())
 	p.saveAllocations()
 
 	return grant, true, nil
 }
 
 // Update shared allocations effected by agrant.
-func (p *policy) updateSharedAllocations(grant CpuGrant) error {
+func (p *policy) updateSharedAllocations(grant CPUGrant) error {
 	log.Debug("* updating shared allocations affected by %s", grant.String())
 
-	for _, other := range p.allocations.Cpu {
+	for _, other := range p.allocations.CPU {
 		if other.SharedPortion() == 0 {
 			log.Debug("  => %s not affected (no shared portion)...", other.String())
 			continue
 		}
 
-		if opt.PinCpu {
-			shared := other.GetNode().FreeCpu().SharableCpus().String()
+		if opt.PinCPU {
+			shared := other.GetNode().FreeCPU().SharableCPUs().String()
 			log.Debug("  => updating %s with shared CPUs of %s: %s...",
 				other.String(), other.GetNode().Name(), shared)
 			other.GetContainer().SetCpusetCpus(shared)
@@ -216,11 +216,11 @@ func (p *policy) updateSharedAllocations(grant CpuGrant) error {
 }
 
 // Score pools against the request and sort them by score.
-func (p *policy) sortPoolsByScore(request CpuRequest) (map[int]float64, []Node) {
+func (p *policy) sortPoolsByScore(request CPURequest) (map[int]float64, []Node) {
 	scores := make(map[int]float64, p.nodeCnt)
 
 	p.root.DepthFirst(func(n Node) error {
-		scores[n.NodeId()] = n.Score(request)
+		scores[n.NodeID()] = n.Score(request)
 		return nil
 	})
 
@@ -232,10 +232,10 @@ func (p *policy) sortPoolsByScore(request CpuRequest) (map[int]float64, []Node) 
 }
 
 // Compare two pools by scores for allocation preference.
-func (p *policy) comparePools(request CpuRequest, scores map[int]float64, i int, j int) bool {
+func (p *policy) comparePools(request CPURequest, scores map[int]float64, i int, j int) bool {
 	n1, n2 := p.pools[i], p.pools[j]
 	d1, d2 := n1.RootDistance(), n2.RootDistance()
-	id1, id2 := n1.NodeId(), n2.NodeId()
+	id1, id2 := n1.NodeID(), n2.NodeID()
 	s1, s2 := scores[id1], scores[id2]
 
 	switch {

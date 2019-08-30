@@ -29,7 +29,7 @@ const (
 )
 
 // unit name to multiplier mapping
-var units map[string]int64 = map[string]int64{
+var units = map[string]int64{
 	"k": k, "kB": k,
 	"M": M, "MB": M,
 	"G": G, "GB": G,

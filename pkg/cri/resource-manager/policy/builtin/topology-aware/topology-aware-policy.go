@@ -34,24 +34,24 @@ const (
 // allocations is our cache.Cachable for saving resource allocations in the cache.
 type allocations struct {
 	policy *policy
-	Cpu    map[string]CpuGrant
+	CPU    map[string]CPUGrant
 }
 
 // policy is our runtime state for the topology aware policy.
 type policy struct {
-	options     policyapi.PolicyOpts // options we were created or reconfigured with
-	cache       cache.Cache          // pod/container cache
-	sys         *system.System       // system/HW topology info
-	allowed     cpuset.CPUSet        // bounding set of CPUs we're allowed to use
-	reserved    cpuset.CPUSet        // system-/kube-reserved CPUs
-	reserveCnt  int                  // number of CPUs to reserve if given as resource.Quantity
-	isolated    cpuset.CPUSet        // (our allowed set of) isolated CPUs
-	nodes       map[string]Node      // pool nodes by name
-	pools       []Node               // pre-populated node slice for scoring, etc...
-	root        Node                 // root of our pool/partition tree
-	nodeCnt     int                  // number of pools
-	depth       int                  // tree depth
-	allocations allocations          // container pool assignments
+	options     policyapi.Options // options we were created or reconfigured with
+	cache       cache.Cache       // pod/container cache
+	sys         *system.System    // system/HW topology info
+	allowed     cpuset.CPUSet     // bounding set of CPUs we're allowed to use
+	reserved    cpuset.CPUSet     // system-/kube-reserved CPUs
+	reserveCnt  int               // number of CPUs to reserve if given as resource.Quantity
+	isolated    cpuset.CPUSet     // (our allowed set of) isolated CPUs
+	nodes       map[string]Node   // pool nodes by name
+	pools       []Node            // pre-populated node slice for scoring, etc...
+	root        Node              // root of our pool/partition tree
+	nodeCnt     int               // number of pools
+	depth       int               // tree depth
+	allocations allocations       // container pool assignments
 
 }
 
@@ -59,11 +59,11 @@ type policy struct {
 var _ policyapi.Backend = &policy{}
 
 // CreateTopologyAwarePolicy creates a new policy instance.
-func CreateTopologyAwarePolicy(opts *policyapi.PolicyOpts) policyapi.Backend {
+func CreateTopologyAwarePolicy(opts *policyapi.Options) policyapi.Backend {
 	p := &policy{options: *opts}
 
 	p.nodes = make(map[string]Node)
-	p.allocations = allocations{policy: p, Cpu: make(map[string]CpuGrant, 32)}
+	p.allocations = allocations{policy: p, CPU: make(map[string]CPUGrant, 32)}
 
 	if err := p.discoverSystemTopology(); err != nil {
 		log.Fatal("failed to create topology-aware policy: %v", err)
@@ -107,12 +107,12 @@ func (p *policy) Start(cch cache.Cache) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (p *policy) AllocateResources(container cache.Container) error {
-	log.Debug("allocating resources for %s...", container.GetCacheId())
+	log.Debug("allocating resources for %s...", container.GetCacheID())
 
 	grant, err := p.allocatePool(container)
 	if err != nil {
 		return policyError("failed to allocate resources for %s: %v",
-			container.GetCacheId(), err)
+			container.GetCacheID(), err)
 	}
 
 	if err := p.applyGrant(grant); err != nil {
@@ -126,7 +126,7 @@ func (p *policy) AllocateResources(container cache.Container) error {
 
 	if err := p.updateSharedAllocations(grant); err != nil {
 		log.Warn("failed to update shared allocations affected by %s: %v",
-			container.GetCacheId(), err)
+			container.GetCacheID(), err)
 	}
 
 	p.root.Dump("<post-alloc>")
@@ -136,18 +136,18 @@ func (p *policy) AllocateResources(container cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (p *policy) ReleaseResources(container cache.Container) error {
-	log.Debug("releasing resources of %s...", container.GetCacheId())
+	log.Debug("releasing resources of %s...", container.GetCacheID())
 
 	grant, found, err := p.releasePool(container)
 	if err != nil {
 		return policyError("failed to release resources of %s: %v",
-			container.GetCacheId(), err)
+			container.GetCacheID(), err)
 	}
 
 	if found {
 		if err = p.updateSharedAllocations(grant); err != nil {
 			log.Warn("failed to update shared allocations affected by %s: %v",
-				container.GetCacheId(), err)
+				container.GetCacheID(), err)
 		}
 	}
 
@@ -158,7 +158,7 @@ func (p *policy) ReleaseResources(container cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (p *policy) UpdateResources(c cache.Container) error {
-	log.Debug("(not) updating container %s...", c.GetCacheId())
+	log.Debug("(not) updating container %s...", c.GetCacheID())
 	return nil
 }
 
@@ -183,9 +183,9 @@ func (p *policy) SetConfig(rawConf string) error {
 		return err
 	}
 
-	if opt.PinCpu != conf.PinCpu {
-		opt.PinCpu = conf.PinCpu
-		log.Info("pin containers to CPUs: %v", opt.PinCpu)
+	if opt.PinCPU != conf.PinCPU {
+		opt.PinCPU = conf.PinCPU
+		log.Info("pin containers to CPUs: %v", opt.PinCPU)
 	}
 
 	if opt.PinMem != conf.PinMem {
@@ -228,7 +228,7 @@ func (p *policy) discoverSystemTopology() error {
 
 // Check the constraints passed to us.
 func (p *policy) checkConstraints() error {
-	if c, ok := p.options.Available[policyapi.DomainCpu]; ok {
+	if c, ok := p.options.Available[policyapi.DomainCPU]; ok {
 		p.allowed = c.(cpuset.CPUSet)
 	} else {
 		// default to all online cpus
@@ -237,28 +237,29 @@ func (p *policy) checkConstraints() error {
 
 	p.isolated = p.sys.Isolated().Intersection(p.allowed)
 
-	if c, ok := p.options.Reserved[policyapi.DomainCpu]; !ok {
+	c, ok := p.options.Reserved[policyapi.DomainCPU]
+	if !ok {
 		return policyError("cannot start without CPU reservation")
-	} else {
-		switch c.(type) {
-		case cpuset.CPUSet:
-			p.reserved = c.(cpuset.CPUSet)
-			// check that all reserved CPUs are in the allowed set
-			if !p.reserved.Difference(p.allowed).IsEmpty() {
-				return policyError("invalid reserved cpuset %s, some CPUs (%s) are not "+
-					"part of the online allowed cpuset (%s)", p.reserved.String(),
-					p.reserved.Difference(p.allowed).String(), p.allowed.String())
-			}
-			// check that none of the reserved CPUs are isolated
-			if !p.reserved.Intersection(p.isolated).IsEmpty() {
-				return policyError("invalid reserved cpuset %s, some CPUs (%s) are also isolated",
-					p.reserved.Intersection(p.isolated).String())
-			}
+	}
 
-		case resapi.Quantity:
-			qty := c.(resapi.Quantity)
-			p.reserveCnt = (int(qty.MilliValue()) + 999) / 1000
+	switch c.(type) {
+	case cpuset.CPUSet:
+		p.reserved = c.(cpuset.CPUSet)
+		// check that all reserved CPUs are in the allowed set
+		if !p.reserved.Difference(p.allowed).IsEmpty() {
+			return policyError("invalid reserved cpuset %s, some CPUs (%s) are not "+
+				"part of the online allowed cpuset (%s)", p.reserved.String(),
+				p.reserved.Difference(p.allowed).String(), p.allowed.String())
 		}
+		// check that none of the reserved CPUs are isolated
+		if !p.reserved.Intersection(p.isolated).IsEmpty() {
+			return policyError("invalid reserved cpuset %s, some CPUs (%s) are also isolated",
+				p.reserved.Intersection(p.isolated).String())
+		}
+
+	case resapi.Quantity:
+		qty := c.(resapi.Quantity)
+		p.reserveCnt = (int(qty.MilliValue()) + 999) / 1000
 	}
 
 	return nil
@@ -285,7 +286,7 @@ func (p *policy) restoreCache() error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policyapi.PolicyOpts) policyapi.Backend
+type Implementation func(*policyapi.Options) policyapi.Backend
 
 // Name returns the name of this policy implementation.
 func (Implementation) Name() string {

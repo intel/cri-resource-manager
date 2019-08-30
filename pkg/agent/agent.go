@@ -43,7 +43,7 @@ type agent struct {
 	updater    configUpdater        // Client sending config updates to cri-resource-manager
 }
 
-// NewResourceManager creates a new instance of ResourceManagerAgent
+// NewResourceManagerAgent creates a new instance of ResourceManagerAgent
 func NewResourceManagerAgent() (ResourceManagerAgent, error) {
 	var err error
 

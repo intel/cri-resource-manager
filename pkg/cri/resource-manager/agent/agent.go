@@ -31,7 +31,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 )
 
-type AgentInterface interface {
+// Interface describe interfaces of cri-resource-manager agent
+type Interface interface {
 	GetNode(time.Duration) (core_v1.Node, error)
 	PatchNode([]*agent_v1.JsonPatch, time.Duration) error
 	UpdateNodeCapacity(map[string]string, time.Duration) error
@@ -52,14 +53,14 @@ type AgentInterface interface {
 	FindTaintIndex([]core_v1.Taint, *core_v1.Taint) (int, bool)
 }
 
-// agentInterface implements AgentInterface
+// agentInterface implements Interface
 type agentInterface struct {
 	cli agent_v1.AgentClient
 }
 
 // NewAgentInterface connects to cri-resource-manager-agent gRPC server
-// and return a new AgentInterface
-func NewAgentInterface(socket string) (AgentInterface, error) {
+// and return a new Interface
+func NewAgentInterface(socket string) (Interface, error) {
 	a := &agentInterface{}
 
 	dialOpts := []grpc.DialOption{
@@ -149,19 +150,19 @@ const (
 	PatchReplace string = "replace"
 )
 
-func PatchPath(class, key string) string {
+func patchPath(class, key string) string {
 	return "/metadata/" + class + "/" + strings.Replace(key, "/", "~1", -1)
 }
 
-func LabelPatchPath(key string) string {
-	return PatchPath("labels", key)
+func labelPatchPath(key string) string {
+	return patchPath("labels", key)
 }
 
-func AnnotationPatchPath(key string) string {
-	return PatchPath("annotations", key)
+func annotationPatchPath(key string) string {
+	return patchPath("annotations", key)
 }
 
-func TaintPatchPath(idx int) string {
+func taintPatchPath(idx int) string {
 	return fmt.Sprintf("/spec/taints/%d", idx)
 }
 
@@ -187,7 +188,7 @@ func (a *agentInterface) SetLabels(labels map[string]string, timeout time.Durati
 	patches := []*agent_v1.JsonPatch{}
 	for key, val := range labels {
 		patch := &agent_v1.JsonPatch{
-			Path:  LabelPatchPath(key),
+			Path:  labelPatchPath(key),
 			Value: val,
 		}
 		if _, ok := node.Labels[key]; ok {
@@ -218,7 +219,7 @@ func (a *agentInterface) RemoveLabels(keys []string, timeout time.Duration) erro
 		}
 		patch := &agent_v1.JsonPatch{
 			Op:   PatchRemove,
-			Path: LabelPatchPath(key),
+			Path: labelPatchPath(key),
 		}
 		patches = append(patches, patch)
 	}
@@ -250,7 +251,7 @@ func (a *agentInterface) SetAnnotations(annotations map[string]string, timeout t
 	patches := []*agent_v1.JsonPatch{}
 	for key, val := range annotations {
 		patch := &agent_v1.JsonPatch{
-			Path:  AnnotationPatchPath(key),
+			Path:  annotationPatchPath(key),
 			Value: val,
 		}
 		if _, ok := node.Annotations[key]; ok {
@@ -282,7 +283,7 @@ func (a *agentInterface) RemoveAnnotations(keys []string, timeout time.Duration)
 
 		patch := &agent_v1.JsonPatch{
 			Op:   PatchRemove,
-			Path: AnnotationPatchPath(key),
+			Path: annotationPatchPath(key),
 		}
 		patches = append(patches, patch)
 	}
@@ -327,7 +328,7 @@ func (a *agentInterface) SetTaints(taints []core_v1.Taint, timeout time.Duration
 		}
 		idx, found := findTaintIndex(node.Spec.Taints, &t)
 		patch := &agent_v1.JsonPatch{Value: string(value)}
-		patch.Path = TaintPatchPath(idx)
+		patch.Path = taintPatchPath(idx)
 		if !found {
 			patch.Op = PatchAdd
 		} else {
@@ -358,7 +359,7 @@ func (a *agentInterface) RemoveTaints(taints []core_v1.Taint, timeout time.Durat
 		if !found {
 			patch := &agent_v1.JsonPatch{
 				Op:   "remove",
-				Path: TaintPatchPath(idx),
+				Path: taintPatchPath(idx),
 			}
 			patches = append(patches, patch)
 		}

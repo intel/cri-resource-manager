@@ -40,10 +40,10 @@ type ResourceManager interface {
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay         // our CRI relay
-	cache        cache.Cache         // cached state
-	policy       policy.Policy       // resource manager policy
-	configServer config.ConfigServer // configuration management server
+	relay        relay.Relay   // our CRI relay
+	cache        cache.Cache   // cached state
+	policy       policy.Policy // resource manager policy
+	configServer config.Server // configuration management server
 }
 
 // NewResourceManager creates a new ResourceManager instance.

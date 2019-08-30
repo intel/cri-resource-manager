@@ -53,9 +53,9 @@ const (
 type stp struct {
 	logger.Logger
 
-	conf  *config              // STP policy configuration
-	state cache.Cache          // state cache
-	agent agent.AgentInterface // client connection to cri-resmgr agent gRPC server
+	conf  *config         // STP policy configuration
+	state cache.Cache     // state cache
+	agent agent.Interface // client connection to cri-resmgr agent gRPC server
 }
 
 var _ policy.Backend = &stp{}
@@ -74,7 +74,7 @@ func stringify(r interface{}) string {
 //
 
 // CreateStpPolicy creates a new policy instance.
-func CreateStpPolicy(opts *policy.PolicyOpts) policy.Backend {
+func CreateStpPolicy(opts *policy.Options) policy.Backend {
 	var err error
 	stp := &stp{Logger: logger.NewLogger(PolicyName), agent: opts.AgentCli}
 
@@ -144,7 +144,7 @@ func (stp *stp) Start(cch cache.Cache) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (stp *stp) AllocateResources(c cache.Container) error {
-	containerID := c.GetCacheId()
+	containerID := c.GetCacheID()
 	stp.Debug("allocating resources for container %s...", containerID)
 
 	cs := stpContainerStatus{Socket: -1}
@@ -217,14 +217,14 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (stp *stp) ReleaseResources(c cache.Container) error {
-	stp.Debug("releasing resources of container %s...", c.GetCacheId())
-	stp.releaseStpResources(c.GetCacheId())
+	stp.Debug("releasing resources of container %s...", c.GetCacheID())
+	stp.releaseStpResources(c.GetCacheID())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (stp *stp) UpdateResources(c cache.Container) error {
-	stp.Debug("updating resource allocations of container %s...", c.GetCacheId())
+	stp.Debug("updating resource allocations of container %s...", c.GetCacheID())
 	return nil
 }
 
@@ -434,7 +434,7 @@ func (stp *stp) allocateStpResources(c cache.Container, cs stpContainerStatus) e
 		CPULists = availableCPULists[i : i+1]
 	}
 
-	containerID := c.GetCacheId()
+	containerID := c.GetCacheID()
 	cpuset := ""
 	sep := ""
 	for _, cl := range CPULists {
@@ -551,7 +551,7 @@ func (stp *stp) setContainerRegistry(ccr *stpContainerCache) {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.PolicyOpts) policy.Backend
+type Implementation func(*policy.Options) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (i Implementation) Name() string {

@@ -28,24 +28,24 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/log"
 )
 
-// Callback function for SetConfig request
+// SetConfigCb is a callback function for SetConfig request
 type SetConfigCb func(*RawConfig) error
 
-// ConfigServer is the interface for our gRPC server.
-type ConfigServer interface {
+// Server is the interface for our gRPC server.
+type Server interface {
 	Start(string) error
 	Stop()
 }
 
-// server implements ConfigServer.
+// server implements Server.
 type server struct {
 	log.Logger
 	server      *grpc.Server // gRPC server instance
 	setConfigCb SetConfigCb
 }
 
-// NewConfigServer creates new ConfigServer instance.
-func NewConfigServer(cb SetConfigCb) (ConfigServer, error) {
+// NewConfigServer creates new Server instance.
+func NewConfigServer(cb SetConfigCb) (Server, error) {
 	s := &server{
 		Logger:      log.NewLogger("config-server"),
 		setConfigCb: cb,
@@ -82,7 +82,7 @@ func (s *server) Start(socket string) error {
 
 }
 
-// Stop ConfigServer instance
+// Stop Server instance
 func (s *server) Stop() {
 	s.server.Stop()
 }

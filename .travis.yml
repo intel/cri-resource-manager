@@ -17,15 +17,11 @@ sudo: required
 
 before_install:
   ## checkers
-  - go get -v golang.org/x/lint/golint
-  - go get -v github.com/fzipp/gocyclo
-  - go get -v golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow
+  - curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(go env GOPATH)/bin v1.18.0
 
 script:
   - make format
-  # - make lint
-  # - make vet
-  # - make cyclomatic-check
+  - make golangci-lint
   - make
   - make test
 

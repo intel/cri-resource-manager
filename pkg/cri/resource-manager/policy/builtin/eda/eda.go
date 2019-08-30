@@ -48,7 +48,7 @@ var _ policy.Backend = &eda{}
 //
 
 // CreateEdaPolicy creates a new policy instance.
-func CreateEdaPolicy(opts *policy.PolicyOpts) policy.Backend {
+func CreateEdaPolicy(opts *policy.Options) policy.Backend {
 	eda := &eda{Logger: logger.NewLogger(PolicyName)}
 	eda.Info("creating policy...")
 	// TODO: policy configuration (if any)
@@ -73,7 +73,7 @@ func (eda *eda) Start(cch cache.Cache) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (eda *eda) AllocateResources(c cache.Container) error {
-	containerID := c.GetCacheId()
+	containerID := c.GetCacheID()
 	eda.Debug("allocating resources for container %s...", containerID)
 
 	// Allocate (CPU) resources for the container
@@ -99,13 +99,13 @@ func (eda *eda) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (eda *eda) ReleaseResources(c cache.Container) error {
-	eda.Debug("releasing resources of container %s...", c.GetCacheId())
+	eda.Debug("releasing resources of container %s...", c.GetCacheID())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (eda *eda) UpdateResources(c cache.Container) error {
-	eda.Debug("updating resource allocations of container %s...", c.GetCacheId())
+	eda.Debug("updating resource allocations of container %s...", c.GetCacheID())
 	return nil
 }
 
@@ -136,7 +136,7 @@ func edaError(format string, args ...interface{}) error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.PolicyOpts) policy.Backend
+type Implementation func(*policy.Options) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (i Implementation) Name() string {

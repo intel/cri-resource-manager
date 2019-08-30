@@ -35,11 +35,11 @@ const (
 func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
 	cfg := req.Config
 	if cfg == nil {
-		return cacheError("pod %s has no config", p.Id)
+		return cacheError("pod %s has no config", p.ID)
 	}
 	meta := cfg.Metadata
 	if meta == nil {
-		return cacheError("pod %s has no request metadata", p.Id)
+		return cacheError("pod %s has no request metadata", p.ID)
 	}
 
 	p.Name = meta.Name
@@ -59,7 +59,7 @@ func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
 func (p *pod) fromListResponse(pod *cri.PodSandbox) error {
 	meta := pod.Metadata
 	if meta == nil {
-		return cacheError("pod %s has no reply metadata", p.Id)
+		return cacheError("pod %s has no reply metadata", p.ID)
 	}
 
 	p.Name = meta.Name
@@ -83,7 +83,7 @@ func (p *pod) GetInitContainers() []Container {
 	containers := []Container{}
 
 	for _, c := range p.cache.Containers {
-		if _, ok := p.Resources.InitContainers[c.Id]; ok {
+		if _, ok := p.Resources.InitContainers[c.ID]; ok {
 			containers = append(containers, c)
 		}
 	}
@@ -97,7 +97,7 @@ func (p *pod) GetContainers() []Container {
 
 	for _, c := range p.cache.Containers {
 		if p.Resources != nil {
-			if _, ok := p.Resources.Containers[c.Id]; !ok {
+			if _, ok := p.Resources.Containers[c.ID]; !ok {
 				continue
 			}
 		}
@@ -109,13 +109,13 @@ func (p *pod) GetContainers() []Container {
 }
 
 // Get the id of a pod.
-func (p *pod) GetId() string {
-	return p.Id
+func (p *pod) GetID() string {
+	return p.ID
 }
 
 // Get the (k8s) unique id of a pod.
-func (p *pod) GetUid() string {
-	return p.Uid
+func (p *pod) GetUID() string {
+	return p.UID
 }
 
 // Get the name of a pod.
@@ -261,9 +261,9 @@ func (p *pod) GetPodResourceRequirements() PodResourceRequirements {
 func (p *pod) extractLabels() {
 	uid, ok := p.GetLabel(kubetypes.KubernetesPodUIDLabel)
 	if !ok {
-		p.cache.Warn("can't find (k8s) uid label for pod %s", p.Id)
+		p.cache.Warn("can't find (k8s) uid label for pod %s", p.ID)
 	}
-	p.Uid = uid
+	p.UID = uid
 }
 
 // Parse per container resource requirements from webhook annotations.

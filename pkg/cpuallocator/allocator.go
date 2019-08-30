@@ -43,8 +43,8 @@ const (
 	debugFlag = "cpu-allocator-debug"
 )
 
-// CpuAllocator encapsulates state for allocating CPUs.
-type CpuAllocator struct {
+// CPUAllocator encapsulates state for allocating CPUs.
+type CPUAllocator struct {
 	logger.Logger               // allocator logger instance
 	sys           *sysfs.System // sysfs CPU and topology information
 	flags         AllocFlag     // allocation preferences
@@ -54,7 +54,7 @@ type CpuAllocator struct {
 	offline       cpuset.CPUSet // set of CPUs currently offline
 
 	pkgs []sysfs.Package // physical CPU packages, sorted by preference
-	cpus []sysfs.Cpu     // CPU cores, sorted by preference
+	cpus []sysfs.CPU     // CPU cores, sorted by preference
 }
 
 // A singleton wrapper around sysfs.System.
@@ -63,9 +63,9 @@ type sysfsSingleton struct {
 	sys       *sysfs.System // wrapped sysfs.System instance
 	err       error         // error during recovery
 	cpusets   struct {      // cached cpusets per
-		pkg  map[sysfs.Id]cpuset.CPUSet // package,
-		node map[sysfs.Id]cpuset.CPUSet // node, and
-		core map[sysfs.Id]cpuset.CPUSet // CPU core
+		pkg  map[sysfs.ID]cpuset.CPUSet // package,
+		node map[sysfs.ID]cpuset.CPUSet // node, and
+		core map[sysfs.ID]cpuset.CPUSet // CPU core
 	}
 }
 
@@ -76,11 +76,11 @@ func init() {
 	flag.BoolVar(&debug, debugFlag, false, "enable CPU allocator debug log")
 }
 
-// IdFilter helps filtering Ids.
-type IdFilter func(sysfs.Id) bool
+// IDFilter helps filtering Ids.
+type IDFilter func(sysfs.ID) bool
 
-// IdSorter helps sorting Ids.
-type IdSorter func(int, int) bool
+// IDSorter helps sorting Ids.
+type IDSorter func(int, int) bool
 
 // our logger instance
 var log = logger.NewLogger(logSource)
@@ -88,17 +88,17 @@ var log = logger.NewLogger(logSource)
 // Get/discover sysfs.System.
 func (s *sysfsSingleton) get() (*sysfs.System, error) {
 	s.Do(func() {
-		s.sys, s.err = sysfs.DiscoverSystem(sysfs.DiscoverCpuTopology)
-		s.cpusets.pkg = make(map[sysfs.Id]cpuset.CPUSet)
-		s.cpusets.node = make(map[sysfs.Id]cpuset.CPUSet)
-		s.cpusets.core = make(map[sysfs.Id]cpuset.CPUSet)
+		s.sys, s.err = sysfs.DiscoverSystem(sysfs.DiscoverCPUTopology)
+		s.cpusets.pkg = make(map[sysfs.ID]cpuset.CPUSet)
+		s.cpusets.node = make(map[sysfs.ID]cpuset.CPUSet)
+		s.cpusets.core = make(map[sysfs.ID]cpuset.CPUSet)
 	})
 
 	return s.sys, s.err
 }
 
 // PackageCPUSet gets the CPUSet for the given package.
-func (s *sysfsSingleton) PackageCPUSet(id sysfs.Id) cpuset.CPUSet {
+func (s *sysfsSingleton) PackageCPUSet(id sysfs.ID) cpuset.CPUSet {
 	if cset, ok := s.cpusets.pkg[id]; ok {
 		return cset
 	}
@@ -110,7 +110,7 @@ func (s *sysfsSingleton) PackageCPUSet(id sysfs.Id) cpuset.CPUSet {
 }
 
 // NodeCPUSet gets the CPUSet for the given node.
-func (s *sysfsSingleton) NodeCPUSet(id sysfs.Id) cpuset.CPUSet {
+func (s *sysfsSingleton) NodeCPUSet(id sysfs.ID) cpuset.CPUSet {
 	if cset, ok := s.cpusets.node[id]; ok {
 		return cset
 	}
@@ -122,22 +122,22 @@ func (s *sysfsSingleton) NodeCPUSet(id sysfs.Id) cpuset.CPUSet {
 }
 
 // CoreCPUSet gets the CPUSet for the given core.
-func (s *sysfsSingleton) CoreCPUSet(id sysfs.Id) cpuset.CPUSet {
+func (s *sysfsSingleton) CoreCPUSet(id sysfs.ID) cpuset.CPUSet {
 	if cset, ok := s.cpusets.core[id]; ok {
 		return cset
 	}
 
-	cset := s.sys.Cpu(id).ThreadCPUSet()
+	cset := s.sys.CPU(id).ThreadCPUSet()
 	for _, cid := range cset.ToSlice() {
-		s.cpusets.core[sysfs.Id(cid)] = cset
+		s.cpusets.core[sysfs.ID(cid)] = cset
 	}
 
 	return cset
 }
 
 // Pick packages, nodes or CPUs by filtering according to a function.
-func (s *sysfsSingleton) pick(idSlice []sysfs.Id, f IdFilter) []sysfs.Id {
-	ids := make([]sysfs.Id, len(idSlice))
+func (s *sysfsSingleton) pick(idSlice []sysfs.ID, f IDFilter) []sysfs.ID {
+	ids := make([]sysfs.ID, len(idSlice))
 
 	idx := 0
 	for _, id := range idSlice {
@@ -150,8 +150,8 @@ func (s *sysfsSingleton) pick(idSlice []sysfs.Id, f IdFilter) []sysfs.Id {
 	return ids[0:idx]
 }
 
-// NewCpuAllocator creates a new CPU allocator.
-func NewCpuAllocator(sys *sysfs.System) *CpuAllocator {
+// NewCPUAllocator creates a new CPU allocator.
+func NewCPUAllocator(sys *sysfs.System) *CPUAllocator {
 	if sys == nil {
 		sys, _ = system.get()
 	}
@@ -159,7 +159,7 @@ func NewCpuAllocator(sys *sysfs.System) *CpuAllocator {
 		return nil
 	}
 
-	a := &CpuAllocator{
+	a := &CPUAllocator{
 		Logger: log,
 		sys:    sys,
 		flags:  AllocDefault,
@@ -168,7 +168,7 @@ func NewCpuAllocator(sys *sysfs.System) *CpuAllocator {
 	return a
 }
 
-func (a *CpuAllocator) debug(format string, args ...interface{}) {
+func (a *CPUAllocator) debug(format string, args ...interface{}) {
 	if !debug {
 		return
 	}
@@ -177,14 +177,14 @@ func (a *CpuAllocator) debug(format string, args ...interface{}) {
 }
 
 // Allocate full idle CPU packages.
-func (a *CpuAllocator) takeIdlePackages() {
+func (a *CPUAllocator) takeIdlePackages() {
 	a.Debug("* takeIdlePackages()...")
 
 	offline := a.sys.Offlined()
 
 	// pick idle packages
-	pkgs := system.pick(a.sys.PackageIds(),
-		func(id sysfs.Id) bool {
+	pkgs := system.pick(a.sys.PackageIDs(),
+		func(id sysfs.ID) bool {
 			cset := system.PackageCPUSet(id).Difference(offline)
 			return cset.Intersection(a.from).Equals(cset)
 		})
@@ -215,14 +215,14 @@ func (a *CpuAllocator) takeIdlePackages() {
 }
 
 // Allocate full idle CPU cores.
-func (a *CpuAllocator) takeIdleCores() {
+func (a *CPUAllocator) takeIdleCores() {
 	a.Debug("* takeIdleCores()...")
 
 	offline := a.sys.Offlined()
 
 	// pick (first id for all) idle cores
-	cores := system.pick(a.sys.CpuIds(),
-		func(id sysfs.Id) bool {
+	cores := system.pick(a.sys.CPUIDs(),
+		func(id sysfs.ID) bool {
 			cset := system.CoreCPUSet(id).Difference(offline)
 			return cset.Intersection(a.from).Equals(cset) && cset.ToSlice()[0] == int(id)
 		})
@@ -253,12 +253,12 @@ func (a *CpuAllocator) takeIdleCores() {
 }
 
 // Allocate idle CPU hyperthreads.
-func (a *CpuAllocator) takeIdleThreads() {
+func (a *CPUAllocator) takeIdleThreads() {
 	offline := a.sys.Offlined()
 
 	// pick all threads with free capacity
-	cores := system.pick(a.sys.CpuIds(),
-		func(id sysfs.Id) bool {
+	cores := system.pick(a.sys.CPUIDs(),
+		func(id sysfs.ID) bool {
 			return a.from.Difference(offline).Contains(int(id))
 		})
 
@@ -275,8 +275,8 @@ func (a *CpuAllocator) takeIdleThreads() {
 		func(i, j int) bool {
 			iCore := cores[i]
 			jCore := cores[j]
-			iPkg := a.sys.Cpu(iCore).PackageId()
-			jPkg := a.sys.Cpu(jCore).PackageId()
+			iPkg := a.sys.CPU(iCore).PackageID()
+			jPkg := a.sys.CPU(jCore).PackageID()
 
 			iCoreSet := system.CoreCPUSet(iCore)
 			jCoreSet := system.CoreCPUSet(jCore)
@@ -328,7 +328,7 @@ func (a *CpuAllocator) takeIdleThreads() {
 }
 
 // Perform CPU allocation.
-func (a *CpuAllocator) allocate() cpuset.CPUSet {
+func (a *CPUAllocator) allocate() cpuset.CPUSet {
 	if (a.flags & AllocIdlePackages) != 0 {
 		a.takeIdlePackages()
 
@@ -363,7 +363,7 @@ func allocateCpus(from *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
 	case from.Size() == cnt:
 		result, err, *from = from.Clone(), nil, cpuset.NewCPUSet()
 	default:
-		a := NewCpuAllocator(nil)
+		a := NewCPUAllocator(nil)
 		a.from = from.Clone()
 		a.cnt = cnt
 

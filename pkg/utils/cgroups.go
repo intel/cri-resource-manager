@@ -25,11 +25,11 @@ import (
 )
 
 const (
-	IntelRdtTasks   = "tasks"
-	CpusetCgroupDir = "/sys/fs/cgroup/cpuset/"
+	intelRdtTasks   = "tasks"
+	cpusetCgroupDir = "/sys/fs/cgroup/cpuset/"
 )
 
-// Find container path in one specified subsystem directory
+// GetContainerCgroupDir finds container path in one specified subsystem directory
 func GetContainerCgroupDir(subsystemDir, containerID string) string {
 	var containerDir string
 
@@ -56,8 +56,8 @@ func GetProcessInContainer(cgroupParentDir, containerID string) ([]int, error) {
 	// Probe known per-container directories, in order of decreasing probability
 	if cgroupParentDir != "" {
 		dirs := []string{
-			filepath.Join(CpusetCgroupDir, cgroupParentDir, "docker-"+containerID+".scope"),
-			filepath.Join(CpusetCgroupDir, cgroupParentDir, containerID),
+			filepath.Join(cpusetCgroupDir, cgroupParentDir, "docker-"+containerID+".scope"),
+			filepath.Join(cpusetCgroupDir, cgroupParentDir, containerID),
 		}
 		for _, d := range dirs {
 			info, err := os.Stat(d)
@@ -70,14 +70,14 @@ func GetProcessInContainer(cgroupParentDir, containerID string) ([]int, error) {
 
 	// Try generic way to search container directory under one cgroups subsytem directory
 	if containerDir == "" {
-		containerDir = GetContainerCgroupDir(CpusetCgroupDir, containerID)
+		containerDir = GetContainerCgroupDir(cpusetCgroupDir, containerID)
 		if containerDir == "" {
 			return pids, fmt.Errorf("failed to find corresponding cgroups directory for container %s", containerID)
 		}
 	}
 
 	// Find all processes listed in cgroup tasks file and apply to RDT CLOS
-	cgroupTasksFileName := path.Join(containerDir, IntelRdtTasks)
+	cgroupTasksFileName := path.Join(containerDir, intelRdtTasks)
 
 	file, err := os.Open(cgroupTasksFileName)
 	if err != nil {
