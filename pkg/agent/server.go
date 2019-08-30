@@ -29,7 +29,7 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
 
-	"github.com/intel/cri-resource-manager/pkg/agent/api/v1"
+	v1 "github.com/intel/cri-resource-manager/pkg/agent/api/v1"
 	"github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -155,7 +155,7 @@ func (g *grpcServer) UpdateNodeCapacity(ctx context.Context, req *v1.UpdateNodeC
 			return rpl, err
 		}
 
-		capacity += sep + fmt.Sprintf(`"%s": "%d"`, name, count)
+		capacity += sep + fmt.Sprintf(`"%s": "%s"`, name, count)
 		sep = ", "
 	}
 

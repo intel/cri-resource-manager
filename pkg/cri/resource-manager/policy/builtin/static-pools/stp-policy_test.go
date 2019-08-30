@@ -42,20 +42,20 @@ func TestParseContainerCmdline(t *testing.T) {
 	}
 
 	// 3. we should ignore unknown cmk options
-	args = cmk.parseContainerCmdline([]string{"cmk", "isolate", "--invalid-1=inv1", "--pool", "foo", "--invalid-2=inv2", "cmd", "--arg"}, []string{})
+	args = stp.parseContainerCmdline([]string{"cmk", "isolate", "--invalid-1=inv1", "--pool", "foo", "--invalid-2=inv2", "cmd", "--arg"}, []string{})
 	expected = cmkLegacyArgs{Pool: "foo", SocketID: -1, Command: []string{"cmd", "--arg"}}
 	if args == nil || !cmp.Equal(expected, *args) {
 		t.Errorf("Exptected %v but got %v", expected, *args)
 	}
 
 	// 4. --pool should be defined in cmk options
-	args = cmk.parseContainerCmdline([]string{"cmk", "isolate", "--socket-id=2", "cmd", "--arg"}, []string{})
+	args = stp.parseContainerCmdline([]string{"cmk", "isolate", "--socket-id=2", "cmd", "--arg"}, []string{})
 	if args != nil {
 		t.Errorf("Exptected <nil> but got %v", *args)
 	}
 
 	// 5. parsing from container "Args"
-	args = cmk.parseContainerCmdline([]string{"bash"}, []string{"-c", "cmk isolate --pool=foo --socket-id=2 cmd --arg"})
+	args = stp.parseContainerCmdline([]string{"bash"}, []string{"-c", "cmk isolate --pool=foo --socket-id=2 cmd --arg"})
 	expected = cmkLegacyArgs{Pool: "foo", SocketID: 2, Command: []string{"cmd", "--arg"}}
 	if args == nil || !cmp.Equal(expected, *args) {
 		t.Errorf("Exptected %v but got %v", expected, *args)

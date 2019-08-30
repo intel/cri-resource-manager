@@ -5,6 +5,10 @@ dist: bionic
 go:
   - 1.12.x
 
+env:
+  global:
+    - GO111MODULE=on
+
 cache:
   directories:
     - $GOPATH/pkg/mod
@@ -23,7 +27,7 @@ script:
   # - make vet
   # - make cyclomatic-check
   - make
-  #- make test
+  - make test
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
