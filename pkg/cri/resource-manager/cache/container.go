@@ -509,6 +509,10 @@ func (c *container) DeleteDevice(path string) {
 	}
 }
 
+func (c *container) GetTopologyHints() sysfs.TopologyHints {
+	return c.TopologyHints
+}
+
 func (c *container) GetCpuPeriod() int64 {
 	if c.LinuxReq == nil {
 		return 0

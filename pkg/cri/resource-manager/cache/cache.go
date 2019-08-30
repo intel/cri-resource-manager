@@ -197,6 +197,9 @@ type Container interface {
 	// DeleteDevice removes a device from the container.
 	DeleteDevice(string)
 
+	// Get any attached topology hints.
+	GetTopologyHints() sysfs.TopologyHints
+
 	// GetCpuPeriod gets the CFS CPU period of the container.
 	GetCpuPeriod() int64
 	// GetCpuQuota gets the CFS CPU quota of the container.
