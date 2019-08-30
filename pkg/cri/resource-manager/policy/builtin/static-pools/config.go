@@ -186,7 +186,7 @@ func validateCPUList(name string) error {
 	// check that the actual numbers make sense, i.e. that numbers are in
 	// ascending order
 	if !cpusetValidationRe.MatchString(name) {
-		fmt.Errorf("%q does not look like a cpuset", name)
+		return fmt.Errorf("%q does not look like a cpuset", name)
 	}
 	return nil
 }
