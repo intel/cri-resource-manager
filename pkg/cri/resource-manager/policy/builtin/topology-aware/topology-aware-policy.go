@@ -39,19 +39,19 @@ type allocations struct {
 
 // policy is our runtime state for the topology aware policy.
 type policy struct {
-	options     policyapi.Options // options we were created or reconfigured with
-	cache       cache.Cache       // pod/container cache
-	sys         *system.System    // system/HW topology info
-	allowed     cpuset.CPUSet     // bounding set of CPUs we're allowed to use
-	reserved    cpuset.CPUSet     // system-/kube-reserved CPUs
-	reserveCnt  int               // number of CPUs to reserve if given as resource.Quantity
-	isolated    cpuset.CPUSet     // (our allowed set of) isolated CPUs
-	nodes       map[string]Node   // pool nodes by name
-	pools       []Node            // pre-populated node slice for scoring, etc...
-	root        Node              // root of our pool/partition tree
-	nodeCnt     int               // number of pools
-	depth       int               // tree depth
-	allocations allocations       // container pool assignments
+	options     policyapi.BackendOptions // options we were created or reconfigured with
+	cache       cache.Cache              // pod/container cache
+	sys         *system.System           // system/HW topology info
+	allowed     cpuset.CPUSet            // bounding set of CPUs we're allowed to use
+	reserved    cpuset.CPUSet            // system-/kube-reserved CPUs
+	reserveCnt  int                      // number of CPUs to reserve if given as resource.Quantity
+	isolated    cpuset.CPUSet            // (our allowed set of) isolated CPUs
+	nodes       map[string]Node          // pool nodes by name
+	pools       []Node                   // pre-populated node slice for scoring, etc...
+	root        Node                     // root of our pool/partition tree
+	nodeCnt     int                      // number of pools
+	depth       int                      // tree depth
+	allocations allocations              // container pool assignments
 
 }
 
@@ -59,7 +59,7 @@ type policy struct {
 var _ policyapi.Backend = &policy{}
 
 // CreateTopologyAwarePolicy creates a new policy instance.
-func CreateTopologyAwarePolicy(opts *policyapi.Options) policyapi.Backend {
+func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 	p := &policy{options: *opts}
 
 	p.nodes = make(map[string]Node)
@@ -319,7 +319,7 @@ func (p *policy) restoreCache() error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policyapi.Options) policyapi.Backend
+type Implementation func(*policyapi.BackendOptions) policyapi.Backend
 
 // Name returns the name of this policy implementation.
 func (Implementation) Name() string {

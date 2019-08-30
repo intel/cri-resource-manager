@@ -50,3 +50,13 @@ func (c *RawConfig) HasIdenticalData(data map[string]string) bool {
 
 	return true
 }
+
+// Get returns one config section
+func (c *RawConfig) Get(key string) string {
+	if c.Data != nil {
+		if value, ok := c.Data[key]; ok {
+			return value
+		}
+	}
+	return defaultConfig(key)
+}

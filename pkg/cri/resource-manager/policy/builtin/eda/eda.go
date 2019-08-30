@@ -48,7 +48,7 @@ var _ policy.Backend = &eda{}
 //
 
 // CreateEdaPolicy creates a new policy instance.
-func CreateEdaPolicy(opts *policy.Options) policy.Backend {
+func CreateEdaPolicy(opts *policy.BackendOptions) policy.Backend {
 	eda := &eda{Logger: logger.NewLogger(PolicyName)}
 	eda.Info("creating policy...")
 	// TODO: policy configuration (if any)
@@ -149,7 +149,7 @@ func edaError(format string, args ...interface{}) error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.Options) policy.Backend
+type Implementation func(*policy.BackendOptions) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (i Implementation) Name() string {

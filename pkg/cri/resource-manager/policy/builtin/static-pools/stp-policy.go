@@ -74,7 +74,7 @@ func stringify(r interface{}) string {
 //
 
 // CreateStpPolicy creates a new policy instance.
-func CreateStpPolicy(opts *policy.Options) policy.Backend {
+func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	var err error
 	stp := &stp{Logger: logger.NewLogger(PolicyName), agent: opts.AgentCli}
 
@@ -568,7 +568,7 @@ func (stp *stp) setContainerRegistry(ccr *stpContainerCache) {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.Options) policy.Backend
+type Implementation func(*policy.BackendOptions) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (i Implementation) Name() string {

@@ -34,7 +34,7 @@ type none struct {
 var _ policy.Backend = &none{}
 
 // CreateNonePolicy creates a new policy instance.
-func CreateNonePolicy(opts *policy.Options) policy.Backend {
+func CreateNonePolicy(opts *policy.BackendOptions) policy.Backend {
 	n := &none{Logger: logger.NewLogger(PolicyName)}
 	n.Info("creating policy...")
 	return n
@@ -100,7 +100,7 @@ func (n *none) SetConfig(string) error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.Options) policy.Backend
+type Implementation func(*policy.BackendOptions) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (n Implementation) Name() string {

@@ -71,7 +71,7 @@ type staticplus struct {
 var _ policy.Backend = &staticplus{}
 
 // CreateStaticPlusPolicy creates a new policy instance.
-func CreateStaticPlusPolicy(opts *policy.Options) policy.Backend {
+func CreateStaticPlusPolicy(opts *policy.BackendOptions) policy.Backend {
 	p := &staticplus{
 		Logger: logger.NewLogger(PolicyName),
 	}
@@ -763,7 +763,7 @@ func MilliCPUToShares(milliCPU int) int64 {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.Options) policy.Backend
+type Implementation func(*policy.BackendOptions) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (n Implementation) Name() string {

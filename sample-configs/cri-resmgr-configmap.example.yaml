@@ -48,4 +48,28 @@ data:
         - Cpuset: 28,29,30,31
           Socket: 3
         exclusive: false
-
+  rdt: |+
+    # This example config specifies three RDT classes (or resctrl groups) with L3
+    # CAT configured
+    resctrlGroups:
+      Guaranteed:
+        l3schema:
+          all: "100%"
+    # Specify CacheId (typically correspons CPU socket) specific setting
+    #      1: "80%"
+    # MBA (Memory Bandwidth Allocation)
+    #    mbschema:
+    #      all: 100
+    #      1-3: 80
+      Burstable:
+        l3schema:
+          all: "66%"
+    # MBA (Memory Bandwidth Allocation)
+    #    mbschema:
+    #      all: 66
+      BestEffort:
+        l3schema:
+          all: "33%"
+    # MBA (Memory Bandwidth Allocation)
+    #    mbschema:
+    #      all: 33
