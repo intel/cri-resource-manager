@@ -90,8 +90,6 @@ func (a *agent) Run() error {
 		config := <-a.watcher.ConfigChan()
 		a.updater.Update(&config)
 	}
-
-	return nil
 }
 
 func agentError(format string, args ...interface{}) error {

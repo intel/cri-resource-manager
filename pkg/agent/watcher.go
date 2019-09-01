@@ -143,7 +143,6 @@ func (w *watcher) watch() error {
 			}
 		}
 	}
-	return nil
 }
 
 func (w *watcher) handleEvent(event watch.Event) error {
