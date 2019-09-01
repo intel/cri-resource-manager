@@ -57,6 +57,9 @@ lint:
 fluff:
 	@rc=0 ; for f in $$(find -name \*.go | grep -v \.\/vendor) ; do $(GOFLUFF) $(GOFLUFF_DEBUG) $(GOFLUFF_WHITELIST) -set_exit_status $$f || rc=1 ; done ; exit $$rc
 
+test:
+	@$(GO) test -race -coverprofile=coverage.txt -covermode=atomic $(shell $(GO) list ./... | grep -v vendor)
+
 # clean the given commands
 clean:
 	@for cmd in $(COMMANDS); do \
@@ -115,4 +118,4 @@ check-git-hooks:
 	    echo "done."; \
 	fi
 
-.PHONY: all build format vet cyclomatic-check lint clean images $(COMMANDS) $(IMAGES)
+.PHONY: all build format vet cyclomatic-check lint test clean images $(COMMANDS) $(IMAGES)
