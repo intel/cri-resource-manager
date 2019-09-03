@@ -81,7 +81,7 @@ func (u *updater) Start() error {
 			u.Debug("sending SetConfig request to cri-resmgr")
 			_, err := u.resmgrCli.SetConfig(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
 			if err != nil {
-				u.Warning("failed to update cri-resmgr config: %v", err)
+				u.Warn("failed to update cri-resmgr config: %v", err)
 				time.Sleep(1 * time.Second)
 			} else {
 				c = nil

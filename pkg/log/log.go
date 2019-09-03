@@ -39,7 +39,6 @@ const (
 type Logger interface {
 	Info(format string, args ...interface{})
 	Warn(format string, args ...interface{})
-	Warning(format string, args ...interface{})
 	Error(format string, args ...interface{})
 	Fatal(format string, args ...interface{})
 	Panic(format string, args ...interface{})
@@ -165,14 +164,6 @@ func (l *logger) Warn(format string, args ...interface{}) {
 	opt.active.Warn(l.formatMessage(format, args...))
 }
 
-// Emit a warning message.
-func (l *logger) Warning(format string, args ...interface{}) {
-	if !l.passthrough(LevelWarn) {
-		return
-	}
-	opt.active.Warn(l.formatMessage(format, args...))
-}
-
 // Emit an error message.
 func (l *logger) Error(format string, args ...interface{}) {
 	if !l.passthrough(LevelError) {
@@ -209,11 +200,6 @@ func Info(format string, args ...interface{}) {
 
 // Emit a warning message with the default source.
 func Warn(format string, args ...interface{}) {
-	defLogger.Warn(format, args...)
-}
-
-// Emit a warning message with the default source.
-func Warning(format string, args ...interface{}) {
 	defLogger.Warn(format, args...)
 }
 

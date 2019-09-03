@@ -405,7 +405,7 @@ func (stp *stp) allocateStpResources(c cache.Container, cs stpContainerStatus) e
 		if ok {
 			iNumCores, err := strconv.ParseInt(envNumCores, 10, 64)
 			if err != nil || iNumCores != cs.NExclusiveCPUs {
-				stp.Warning("Ignoring deprecated env variable setting, %s=%q does "+
+				stp.Warn("Ignoring deprecated env variable setting, %s=%q does "+
 					"not match the number of cores (%d) from resource request",
 					CmkEnvNumCores, envNumCores, cs.NExclusiveCPUs)
 			}

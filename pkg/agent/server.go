@@ -186,7 +186,7 @@ func (g *grpcServer) GetConfig(ctx context.Context, req *v1.GetConfigRequest) (*
 	if g.getConfig != nil {
 		rpl.Config = g.getConfig()
 	} else {
-		g.Warning("no getter method configured, returning empty config!")
+		g.Warn("no getter method configured, returning empty config!")
 	}
 	return rpl, nil
 }
