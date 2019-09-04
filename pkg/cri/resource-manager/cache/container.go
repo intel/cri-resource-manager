@@ -16,6 +16,7 @@ package cache
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -69,7 +70,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Relabel:     m.SelinuxRelabel,
 			Propagation: MountType(m.Propagation),
 		}
-		if hints := getTopologyHints(m.HostPath, m.ContainerPath); len(hints) > 0 {
+		if hints := getTopologyHints(m.HostPath, m.ContainerPath, m.Readonly); len(hints) > 0 {
 			c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, hints)
 		}
 	}
@@ -81,7 +82,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Host:        d.HostPath,
 			Permissions: d.Permissions,
 		}
-		if hints := getTopologyHints(d.HostPath, d.ContainerPath); len(hints) > 0 {
+		if hints := getTopologyHints(d.HostPath, d.ContainerPath, strings.IndexAny(d.Permissions, "wm") == -1); len(hints) > 0 {
 			c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, hints)
 		}
 	}
@@ -644,15 +645,34 @@ func quotaToMilliCpu(quota, period int64) int64 {
 	return milliCpu
 }
 
-func getTopologyHints(hostPath, containerPath string) (ret sysfs.TopologyHints) {
-	// ignore topology information for small files in /etc, service files in /var/lib/kubelet and host libraries mounts
-	ignoredTopologyHostPaths := []string{"/etc/", "/var/lib/kubelet/", "/lib/", "/lib64/", "/usr/lib/", "/usr/lib32/", "/usr/lib64/"}
+func getTopologyHints(hostPath, containerPath string, readOnly bool) (ret sysfs.TopologyHints) {
+	if readOnly {
+		// if device or path is read-only, assume it as non-important for now
+		// TODO: determine topology hint, but use it with low priority
+		return
+	}
 
-	for _, path := range ignoredTopologyHostPaths {
+	// ignore topology information for small files in /etc, service files in /var/lib/kubelet and host libraries mounts
+	ignoredTopologyPaths := []string{"/.cri-resmgr", "/etc/", "/dev/termination-log", "/lib/", "/lib64/", "/usr/lib/", "/usr/lib32/", "/usr/lib64/"}
+
+	for _, path := range ignoredTopologyPaths {
 		if strings.HasPrefix(hostPath, path) || strings.HasPrefix(containerPath, path) {
 			return
 		}
 	}
+
+	// More complext rules, for Kubelet secrets and config maps
+	ignoredTopologyPathRegexps := []*regexp.Regexp{
+		// Kubelet directory can be different, but we can detect it by structure inside of it.
+		// For now, we can safely ignore exposed config maps and secrets for topology hints.
+		regexp.MustCompile(`(kubelet)?/pods/[[:xdigit:]-]+/volumes/kubernetes.io~(configmap|secret)/`),
+	}
+	for _, re := range ignoredTopologyPathRegexps {
+		if re.MatchString(hostPath) || re.MatchString(containerPath) {
+			return
+		}
+	}
+
 	if devPath, err := sysfs.FindSysFsDevice(hostPath); err == nil {
 		if hints, err := sysfs.NewTopologyHints(devPath); err == nil && len(hints) > 0 {
 			ret = sysfs.MergeTopologyHints(ret, hints)
