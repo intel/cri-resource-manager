@@ -385,7 +385,7 @@ func (s *static) allocateCPUs(numCPUs int, containerID string) (cpuset.CPUSet, e
 }
 
 func (s *static) guaranteedCPUs(pod cache.Pod, container cache.Container) int {
-	qos := pod.GetPodQOS()
+	qos := pod.GetQOSClass()
 
 	s.Debug("* QoS class for pod %s (%s) is %s", pod.GetId(), pod.GetName(), qos)
 

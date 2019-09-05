@@ -63,15 +63,17 @@ type Pod interface {
 	GetName() string
 	GetNamespace() string
 	GetState() PodState
+	GetQOSClass() v1.PodQOSClass
+
 	GetLabelKeys() []string
 	GetLabel(string) (string, bool)
 	GetAnnotationKeys() []string
 	GetAnnotation(key string) (string, bool)
 	GetAnnotationObject(key string, objPtr interface{},
 		decode func([]byte, interface{}) error) (bool, error)
+
 	GetCgroupParentDir() string
 	GetPodResourceRequirements() PodResourceRequirements
-	GetPodQOS() v1.PodQOSClass
 }
 
 // A cached pod.
@@ -82,11 +84,11 @@ type pod struct {
 	Name         string            // pod sandbox name
 	Namespace    string            // pod namespace
 	State        PodState          // ready/not ready
+	QOSClass     v1.PodQOSClass    // pod QoS class
 	Labels       map[string]string // pod labels
 	Annotations  map[string]string // pod annotations
 	CgroupParent string            // cgroup parent directory
 
-	QOSClass  v1.PodQOSClass           // pod QoS class
 	Resources *PodResourceRequirements // annotated resource requirements
 }
 
@@ -124,6 +126,8 @@ type Container interface {
 	GetNamespace() string
 	// GetState returns the ContainerState of the container.
 	GetState() ContainerState
+	// GetQOSClass returns the QoS class the pod would have if this was its only container.
+	GetQOSClass() v1.PodQOSClass
 	// GetImage returns the image of the container.
 	GetImage() string
 	// GetCommand returns the container command.
@@ -247,6 +251,7 @@ type container struct {
 	Name          string              // container name
 	Namespace     string              // container namespace
 	State         ContainerState      // created/running/exited/unknown
+	QOSClass      v1.PodQOSClass      // QoS class, if the container had one
 	Image         string              // containers image
 	Command       []string            // command to run in container
 	Args          []string            // arguments for command
@@ -257,8 +262,8 @@ type container struct {
 	Devices       map[string]*Device  // devices
 	TopologyHints sysfs.TopologyHints // Set of topology hints for all containers within Pod
 
-	Resources v1.ResourceRequirements // container resources (from webhook annotation)
-	LinuxReq  *cri.LinuxContainerResources
+	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
+	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 }
 
 // MountType is a propagation type.
