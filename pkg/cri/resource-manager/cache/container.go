@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 
 	v1 "k8s.io/api/core/v1"
@@ -254,6 +255,21 @@ func (c *container) GetArgs() []string {
 	return args
 }
 
+func keysInNamespace(m *map[string]string, namespace string) []string {
+	keys := make([]string, 0, len(*m))
+
+	for key := range *m {
+		split := strings.SplitN(key, "/", 2)
+		if len(split) == 2 && split[0] == namespace {
+			keys = append(keys, split[1])
+		} else if len(split) == 1 && len(namespace) == 0 {
+			keys = append(keys, split[0])
+		}
+	}
+
+	return keys
+}
+
 func (c *container) GetLabelKeys() []string {
 	keys := make([]string, len(c.Labels))
 
@@ -268,6 +284,15 @@ func (c *container) GetLabelKeys() []string {
 
 func (c *container) GetLabel(key string) (string, bool) {
 	value, ok := c.Labels[key]
+	return value, ok
+}
+
+func (c *container) GetResmgrLabelKeys() []string {
+	return keysInNamespace(&c.Labels, kubernetes.ResmgrKeyNamespace)
+}
+
+func (c *container) GetResmgrLabel(key string) (string, bool) {
+	value, ok := c.Labels[kubernetes.ResmgrKey(key)]
 	return value, ok
 }
 
@@ -298,6 +323,14 @@ func (c *container) GetAnnotation(key string, objPtr interface{}) (string, bool)
 	}
 
 	return jsonStr, true
+}
+
+func (c *container) GetResmgrAnnotationKeys() []string {
+	return keysInNamespace(&c.Annotations, kubernetes.ResmgrKeyNamespace)
+}
+
+func (c *container) GetResmgrAnnotation(key string, objPtr interface{}) (string, bool) {
+	return c.GetAnnotation(kubernetes.ResmgrKey(key), objPtr)
 }
 
 func (c *container) GetEnvKeys() []string {

@@ -134,10 +134,22 @@ type Container interface {
 	GetLabelKeys() []string
 	// GetLabel returns the value of a container label.
 	GetLabel(string) (string, bool)
+	// GetResmgrLabelKeys returns container label keys (without the namespace
+	// part) in cri-resource-manager namespace.
+	GetResmgrLabelKeys() []string
+	// GetResmgrLabel returns the value of a container label from the
+	// cri-resource-manager namespace.
+	GetResmgrLabel(string) (string, bool)
 	// GetAnnotationKeys returns the keys of all annotations of the container.
 	GetAnnotationKeys() []string
 	// GetAnnotation returns the value of a container annotation.
 	GetAnnotation(key string, objPtr interface{}) (string, bool)
+	// GetResmgrAnnotationKeys returns container annotation keys (without the
+	// namespace part) in cri-resource-manager namespace.
+	GetResmgrAnnotationKeys() []string
+	// GetAnnotation returns the value of a container annotation from the
+	// cri-resource-manager namespace.
+	GetResmgrAnnotation(key string, objPtr interface{}) (string, bool)
 	// GetEnvKeys returns the keys of all container environment variables.
 	GetEnvKeys() []string
 	// GetEnv returns the value of a container environment variable.
