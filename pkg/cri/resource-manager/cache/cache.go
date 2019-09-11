@@ -55,24 +55,56 @@ type PodResourceRequirements struct {
 
 // Pod is the exposed interface from a cached pod.
 type Pod interface {
+	// GetInitContainers returns the init containers of the pod.
 	GetInitContainers() []Container
+	// GetContainers returns the (non-init) containers of the pod.
 	GetContainers() []Container
-
+	// GetId returns the pod id of the pod.
 	GetId() string
+	// GetUid returns the (kubernetes) unique id of the pod.
 	GetUid() string
+	// GetName returns the name of the pod.
 	GetName() string
+	// GetNamespace returns the namespace of the pod.
 	GetNamespace() string
+	// GetState returns the PodState of the pod.
 	GetState() PodState
+	// GetQOSClass returns the PodQOSClass of the pod.
 	GetQOSClass() v1.PodQOSClass
-
+	// GetLabelKeys returns the keys of all pod labels as a string slice.
 	GetLabelKeys() []string
+	// GetLabel returns the value of the given label and whether it was found.
 	GetLabel(string) (string, bool)
+	// GetResmgrLabelKeys returns pod label keys (without the namespace
+	// part) in cri-resource-manager namespace.
+	GetResmgrLabelKeys() []string
+	// GetResmgrLabel returns the value of a pod label from the
+	// cri-resource-manager namespace.
+	GetResmgrLabel(string) (string, bool)
+	// GetAnnotationKeys returns the keys of all annotations of the container.
+
+	// GetAnnotationKeys returns the keys of all pod annotations as a string slice.
 	GetAnnotationKeys() []string
+	// GetAnnotation returns the value of the given annotation and whether it was found.
 	GetAnnotation(key string) (string, bool)
+	// GetAnnotationObject decodes the value of the given annotation with the given function.
 	GetAnnotationObject(key string, objPtr interface{},
 		decode func([]byte, interface{}) error) (bool, error)
-
+	// GetResmgrAnnotationKeys returns pod annotation keys (without the
+	// namespace part) in cri-resource-manager namespace as a string slice.
+	GetResmgrAnnotationKeys() []string
+	// GetAnnotation returns the value of a pod annotation from the
+	// cri-resource-manager namespace and whether it was found.
+	GetResmgrAnnotation(key string) (string, bool)
+	// GetResmgrAnnotationObject decodes the value of the given annotation in the
+	// cri-resource-manager namespace.
+	GetResmgrAnnotationObject(key string, objPtr interface{},
+		decode func([]byte, interface{}) error) (bool, error)
+	// GetCgroupParentDir returns the pods cgroup parent directory.
 	GetCgroupParentDir() string
+	// GetPodResourceRequirements returns container resource requirements if the
+	// necessary associated annotation put in place by the CRI resource manager
+	// webhook was found.
 	GetPodResourceRequirements() PodResourceRequirements
 }
 

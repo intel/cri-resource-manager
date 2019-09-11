@@ -20,9 +20,10 @@ import (
 
 	"k8s.io/api/core/v1"
 
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
 
 const (
@@ -151,6 +152,17 @@ func (p *pod) GetLabel(key string) (string, bool) {
 	return value, ok
 }
 
+// Get all label keys in the cri-resource-manager namespace.
+func (p *pod) GetResmgrLabelKeys() []string {
+	return keysInNamespace(&p.Labels, kubernetes.ResmgrKeyNamespace)
+}
+
+// Get the label for the given key in the cri-resource-manager namespace.
+func (p *pod) GetResmgrLabel(key string) (string, bool) {
+	value, ok := p.Labels[kubernetes.ResmgrKey(key)]
+	return value, ok
+}
+
 // Get the keys of all annotations of a pod.
 func (p *pod) GetAnnotationKeys() []string {
 	keys := make([]string, len(p.Annotations))
@@ -213,6 +225,22 @@ func (p *pod) GetAnnotationObject(key string, objPtr interface{},
 	}
 
 	return true, err
+}
+
+// Get the keys of all annotation in the cri-resource-manager namespace.
+func (p *pod) GetResmgrAnnotationKeys() []string {
+	return keysInNamespace(&p.Annotations, kubernetes.ResmgrKeyNamespace)
+}
+
+// Get the value of the given annotation in the cri-resource-manager namespace.
+func (p *pod) GetResmgrAnnotation(key string) (string, bool) {
+	return p.GetAnnotation(kubernetes.ResmgrKey(key))
+}
+
+// Get and decode the pod annotation for the key in the cri-resource-manager namespace..
+func (p *pod) GetResmgrAnnotationObject(key string, objPtr interface{},
+	decode func([]byte, interface{}) error) (bool, error) {
+	return p.GetAnnotationObject(kubernetes.ResmgrKey(key), objPtr, decode)
 }
 
 // Get the cgroup parent directory of a pod, if known.
