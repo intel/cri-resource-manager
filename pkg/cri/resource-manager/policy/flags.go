@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -193,8 +194,13 @@ var listCmd listPolicies
 
 func (l *listPolicies) Set(value string) error {
 	fmt.Printf("The available policies are:\n")
-	for name, impl := range opt.policies {
-		fmt.Printf("  %s: %s\n", name, impl.Description())
+	names := make([]string, 0, len(opt.policies))
+	for name := range opt.policies {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		fmt.Printf("  %s: %s\n", name, opt.policies[name].Description())
 	}
 	os.Exit(0)
 	return nil
