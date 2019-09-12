@@ -44,15 +44,18 @@ const (
 	DomainMemoryBW Domain = "memory-bandwidth"
 )
 
-// Constraint describes, per hardware domain, the resources available for a policy.
-type Constraint map[Domain]interface{}
+// Constraint describes constraint of one hardware domain
+type Constraint interface{}
+
+// ConstraintSet describes, per hardware domain, the resources available for a policy.
+type ConstraintSet map[Domain]Constraint
 
 // Options describes policy options
 type Options struct {
 	// Resource availibility constraint
-	Available Constraint
+	Available ConstraintSet
 	// Resource reservation constraint
-	Reserved Constraint
+	Reserved ConstraintSet
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
 	// Policy configuration data
@@ -163,14 +166,14 @@ func NewPolicy(resmgrCfg *config.RawConfig, a agent.Interface) (Policy, error) {
 	if len(opt.available) != 0 {
 		p.Info("  with resource availability constraints:")
 		for d := range opt.available {
-			p.Info("    - %s", opt.available.String(d))
+			p.Info("    - %s=%s", d, ConstraintToString(opt.available[d]))
 		}
 	}
 
 	if len(opt.reserved) != 0 {
 		p.Info("  with resource reservation constraints:")
 		for d := range opt.reserved {
-			p.Info("    - %s", opt.reserved.String(d))
+			p.Info("    - %s=%s", d, ConstraintToString(opt.reserved[d]))
 		}
 	}
 
@@ -305,26 +308,19 @@ func Register(p Implementation) error {
 }
 
 // String returns the given constraint as a string.
-func (c Constraint) String(key Domain) string {
-	value, ok := c[key]
-	if !ok {
-		return ""
-	}
-
-	str := string(key) + "="
-
+func ConstraintToString(value Constraint) string {
 	switch value.(type) {
 	case cpuset.CPUSet:
-		return str + "#" + value.(cpuset.CPUSet).String()
+		return "#" + value.(cpuset.CPUSet).String()
 	case int:
-		return str + strconv.Itoa(value.(int))
+		return strconv.Itoa(value.(int))
 	case string:
-		return str + value.(string)
+		return value.(string)
 	case resource.Quantity:
 		qty := value.(resource.Quantity)
-		return str + qty.String()
+		return qty.String()
 	default:
-		return str + fmt.Sprintf("<???(type:%T)>", value)
+		return fmt.Sprintf("<???(type:%T)>", value)
 	}
 }
 

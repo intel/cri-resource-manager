@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,17 +28,9 @@ import (
 )
 
 const (
-	// DefaultPolicy is the name of the default policy to use.
-	DefaultPolicy = NullPolicy
 	// NullPolicy is the reserved name for disabling policy altogether.
 	NullPolicy = "null"
 
-	// Flag for selecting the active policy.
-	optionPolicy = "policy"
-	// Flag for specifying per hardware domain resource availability constraints.
-	optionAvailable = "available-resources"
-	// Flag for specifying per hardware domain resource reservations for kube/system.
-	optionReserved = "reserved-resources"
 	// Flag for listing the available policies.
 	optionListPolicies = "list-policies"
 )
@@ -46,16 +39,15 @@ const (
 type options struct {
 	policy    string                    // active policy
 	policies  map[string]Implementation // registered policies
-	available Constraint                // resource availability
-	reserved  Constraint                // resource reservations
+	available ConstraintSet             // resource availability
+	reserved  ConstraintSet             // resource reservations
 }
 
 // Policy options with their defaults.
 var opt = options{
-	policy:    DefaultPolicy,
+	available: ConstraintSet{},
+	reserved:  ConstraintSet{},
 	policies:  make(map[string]Implementation),
-	available: Constraint{},
-	reserved:  Constraint{},
 }
 
 //
@@ -143,7 +135,18 @@ func parseMemBWConstraint(mbw string) (interface{}, error) {
 	return mbw, nil
 }
 
-func (o *options) setConstraint(c Constraint, constraint string) error {
+// Set implements the Set() function of flags.Value interface
+func (c *ConstraintSet) Set(value string) error {
+	for _, constraint := range strings.Split(value, ",") {
+		if err := (*c).setConstraint(constraint); err != nil {
+			return policyError("invalid constraint: %v", err)
+		}
+	}
+	return nil
+}
+
+// setConstraint sets a single constraint
+func (c ConstraintSet) setConstraint(constraint string) error {
 	var err error
 	var domain, value string
 
@@ -172,100 +175,43 @@ func (o *options) setConstraint(c Constraint, constraint string) error {
 	return err
 }
 
-func (o *options) getConstraint(c Constraint) string {
-	constraint := ""
+func (c *ConstraintSet) String() string {
+	ret := ""
 	sep := ""
-	for domain := range c {
-		constraint += sep + c.String(domain)
+	for domain, value := range *c {
+		ret += sep + string(domain) + "=" + ConstraintToString(value)
 		sep = ","
 	}
-	return constraint
+	return ret
 }
 
-func (o *options) Set(name, value string) error {
-	switch name {
-	case optionPolicy:
-		o.policy = value
-	case optionAvailable:
-		for _, constraint := range strings.Split(value, ",") {
-			if err := o.setConstraint(o.available, constraint); err != nil {
-				return policyError("invalid availability constraint: %v", err)
-			}
-		}
-	case optionReserved:
-		for _, constraint := range strings.Split(value, ",") {
-			if err := o.setConstraint(o.reserved, constraint); err != nil {
-				return policyError("invalid reservation constraint: %v", err)
-			}
-		}
-	case optionListPolicies:
-		fmt.Printf("The available policies are:\n")
-		for name, impl := range opt.policies {
-			fmt.Printf("  %s: %s\n", name, impl.Description())
-		}
-		os.Exit(0)
+// listPolicies is a helper type used for implementing the "list-policies"
+// option which acts like a sub-command
+type listPolicies bool
 
-	default:
-		return fmt.Errorf("can't set unknown policy option '%s'", name)
+var listCmd listPolicies
+
+func (l *listPolicies) Set(value string) error {
+	fmt.Printf("The available policies are:\n")
+	for name, impl := range opt.policies {
+		fmt.Printf("  %s: %s\n", name, impl.Description())
 	}
-
+	os.Exit(0)
 	return nil
 }
 
-func (o *options) Get(name string) string {
-	switch name {
-	case optionPolicy:
-		return o.policy
-	case optionAvailable:
-		return o.getConstraint(o.available)
-	case optionReserved:
-		return o.getConstraint(o.reserved)
-	default:
-		return fmt.Sprintf("<no default for unknown policy option '%s'>", name)
-	}
-}
+func (l *listPolicies) IsBoolFlag() bool { return true }
 
-type wrappedOption struct {
-	name   string
-	opt    *options
-	isBool bool
-}
-
-func (wo *wrappedOption) IsBoolFlag() bool {
-	return wo.isBool
-}
-
-func wrapOption(name, usage string) (flag.Value, string, string) {
-	return wrappedOption{name: name, opt: &opt}, name, usage
-}
-
-func (wo wrappedOption) Name() string {
-	return wo.name
-}
-
-func (wo wrappedOption) Set(value string) error {
-	return wo.opt.Set(wo.Name(), value)
-}
-
-func (wo wrappedOption) String() string {
-	if wo.isBool {
-		return ""
-	}
-	return wo.opt.Get(wo.Name())
-}
-
-func wrapBoolean(name, usage string) (flag.Value, string, string) {
-	return &wrappedOption{name: name, opt: &opt, isBool: true}, name, usage
-}
+func (l *listPolicies) String() string { return strconv.FormatBool(bool(*l)) }
 
 func init() {
-	flag.Var(wrapOption(optionPolicy,
+	flag.StringVar(&opt.policy, "policy", NullPolicy,
 		"select the policy to use for hardware resource decision making.\n"+
-			"You can list the available policies with the --"+optionListPolicies+" option."))
-	flag.Var(wrapOption(optionAvailable,
-		"specify the amount of resources available for allocation by the active policy."))
-	flag.Var(wrapOption(optionReserved,
-		"specify the amount of resources reserved for system- and kube-tasks."))
-	flag.Var(wrapBoolean(optionListPolicies,
-		"list the available resource management policies."))
+			"You can list the available policies with the --"+optionListPolicies+" option.")
+	flag.Var(&opt.available, "available-resources",
+		"specify the amount of resources available for allocation by the active policy.")
+	flag.Var(&opt.reserved, "reserved-resources",
+		"specify the amount of resources reserved for system- and kube-tasks.")
+	flag.Var(&listCmd, optionListPolicies,
+		"list the available resource management policies.")
 }
