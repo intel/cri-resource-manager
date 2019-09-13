@@ -23,7 +23,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
@@ -100,9 +99,11 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			c.Resources = r
 		} else if r, ok := p.Resources.Containers[c.Name]; ok {
 			c.Resources = r
-		} else {
-			c.Resources = c.estimateResources()
 		}
+	}
+
+	if len(c.Resources.Requests) == 0 && len(c.Resources.Limits) == 0 {
+		c.Resources = estimateComputeResources(c.LinuxReq)
 	}
 
 	c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
@@ -237,6 +238,16 @@ func (c *container) GetNamespace() string {
 
 func (c *container) GetState() ContainerState {
 	return c.State
+}
+
+func (c *container) GetQOSClass() v1.PodQOSClass {
+	var qos v1.PodQOSClass
+
+	if pod, found := c.GetPod(); found {
+		qos = pod.GetQOSClass()
+	}
+
+	return qos
 }
 
 func (c *container) GetImage() string {
@@ -509,6 +520,10 @@ func (c *container) DeleteDevice(path string) {
 	}
 }
 
+func (c *container) GetTopologyHints() sysfs.TopologyHints {
+	return c.TopologyHints
+}
+
 func (c *container) GetCpuPeriod() int64 {
 	if c.LinuxReq == nil {
 		return 0
@@ -617,65 +632,6 @@ func (c *container) SetCpusetMems(value string) {
 	}
 	c.LinuxReq.CpusetMems = value
 	c.cache.markChanged(c)
-}
-
-// constants for estimating request/limit for CPU and memory (kubernetes/pkg/cm/helpers_linux.go)
-const (
-	MinShares     = 2
-	SharesPerCPU  = 1024
-	MilliCPUToCPU = 1000
-)
-
-func (c *container) estimateResources() v1.ResourceRequirements {
-	r := v1.ResourceRequirements{
-		Requests: v1.ResourceList{},
-		Limits:   v1.ResourceList{},
-	}
-
-	if c.LinuxReq == nil {
-		return r
-	}
-
-	shares := c.LinuxReq.CpuShares
-	req := sharesToMilliCpu(shares)
-	if req > 0 {
-		qreq := resource.NewMilliQuantity(req, resource.DecimalSI)
-		r.Requests[v1.ResourceCPU] = *qreq
-	}
-
-	period := c.LinuxReq.CpuPeriod
-	quota := c.LinuxReq.CpuQuota
-	lim := quotaToMilliCpu(quota, period)
-	if lim > 0 {
-		qlim := resource.NewMilliQuantity(lim, resource.DecimalSI)
-		r.Limits[v1.ResourceCPU] = *qlim
-	}
-
-	memory := c.LinuxReq.MemoryLimitInBytes
-	if memory > 0 {
-		qmem := resource.NewQuantity(memory, resource.BinarySI)
-		r.Limits[v1.ResourceMemory] = *qmem
-	}
-
-	return r
-}
-
-func sharesToMilliCpu(shares int64) int64 {
-	if shares == MinShares {
-		return 0
-	}
-
-	return (shares * MilliCPUToCPU) / SharesPerCPU
-}
-
-func quotaToMilliCpu(quota, period int64) int64 {
-	if quota == 0 || period == 0 {
-		return 0
-	}
-
-	milliCpu := (quota * MilliCPUToCPU) / period
-
-	return milliCpu
 }
 
 func getTopologyHints(hostPath, containerPath string, readOnly bool) (ret sysfs.TopologyHints) {

@@ -55,23 +55,57 @@ type PodResourceRequirements struct {
 
 // Pod is the exposed interface from a cached pod.
 type Pod interface {
+	// GetInitContainers returns the init containers of the pod.
 	GetInitContainers() []Container
+	// GetContainers returns the (non-init) containers of the pod.
 	GetContainers() []Container
-
+	// GetId returns the pod id of the pod.
 	GetId() string
+	// GetUid returns the (kubernetes) unique id of the pod.
 	GetUid() string
+	// GetName returns the name of the pod.
 	GetName() string
+	// GetNamespace returns the namespace of the pod.
 	GetNamespace() string
+	// GetState returns the PodState of the pod.
 	GetState() PodState
+	// GetQOSClass returns the PodQOSClass of the pod.
+	GetQOSClass() v1.PodQOSClass
+	// GetLabelKeys returns the keys of all pod labels as a string slice.
 	GetLabelKeys() []string
+	// GetLabel returns the value of the given label and whether it was found.
 	GetLabel(string) (string, bool)
+	// GetResmgrLabelKeys returns pod label keys (without the namespace
+	// part) in cri-resource-manager namespace.
+	GetResmgrLabelKeys() []string
+	// GetResmgrLabel returns the value of a pod label from the
+	// cri-resource-manager namespace.
+	GetResmgrLabel(string) (string, bool)
+	// GetAnnotationKeys returns the keys of all annotations of the container.
+
+	// GetAnnotationKeys returns the keys of all pod annotations as a string slice.
 	GetAnnotationKeys() []string
+	// GetAnnotation returns the value of the given annotation and whether it was found.
 	GetAnnotation(key string) (string, bool)
+	// GetAnnotationObject decodes the value of the given annotation with the given function.
 	GetAnnotationObject(key string, objPtr interface{},
 		decode func([]byte, interface{}) error) (bool, error)
+	// GetResmgrAnnotationKeys returns pod annotation keys (without the
+	// namespace part) in cri-resource-manager namespace as a string slice.
+	GetResmgrAnnotationKeys() []string
+	// GetAnnotation returns the value of a pod annotation from the
+	// cri-resource-manager namespace and whether it was found.
+	GetResmgrAnnotation(key string) (string, bool)
+	// GetResmgrAnnotationObject decodes the value of the given annotation in the
+	// cri-resource-manager namespace.
+	GetResmgrAnnotationObject(key string, objPtr interface{},
+		decode func([]byte, interface{}) error) (bool, error)
+	// GetCgroupParentDir returns the pods cgroup parent directory.
 	GetCgroupParentDir() string
+	// GetPodResourceRequirements returns container resource requirements if the
+	// necessary associated annotation put in place by the CRI resource manager
+	// webhook was found.
 	GetPodResourceRequirements() PodResourceRequirements
-	GetPodQOS() v1.PodQOSClass
 }
 
 // A cached pod.
@@ -82,11 +116,11 @@ type pod struct {
 	Name         string            // pod sandbox name
 	Namespace    string            // pod namespace
 	State        PodState          // ready/not ready
+	QOSClass     v1.PodQOSClass    // pod QoS class
 	Labels       map[string]string // pod labels
 	Annotations  map[string]string // pod annotations
 	CgroupParent string            // cgroup parent directory
 
-	QOSClass  v1.PodQOSClass           // pod QoS class
 	Resources *PodResourceRequirements // annotated resource requirements
 }
 
@@ -124,6 +158,8 @@ type Container interface {
 	GetNamespace() string
 	// GetState returns the ContainerState of the container.
 	GetState() ContainerState
+	// GetQOSClass returns the QoS class the pod would have if this was its only container.
+	GetQOSClass() v1.PodQOSClass
 	// GetImage returns the image of the container.
 	GetImage() string
 	// GetCommand returns the container command.
@@ -197,6 +233,9 @@ type Container interface {
 	// DeleteDevice removes a device from the container.
 	DeleteDevice(string)
 
+	// Get any attached topology hints.
+	GetTopologyHints() sysfs.TopologyHints
+
 	// GetCpuPeriod gets the CFS CPU period of the container.
 	GetCpuPeriod() int64
 	// GetCpuQuota gets the CFS CPU quota of the container.
@@ -244,6 +283,7 @@ type container struct {
 	Name          string              // container name
 	Namespace     string              // container namespace
 	State         ContainerState      // created/running/exited/unknown
+	QOSClass      v1.PodQOSClass      // QoS class, if the container had one
 	Image         string              // containers image
 	Command       []string            // command to run in container
 	Args          []string            // arguments for command
@@ -254,8 +294,8 @@ type container struct {
 	Devices       map[string]*Device  // devices
 	TopologyHints sysfs.TopologyHints // Set of topology hints for all containers within Pod
 
-	Resources v1.ResourceRequirements // container resources (from webhook annotation)
-	LinuxReq  *cri.LinuxContainerResources
+	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
+	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 }
 
 // MountType is a propagation type.

@@ -54,25 +54,25 @@ func NewIdSetFromIntSlice(ids ...int) IdSet {
 	return s
 }
 
-// Add adds an id to the set, return whether it was already present.
-func (s IdSet) Add(id Id) bool {
-	_, present := s[id]
-	if !present {
-		s[id] = struct{}{}
-	}
-	return present
+// Clone returns a copy of this IdSet.
+func (s IdSet) Clone() IdSet {
+	return NewIdSet(s.Members()...)
 }
 
-// Del deletes an id from the set, return whether it was present.
-func (s IdSet) Del(id Id) bool {
-	if s == nil {
-		return false
+// Add adds the given ids into the set.
+func (s IdSet) Add(ids ...Id) {
+	for _, id := range ids {
+		s[id] = struct{}{}
 	}
-	_, present := s[id]
-	if present {
-		delete(s, id)
+}
+
+// Del deletes the given ids from the set.
+func (s IdSet) Del(ids ...Id) {
+	if s != nil {
+		for _, id := range ids {
+			delete(s, id)
+		}
 	}
-	return present
 }
 
 // Size returns the number of ids in the set.
@@ -80,13 +80,20 @@ func (s IdSet) Size() int {
 	return len(s)
 }
 
-// Has tests if an id is present in a set.
-func (s IdSet) Has(id Id) bool {
+// Has tests if all the ids are present in the set.
+func (s IdSet) Has(ids ...Id) bool {
 	if s == nil {
 		return false
 	}
-	_, present := s[id]
-	return present
+
+	for _, id := range ids {
+		_, ok := s[id]
+		if !ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Members returns all ids in the set as a randomly ordered slice.
@@ -128,7 +135,7 @@ func FromCPUSet(cset cpuset.CPUSet) IdSet {
 
 // String returns the set as a string.
 func (s IdSet) String() string {
-	return s.StringWithSeparator(" ")
+	return s.StringWithSeparator(",")
 }
 
 // StringWithSeparator returns the set as a string, separated with the given separator.

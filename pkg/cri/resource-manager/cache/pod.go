@@ -19,11 +19,11 @@ import (
 	"strconv"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/sets"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
 
 const (
@@ -152,6 +152,17 @@ func (p *pod) GetLabel(key string) (string, bool) {
 	return value, ok
 }
 
+// Get all label keys in the cri-resource-manager namespace.
+func (p *pod) GetResmgrLabelKeys() []string {
+	return keysInNamespace(&p.Labels, kubernetes.ResmgrKeyNamespace)
+}
+
+// Get the label for the given key in the cri-resource-manager namespace.
+func (p *pod) GetResmgrLabel(key string) (string, bool) {
+	value, ok := p.Labels[kubernetes.ResmgrKey(key)]
+	return value, ok
+}
+
 // Get the keys of all annotations of a pod.
 func (p *pod) GetAnnotationKeys() []string {
 	keys := make([]string, len(p.Annotations))
@@ -216,6 +227,22 @@ func (p *pod) GetAnnotationObject(key string, objPtr interface{},
 	return true, err
 }
 
+// Get the keys of all annotation in the cri-resource-manager namespace.
+func (p *pod) GetResmgrAnnotationKeys() []string {
+	return keysInNamespace(&p.Annotations, kubernetes.ResmgrKeyNamespace)
+}
+
+// Get the value of the given annotation in the cri-resource-manager namespace.
+func (p *pod) GetResmgrAnnotation(key string) (string, bool) {
+	return p.GetAnnotation(kubernetes.ResmgrKey(key))
+}
+
+// Get and decode the pod annotation for the key in the cri-resource-manager namespace..
+func (p *pod) GetResmgrAnnotationObject(key string, objPtr interface{},
+	decode func([]byte, interface{}) error) (bool, error) {
+	return p.GetAnnotationObject(kubernetes.ResmgrKey(key), objPtr, decode)
+}
+
 // Get the cgroup parent directory of a pod, if known.
 func (p *pod) GetCgroupParentDir() string {
 	return p.CgroupParent
@@ -245,78 +272,15 @@ func (p *pod) parseResourceAnnotations() {
 	p.GetAnnotationObject(KeyResourceAnnotation, p.Resources, nil)
 }
 
-// Determine the QoS class of a pod (code lifted over from Kubernetes).
-func (p *pod) GetPodQOS() v1.PodQOSClass {
-	if p.QOSClass != "" {
-		return p.QOSClass
+// Determine the QoS class of the pod.
+func (p *pod) GetQOSClass() v1.PodQOSClass {
+	if p.QOSClass == "" {
+		p.QOSClass = cgroupParentToQOS(p.CgroupParent)
 	}
 
-	requests := v1.ResourceList{}
-	limits := v1.ResourceList{}
-	zeroQuantity := resource.MustParse("0")
-	isGuaranteed := true
-	podResources := p.Resources
-	for _, resources := range podResources.Containers {
-		// process requests
-		for name, quantity := range resources.Requests {
-			if !isSupportedQoSComputeResource(name) {
-				continue
-			}
-			if quantity.Cmp(zeroQuantity) == 1 {
-				delta := quantity.Copy()
-				if _, exists := requests[name]; !exists {
-					requests[name] = *delta
-				} else {
-					delta.Add(requests[name])
-					requests[name] = *delta
-				}
-			}
-		}
-		// process limits
-		qosLimitsFound := sets.NewString()
-		for name, quantity := range resources.Limits {
-			if !isSupportedQoSComputeResource(name) {
-				continue
-			}
-			if quantity.Cmp(zeroQuantity) == 1 {
-				qosLimitsFound.Insert(string(name))
-				delta := quantity.Copy()
-				if _, exists := limits[name]; !exists {
-					limits[name] = *delta
-				} else {
-					delta.Add(limits[name])
-					limits[name] = *delta
-				}
-			}
-		}
+	if p.QOSClass == "" {
+		p.QOSClass = resourcesToQOS(p.Resources)
+	}
 
-		if !qosLimitsFound.HasAll(string(v1.ResourceMemory), string(v1.ResourceCPU)) {
-			isGuaranteed = false
-		}
-	}
-	if len(requests) == 0 && len(limits) == 0 {
-		p.QOSClass = v1.PodQOSBestEffort
-		return p.QOSClass
-	}
-	// Check is requests match limits for all resources.
-	if isGuaranteed {
-		for name, req := range requests {
-			if lim, exists := limits[name]; !exists || lim.Cmp(req) != 0 {
-				isGuaranteed = false
-				break
-			}
-		}
-	}
-	if isGuaranteed &&
-		len(requests) == len(limits) {
-		p.QOSClass = v1.PodQOSGuaranteed
-		return p.QOSClass
-	}
-	p.QOSClass = v1.PodQOSBurstable
 	return p.QOSClass
-}
-
-// Check if a resource (class) contributes to the QoS class of a pod.
-func isSupportedQoSComputeResource(name v1.ResourceName) bool {
-	return name == v1.ResourceCPU || name == v1.ResourceMemory
 }

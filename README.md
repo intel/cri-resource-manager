@@ -156,7 +156,7 @@ policy configuration adhere the following scheme:
 The data format of the policy configuration is policy-specific and may be
 different between policies (the `static` and `stp` policies use YAML).
 There is a
-[sammple ConfigMap spec](sample-configs/cri-resmgr-configmap.example.yaml)
+[sample ConfigMap spec](sample-configs/cri-resmgr-configmap.example.yaml)
 that contains referential policy configuration for the static and stp policies.
 See the policy-specific documentation for more information on the policy
 configurations ([STP policy documentation](docs/policy-static-pools.md))

@@ -146,7 +146,7 @@ func (o *options) Get(name string) string {
 	case optMetrics:
 		return o.metrics
 	default:
-		return fmt.Sprintf("<no value, unknown instrumnetation option '%s'>", name)
+		return fmt.Sprintf("<no value, unknown instrumentation option '%s'>", name)
 	}
 }
 
