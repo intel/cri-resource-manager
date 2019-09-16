@@ -24,6 +24,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	version "github.com/intel/cri-resource-manager/pkg/version"
 )
 
 func main() {
@@ -36,6 +37,8 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+
+	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
 
 	if err := instrumentation.Setup("CRI-RM"); err != nil {
 		log.Fatal("failed to set up instrumentation: %v", err)
