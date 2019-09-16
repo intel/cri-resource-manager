@@ -156,7 +156,9 @@ func (o *options) mergeFakeHints(n *options) {
 
 	for c, nhints := range n.Hints {
 		if ohints, ok := o.Hints[c]; !ok {
-			o.Hints[c] = nhints
+			if len(nhints) != 0 {
+				o.Hints[c] = nhints
+			}
 		} else {
 			for _, nh := range nhints {
 				duplicate := false
