@@ -1,0 +1,41 @@
+Name:    cri-resource-manager
+Version: __VERSION__
+Release: 0
+Summary: CRI Resource Manager, a CRI proxy with various in-node workload placement policies
+License: ASL 2.0 
+URL:     https://github.com/intel/cri-resource-manager
+Source0: https://github.com/intel/cri-resource-manager/archive/cri-resource-manager-%{version}.tar.bz2
+BuildRequires: go >= 1.12, /usr/bin/make, /usr/bin/install
+
+%package doc
+Summary: Documentation el al. collateral for Resource Manager Cluster/Node Agent
+Requires: %{name} = %{version}
+
+%description
+Kubernetes Container Runtime Interface proxy service with hardware resource aware workload
+placement policies.
+
+%description doc
+LICENSE, README, and any other potential documentation.
+
+%prep
+%setup -q -n cri-resource-manager-%{version}
+
+%build
+make build BUILD_DIRS=cri-resmgr
+
+%install
+%make_install UNITDIR=%{_unitdir} SYSCONFDIR=%{_sysconfdir} BUILD_DIRS=cri-resmgr
+install -m 0700 -d %{?buildroot}%{_sharedstatedir}/cri-resmgr
+
+
+%files
+%defattr(-,root,root,-)
+%{_bindir}/*
+%{_sysconfdir}/sysconfig/*
+%{_unitdir}/*
+%dir %attr(0700,root,root) %{_sharedstatedir}/cri-resmgr
+
+%files doc
+%defattr(-,root,root,-)
+%doc CONTRIBUTING.md LICENSE README.md SECURITY.md TODO.md
