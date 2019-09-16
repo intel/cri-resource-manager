@@ -26,7 +26,7 @@ const (
 	// optPrefix is our common option prefix.
 	optPrefix = "topology-aware-"
 	// Control whether containers are CPU-pinned using the cpuset cgroup controller.
-	optPinCpu = optPrefix + "pin-cpu"
+	optPinCPU = optPrefix + "pin-cpu"
 	// Control whether containers are memory-pinned using the cpuset cgroup controller.
 	optPinMem = optPrefix + "pin-memory"
 	// Control whether isolated CPUs are preferred for exclusive allocation.
@@ -39,7 +39,7 @@ const (
 
 // Options captures our configurable policy parameters.
 type options struct {
-	PinCpu         bool `json:"PinCPU"`             // pin workloads to CPU
+	PinCPU         bool `json:"PinCPU"`             // pin workloads to CPU
 	PinMem         bool `json:"PinMemory"`          // pin workloads to memory
 	PreferIsolated bool `json:"PreferIsolatedCPUs"` // prefer isolated CPUs for exclusive usage
 	PreferShared   bool `json:"PreferSharedCPUs"`   // prefer shared CPU allocation
@@ -49,7 +49,7 @@ type options struct {
 
 // Our configurable options with their defaults.
 var opt = options{
-	PinCpu:         true,
+	PinCPU:         true,
 	PinMem:         true,
 	PreferIsolated: true,
 	PreferShared:   false,
@@ -73,10 +73,10 @@ func (o *options) Set(name, value string) error {
 	var err error
 
 	switch name {
-	case optPinCpu:
-		o.PinCpu, err = strconv.ParseBool(value)
+	case optPinCPU:
+		o.PinCPU, err = strconv.ParseBool(value)
 	case optPinMem:
-		o.PinCpu, err = strconv.ParseBool(value)
+		o.PinMem, err = strconv.ParseBool(value)
 	case optPreferIsolated:
 		o.PreferIsolated, err = strconv.ParseBool(value)
 	case optPreferShared:
@@ -99,8 +99,8 @@ func (o *options) Set(name, value string) error {
 
 func (o *options) Get(name string) string {
 	switch name {
-	case optPinCpu:
-		return fmt.Sprintf("%v", o.PinCpu)
+	case optPinCPU:
+		return fmt.Sprintf("%v", o.PinCPU)
 	case optPinMem:
 		return fmt.Sprintf("%v", o.PinMem)
 	case optPreferIsolated:
@@ -114,8 +114,8 @@ func (o *options) Get(name string) string {
 	}
 }
 
-func (p *options) IsExplicit(option string) bool {
-	_, explicit := p.explicit[option]
+func (o *options) IsExplicit(option string) bool {
+	_, explicit := o.explicit[option]
 	return explicit
 }
 
@@ -143,7 +143,7 @@ func (wo *wrappedOption) String() string {
 
 // Register our command-line flags.
 func init() {
-	flag.Var(wrapOption(optPinCpu,
+	flag.Var(wrapOption(optPinCPU,
 		"Whether container should be CPU-pinned using the cpuset cgroup controller."))
 	flag.Var(wrapOption(optPinMem,
 		"Whether container should be memory-pinned using the cpuset cgroup controller."))

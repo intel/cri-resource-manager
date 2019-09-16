@@ -93,9 +93,9 @@ func (m *resmgr) startPolicy() error {
 	}
 
 	for _, c := range del {
-		m.Info("releasing resources of stale container %s...", c.GetId())
+		m.Info("releasing resources of stale container %s...", c.GetID())
 		if err := m.policy.ReleaseResources(c); err != nil {
-			m.Warn("failed to release resources for stale container %s: %v", c.GetId(), err)
+			m.Warn("failed to release resources for stale container %s: %v", c.GetID(), err)
 		}
 	}
 
@@ -105,12 +105,12 @@ func (m *resmgr) startPolicy() error {
 			continue
 		}
 
-		m.Info("allocating resources for out-of-sync container %s...", c.GetId())
+		m.Info("allocating resources for out-of-sync container %s...", c.GetID())
 		if err := m.policy.AllocateResources(c); err != nil {
-			m.Warn("failed to allocate resources for out-of-sync container %s: %v", c.GetId(), err)
+			m.Warn("failed to allocate resources for out-of-sync container %s: %v", c.GetID(), err)
 		}
 
-		added[c.GetId()] = struct{}{}
+		added[c.GetID()] = struct{}{}
 	}
 
 	for _, id := range m.cache.GetContainerIds() {
@@ -122,9 +122,9 @@ func (m *resmgr) startPolicy() error {
 			continue
 		}
 
-		m.Info("refreshing resource allocation for container %s...", c.GetId())
+		m.Info("refreshing resource allocation for container %s...", c.GetID())
 		if err := m.policy.AllocateResources(c); err != nil {
-			m.Warn("failed to refresh resource allocation for container %s: %v", c.GetId(), err)
+			m.Warn("failed to refresh resource allocation for container %s: %v", c.GetID(), err)
 		}
 	}
 
@@ -229,11 +229,11 @@ func (m *resmgr) processWithPolicy(ctx context.Context, method string, req inter
 		if !ok {
 			return handler(ctx, req)
 		}
-		m.cache.DeleteContainer(c.GetCacheId())
+		m.cache.DeleteContainer(c.GetCacheID())
 
 		m.policy.PrepareDecisions()
 		if err := m.policy.ReleaseResources(c); err != nil {
-			m.Warn("failed to release resources for container %s: %v", c.GetId(), err)
+			m.Warn("failed to release resources for container %s: %v", c.GetID(), err)
 		}
 
 		rpl, err := handler(ctx, req)
@@ -265,14 +265,14 @@ func (m *resmgr) processWithPolicy(ctx context.Context, method string, req inter
 		m.policy.PrepareDecisions()
 		for _, id := range m.cache.GetContainerIds() {
 			c, ok := m.cache.LookupContainer(id)
-			if !ok || c.GetPodId() != req.(*api.RemovePodSandboxRequest).PodSandboxId {
+			if !ok || c.GetPodID() != req.(*api.RemovePodSandboxRequest).PodSandboxId {
 				continue
 			}
 
-			m.Info("removing container %s", c.GetPodId())
-			m.cache.DeleteContainer(c.GetCacheId())
+			m.Info("removing container %s", c.GetPodID())
+			m.cache.DeleteContainer(c.GetCacheID())
 			if e := m.policy.ReleaseResources(c); e != nil {
-				m.Warn("failed to release resources for container %s: %v", c.GetId(), e)
+				m.Warn("failed to release resources for container %s: %v", c.GetID(), e)
 			}
 		}
 		m.enforcePendingDecisions(ctx)
@@ -290,9 +290,9 @@ func (m *resmgr) processWithPolicy(ctx context.Context, method string, req inter
 		rpl, err := handler(ctx, req)
 
 		m.Info("StartContainerRequest response %v", rpl)
-		policy_err := m.policy.PostStart(c)
-		if policy_err != nil {
-			m.Warn("failed to update affected container %s: %v", c.GetId(), policy_err)
+		policyErr := m.policy.PostStart(c)
+		if policyErr != nil {
+			m.Warn("failed to update affected container %s: %v", c.GetID(), policyErr)
 		}
 		return rpl, err
 
@@ -314,7 +314,7 @@ func (m *resmgr) enforcePendingDecisions(ctx context.Context, updates ...cache.C
 
 		err := m.updateContainer(ctx, c)
 		if err != nil {
-			m.Warn("failed to update container %s during startup: %v", c.GetId(), err)
+			m.Warn("failed to update container %s during startup: %v", c.GetID(), err)
 		}
 	}
 
@@ -327,7 +327,7 @@ func (m *resmgr) createContainer(ctx context.Context, handler server.Handler,
 
 	c.InsertMount(&cache.Mount{
 		Container:   "/.cri-resmgr",
-		Host:        m.cache.ContainerDirectory(c.GetCacheId()),
+		Host:        m.cache.ContainerDirectory(c.GetCacheID()),
 		Readonly:    true,
 		Propagation: cache.MountHostToContainer,
 	})
@@ -340,7 +340,7 @@ func (m *resmgr) createContainer(ctx context.Context, handler server.Handler,
 	if err != nil {
 		return nil, err
 	}
-	m.cache.UpdateContainerId(c.GetCacheId(), rpl)
+	m.cache.UpdateContainerID(c.GetCacheID(), rpl)
 
 	upd, err := c.CriUpdateRequest()
 	if err != nil {
@@ -364,7 +364,7 @@ func (m *resmgr) updateContainer(ctx context.Context, c cache.Container) error {
 
 	req, err := c.CriUpdateRequest()
 	if err != nil {
-		return resmgrError("can't update container %s: %v", c.GetCacheId(), err)
+		return resmgrError("can't update container %s: %v", c.GetCacheID(), err)
 	}
 
 	_, err = m.relay.Client().UpdateContainerResources(ctx, req)

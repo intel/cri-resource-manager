@@ -23,18 +23,18 @@ import (
 
 const (
 	// Unknown represents an unknown id.
-	Unknown Id = -1
+	Unknown ID = -1
 )
 
-// Id is nn integer id, used to identify packages, CPUs, nodes, etc.
-type Id int
+// ID is nn integer id, used to identify packages, CPUs, nodes, etc.
+type ID int
 
-// IdSet is an unordered set of integer ids.
-type IdSet map[Id]struct{}
+// IDSet is an unordered set of integer ids.
+type IDSet map[ID]struct{}
 
-// NewIdSet creates a new unordered set of (integer) ids.
-func NewIdSet(ids ...Id) IdSet {
-	s := make(map[Id]struct{})
+// NewIDSet creates a new unordered set of (integer) ids.
+func NewIDSet(ids ...ID) IDSet {
+	s := make(map[ID]struct{})
 
 	for _, id := range ids {
 		s[id] = struct{}{}
@@ -43,31 +43,31 @@ func NewIdSet(ids ...Id) IdSet {
 	return s
 }
 
-// NewIdSetFromIntSlice creates a new unordered set from an integer slice.
-func NewIdSetFromIntSlice(ids ...int) IdSet {
-	s := make(map[Id]struct{})
+// NewIDSetFromIntSlice creates a new unordered set from an integer slice.
+func NewIDSetFromIntSlice(ids ...int) IDSet {
+	s := make(map[ID]struct{})
 
 	for _, id := range ids {
-		s[Id(id)] = struct{}{}
+		s[ID(id)] = struct{}{}
 	}
 
 	return s
 }
 
 // Clone returns a copy of this IdSet.
-func (s IdSet) Clone() IdSet {
-	return NewIdSet(s.Members()...)
+func (s IDSet) Clone() IDSet {
+	return NewIDSet(s.Members()...)
 }
 
 // Add adds the given ids into the set.
-func (s IdSet) Add(ids ...Id) {
+func (s IDSet) Add(ids ...ID) {
 	for _, id := range ids {
 		s[id] = struct{}{}
 	}
 }
 
 // Del deletes the given ids from the set.
-func (s IdSet) Del(ids ...Id) {
+func (s IDSet) Del(ids ...ID) {
 	if s != nil {
 		for _, id := range ids {
 			delete(s, id)
@@ -76,12 +76,12 @@ func (s IdSet) Del(ids ...Id) {
 }
 
 // Size returns the number of ids in the set.
-func (s IdSet) Size() int {
+func (s IDSet) Size() int {
 	return len(s)
 }
 
 // Has tests if all the ids are present in the set.
-func (s IdSet) Has(ids ...Id) bool {
+func (s IDSet) Has(ids ...ID) bool {
 	if s == nil {
 		return false
 	}
@@ -97,11 +97,11 @@ func (s IdSet) Has(ids ...Id) bool {
 }
 
 // Members returns all ids in the set as a randomly ordered slice.
-func (s IdSet) Members() []Id {
+func (s IDSet) Members() []ID {
 	if s == nil {
-		return []Id{}
+		return []ID{}
 	}
-	ids := make([]Id, len(s))
+	ids := make([]ID, len(s))
 	idx := 0
 	for id := range s {
 		ids[idx] = id
@@ -111,7 +111,7 @@ func (s IdSet) Members() []Id {
 }
 
 // SortedMembers returns all ids in the set as a sorted slice.
-func (s IdSet) SortedMembers() []Id {
+func (s IDSet) SortedMembers() []ID {
 	ids := s.Members()
 	sort.Slice(ids, func(i, j int) bool {
 		return ids[i] < ids[j]
@@ -120,7 +120,7 @@ func (s IdSet) SortedMembers() []Id {
 }
 
 // CPUSet returns a cpuset.CPUSet corresponding to an id set.
-func (s IdSet) CPUSet() cpuset.CPUSet {
+func (s IDSet) CPUSet() cpuset.CPUSet {
 	b := cpuset.NewBuilder()
 	for id := range s {
 		b.Add(int(id))
@@ -129,17 +129,17 @@ func (s IdSet) CPUSet() cpuset.CPUSet {
 }
 
 // FromCPUSet returns an id set corresponding to a cpuset.CPUSet.
-func FromCPUSet(cset cpuset.CPUSet) IdSet {
-	return NewIdSetFromIntSlice(cset.ToSlice()...)
+func FromCPUSet(cset cpuset.CPUSet) IDSet {
+	return NewIDSetFromIntSlice(cset.ToSlice()...)
 }
 
 // String returns the set as a string.
-func (s IdSet) String() string {
+func (s IDSet) String() string {
 	return s.StringWithSeparator(",")
 }
 
 // StringWithSeparator returns the set as a string, separated with the given separator.
-func (s IdSet) StringWithSeparator(args ...string) string {
+func (s IDSet) StringWithSeparator(args ...string) string {
 	if s == nil || len(s) == 0 {
 		return ""
 	}

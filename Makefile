@@ -8,19 +8,10 @@ GOCYCLO := gocyclo
 # Golint is a linter for Go source code
 # go get -u golang.org/x/lint/golint
 GOLINT := golint
-# Gofluff relaxes linting a bit, allowing one to whitelist locally preferred terms.
-GOFLUFF := scripts/hacking/gofluff
-# We insist on using Cpu and Id, despite of golint suggesting on CPU and ID.
-# We also use in one special case context.Context as a non-first parameter.
-# Silence these complaints of golint.
-GOFLUFF_DEBUG :=
-GOFLUFF_WHITELIST := \
-  --whitelist Cpu=CPU,Id=ID,Uid=UID \
-  --allow-nonfirst relayWithCacheUpdate=context.Context \
-  --allow-nonfirst relayWithNoActions=context.Context \
-  --allow-nonfirst filterWithFakeSuccess=context.Context \
-  --allow-nonfirst interceptWithPolicy=context.Context \
-  --allow-blankimport ./pkg/cri-resource-manager/builtin-policies.go
+# golangci-lint is a powerfull and fast meta-linter
+# https://github.com/golangci/golangci-lint
+GOLANGCI_LINT := golangci-lint
+GOLANGCI_LINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
 
 # Commands to build by the build target.
 COMMANDS = $(shell ls cmd)
@@ -54,8 +45,8 @@ cyclomatic-check:
 lint:
 	@rc=0 ; for f in $$(find -name \*.go | grep -v \.\/vendor) ; do $(GOLINT) -set_exit_status $$f || rc=1 ; done ; exit $$rc
 
-fluff:
-	@rc=0 ; for f in $$(find -name \*.go | grep -v \.\/vendor) ; do $(GOFLUFF) $(GOFLUFF_DEBUG) $(GOFLUFF_WHITELIST) -set_exit_status $$f || rc=1 ; done ; exit $$rc
+golangci-lint:
+	@$(GOLANGCI_LINT) run $(GOLANGCI_LINT_CHECKERS)
 
 test:
 	@$(GO) test -race -coverprofile=coverage.txt -covermode=atomic $(shell $(GO) list ./... | grep -v vendor)
@@ -100,7 +91,7 @@ deploy: images
 	fi
 
 # go-build the given commands
-$(COMMANDS): check-git-hooks
+$(COMMANDS):
 	@echo "Building $@..." && \
 	    cd cmd/$@ && \
 	    GO111MODULE=on go build -o $@
@@ -109,13 +100,4 @@ $(COMMANDS): check-git-hooks
 	@echo "Generating $@..."
 	@$(PROTOC) -I . $< --go_out=plugins=grpc:.
 
-# check and redirect git hooks to our in-repo hook directory
-check-git-hooks:
-	@if [ ! -e .git-hooks.redirected ]; then \
-	    echo -n "Redirecting git hooks to .githooks..."; \
-	    git config core.hookspath .githooks && \
-	      touch .git-hooks.redirected && \
-	    echo "done."; \
-	fi
-
-.PHONY: all build format vet cyclomatic-check lint test clean images $(COMMANDS) $(IMAGES)
+.PHONY: all build format vet cyclomatic-check lint test clean images golangci-lint $(COMMANDS) $(IMAGES)

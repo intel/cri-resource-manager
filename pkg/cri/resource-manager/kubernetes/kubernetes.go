@@ -17,6 +17,7 @@ limitations under the License.
 package kubernetes
 
 const (
+	// ResmgrKeyNamespace is a CRI Resource Manager namespace
 	ResmgrKeyNamespace = "cri-resource-manager.intel.com"
 )
 

@@ -54,8 +54,8 @@ type Node interface {
 	Name() string
 	// Kind returns the type of this node.
 	Kind() NodeKind
-	// NodeId returns the (enumerated) node id of this node.
-	NodeId() int
+	// NodeID returns the (enumerated) node id of this node.
+	NodeID() int
 	// Parent returns the parent node of this node.
 	Parent() Node
 	// Children returns the child nodes of this node.
@@ -78,20 +78,20 @@ type Node interface {
 	System() *system.System
 	// Policy returns the policy back pointer.
 	Policy() *policy
-	// DiscoverCpu
-	DiscoverCpu() CpuSupply
-	// GetCpu
-	GetCpu() CpuSupply
-	// FreeCpu returns the availble CPU supply of the node.
-	FreeCpu() CpuSupply
-	// GrantedCpu returns the amount of granted shared CPU capacity of this node.
-	GrantedCpu() int
+	// DiscoverCPU
+	DiscoverCPU() CPUSupply
+	// GetCPU
+	GetCPU() CPUSupply
+	// FreeCPU returns the availble CPU supply of the node.
+	FreeCPU() CPUSupply
+	// GrantedCPU returns the amount of granted shared CPU capacity of this node.
+	GrantedCPU() int
 	// GetMemset
-	GetMemset() system.IdSet
+	GetMemset() system.IDSet
 	// DiscoverMemset
-	DiscoverMemset() system.IdSet
+	DiscoverMemset() system.IDSet
 	// Score calculates the score of the node wrt. the given request.
-	Score(CpuRequest) float64
+	Score(CPURequest) float64
 	// DepthFirst traverse the tree@node calling the function at each node.
 	DepthFirst(func(Node) error) error
 	// BreadthFirst traverse the tree@node calling the function at each node.
@@ -112,9 +112,9 @@ type node struct {
 	depth    int          // node depth in the tree
 	parent   Node         // parent node
 	children []Node       // child nodes
-	nodecpu  CpuSupply    // CPU available at this node
-	freecpu  CpuSupply    // CPU allocatable at this node
-	mem      system.IdSet // memory attached to this node
+	nodecpu  CPUSupply    // CPU available at this node
+	freecpu  CPUSupply    // CPU allocatable at this node
+	mem      system.IDSet // memory attached to this node
 }
 
 // nodeself is used to 'upcast' a generic Node interface to a type-specific one.
@@ -125,14 +125,14 @@ type nodeself struct {
 // socketnode represents a physical CPU package/socket in the system.
 type socketnode struct {
 	node                   // common node data
-	id     system.Id       // NUMA node socket id
+	id     system.ID       // NUMA node socket id
 	syspkg *system.Package // corresponding system.Package
 }
 
 // numanode represents a NUMA node in the system.
 type numanode struct {
 	node                 // common node data
-	id      system.Id    // NUMA node system id
+	id      system.ID    // NUMA node system id
 	sysnode *system.Node // corresponding system.Node
 }
 
@@ -178,8 +178,8 @@ func (n *node) Kind() NodeKind {
 	return n.kind
 }
 
-// NodeId returns the node id of this node.
-func (n *node) NodeId() int {
+// NodeID returns the node id of this node.
+func (n *node) NodeID() int {
 	if n.IsNil() {
 		return -1
 	}
@@ -188,7 +188,7 @@ func (n *node) NodeId() int {
 
 // IsSameNode checks if the given node is that same as this one.
 func (n *node) IsSameNode(other Node) bool {
-	return n.NodeId() == other.NodeId()
+	return n.NodeID() == other.NodeID()
 }
 
 // IsRootNode returns true if this node has no parent.
@@ -266,8 +266,8 @@ func (n *node) Dump(prefix string, level ...int) {
 	log.Debug("%s  - node CPU: %v", idt, n.nodecpu)
 	log.Debug("%s  - free CPU: %v", idt, n.freecpu)
 	log.Debug("%s  - memory: %v", idt, n.mem)
-	for _, grant := range n.policy.allocations.Cpu {
-		if grant.GetNode().NodeId() == n.id {
+	for _, grant := range n.policy.allocations.CPU {
+		if grant.GetNode().NodeID() == n.id {
 			log.Debug("%s    + %s", idt, grant.String())
 		}
 	}
@@ -322,47 +322,47 @@ func (n *node) Policy() *policy {
 }
 
 // Get CPU available at this node.
-func (n *node) GetCpu() CpuSupply {
-	return n.self.node.GetCpu()
+func (n *node) GetCPU() CPUSupply {
+	return n.self.node.GetCPU()
 }
 
 // Discover CPU available at this node.
-func (n *node) DiscoverCpu() CpuSupply {
-	return n.self.node.DiscoverCpu()
+func (n *node) DiscoverCPU() CPUSupply {
+	return n.self.node.DiscoverCPU()
 }
 
 // FreeCpu returns the available CPU supply in this node.
-func (n *node) FreeCpu() CpuSupply {
+func (n *node) FreeCPU() CPUSupply {
 	return n.freecpu
 }
 
 // Get score for a cpu request.
-func (n *node) Score(req CpuRequest) float64 {
-	f := n.FreeCpu()
+func (n *node) Score(req CPURequest) float64 {
+	f := n.FreeCPU()
 	return f.Score(req)
 }
 
 // Get the set of memory attached to this node.
-func (n *node) GetMemset() system.IdSet {
+func (n *node) GetMemset() system.IDSet {
 	return n.self.node.GetMemset()
 }
 
 // Discover the set of memory attached to this node.
-func (n *node) DiscoverMemset() system.IdSet {
+func (n *node) DiscoverMemset() system.IDSet {
 	return n.self.node.DiscoverMemset()
 }
 
 // Granted returns the amount of granted shared CPU capacity of this node.
-func (n *node) GrantedCpu() int {
+func (n *node) GrantedCPU() int {
 	granted := n.freecpu.Granted()
 	for _, c := range n.children {
-		granted += c.GrantedCpu()
+		granted += c.GrantedCPU()
 	}
 	return granted
 }
 
 // NewNumaNode create a node for a CPU socket.
-func (p *policy) NewNumaNode(id system.Id, parent Node) Node {
+func (p *policy) NewNumaNode(id system.ID, parent Node) Node {
 	n := &numanode{}
 	n.self.node = n
 	n.node.init(p, fmt.Sprintf("numa node #%v", id), NumaNode, parent)
@@ -378,36 +378,36 @@ func (n *numanode) dump(prefix string, level ...int) {
 }
 
 // Get CPU supply available at this node.
-func (n *numanode) GetCpu() CpuSupply {
+func (n *numanode) GetCPU() CPUSupply {
 	return n.nodecpu.Clone()
 }
 
-// DiscoverCpu discovers the CPU supply available at this node.
-func (n *numanode) DiscoverCpu() CpuSupply {
+// DiscoverCPU discovers the CPU supply available at this node.
+func (n *numanode) DiscoverCPU() CPUSupply {
 	log.Debug("discovering CPU available at node %s...", n.Name())
 
 	nodecpus := n.sysnode.CPUSet()
 	isolated := nodecpus.Intersection(n.policy.isolated)
 	sharable := nodecpus.Difference(isolated)
-	n.nodecpu = newCpuSupply(n, isolated, sharable, 0)
+	n.nodecpu = newCPUSupply(n, isolated, sharable, 0)
 
 	n.freecpu = n.nodecpu.Clone()
 	return n.nodecpu.Clone()
 }
 
 // GetMemset() returns the set of memory attached to this node.
-func (n *numanode) GetMemset() system.IdSet {
+func (n *numanode) GetMemset() system.IDSet {
 	return n.mem.Clone()
 }
 
 // DiscoverMemset discovers the set of memory attached to this node.
-func (n *numanode) DiscoverMemset() system.IdSet {
-	n.mem = system.NewIdSet(n.sysnode.Id())
+func (n *numanode) DiscoverMemset() system.IDSet {
+	n.mem = system.NewIDSet(n.sysnode.ID())
 	return n.mem.Clone()
 }
 
 // NewSocketNode create a node for a CPU socket.
-func (p *policy) NewSocketNode(id system.Id, parent Node) Node {
+func (p *policy) NewSocketNode(id system.ID, parent Node) Node {
 	n := &socketnode{}
 	n.self.node = n
 	n.node.init(p, fmt.Sprintf("socket #%v", id), SocketNode, parent)
@@ -423,23 +423,23 @@ func (n *socketnode) dump(prefix string, level ...int) {
 }
 
 // Get CPU supply available at this node.
-func (n *socketnode) GetCpu() CpuSupply {
+func (n *socketnode) GetCPU() CPUSupply {
 	return n.nodecpu.Clone()
 }
 
-// DiscoverCpu discovers the CPU supply available at this socket.
-func (n *socketnode) DiscoverCpu() CpuSupply {
+// DiscoverCPU discovers the CPU supply available at this socket.
+func (n *socketnode) DiscoverCPU() CPUSupply {
 	log.Debug("discovering CPU available at node %s...", n.Name())
 
 	if n.IsLeafNode() {
 		sockcpus := n.syspkg.CPUSet()
 		isolated := sockcpus.Intersection(n.policy.isolated)
 		sharable := sockcpus.Difference(isolated)
-		n.nodecpu = newCpuSupply(n, isolated, sharable, 0)
+		n.nodecpu = newCPUSupply(n, isolated, sharable, 0)
 	} else {
-		n.nodecpu = newCpuSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0)
+		n.nodecpu = newCPUSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0)
 		for _, c := range n.children {
-			n.nodecpu.Cumulate(c.DiscoverCpu())
+			n.nodecpu.Cumulate(c.DiscoverCPU())
 		}
 	}
 
@@ -448,13 +448,13 @@ func (n *socketnode) DiscoverCpu() CpuSupply {
 }
 
 // GetMemset() returns the set of memory attached to this socket.
-func (n *socketnode) GetMemset() system.IdSet {
+func (n *socketnode) GetMemset() system.IDSet {
 	return n.mem.Clone()
 }
 
 // DiscoverMemset discovers the set of memory attached to this socket.
-func (n *socketnode) DiscoverMemset() system.IdSet {
-	n.mem = system.NewIdSet()
+func (n *socketnode) DiscoverMemset() system.IDSet {
+	n.mem = system.NewIDSet()
 	for _, c := range n.children {
 		n.mem.Add(c.GetMemset().Members()...)
 	}
@@ -477,17 +477,17 @@ func (n *virtualnode) dump(prefix string, level ...int) {
 }
 
 // Get CPU supply available at this node.
-func (n *virtualnode) GetCpu() CpuSupply {
+func (n *virtualnode) GetCPU() CPUSupply {
 	return n.nodecpu.Clone()
 }
 
-// DiscoverCpu discovers the CPU supply available at this node.
-func (n *virtualnode) DiscoverCpu() CpuSupply {
+// DiscoverCPU discovers the CPU supply available at this node.
+func (n *virtualnode) DiscoverCPU() CPUSupply {
 	log.Debug("discovering CPU available at node %s...", n.Name())
 
-	n.nodecpu = newCpuSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0)
+	n.nodecpu = newCPUSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0)
 	for _, c := range n.children {
-		n.nodecpu.Cumulate(c.DiscoverCpu())
+		n.nodecpu.Cumulate(c.DiscoverCPU())
 	}
 
 	n.freecpu = n.nodecpu.Clone()
@@ -495,13 +495,13 @@ func (n *virtualnode) DiscoverCpu() CpuSupply {
 }
 
 // GetMemset() returns the set of memory attached to this socket.
-func (n *virtualnode) GetMemset() system.IdSet {
+func (n *virtualnode) GetMemset() system.IDSet {
 	return n.mem.Clone()
 }
 
 // DiscoverMemset discovers the set of memory attached to this socket.
-func (n *virtualnode) DiscoverMemset() system.IdSet {
-	n.mem = system.NewIdSet()
+func (n *virtualnode) DiscoverMemset() system.IDSet {
+	n.mem = system.NewIDSet()
 	for _, c := range n.children {
 		n.mem.Add(c.GetMemset().Members()...)
 	}

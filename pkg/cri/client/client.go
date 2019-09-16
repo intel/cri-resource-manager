@@ -29,8 +29,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
-// ClientOptions contains the configurable options of our CRI client.
-type ClientOptions struct {
+// Options contains the configurable options of our CRI client.
+type Options struct {
 	// ImageSocket is the socket path for the CRI image service.
 	ImageSocket string
 	// RuntimeSocket is the socket path for the CRI runtime service.
@@ -68,7 +68,7 @@ type client struct {
 	logger.Logger
 	api.ImageServiceClient
 	api.RuntimeServiceClient
-	options ClientOptions    // client options
+	options Options          // client options
 	icc     *grpc.ClientConn // our gRPC connection to the image service
 	rcc     *grpc.ClientConn // our gRPC connection to the runtime service
 }
@@ -79,7 +79,7 @@ const (
 )
 
 // NewClient creates a new client instance.
-func NewClient(options ClientOptions) (Client, error) {
+func NewClient(options Options) (Client, error) {
 	if options.ImageSocket == DontConnect && options.RuntimeSocket == DontConnect {
 		return nil, clientError("neither image nor runtime socket specified")
 	}

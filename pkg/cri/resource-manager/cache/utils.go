@@ -130,11 +130,11 @@ func MilliCPUToQuota(milliCPU int64) (int64, int64) {
 	return quota, period
 }
 
-// We don't do this direction (we leave the adjustment intact)...
+// MemoryRequestToOomScoreAdj -- We don't do this direction (we leave the adjustment intact)...
 func MemoryRequestToOomScoreAdj(namespace string, configSource string, qos corev1.PodQOSClass,
 	memRequest int64) int64 {
 	panic("this shouldn't be called... better leave the OOM score adjustment intact.")
-	return 0
+	// return 0
 }
 
 // OomScoreAdjToMemoryRequest tries to convert OOM score to original memory request.

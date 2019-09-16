@@ -188,37 +188,37 @@ func (l *logger) Panic(format string, args ...interface{}) {
 // Default logger/source.
 var defLogger Logger
 
-// Get the default logger.
+// Default gets the default logger.
 func Default() Logger {
 	return defLogger
 }
 
-// Emit an info message with the default soruce.
+// Info emit an info message with the default soruce.
 func Info(format string, args ...interface{}) {
 	defLogger.Info(format, args...)
 }
 
-// Emit a warning message with the default source.
+// Warn emit a warning message with the default source.
 func Warn(format string, args ...interface{}) {
 	defLogger.Warn(format, args...)
 }
 
-// Emit an error message with the default source.
+// Error emit an error message with the default source.
 func Error(format string, args ...interface{}) {
 	defLogger.Error(format, args...)
 }
 
-// Emit a fatal error message with the default source.
+// Fatal emit a fatal error message with the default source.
 func Fatal(format string, args ...interface{}) {
 	defLogger.Fatal(format, args...)
 }
 
-// Emit a fatal error message with the default source and panic.
+// Panic emit a fatal error message with the default source and panic.
 func Panic(format string, args ...interface{}) {
 	defLogger.Panic(format, args...)
 }
 
-// Emit a debug message with the default source.
+// Debug emit a debug message with the default source.
 func Debug(format string, args ...interface{}) {
 	defLogger.Debug(format, args...)
 }

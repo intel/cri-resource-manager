@@ -62,7 +62,7 @@ var opt = options{
 // XXX TODO: write missing constraint parsers as needed...
 //
 
-func parseCpuConstraint(cpus string) (interface{}, error) {
+func parseCPUConstraint(cpus string) (interface{}, error) {
 	switch {
 	case strings.Contains(cpus, ":"):
 		split := strings.Split(cpus, ":")
@@ -73,7 +73,7 @@ func parseCpuConstraint(cpus string) (interface{}, error) {
 			return parseCpuset(cpus, value)
 
 		case "quantity":
-			return parseCpuQuantity(cpus, value)
+			return parseCPUQuantity(cpus, value)
 
 		case "cgroup":
 			return parseCgroupCpuset(cpus, value)
@@ -92,11 +92,11 @@ func parseCpuConstraint(cpus string) (interface{}, error) {
 		return parseCgroupCpuset(cpus, cpus)
 
 	default:
-		return parseCpuQuantity(cpus, cpus)
+		return parseCPUQuantity(cpus, cpus)
 	}
 }
 
-func parseCpuQuantity(constraint, value string) (interface{}, error) {
+func parseCPUQuantity(constraint, value string) (interface{}, error) {
 	qty, err := resource.ParseQuantity(value)
 	if err != nil {
 		return nil, policyError("invalid cpu quantity '%s' in constraint '%s': %v",
@@ -155,8 +155,8 @@ func (o *options) setConstraint(c Constraint, constraint string) error {
 	domain, value = domval[0], domval[1]
 
 	switch domain {
-	case string(DomainCpu):
-		c[DomainCpu], err = parseCpuConstraint(value)
+	case string(DomainCPU):
+		c[DomainCPU], err = parseCPUConstraint(value)
 	case string(DomainMemory):
 		c[DomainMemory], err = parseMemConstraint(value)
 	case string(DomainHugePage):

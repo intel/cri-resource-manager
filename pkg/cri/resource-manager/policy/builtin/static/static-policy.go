@@ -61,7 +61,7 @@ const (
 )
 
 // NewStaticPolicy creates a new policy instance.
-func NewStaticPolicy(opts *policy.PolicyOpts) policy.Backend {
+func NewStaticPolicy(opts *policy.Options) policy.Backend {
 	s := &static{
 		config:    opts.Config,
 		Logger:    logger.NewLogger(PolicyName),
@@ -77,7 +77,7 @@ func NewStaticPolicy(opts *policy.PolicyOpts) policy.Backend {
 	}
 
 	s.sys = sys
-	s.numHT = sys.Cpu(sysfs.Id(0)).ThreadCPUSet().Size()
+	s.numHT = sys.CPU(sysfs.ID(0)).ThreadCPUSet().Size()
 
 	if err := s.checkConstraints(); err != nil {
 		s.Fatal("cannot start with given constraints: %v", err)
@@ -125,10 +125,10 @@ func (s *static) Start(state cache.Cache) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (s *static) AllocateResources(c cache.Container) error {
-	s.Info("allocating resource for container %s...", c.GetCacheId())
+	s.Info("allocating resource for container %s...", c.GetCacheID())
 
 	container := c
-	containerID := c.GetCacheId()
+	containerID := c.GetCacheID()
 	pod, found := c.GetPod()
 	if !found {
 		return policyError("can't find pod for container %s", containerID)
@@ -141,9 +141,9 @@ func (s *static) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (s *static) ReleaseResources(c cache.Container) error {
-	s.Info("releasing resources of container %s...", c.GetCacheId())
+	s.Info("releasing resources of container %s...", c.GetCacheID())
 
-	containerID := c.GetCacheId()
+	containerID := c.GetCacheID()
 	err := s.RemoveContainer(containerID)
 
 	return err
@@ -151,13 +151,13 @@ func (s *static) ReleaseResources(c cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (s *static) UpdateResources(c cache.Container) error {
-	s.Debug("(not) updating container %s...", c.GetCacheId())
+	s.Debug("(not) updating container %s...", c.GetCacheID())
 	return nil
 }
 
 // ExportResourceData provides resource data to export for the container.
 func (s *static) ExportResourceData(c cache.Container, syntax policy.DataSyntax) []byte {
-	cset, ok := s.GetCPUSet(c.GetCacheId())
+	cset, ok := s.GetCPUSet(c.GetCacheID())
 	if !ok {
 		cset = s.GetDefaultCPUSet()
 	}
@@ -277,7 +277,7 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 		if c, ok := s.state.LookupContainer(containerID); ok {
 			p, found := c.GetPod()
 			if !found {
-				s.Warn("can't find pod for container %s", c.GetId())
+				s.Warn("can't find pod for container %s", c.GetID())
 				return false, false
 			}
 
@@ -287,7 +287,7 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 				} else {
 					if err != nil {
 						s.Error("invalid label '%s' on pod %s container %s, expecting boolean: %v",
-							labelPreferIsolated, p.GetId(), c.GetId(), err)
+							labelPreferIsolated, p.GetID(), c.GetID(), err)
 					}
 				}
 			}
@@ -345,13 +345,13 @@ func (s *static) fullCore(cset cpuset.CPUSet) bool {
 	if cset.Size() != s.numHT {
 		return false
 	}
-	coreId := -1
+	coreID := -1
 	for _, cpu := range cset.ToSlice() {
-		id := s.sys.Cpu(sysfs.Id(cpu)).CoreId()
+		id := s.sys.CPU(sysfs.ID(cpu)).CoreID()
 		switch {
-		case coreId < 0:
-			coreId = int(id)
-		case coreId != int(id):
+		case coreID < 0:
+			coreID = int(id)
+		case coreID != int(id):
 			return false
 		}
 	}
@@ -387,7 +387,7 @@ func (s *static) allocateCPUs(numCPUs int, containerID string) (cpuset.CPUSet, e
 func (s *static) guaranteedCPUs(pod cache.Pod, container cache.Container) int {
 	qos := pod.GetQOSClass()
 
-	s.Debug("* QoS class for pod %s (%s) is %s", pod.GetId(), pod.GetName(), qos)
+	s.Debug("* QoS class for pod %s (%s) is %s", pod.GetID(), pod.GetName(), qos)
 
 	if qos != v1.PodQOSGuaranteed {
 		return 0
@@ -408,7 +408,7 @@ func (s *static) checkConstraints() error {
 	isolated := s.sys.Isolated().Intersection(online)
 	online = online.Difference(isolated)
 
-	cpus, ok := s.available[policy.DomainCpu]
+	cpus, ok := s.available[policy.DomainCPU]
 	if !ok {
 		s.availableCpus = online
 	} else {
@@ -431,7 +431,7 @@ func (s *static) allocateReserved() error {
 	var err error
 	var reserved cpuset.CPUSet
 
-	cpus, ok := s.reserved[policy.DomainCpu]
+	cpus, ok := s.reserved[policy.DomainCPU]
 	if !ok {
 		return policyError("static policy cannot start without reserved CPUs")
 	}
@@ -657,7 +657,7 @@ func (s *static) SetCpusetCpus(id, value string) error {
 	}
 
 	c.SetCpusetCpus(value)
-	s.Info("container %s/%s: CpusetCpus set to %s", c.GetCacheId(), c.GetId(), value)
+	s.Info("container %s/%s: CpusetCpus set to %s", c.GetCacheID(), c.GetID(), value)
 
 	return nil
 }
@@ -667,7 +667,7 @@ func (s *static) SetCpusetCpus(id, value string) error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.PolicyOpts) policy.Backend
+type Implementation func(*policy.Options) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (i Implementation) Name() string {

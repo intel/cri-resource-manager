@@ -37,7 +37,7 @@ func (cs *cpuSupply) maskByHints(cpus cpuset.CPUSet, hints system.TopologyHints)
 		case h.NUMAs != "":
 			for _, idstr := range strings.Split(h.NUMAs, ",") {
 				if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-					if node := cs.node.System().Node(system.Id(id)); node != nil {
+					if node := cs.node.System().Node(system.ID(id)); node != nil {
 						cpus = cpus.Intersection(node.CPUSet())
 					}
 				}
@@ -46,7 +46,7 @@ func (cs *cpuSupply) maskByHints(cpus cpuset.CPUSet, hints system.TopologyHints)
 		case h.Sockets != "":
 			for _, idstr := range strings.Split(h.Sockets, ",") {
 				if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-					if pkg := cs.node.System().Package(system.Id(id)); pkg != nil {
+					if pkg := cs.node.System().Package(system.ID(id)); pkg != nil {
 						cpus = cpus.Intersection(pkg.CPUSet())
 					}
 				}
@@ -70,7 +70,7 @@ func (cs *cpuSupply) hintCpus(h system.TopologyHint) cpuset.CPUSet {
 	case h.NUMAs != "":
 		for _, idstr := range strings.Split(h.NUMAs, ",") {
 			if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-				if node := cs.node.System().Node(system.Id(id)); node != nil {
+				if node := cs.node.System().Node(system.ID(id)); node != nil {
 					cpus = cpus.Union(node.CPUSet())
 				}
 			}
@@ -79,7 +79,7 @@ func (cs *cpuSupply) hintCpus(h system.TopologyHint) cpuset.CPUSet {
 	case h.Sockets != "":
 		for _, idstr := range strings.Split(h.Sockets, ",") {
 			if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-				if pkg := cs.node.System().Package(system.Id(id)); pkg != nil {
+				if pkg := cs.node.System().Package(system.ID(id)); pkg != nil {
 					cpus = cpus.Union(pkg.CPUSet())
 				}
 			}

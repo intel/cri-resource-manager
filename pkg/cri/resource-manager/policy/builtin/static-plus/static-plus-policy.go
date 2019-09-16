@@ -68,7 +68,7 @@ type staticplus struct {
 var _ policy.Backend = &staticplus{}
 
 // CreateStaticPlusPolicy creates a new policy instance.
-func CreateStaticPlusPolicy(opts *policy.PolicyOpts) policy.Backend {
+func CreateStaticPlusPolicy(opts *policy.Options) policy.Backend {
 	p := &staticplus{
 		Logger: logger.NewLogger(PolicyName),
 	}
@@ -117,7 +117,7 @@ func (p *staticplus) Start(cch cache.Cache) error {
 func (p *staticplus) AllocateResources(c cache.Container) error {
 	var a *Assignment
 
-	id := c.GetCacheId()
+	id := c.GetCacheID()
 
 	p.Debug("allocating container %s...", id)
 
@@ -135,7 +135,7 @@ func (p *staticplus) AllocateResources(c cache.Container) error {
 
 // ReleaseResources release resources assigned to the given container.
 func (p *staticplus) ReleaseResources(c cache.Container) error {
-	id := c.GetCacheId()
+	id := c.GetCacheID()
 
 	p.Debug("releasing container %s...", id)
 
@@ -149,13 +149,13 @@ func (p *staticplus) ReleaseResources(c cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (p *staticplus) UpdateResources(c cache.Container) error {
-	p.Debug("(not) updating container %s...", c.GetCacheId())
+	p.Debug("(not) updating container %s...", c.GetCacheID())
 	return nil
 }
 
 // ExportResourceData provides resource data to export for the container.
 func (p *staticplus) ExportResourceData(c cache.Container, syntax policy.DataSyntax) []byte {
-	id := c.GetCacheId()
+	id := c.GetCacheID()
 	a, ok := p.allocations[id]
 	if !ok {
 		// Hmm...
@@ -175,7 +175,7 @@ func (p *staticplus) PostStart(cch cache.Container) error {
 }
 
 // SetConfig sets the policy backend configuration
-func (s *staticplus) SetConfig(string) error {
+func (p *staticplus) SetConfig(string) error {
 	return nil
 }
 
@@ -224,7 +224,7 @@ func (p *staticplus) setupPools(available, reserved policy.Constraint) error {
 
 	p.offline = p.sys.Offlined()
 
-	cpus, ok := available[policy.DomainCpu]
+	cpus, ok := available[policy.DomainCPU]
 	if !ok {
 		p.available = p.sys.CPUSet().Difference(p.offline)
 	} else {
@@ -234,7 +234,7 @@ func (p *staticplus) setupPools(available, reserved policy.Constraint) error {
 	p.isolated = p.sys.Isolated().Intersection(p.available)
 	p.available = p.available.Difference(p.isolated)
 
-	cpus, ok = reserved[policy.DomainCpu]
+	cpus, ok = reserved[policy.DomainCPU]
 	if !ok {
 		return policyError("cannot start without any reserved CPUs")
 	}
@@ -353,26 +353,26 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 	// always assign system containers to the reserved pool
 	case c.GetNamespace() == metav1.NamespaceSystem:
 		c.SetCpusetCpus(p.reserved.String())
-		c.SetCpuShares(int64(MilliCPUToShares(a.shared)))
+		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
 		p.Info("system container %s allocated (%d mCPU) to reserved pool %s",
-			c.GetCacheId(), a.shared, p.reserved.String())
+			c.GetCacheID(), a.shared, p.reserved.String())
 
 		// for shared-only assignments, it's enough to update the container
 	case a.exclusive.IsEmpty():
 		c.SetCpusetCpus(p.shared.String())
-		c.SetCpuShares(int64(MilliCPUToShares(a.shared)))
+		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
 		p.Info("container %s allocated (%d mCPU) to shared pool %s",
-			c.GetCacheId(), a.shared, p.shared.String())
+			c.GetCacheID(), a.shared, p.shared.String())
 
 		// if we got isolated exclusive cpus, it's enough to update the container
 	case !a.exclusive.Intersection(p.sys.Isolated()).IsEmpty():
 		c.SetCpusetCpus(a.exclusive.Union(p.shared).String())
-		c.SetCpuShares(int64(MilliCPUToShares(a.shared)))
+		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
 		p.Info("container %s allocated to isolated (%s) and shared (%d mCPU) pool %s",
-			c.GetCacheId(), a.exclusive.String(), a.shared, p.shared.String())
+			c.GetCacheID(), a.exclusive.String(), a.shared, p.shared.String())
 
 		// if we sliced off shared cpus, we might need to update other containers as well
 	default:
@@ -381,7 +381,7 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		}
 	}
 
-	p.allocations[c.GetCacheId()] = a
+	p.allocations[c.GetCacheID()] = a
 
 	p.cache.SetPolicyEntry(keySharedPool, p.shared)
 	p.cache.SetPolicyEntry(keyAllocations,
@@ -455,7 +455,7 @@ func (p *staticplus) updateSharedAllocations() error {
 			cac.SetCpusetCpus(cset.String())
 
 			p.Info("container %s reallocated to exclusive (%s) and shared (%d mCPU) pool %s",
-				cac.GetCacheId(), ca.exclusive.String(), ca.shared, cset.String())
+				cac.GetCacheID(), ca.exclusive.String(), ca.shared, cset.String())
 		}
 
 		avail -= ca.shared
@@ -696,7 +696,7 @@ func MilliCPUToShares(milliCPU int) int64 {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.PolicyOpts) policy.Backend
+type Implementation func(*policy.Options) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (n Implementation) Name() string {

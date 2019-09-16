@@ -59,8 +59,8 @@ func (p *policy) restoreConfig() bool {
 	opt.Hints = restored.Hints
 	p.saveConfig()
 
-	if opt.IsExplicit(optPinCpu) {
-		restored.PinCpu = opt.PinCpu
+	if opt.IsExplicit(optPinCPU) {
+		restored.PinCPU = opt.PinCPU
 	}
 	if opt.IsExplicit(optPinMem) {
 		restored.PinMem = opt.PinMem
@@ -84,17 +84,17 @@ type cachedGrant struct {
 	Pool      string
 }
 
-func newCachedGrant(cg CpuGrant) *cachedGrant {
+func newCachedGrant(cg CPUGrant) *cachedGrant {
 	ccg := &cachedGrant{}
-	ccg.Exclusive = cg.ExclusiveCpus().String()
+	ccg.Exclusive = cg.ExclusiveCPUs().String()
 	ccg.Part = cg.SharedPortion()
-	ccg.Container = cg.GetContainer().GetCacheId()
+	ccg.Container = cg.GetContainer().GetCacheID()
 	ccg.Pool = cg.GetNode().Name()
 
 	return ccg
 }
 
-func (ccg *cachedGrant) ToCpuGrant(policy *policy) (CpuGrant, error) {
+func (ccg *cachedGrant) ToCPUGrant(policy *policy) (CPUGrant, error) {
 	node, ok := policy.nodes[ccg.Pool]
 	if !ok {
 		return nil, policyError("cache error: failed to restore %v, unknown pool/node", *ccg)
@@ -104,7 +104,7 @@ func (ccg *cachedGrant) ToCpuGrant(policy *policy) (CpuGrant, error) {
 		return nil, policyError("cache error: failed to restore %v, unknown container", *ccg)
 	}
 
-	return newCpuGrant(
+	return newCPUGrant(
 		node,
 		container,
 		cpuset.MustParse(ccg.Exclusive),
@@ -130,7 +130,7 @@ func (cg *cpuGrant) UnmarshalJSON(data []byte) error {
 
 func (a *allocations) MarshalJSON() ([]byte, error) {
 	cgrants := make(map[string]*cachedGrant)
-	for id, cg := range a.Cpu {
+	for id, cg := range a.CPU {
 		cgrants[id] = newCachedGrant(cg)
 	}
 
@@ -145,14 +145,14 @@ func (a *allocations) UnmarshalJSON(data []byte) error {
 		return policyError("failed to restore allocations: %v", err)
 	}
 
-	a.Cpu = make(map[string]CpuGrant, 32)
+	a.CPU = make(map[string]CPUGrant, 32)
 	for id, ccg := range cgrants {
-		a.Cpu[id], err = ccg.ToCpuGrant(a.policy)
+		a.CPU[id], err = ccg.ToCPUGrant(a.policy)
 		if err != nil {
 			log.Error("removing unresolvable cached grant %v: %v", *ccg, err)
-			delete(a.Cpu, id)
+			delete(a.CPU, id)
 		} else {
-			log.Debug("resolved cache grant: %v", a.Cpu[id].String())
+			log.Debug("resolved cache grant: %v", a.CPU[id].String())
 		}
 	}
 
@@ -174,14 +174,14 @@ func (a *allocations) Set(value interface{}) {
 		from = value.(*allocations)
 	}
 
-	a.Cpu = make(map[string]CpuGrant, 32)
-	for id, cg := range from.Cpu {
-		a.Cpu[id] = cg
+	a.CPU = make(map[string]CPUGrant, 32)
+	for id, cg := range from.CPU {
+		a.CPU[id] = cg
 	}
 }
 
 func (a *allocations) Dump(logfn func(format string, args ...interface{}), prefix string) {
-	for _, cg := range a.Cpu {
+	for _, cg := range a.CPU {
 		logfn(prefix+"%s", cg.String())
 	}
 }

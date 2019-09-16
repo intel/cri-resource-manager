@@ -35,8 +35,8 @@ import (
 	"go.opencensus.io/trace"
 )
 
-// ServerOptions contains the configurable options of our CRI server.
-type ServerOptions struct {
+// Options contains the configurable options of our CRI server.
+type Options struct {
 	// Socket is the path of our gRPC servers unix-domain socket.
 	Socket string
 }
@@ -66,7 +66,7 @@ type server struct {
 	logger.Logger
 	listener     net.Listener              // socket our gRPC server listens on
 	server       *grpc.Server              // our gRPC server
-	options      ServerOptions             // server options
+	options      Options                   // server options
 	interceptors map[string]Interceptor    // request intercepting hooks
 	dumper       dump.Dumper               // request/reply dumper
 	runtime      *api.RuntimeServiceServer // CRI runtime service
@@ -74,7 +74,7 @@ type server struct {
 }
 
 // NewServer creates a new server instance.
-func NewServer(options ServerOptions) (Server, error) {
+func NewServer(options Options) (Server, error) {
 	if !filepath.IsAbs(options.Socket) {
 		return nil, serverError("invalid socket '%s', expecting absolute path",
 			options.Socket)

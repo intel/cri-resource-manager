@@ -34,7 +34,7 @@ type none struct {
 var _ policy.Backend = &none{}
 
 // CreateNonePolicy creates a new policy instance.
-func CreateNonePolicy(opts *policy.PolicyOpts) policy.Backend {
+func CreateNonePolicy(opts *policy.Options) policy.Backend {
 	n := &none{Logger: logger.NewLogger(PolicyName)}
 	n.Info("creating policy...")
 	return n
@@ -58,19 +58,19 @@ func (n *none) Start(cch cache.Cache) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (n *none) AllocateResources(c cache.Container) error {
-	n.Debug("(not) allocating container %s...", c.GetCacheId())
+	n.Debug("(not) allocating container %s...", c.GetCacheID())
 	return nil
 }
 
 // ReleaseResources is a resource release request for this policy.
 func (n *none) ReleaseResources(c cache.Container) error {
-	n.Debug("(not) releasing container %s...", c.GetCacheId())
+	n.Debug("(not) releasing container %s...", c.GetCacheID())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (n *none) UpdateResources(c cache.Container) error {
-	n.Debug("(not) updating container %s...", c.GetCacheId())
+	n.Debug("(not) updating container %s...", c.GetCacheID())
 	return nil
 }
 
@@ -94,7 +94,7 @@ func (n *none) SetConfig(string) error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.PolicyOpts) policy.Backend
+type Implementation func(*policy.Options) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (n Implementation) Name() string {

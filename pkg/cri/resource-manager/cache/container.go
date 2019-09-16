@@ -28,23 +28,23 @@ import (
 
 // Create a container for a create request.
 func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
-	c.PodId = req.PodSandboxId
+	c.PodID = req.PodSandboxId
 
 	cfg := req.Config
 	if cfg == nil {
-		return cacheError("container of pod %s has no config", c.PodId)
+		return cacheError("container of pod %s has no config", c.PodID)
 	}
 	meta := cfg.Metadata
 	if meta == nil {
-		return cacheError("container of pod %s has no request metadata", c.PodId)
+		return cacheError("container of pod %s has no request metadata", c.PodID)
 	}
 	podCfg := req.SandboxConfig
 	if podCfg == nil {
-		return cacheError("container of pod %s has no request pod config data", c.PodId)
+		return cacheError("container of pod %s has no request pod config data", c.PodID)
 	}
 	podMeta := podCfg.Metadata
 	if podMeta == nil {
-		return cacheError("container of pod %s has no request pod metadata", c.PodId)
+		return cacheError("container of pod %s has no request pod metadata", c.PodID)
 	}
 
 	c.Name = meta.Name
@@ -94,7 +94,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 
 	c.LinuxReq = cfg.GetLinux().GetResources()
 
-	if p, _ := c.cache.Pods[c.PodId]; p != nil && p.Resources != nil {
+	if p, _ := c.cache.Pods[c.PodID]; p != nil && p.Resources != nil {
 		if r, ok := p.Resources.InitContainers[c.Name]; ok {
 			c.Resources = r
 		} else if r, ok := p.Resources.Containers[c.Name]; ok {
@@ -113,19 +113,19 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 
 // Create container from a container list response.
 func (c *container) fromListResponse(lrc *cri.Container) error {
-	c.PodId = lrc.PodSandboxId
+	c.PodID = lrc.PodSandboxId
 
-	p, _ := c.cache.Pods[c.PodId]
+	p, _ := c.cache.Pods[c.PodID]
 	if p == nil {
-		return cacheError("can't find cached pod %s for listed container", c.PodId)
+		return cacheError("can't find cached pod %s for listed container", c.PodID)
 	}
 
 	meta := lrc.Metadata
 	if meta == nil {
-		return cacheError("listed container of pod %s has no metadata", c.PodId)
+		return cacheError("listed container of pod %s has no metadata", c.PodID)
 	}
 
-	c.Id = lrc.Id
+	c.ID = lrc.Id
 	c.Name = meta.Name
 	c.Namespace = p.Namespace
 	c.State = ContainerState(int32(lrc.State))
@@ -146,9 +146,9 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 
 // UpdateCriCreateRequest updates a CRI ContainerCreateRequest for the container.
 func (c *container) UpdateCriCreateRequest(req *cri.CreateContainerRequest) error {
-	if c.State != ContainerStateCreating || c.Id != "" {
+	if c.State != ContainerStateCreating || c.ID != "" {
 		c.cache.Warn("hmm... cache thinks container (%v/%v) being created exists",
-			c.CacheId, c.Id)
+			c.CacheID, c.ID)
 	}
 
 	req.Config.Command = c.Command
@@ -197,8 +197,8 @@ func (c *container) UpdateCriCreateRequest(req *cri.CreateContainerRequest) erro
 
 // CriUpdateRequest creates a CRI UpdateContainerResourcesRequest for the container.
 func (c *container) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error) {
-	if c.Id == "" {
-		return nil, cacheError("can't udpate container %s, not created yet", c.CacheId)
+	if c.ID == "" {
+		return nil, cacheError("can't udpate container %s, not created yet", c.CacheID)
 	}
 
 	if c.LinuxReq == nil {
@@ -206,26 +206,26 @@ func (c *container) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, er
 	}
 
 	return &cri.UpdateContainerResourcesRequest{
-		ContainerId: c.Id,
+		ContainerId: c.ID,
 		Linux:       &(*c.LinuxReq),
 	}, nil
 }
 
 func (c *container) GetPod() (Pod, bool) {
-	pod, found := c.cache.Pods[c.PodId]
+	pod, found := c.cache.Pods[c.PodID]
 	return pod, found
 }
 
-func (c *container) GetId() string {
-	return c.Id
+func (c *container) GetID() string {
+	return c.ID
 }
 
-func (c *container) GetPodId() string {
-	return c.PodId
+func (c *container) GetPodID() string {
+	return c.PodID
 }
 
-func (c *container) GetCacheId() string {
-	return c.CacheId
+func (c *container) GetCacheID() string {
+	return c.CacheID
 }
 
 func (c *container) GetName() string {
@@ -328,7 +328,7 @@ func (c *container) GetAnnotation(key string, objPtr interface{}) (string, bool)
 	if objPtr != nil {
 		if err := json.Unmarshal([]byte(jsonStr), objPtr); err != nil {
 			c.cache.Error("failed to unmarshal annotation %s (%s) of pod %s into %T",
-				key, jsonStr, c.Id, objPtr)
+				key, jsonStr, c.ID, objPtr)
 			return "", false
 		}
 	}
@@ -524,21 +524,21 @@ func (c *container) GetTopologyHints() sysfs.TopologyHints {
 	return c.TopologyHints
 }
 
-func (c *container) GetCpuPeriod() int64 {
+func (c *container) GetCPUPeriod() int64 {
 	if c.LinuxReq == nil {
 		return 0
 	}
 	return c.LinuxReq.CpuPeriod
 }
 
-func (c *container) GetCpuQuota() int64 {
+func (c *container) GetCPUQuota() int64 {
 	if c.LinuxReq == nil {
 		return 0
 	}
 	return c.LinuxReq.CpuQuota
 }
 
-func (c *container) GetCpuShares() int64 {
+func (c *container) GetCPUShares() int64 {
 	if c.LinuxReq == nil {
 		return 0
 	}
@@ -578,7 +578,7 @@ func (c *container) SetLinuxResources(req *cri.LinuxContainerResources) {
 	c.cache.markChanged(c)
 }
 
-func (c *container) SetCpuPeriod(value int64) {
+func (c *container) SetCPUPeriod(value int64) {
 	if c.LinuxReq == nil {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
@@ -586,7 +586,7 @@ func (c *container) SetCpuPeriod(value int64) {
 	c.cache.markChanged(c)
 }
 
-func (c *container) SetCpuQuota(value int64) {
+func (c *container) SetCPUQuota(value int64) {
 	if c.LinuxReq == nil {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
@@ -594,7 +594,7 @@ func (c *container) SetCpuQuota(value int64) {
 	c.cache.markChanged(c)
 }
 
-func (c *container) SetCpuShares(value int64) {
+func (c *container) SetCPUShares(value int64) {
 	if c.LinuxReq == nil {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}

@@ -25,44 +25,44 @@ import (
 const (
 	apiVersion = "v1alpha2"
 
-	ImageService = "ImageService"
-	ListImages   = "ListtImages"
-	ImageStatus  = "ImageStatus"
-	PullImage    = "PullImage"
-	RemoveImage  = "RemoveImage"
-	ImageFsInfo  = "ImageFsInfo"
+	imageService = "ImageService"
+	listImages   = "ListtImages"
+	imageStatus  = "ImageStatus"
+	pullImage    = "PullImage"
+	removeImage  = "RemoveImage"
+	imageFsInfo  = "ImageFsInfo"
 
-	RuntimeService           = "RuntimeService"
-	Version                  = "Version"
-	RunPodSandbox            = "RunPodSandbox"
-	StopPodSandbox           = "StopPodSandbox"
-	RemovePodSandbox         = "RemovePodSandbox"
-	PodSandboxStatus         = "PodSandboxStatus"
-	ListPodSandbox           = "ListPodSandbox"
-	CreateContainer          = "CreateContainer"
-	StartContainer           = "StartContainer"
-	StopContainer            = "StopContainer"
-	RemoveContainer          = "RemoveContainer"
-	ListContainers           = "ListContainers"
-	ContainerStatus          = "ContainerStatus"
-	UpdateContainerResources = "UpdateContainerResources"
-	ReopenContainerLog       = "ReopenContainerLog"
-	ExecSync                 = "ExecSync"
-	Exec                     = "Exec"
-	Attach                   = "Attach"
-	PortForward              = "PortForward"
-	ContainerStats           = "ContainerStats"
-	ListContainerStats       = "ListContainerStats"
-	UpdateRuntimeConfig      = "UpdateRuntimeConfig"
-	Status                   = "Status"
+	runtimeService           = "RuntimeService"
+	version                  = "Version"
+	runPodSandbox            = "RunPodSandbox"
+	stopPodSandbox           = "StopPodSandbox"
+	removePodSandbox         = "RemovePodSandbox"
+	podSandboxStatus         = "PodSandboxStatus"
+	listPodSandbox           = "ListPodSandbox"
+	createContainer          = "CreateContainer"
+	startContainer           = "StartContainer"
+	stopContainer            = "StopContainer"
+	removeContainer          = "RemoveContainer"
+	listContainers           = "ListContainers"
+	containerStatus          = "ContainerStatus"
+	updateContainerResources = "UpdateContainerResources"
+	reopenContainerLog       = "ReopenContainerLog"
+	execSync                 = "ExecSync"
+	exec                     = "Exec"
+	attach                   = "Attach"
+	portForward              = "PortForward"
+	containerStats           = "ContainerStats"
+	listContainerStats       = "ListContainerStats"
+	updateRuntimeConfig      = "UpdateRuntimeConfig"
+	status                   = "Status"
 )
 
 func fqmn(service, method string) string {
 	return "/runtime." + apiVersion + "." + service + "/" + method
 }
 
-func (s *server) interceptRequest(service, method string,
-	ctx context.Context, req interface{}, handler grpc.UnaryHandler) (interface{}, error) {
+func (s *server) interceptRequest(ctx context.Context, service, method string,
+	req interface{}, handler grpc.UnaryHandler) (interface{}, error) {
 
 	if span := trace.FromContext(ctx); span != nil {
 		span.AddAttributes(
@@ -76,7 +76,7 @@ func (s *server) interceptRequest(service, method string,
 
 func (s *server) ListImages(ctx context.Context,
 	req *api.ListImagesRequest) (*api.ListImagesResponse, error) {
-	rsp, err := s.interceptRequest(ImageService, ListImages, ctx, req,
+	rsp, err := s.interceptRequest(ctx, imageService, listImages, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.image).ListImages(ctx, req.(*api.ListImagesRequest))
 		})
@@ -90,7 +90,7 @@ func (s *server) ListImages(ctx context.Context,
 
 func (s *server) ImageStatus(ctx context.Context,
 	req *api.ImageStatusRequest) (*api.ImageStatusResponse, error) {
-	rsp, err := s.interceptRequest(ImageService, ImageStatus, ctx, req,
+	rsp, err := s.interceptRequest(ctx, imageService, imageStatus, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.image).ImageStatus(ctx, req.(*api.ImageStatusRequest))
 		})
@@ -104,7 +104,7 @@ func (s *server) ImageStatus(ctx context.Context,
 
 func (s *server) PullImage(ctx context.Context,
 	req *api.PullImageRequest) (*api.PullImageResponse, error) {
-	rsp, err := s.interceptRequest(ImageService, PullImage, ctx, req,
+	rsp, err := s.interceptRequest(ctx, imageService, pullImage, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.image).PullImage(ctx, req.(*api.PullImageRequest))
 		})
@@ -118,7 +118,7 @@ func (s *server) PullImage(ctx context.Context,
 
 func (s *server) RemoveImage(ctx context.Context,
 	req *api.RemoveImageRequest) (*api.RemoveImageResponse, error) {
-	rsp, err := s.interceptRequest(ImageService, RemoveImage, ctx, req,
+	rsp, err := s.interceptRequest(ctx, imageService, removeImage, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.image).RemoveImage(ctx, req.(*api.RemoveImageRequest))
 		})
@@ -132,7 +132,7 @@ func (s *server) RemoveImage(ctx context.Context,
 
 func (s *server) ImageFsInfo(ctx context.Context,
 	req *api.ImageFsInfoRequest) (*api.ImageFsInfoResponse, error) {
-	rsp, err := s.interceptRequest(ImageService, ImageFsInfo, ctx, req,
+	rsp, err := s.interceptRequest(ctx, imageService, imageFsInfo, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.image).ImageFsInfo(ctx, req.(*api.ImageFsInfoRequest))
 		})
@@ -146,7 +146,7 @@ func (s *server) ImageFsInfo(ctx context.Context,
 
 func (s *server) Version(ctx context.Context,
 	req *api.VersionRequest) (*api.VersionResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, Version, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, version, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).Version(ctx, req.(*api.VersionRequest))
 		})
@@ -160,7 +160,7 @@ func (s *server) Version(ctx context.Context,
 
 func (s *server) RunPodSandbox(ctx context.Context,
 	req *api.RunPodSandboxRequest) (*api.RunPodSandboxResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, RunPodSandbox, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, runPodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).RunPodSandbox(ctx, req.(*api.RunPodSandboxRequest))
 		})
@@ -174,7 +174,7 @@ func (s *server) RunPodSandbox(ctx context.Context,
 
 func (s *server) StopPodSandbox(ctx context.Context,
 	req *api.StopPodSandboxRequest) (*api.StopPodSandboxResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, StopPodSandbox, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, stopPodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).StopPodSandbox(ctx, req.(*api.StopPodSandboxRequest))
 		})
@@ -188,7 +188,7 @@ func (s *server) StopPodSandbox(ctx context.Context,
 
 func (s *server) RemovePodSandbox(ctx context.Context,
 	req *api.RemovePodSandboxRequest) (*api.RemovePodSandboxResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, RemovePodSandbox, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, removePodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).RemovePodSandbox(ctx, req.(*api.RemovePodSandboxRequest))
 		})
@@ -202,7 +202,7 @@ func (s *server) RemovePodSandbox(ctx context.Context,
 
 func (s *server) PodSandboxStatus(ctx context.Context,
 	req *api.PodSandboxStatusRequest) (*api.PodSandboxStatusResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, PodSandboxStatus, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, podSandboxStatus, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).PodSandboxStatus(ctx, req.(*api.PodSandboxStatusRequest))
 		})
@@ -216,7 +216,7 @@ func (s *server) PodSandboxStatus(ctx context.Context,
 
 func (s *server) ListPodSandbox(ctx context.Context,
 	req *api.ListPodSandboxRequest) (*api.ListPodSandboxResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, ListPodSandbox, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, listPodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).ListPodSandbox(ctx, req.(*api.ListPodSandboxRequest))
 		})
@@ -230,7 +230,7 @@ func (s *server) ListPodSandbox(ctx context.Context,
 
 func (s *server) CreateContainer(ctx context.Context,
 	req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, CreateContainer, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, createContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).CreateContainer(ctx, req.(*api.CreateContainerRequest))
 		})
@@ -244,7 +244,7 @@ func (s *server) CreateContainer(ctx context.Context,
 
 func (s *server) StartContainer(ctx context.Context,
 	req *api.StartContainerRequest) (*api.StartContainerResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, StartContainer, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, startContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).StartContainer(ctx, req.(*api.StartContainerRequest))
 		})
@@ -258,7 +258,7 @@ func (s *server) StartContainer(ctx context.Context,
 
 func (s *server) StopContainer(ctx context.Context,
 	req *api.StopContainerRequest) (*api.StopContainerResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, StopContainer, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, stopContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).StopContainer(ctx, req.(*api.StopContainerRequest))
 		})
@@ -272,7 +272,7 @@ func (s *server) StopContainer(ctx context.Context,
 
 func (s *server) RemoveContainer(ctx context.Context,
 	req *api.RemoveContainerRequest) (*api.RemoveContainerResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, RemoveContainer, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, removeContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).RemoveContainer(ctx, req.(*api.RemoveContainerRequest))
 		})
@@ -286,7 +286,7 @@ func (s *server) RemoveContainer(ctx context.Context,
 
 func (s *server) ListContainers(ctx context.Context,
 	req *api.ListContainersRequest) (*api.ListContainersResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, ListContainers, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, listContainers, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).ListContainers(ctx, req.(*api.ListContainersRequest))
 		})
@@ -300,7 +300,7 @@ func (s *server) ListContainers(ctx context.Context,
 
 func (s *server) ContainerStatus(ctx context.Context,
 	req *api.ContainerStatusRequest) (*api.ContainerStatusResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, ContainerStatus, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, containerStatus, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).ContainerStatus(ctx, req.(*api.ContainerStatusRequest))
 		})
@@ -314,7 +314,7 @@ func (s *server) ContainerStatus(ctx context.Context,
 
 func (s *server) UpdateContainerResources(ctx context.Context,
 	req *api.UpdateContainerResourcesRequest) (*api.UpdateContainerResourcesResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, UpdateContainerResources, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, updateContainerResources, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).UpdateContainerResources(ctx,
 				req.(*api.UpdateContainerResourcesRequest))
@@ -329,7 +329,7 @@ func (s *server) UpdateContainerResources(ctx context.Context,
 
 func (s *server) ReopenContainerLog(ctx context.Context,
 	req *api.ReopenContainerLogRequest) (*api.ReopenContainerLogResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, ReopenContainerLog, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, reopenContainerLog, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).ReopenContainerLog(ctx, req.(*api.ReopenContainerLogRequest))
 		})
@@ -343,7 +343,7 @@ func (s *server) ReopenContainerLog(ctx context.Context,
 
 func (s *server) ExecSync(ctx context.Context,
 	req *api.ExecSyncRequest) (*api.ExecSyncResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, ExecSync, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, execSync, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).ExecSync(ctx, req.(*api.ExecSyncRequest))
 		})
@@ -357,7 +357,7 @@ func (s *server) ExecSync(ctx context.Context,
 
 func (s *server) Exec(ctx context.Context,
 	req *api.ExecRequest) (*api.ExecResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, Exec, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, exec, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).Exec(ctx, req.(*api.ExecRequest))
 		})
@@ -371,7 +371,7 @@ func (s *server) Exec(ctx context.Context,
 
 func (s *server) Attach(ctx context.Context,
 	req *api.AttachRequest) (*api.AttachResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, Attach, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, attach, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).Attach(ctx, req.(*api.AttachRequest))
 		})
@@ -385,7 +385,7 @@ func (s *server) Attach(ctx context.Context,
 
 func (s *server) PortForward(ctx context.Context,
 	req *api.PortForwardRequest) (*api.PortForwardResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, PortForward, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, portForward, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).PortForward(ctx, req.(*api.PortForwardRequest))
 		})
@@ -399,7 +399,7 @@ func (s *server) PortForward(ctx context.Context,
 
 func (s *server) ContainerStats(ctx context.Context,
 	req *api.ContainerStatsRequest) (*api.ContainerStatsResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, ContainerStats, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, containerStats, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).ContainerStats(ctx, req.(*api.ContainerStatsRequest))
 		})
@@ -413,7 +413,7 @@ func (s *server) ContainerStats(ctx context.Context,
 
 func (s *server) ListContainerStats(ctx context.Context,
 	req *api.ListContainerStatsRequest) (*api.ListContainerStatsResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, ListContainerStats, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, listContainerStats, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).ListContainerStats(ctx, req.(*api.ListContainerStatsRequest))
 		})
@@ -427,7 +427,7 @@ func (s *server) ListContainerStats(ctx context.Context,
 
 func (s *server) UpdateRuntimeConfig(ctx context.Context,
 	req *api.UpdateRuntimeConfigRequest) (*api.UpdateRuntimeConfigResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, UpdateRuntimeConfig, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, updateRuntimeConfig, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).UpdateRuntimeConfig(ctx, req.(*api.UpdateRuntimeConfigRequest))
 		})
@@ -441,7 +441,7 @@ func (s *server) UpdateRuntimeConfig(ctx context.Context,
 
 func (s *server) Status(ctx context.Context,
 	req *api.StatusRequest) (*api.StatusResponse, error) {
-	rsp, err := s.interceptRequest(RuntimeService, Status, ctx, req,
+	rsp, err := s.interceptRequest(ctx, runtimeService, status, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).Status(ctx, req.(*api.StatusRequest))
 		})

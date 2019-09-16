@@ -60,9 +60,9 @@ type Pod interface {
 	// GetContainers returns the (non-init) containers of the pod.
 	GetContainers() []Container
 	// GetId returns the pod id of the pod.
-	GetId() string
-	// GetUid returns the (kubernetes) unique id of the pod.
-	GetUid() string
+	GetID() string
+	// GetUID returns the (kubernetes) unique id of the pod.
+	GetUID() string
 	// GetName returns the name of the pod.
 	GetName() string
 	// GetNamespace returns the namespace of the pod.
@@ -111,8 +111,8 @@ type Pod interface {
 // A cached pod.
 type pod struct {
 	cache        *cache            // our cache of object
-	Id           string            // pod sandbox runtime id
-	Uid          string            // (k8s) unique id
+	ID           string            // pod sandbox runtime id
+	UID          string            // (k8s) unique id
 	Name         string            // pod sandbox name
 	Namespace    string            // pod namespace
 	State        PodState          // ready/not ready
@@ -146,12 +146,12 @@ const (
 type Container interface {
 	// GetPod returns the pod of the container.
 	GetPod() (Pod, bool)
-	// GetId returns the Id of the container.
-	GetId() string
-	// GetPodId returns the pod Id of the container.
-	GetPodId() string
-	// GetCacheId returns the cacheId of the container.
-	GetCacheId() string
+	// GetID returns the ID of the container.
+	GetID() string
+	// GetPodID returns the pod ID of the container.
+	GetPodID() string
+	// GetCacheID returns the cacheID of the container.
+	GetCacheID() string
 	// GetName returns the name of the container.
 	GetName() string
 	// GetNamespace returns the namespace of the container.
@@ -236,12 +236,12 @@ type Container interface {
 	// Get any attached topology hints.
 	GetTopologyHints() sysfs.TopologyHints
 
-	// GetCpuPeriod gets the CFS CPU period of the container.
-	GetCpuPeriod() int64
+	// GetCPUPeriod gets the CFS CPU period of the container.
+	GetCPUPeriod() int64
 	// GetCpuQuota gets the CFS CPU quota of the container.
-	GetCpuQuota() int64
-	// GetCpuShares gets the CFS CPU shares of the container.
-	GetCpuShares() int64
+	GetCPUQuota() int64
+	// GetCPUShares gets the CFS CPU shares of the container.
+	GetCPUShares() int64
 	// GetmemoryLimit gets the memory limit in bytes for the container.
 	GetMemoryLimit() int64
 	// GetOomScoreAdj gets the OOM score adjustment for the container.
@@ -253,12 +253,12 @@ type Container interface {
 
 	// SetLinuxResources sets the Linux-specific resource request of the container.
 	SetLinuxResources(*cri.LinuxContainerResources)
-	// SetCpuPeriod sets the CFS CPU period of the container.
-	SetCpuPeriod(int64)
-	// SetCpuQuota sets the CFS CPU quota of the container.
-	SetCpuQuota(int64)
-	// SetCpuShares sets the CFS CPU shares of the container.
-	SetCpuShares(int64)
+	// SetCPUPeriod sets the CFS CPU period of the container.
+	SetCPUPeriod(int64)
+	// SetCPUQuota sets the CFS CPU quota of the container.
+	SetCPUQuota(int64)
+	// SetCPUShares sets the CFS CPU shares of the container.
+	SetCPUShares(int64)
 	// SetmemoryLimit sets the memory limit in bytes for the container.
 	SetMemoryLimit(int64)
 	// SetOomScoreAdj sets the OOM score adjustment for the container.
@@ -277,9 +277,9 @@ type Container interface {
 // A cached container.
 type container struct {
 	cache         *cache              // our cache of objects
-	Id            string              // container runtime id
-	PodId         string              // associate pods runtime id
-	CacheId       string              // our cache id
+	ID            string              // container runtime id
+	PodID         string              // associate pods runtime id
+	CacheID       string              // our cache id
 	Name          string              // container name
 	Namespace     string              // container namespace
 	State         ContainerState      // created/running/exited/unknown
@@ -359,8 +359,8 @@ type Cache interface {
 	LookupPod(id string) (Pod, bool)
 	// InsertContainer inserts a container into the cache, using a runtime request or reply.
 	InsertContainer(msg interface{}) Container
-	// UpdateContainerId updates a containers runtime id.
-	UpdateContainerId(cacheId string, msg interface{}) Container
+	// UpdateContainerID updates a containers runtime id.
+	UpdateContainerID(cacheID string, msg interface{}) Container
 	// DeleteContainer deletes a container from the cache.
 	DeleteContainer(id string) Container
 	// LookupContainer looks up a container in the cache.
@@ -418,7 +418,7 @@ type cache struct {
 
 	Pods       map[string]*pod       // known/cached pods
 	Containers map[string]*container // known/cache containers
-	NextId     uint64                // next container cache id to use
+	NextID     uint64                // next container cache id to use
 
 	Cfg        *config.RawConfig      // cached/current configuration
 	PolicyName string                 // name of the active policy
@@ -449,7 +449,7 @@ func NewCache(options Options) (Cache, error) {
 		Logger:     logger.NewLogger("cache"),
 		Pods:       make(map[string]*pod),
 		Containers: make(map[string]*container),
-		NextId:     1,
+		NextID:     1,
 		PolicyName: options.Policy,
 		policyData: make(map[string]interface{}),
 		PolicyJSON: make(map[string]string),
@@ -481,17 +481,17 @@ func (cch *cache) GetConfig() *config.RawConfig {
 }
 
 // Derive cache id using pod uid, or allocate a new unused local cache id.
-func (cch *cache) createCacheId(c *container) string {
-	if pod, ok := c.cache.LookupPod(c.PodId); ok {
-		uid := pod.GetUid()
+func (cch *cache) createCacheID(c *container) string {
+	if pod, ok := c.cache.LookupPod(c.PodID); ok {
+		uid := pod.GetUID()
 		if uid != "" {
 			return uid + ":" + c.Name
 		}
 	}
 
-	cch.Warn("can't find unique id for pod %s, assigning local cache id", c.PodId)
-	id := "cache:" + strconv.FormatUint(cch.NextId, 16)
-	cch.NextId++
+	cch.Warn("can't find unique id for pod %s, assigning local cache id", c.PodID)
+	id := "cache:" + strconv.FormatUint(cch.NextID, 16)
+	cch.NextID++
 
 	return id
 }
@@ -500,7 +500,7 @@ func (cch *cache) createCacheId(c *container) string {
 func (cch *cache) InsertPod(id string, msg interface{}) Pod {
 	var err error
 
-	p := &pod{cache: cch, Id: id}
+	p := &pod{cache: cch, ID: id}
 
 	switch msg.(type) {
 	case *cri.RunPodSandboxRequest:
@@ -516,7 +516,7 @@ func (cch *cache) InsertPod(id string, msg interface{}) Pod {
 		return nil
 	}
 
-	cch.Pods[p.Id] = p
+	cch.Pods[p.ID] = p
 
 	cch.Save()
 
@@ -530,7 +530,7 @@ func (cch *cache) DeletePod(id string) Pod {
 		return nil
 	}
 
-	cch.Debug("removing pod %s", p.Id)
+	cch.Debug("removing pod %s", p.ID)
 	delete(cch.Pods, id)
 
 	cch.Save()
@@ -562,41 +562,41 @@ func (cch *cache) InsertContainer(msg interface{}) Container {
 	}
 
 	if err != nil {
-		cch.Error("failed to insert container %s: %v", c.CacheId, err)
+		cch.Error("failed to insert container %s: %v", c.CacheID, err)
 		return nil
 	}
 
-	c.CacheId = cch.createCacheId(c)
+	c.CacheID = cch.createCacheID(c)
 
-	cch.Containers[c.CacheId] = c
-	if c.Id != "" {
-		cch.Containers[c.Id] = c
+	cch.Containers[c.CacheID] = c
+	if c.ID != "" {
+		cch.Containers[c.ID] = c
 	}
 
-	cch.createContainerDirectory(c.CacheId)
+	cch.createContainerDirectory(c.CacheID)
 
 	cch.Save()
 
 	return c
 }
 
-// UpdateContainerId updates a containers runtime id.
-func (cch *cache) UpdateContainerId(cacheId string, msg interface{}) Container {
-	c, ok := cch.Containers[cacheId]
+// UpdateContainerID updates a containers runtime id.
+func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) Container {
+	c, ok := cch.Containers[cacheID]
 	if !ok {
-		cch.Error("failed to update container id, container %s not found", cacheId)
+		cch.Error("failed to update container id, container %s not found", cacheID)
 		return nil
 	}
 
 	switch msg.(type) {
 	case *cri.CreateContainerResponse:
-		c.Id = msg.(*cri.CreateContainerResponse).ContainerId
+		c.ID = msg.(*cri.CreateContainerResponse).ContainerId
 	default:
 		cch.Error("can't update container id from message %T", msg)
 		return nil
 	}
 
-	cch.Containers[c.Id] = c
+	cch.Containers[c.ID] = c
 
 	cch.Save()
 
@@ -610,10 +610,10 @@ func (cch *cache) DeleteContainer(id string) Container {
 		return nil
 	}
 
-	cch.Debug("removing container %s/%s", c.Id, c.CacheId)
-	cch.removeContainerDirectory(c.CacheId)
-	delete(cch.Containers, c.Id)
-	delete(cch.Containers, c.CacheId)
+	cch.Debug("removing container %s/%s", c.ID, c.CacheID)
+	cch.removeContainerDirectory(c.CacheID)
+	delete(cch.Containers, c.ID)
+	delete(cch.Containers, c.CacheID)
 
 	cch.Save()
 
@@ -660,19 +660,19 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse) ([]Pod, []Pod, []
 	}
 
 	for _, pod := range cch.Pods {
-		if _, ok := valid[pod.Id]; !ok {
-			cch.Debug("purging stale pod %s...", pod.Id)
+		if _, ok := valid[pod.ID]; !ok {
+			cch.Debug("purging stale pod %s...", pod.ID)
 			pod.State = PodStateStale
-			del = append(del, cch.DeletePod(pod.Id))
+			del = append(del, cch.DeletePod(pod.ID))
 		}
 	}
 
 	for id, c := range cch.Containers {
-		if _, ok := valid[c.PodId]; !ok {
-			cch.Debug("purging container %s of stale pod %s...", c.CacheId, c.PodId)
-			cch.DeleteContainer(c.CacheId)
+		if _, ok := valid[c.PodID]; !ok {
+			cch.Debug("purging container %s of stale pod %s...", c.CacheID, c.PodID)
+			cch.DeleteContainer(c.CacheID)
 			c.State = ContainerStateStale
-			if id == c.CacheId {
+			if id == c.CacheID {
 				containers = append(containers, c)
 			}
 		}
@@ -701,11 +701,11 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 	}
 
 	for id, c := range cch.Containers {
-		if _, ok := valid[c.Id]; !ok {
-			cch.Debug("purging stale container %s (state: %v)...", c.CacheId, c.GetState())
-			cch.DeleteContainer(c.CacheId)
+		if _, ok := valid[c.ID]; !ok {
+			cch.Debug("purging stale container %s (state: %v)...", c.CacheID, c.GetState())
+			cch.DeleteContainer(c.CacheID)
 			c.State = ContainerStateStale
-			if id == c.CacheId {
+			if id == c.CacheID {
 				del = append(del, c)
 			}
 		}
@@ -778,12 +778,12 @@ func (cch *cache) markChanged(c *container) {
 		return
 	}
 
-	if _, marked := cch.changed[c.CacheId]; marked {
+	if _, marked := cch.changed[c.CacheID]; marked {
 		return
 	}
 
 	cch.updated = append(cch.updated, c)
-	cch.changed[c.CacheId] = struct{}{}
+	cch.changed[c.CacheID] = struct{}{}
 }
 
 // Get the cache ids of all cached containers.
@@ -792,10 +792,10 @@ func (cch *cache) GetContainerCacheIds() []string {
 
 	idx := 0
 	for id, c := range cch.Containers {
-		if id != c.CacheId {
+		if id != c.CacheID {
 			continue
 		}
-		ids[idx] = c.CacheId
+		ids[idx] = c.CacheID
 		idx++
 	}
 
@@ -808,10 +808,10 @@ func (cch *cache) GetContainerIds() []string {
 
 	idx := 0
 	for id, c := range cch.Containers {
-		if id == c.CacheId {
+		if id == c.CacheID {
 			continue
 		}
-		ids[idx] = c.Id
+		ids[idx] = c.ID
 		idx++
 	}
 
@@ -1012,7 +1012,7 @@ type snapshot struct {
 	Version    string
 	Pods       map[string]*pod
 	Containers map[string]*container
-	NextId     uint64
+	NextID     uint64
 	Cfg        *config.RawConfig
 	PolicyName string
 	PolicyJSON map[string]string
@@ -1029,7 +1029,7 @@ func (cch *cache) Snapshot() ([]byte, error) {
 		Pods:       make(map[string]*pod),
 		Containers: make(map[string]*container),
 		Cfg:        cch.Cfg,
-		NextId:     cch.NextId,
+		NextID:     cch.NextID,
 		PolicyName: cch.PolicyName,
 		PolicyJSON: cch.PolicyJSON,
 	}
@@ -1039,8 +1039,8 @@ func (cch *cache) Snapshot() ([]byte, error) {
 	}
 
 	for id, c := range cch.Containers {
-		if id == c.CacheId {
-			s.Containers[c.CacheId] = c
+		if id == c.CacheID {
+			s.Containers[c.CacheID] = c
 		}
 	}
 
@@ -1091,7 +1091,7 @@ func (cch *cache) Restore(data []byte) error {
 	cch.Pods = s.Pods
 	cch.Containers = s.Containers
 	cch.Cfg = s.Cfg
-	cch.NextId = s.NextId
+	cch.NextID = s.NextID
 	cch.PolicyJSON = s.PolicyJSON
 	cch.policyData = make(map[string]interface{})
 
@@ -1100,9 +1100,9 @@ func (cch *cache) Restore(data []byte) error {
 	}
 	for _, c := range cch.Containers {
 		c.cache = cch
-		cch.Containers[c.CacheId] = c
-		if c.Id != "" {
-			cch.Containers[c.Id] = c
+		cch.Containers[c.CacheID] = c
+		if c.ID != "" {
+			cch.Containers[c.ID] = c
 		}
 	}
 
@@ -1155,7 +1155,7 @@ func (cch *cache) ContainerDirectory(id string) string {
 	if !ok {
 		return ""
 	}
-	return filepath.Join(cch.dataDir, strings.Replace(c.CacheId, ":", "-", 1))
+	return filepath.Join(cch.dataDir, strings.Replace(c.CacheID, ":", "-", 1))
 }
 
 func (cch *cache) createContainerDirectory(id string) error {
