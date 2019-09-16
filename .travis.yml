@@ -3,7 +3,7 @@ language: go
 dist: bionic
 
 go:
-  - 1.12.x
+  - 1.13.x
 
 env:
   global:
@@ -21,8 +21,8 @@ before_install:
 
 script:
   - make format
-  - make golangci-lint
   - make
+  - make golangci-lint
   - make test
 
 after_success:
