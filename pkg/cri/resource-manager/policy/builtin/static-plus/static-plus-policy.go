@@ -198,7 +198,7 @@ func (p *staticplus) discoverSystemTopology() error {
 }
 
 // setupPools sets up the pools we allocate resources from.
-func (p *staticplus) setupPools(available, reserved policy.Constraint) error {
+func (p *staticplus) setupPools(available, reserved policy.ConstraintSet) error {
 	// Set up three disjoint CPU pools for allocating CPU to containers. These
 	// three pools are:
 	//

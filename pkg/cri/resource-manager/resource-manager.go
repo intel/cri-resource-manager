@@ -68,8 +68,8 @@ func NewResourceManager() (ResourceManager, error) {
 
 	ropts := relay.Options{
 		RelaySocket:   opt.RelaySocket,
-		ImageSocket:   opt.imageServiceSocket(),
-		RuntimeSocket: opt.runtimeServiceSocket(),
+		ImageSocket:   opt.ImageSocket,
+		RuntimeSocket: opt.RuntimeSocket,
 	}
 	if m.relay, err = relay.NewRelay(ropts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)

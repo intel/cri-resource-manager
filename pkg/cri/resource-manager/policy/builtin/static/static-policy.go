@@ -41,15 +41,15 @@ const (
 type static struct {
 	logger.Logger
 
-	config        string            // active configuration
-	available     policy.Constraint // resource availability constraints
-	reserved      policy.Constraint // system/kube-reservation constraints
-	reservedCpus  cpuset.CPUSet     // CPUs reserved for system- and kube-tasks
-	availableCpus cpuset.CPUSet     // CPUs free usable by this policy
-	isolatedCpus  cpuset.CPUSet     // available CPUs isolated from normal scheduling
-	sys           *sysfs.System     // system/topology information
-	numHT         int               // number of hyperthreads per core
-	state         cache.Cache       // policy/state cache
+	config        string               // active configuration
+	available     policy.ConstraintSet // resource availability constraints
+	reserved      policy.ConstraintSet // system/kube-reservation constraints
+	reservedCpus  cpuset.CPUSet        // CPUs reserved for system- and kube-tasks
+	availableCpus cpuset.CPUSet        // CPUs free usable by this policy
+	isolatedCpus  cpuset.CPUSet        // available CPUs isolated from normal scheduling
+	sys           *sysfs.System        // system/topology information
+	numHT         int                  // number of hyperthreads per core
+	state         cache.Cache          // policy/state cache
 }
 
 // Make sure static implements the policy backend interface.

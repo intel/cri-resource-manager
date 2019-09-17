@@ -51,7 +51,7 @@ func Setup(service string) error {
 	case sampleAlways:
 		cfg = &trace.Config{DefaultSampler: trace.AlwaysSample()}
 	default:
-		cfg = &trace.Config{DefaultSampler: trace.ProbabilitySampler(opt.trace)}
+		cfg = &trace.Config{DefaultSampler: trace.ProbabilitySampler(float64(opt.trace))}
 	}
 	trace.ApplyConfig(*cfg)
 
