@@ -26,6 +26,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// to mock in tests
+var (
+	mockRoot = ""
+)
+
 const (
 	// ProviderKubelet is a constant to distinguish that topology hint comes
 	// from parameters passed to CRI create/update requests from Kubelet
@@ -50,7 +55,7 @@ func NewTopologyHints(devPath string) (hints TopologyHints, err error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed get realpath for %s", devPath)
 	}
-	for p := realDevPath; strings.HasPrefix(p, "/sys/devices/"); p = filepath.Dir(p) {
+	for p := realDevPath; strings.HasPrefix(p, mockRoot+"/sys/devices/"); p = filepath.Dir(p) {
 		hint := TopologyHint{Provider: p}
 		fileMap := map[string]*string{
 			"local_cpulist": &hint.CPUs,
