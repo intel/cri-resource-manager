@@ -145,16 +145,21 @@ func (o *options) mergeFakeHints(n *options) {
 	if o.Hints == nil {
 		o.Hints = make(map[string]system.TopologyHints)
 	}
+
+	for c, ohints := range o.Hints {
+		if len(ohints) == 0 {
+			log.Debug("deleting hints of %s", c)
+			delete(o.Hints, c)
+			delete(n.Hints, c)
+		}
+	}
+
 	for c, nhints := range n.Hints {
 		if ohints, ok := o.Hints[c]; !ok {
-			o.Hints[c] = nhints
-		} else {
-			if len(ohints) == 0 {
-				// was marked for deletion, so do it
-				log.Debug("deleting hints of %s", c)
-				delete(o.Hints, c)
-				continue
+			if len(nhints) != 0 {
+				o.Hints[c] = nhints
 			}
+		} else {
 			for _, nh := range nhints {
 				duplicate := false
 				for _, oh := range ohints {

@@ -164,7 +164,27 @@ func (p *policy) UpdateResources(c cache.Container) error {
 
 // ExportResourceData provides resource data to export for the container.
 func (p *policy) ExportResourceData(c cache.Container, syntax policyapi.DataSyntax) []byte {
-	return nil
+	grant, ok := p.allocations.CPU[c.GetCacheID()]
+	if !ok {
+		return []byte{}
+	}
+
+	shared := grant.SharedCPUs().String()
+	isolated := grant.ExclusiveCPUs().Intersection(grant.GetNode().GetCPU().IsolatedCPUs())
+	exclusive := grant.ExclusiveCPUs().Difference(isolated).String()
+
+	data := ""
+	if shared != "" {
+		data += "SHARED_CPUS=\"" + shared + "\"\n"
+	}
+	if isolated.String() != "" {
+		data += "ISOLATED_CPUS=\"" + isolated.String() + "\"\n"
+	}
+	if exclusive != "" {
+		data += "EXCLUSIVE_CPUS=\"" + exclusive + "\"\n"
+	}
+
+	return []byte(data)
 }
 
 func (p *policy) PostStart(cch cache.Container) error {
