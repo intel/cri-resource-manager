@@ -97,7 +97,7 @@ func (s *static) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (s *static) Start(state cache.Cache) error {
+func (s *static) Start(state cache.Cache, add []cache.Container, del []cache.Container) error {
 	s.Debug("starting up...")
 
 	if s.config != "" {
@@ -119,6 +119,19 @@ func (s *static) Start(state cache.Cache) error {
 	}
 
 	s.validateAssignments()
+
+	return s.Sync(add, del)
+}
+
+// Sync synchronizes the active policy state.
+func (s *static) Sync(add []cache.Container, del []cache.Container) error {
+	s.Debug("synchronizing state...")
+	for _, c := range del {
+		s.ReleaseResources(c)
+	}
+	for _, c := range add {
+		s.AllocateResources(c)
+	}
 
 	return nil
 }

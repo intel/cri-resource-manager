@@ -124,7 +124,7 @@ func (stp *stp) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (stp *stp) Start(cch cache.Cache) error {
+func (stp *stp) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
 	var err error
 
 	err = stp.updateNode(*stp.conf)
@@ -137,7 +137,24 @@ func (stp *stp) Start(cch cache.Cache) error {
 	}
 	stp.Debug("retrieved stp container states from cache:\n%s", stringify(*stp.getContainerRegistry()))
 
+	if err = stp.Sync(add, del); err != nil {
+		return err
+	}
+
 	stp.Debug("preparing for making decisions...")
+
+	return nil
+}
+
+// Sync synchronizes the state of this policy.
+func (stp *stp) Sync(add []cache.Container, del []cache.Container) error {
+	stp.Debug("synchronizing state...")
+	for _, c := range del {
+		stp.ReleaseResources(c)
+	}
+	for _, c := range add {
+		stp.AllocateResources(c)
+	}
 
 	return nil
 }

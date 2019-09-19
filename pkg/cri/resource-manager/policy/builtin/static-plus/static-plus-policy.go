@@ -99,7 +99,7 @@ func (p *staticplus) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (p *staticplus) Start(cch cache.Cache) error {
+func (p *staticplus) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
 	p.cache = cch
 
 	if err := p.restoreCache(); err != nil {
@@ -108,6 +108,19 @@ func (p *staticplus) Start(cch cache.Cache) error {
 
 	if err := p.updatePools(); err != nil {
 		return policyError("failed to start: %v", err)
+	}
+
+	return p.Sync(add, del)
+}
+
+// Sync synchronizes the state ofd this policy.
+func (p *staticplus) Sync(add []cache.Container, del []cache.Container) error {
+	p.Debug("synchronizing state...")
+	for _, c := range del {
+		p.ReleaseResources(c)
+	}
+	for _, c := range add {
+		p.AllocateResources(c)
 	}
 
 	return nil

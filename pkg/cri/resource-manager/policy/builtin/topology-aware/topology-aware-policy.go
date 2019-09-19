@@ -93,7 +93,7 @@ func (p *policy) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (p *policy) Start(cch cache.Cache) error {
+func (p *policy) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
 	p.cache = cch
 
 	if err := p.restoreCache(); err != nil {
@@ -101,6 +101,19 @@ func (p *policy) Start(cch cache.Cache) error {
 	}
 
 	p.root.Dump("<post-start>")
+
+	return p.Sync(add, del)
+}
+
+// Sync synchronizes the state of this policy.
+func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
+	log.Debug("synchronizing state...")
+	for _, c := range del {
+		p.ReleaseResources(c)
+	}
+	for _, c := range add {
+		p.AllocateResources(c)
+	}
 
 	return nil
 }

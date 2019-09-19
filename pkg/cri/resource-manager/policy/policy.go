@@ -95,8 +95,10 @@ type Backend interface {
 	Name() string
 	// Description gives a verbose description about the policy implementation.
 	Description() string
-	// Start up the policy, using the given cache an resource constraints.
-	Start(cache.Cache) error
+	// Start up and sycnhronizes the policy, using the given cache and resource constraints.
+	Start(cache.Cache, []cache.Container, []cache.Container) error
+	// Sync synchronizes the policy, allocating/releasing the given containers.
+	Sync([]cache.Container, []cache.Container) error
 	// AllocateResources allocates resources to/for a container.
 	AllocateResources(cache.Container) error
 	// ReleaseResources release resources of a container.
@@ -114,7 +116,7 @@ type Backend interface {
 // Policy is the exposed interface for container resource allocations decision making.
 type Policy interface {
 	// Start starts up policy, prepare for serving resource management requests.
-	Start(c cache.Cache) error
+	Start(cache.Cache, []cache.Container, []cache.Container) error
 	// PrepareDecisions prepares policy decisions.
 	PrepareDecisions() error
 	// QueryDecisions queries pending policy decisions.
@@ -123,6 +125,8 @@ type Policy interface {
 	CommitDecisions() []cache.Container
 	// AbortDecisions aborts (discard) pending policy decisions.
 	AbortDecisions()
+	// Sync synchronizes the state of the active policy.
+	Sync([]cache.Container, []cache.Container) error
 	// AlocateResources allocates resources to a container.
 	AllocateResources(cache.Container) error
 	// ReleaseResources releases resources of a container.
@@ -194,7 +198,7 @@ func NewPolicy(resmgrCfg *config.RawConfig, a agent.Interface) (Policy, error) {
 }
 
 // Start starts up policy, preparing it for resving requests.
-func (p *policy) Start(cch cache.Cache) error {
+func (p *policy) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
 	if opt.policy == NullPolicy {
 		return nil
 	}
@@ -214,7 +218,7 @@ func (p *policy) Start(cch cache.Cache) error {
 
 	p.PrepareDecisions()
 
-	if err := p.backend.Start(p.cache); err != nil {
+	if err := p.backend.Start(p.cache, add, del); err != nil {
 		p.AbortDecisions()
 		return err
 	}
@@ -248,6 +252,11 @@ func (p *policy) CommitDecisions() []cache.Container {
 // AbortDecisions reverts changes made in the current policy decision making round.
 func (p *policy) AbortDecisions() {
 	p.cache.AbortTransaction()
+}
+
+// Sync synchronizes the active policy state.
+func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
+	return p.backend.Sync(add, del)
 }
 
 // AllocateResources allocates resources for a container.
