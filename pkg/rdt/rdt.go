@@ -183,35 +183,49 @@ func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, 
 	}
 
 	schemata := ""
-	if rdtInfo.l3.Supported() {
-		if !config.L3Schema.IsNil() {
-			// User specified L3 allocation so use it
-			schemata += config.L3Schema.ToStr()
-		} else {
-			// L3 is enabled but user did not specify a config -> use to defaults
-			schemata += config.L3Schema.DefaultStr()
+	// Handle L3 cache allocation
+	switch {
+	case rdtInfo.l3.Supported():
+		if !config.L3CodeSchema.IsNil() && !options.L3Code.Optional {
+			return rdtError("separate L3 code path schema for %q requested but CDP not enabled", name)
 		}
-	} else if !config.L3Schema.IsNil() {
-		if options.L3.Optional {
-			r.Debug("omitting optional L3 schema")
+		if !config.L3DataSchema.IsNil() && !options.L3Data.Optional {
+			return rdtError("separate L3 data path schema for %q requested but CDP not enabled", name)
+		}
+		r.Debug("configuring L3 schema for %q", name)
+		schemata += config.L3Schema.ToStr(L3SchemaTypeUnified)
+	case rdtInfo.l3data.Supported() || rdtInfo.l3code.Supported():
+		if !config.L3CodeSchema.IsNil() {
+			r.Debug("using specific L3 code schema for %q", name)
+			schemata += config.L3CodeSchema.ToStr(L3SchemaTypeCode)
 		} else {
-			return rdtError("L3 schema specified but not supported by the system")
+			// No L3 code schema was specified -> use the "unified" L3 schema
+			r.Debug("using unified L3 schema in code path for %q", name)
+			schemata += config.L3Schema.ToStr(L3SchemaTypeCode)
+		}
+		if !config.L3DataSchema.IsNil() {
+			r.Debug("using specific L3 data schema for %q", name)
+			schemata += config.L3DataSchema.ToStr(L3SchemaTypeData)
+		} else {
+			// No L3 data schema was specified -> use the "unified" L3 schema
+			r.Debug("using unified L3 schema in data path for %q", name)
+			schemata += config.L3Schema.ToStr(L3SchemaTypeData)
+		}
+	default:
+		if (!config.L3Schema.IsNil() && !options.L3.Optional) ||
+			(!config.L3CodeSchema.IsNil() && !options.L3Code.Optional) ||
+			(!config.L3DataSchema.IsNil() && !options.L3Data.Optional) {
+			return rdtError("L3 cache allocation for %q specified in configuration but not supported by system", name)
 		}
 	}
 
-	if rdtInfo.mb.Supported() {
-		if !config.MBSchema.IsNil() {
-			// User specified MB allocation so use it
-			schemata += config.MBSchema.ToStr()
-		} else {
-			// MB is enabled but user did not specify a config -> use to defaults
-			schemata += config.MBSchema.DefaultStr()
-		}
-	} else if !config.MBSchema.IsNil() {
-		if options.MB.Optional {
-			r.Debug("omitting optional MB schema")
-		} else {
-			return rdtError("MB schema specified but not supported by the system")
+	// Handle memory bandwidth allocation
+	switch {
+	case rdtInfo.mb.Supported():
+		schemata += config.MBSchema.ToStr()
+	default:
+		if !config.MBSchema.IsNil() && !options.MB.Optional {
+			return rdtError("memory bandwidth allocation specified in configuration but not supported by system")
 		}
 	}
 
