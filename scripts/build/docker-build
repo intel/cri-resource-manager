@@ -1,12 +1,26 @@
 #!/bin/bash
 
-# usage: docker-image [--image name] [ --tag tag ] [--registry registry] dir-with-Dockerfile
+# usage: docker-image [--image name] [ --tag tag ] [--publish registry] dir-with-Dockerfile
 
 DIR=""
-TAG="latest"
+TAG="testing"
+
+fatal () {
+    echo "[docker-build] fatal error: $@" 1>&2
+    exit 1
+}
+
+log () {
+    echo "[docker-build] $@"
+}
+
+xeq () {
+    [ -z "$Q" ] && log "$@"
+    $@ || exit 1
+}
 
 print_usage () {
-    echo "usage: $0 [--image name] [--tag tag] [--registry docker-registry ] dir-with-Dockerfile"
+    echo "usage: $0 [--image name] [--tag tag] [--publish docker-registry ] dir-with-Dockerfile"
     exit ${1:-1}
 }
 
@@ -21,7 +35,7 @@ parse_commandline () {
                 TAG="$2"
                 shift 2
                 ;;
-            --registry|-r)
+            --publish|-p)
                 REGISTRY="$2"
                 shift 2
                 ;;
@@ -36,8 +50,9 @@ parse_commandline () {
                 set -x
                 shift
                 ;;
-            --*)
-                print_usage
+            -*)
+                BUILD_OPTIONS="$BUILD_OPTIONS $1"
+                shift
                 ;;
             *)
                 if [ -n "$DIR" ]; then
@@ -50,15 +65,14 @@ parse_commandline () {
     done
 
     if [ -z "$DIR" ]; then
-        print_usage
+        fatal "no directory given with Dockerfile"
     fi
 }
 
 check_dockerfile () {
     DOCKERFILE=$DIR/Dockerfile
     if [ ! -e $DOCKERFILE ]; then
-        echo "Dockerfile $DOCKERFILE not found."
-        print_usage
+        fatal "Dockerfile $DOCKERFILE not found in $DIR."
     fi
 }
 
@@ -107,22 +121,24 @@ check_imagename () {
 }
 
 show_summary () {
-    echo "[docker-build] * Generating docker image $IMAGE:$TAG..."
-    echo "[docker-build]     - Dockerfile: $DOCKERFILE"
-    echo "[docker-build]     - publishing: ${REGISTRY}"
+    log "Building docker image $IMAGE:$TAG..."
+    log "  - using docker file $DOCKERFILE"
+    if [ -n "$REGISTRY" ]; then
+        log "  - publishing to $REGISTRY"
+    fi
 }
 
 docker_build () {
-    cmd="docker build -f $DOCKERFILE -t $IMAGE:$TAG . $Q"
-    echo "[docker-build] building images $IMAGE:$TAG (\"$cmd\")..."
-    $cmd || exit 1
+    log "building image $IMAGE:$TAG..."
+    xeq docker build $BUILD_OPTIONS -f $DOCKERFILE -t $IMAGE:$TAG . $Q
 }
 
 docker_publish () {
     if [ -n "$REGISTRY" -a "$REGISTRY" != "-" ]; then
-        cmd="docker tag $IMAGE:$TAG $REGISTRY/$IMAGE:$TAG"
-        echo "[docker-build] publishing built image $IMAGE:$TAG to $REGISTRY (\"$cmd\")..."
-        $cmd || exit 1
+        log "tagging image $IMAGE:$TAG for $REGISTRY..."
+        xeq docker tag $IMAGE:$TAG $REGISTRY/$IMAGE:$TAG
+        log "publishing image as $REGISTRY/$IMAGE:$TAG..."
+        xeq docker push $REGISTRY/$IMAGE:$TAG
     fi
 }
 
