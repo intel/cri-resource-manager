@@ -54,6 +54,10 @@ func (c *RawConfig) HasIdenticalData(data map[string]string) bool {
 // Get returns one config section
 func (c *RawConfig) Get(key string) string {
 	if c.Data != nil {
+		// Prefer node-specific conf
+		if value, ok := c.Data[key+"."+c.NodeName]; ok {
+			return value
+		}
 		if value, ok := c.Data[key]; ok {
 			return value
 		}
