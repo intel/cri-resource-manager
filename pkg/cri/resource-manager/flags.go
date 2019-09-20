@@ -42,7 +42,7 @@ func init() {
 		"Unix domain socket path where CRI runtime service requests should be relayed to.")
 	flag.StringVar(&opt.RelaySocket, "relay-socket", sockets.ResourceManagerRelay,
 		"Unix domain socket path where the resource manager should serve requests on.")
-	flag.StringVar(&opt.RelayDir, "relay-dir", "/var/lib/cri-relay",
+	flag.StringVar(&opt.RelayDir, "relay-dir", "/var/lib/cri-resmgr",
 		"Permanent storage directory path for the resource manager to store its state in.")
 	flag.StringVar(&opt.AgentSocket, "agent-socket", sockets.ResourceManagerAgent,
 		"local socket of the cri-resmgr agent to connect")

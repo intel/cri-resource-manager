@@ -18,9 +18,9 @@ const (
 	// DockerShim is the CRI socket dockershim listens on.
 	DockerShim = "/var/run/dockershim.sock"
 	// ResourceManagerRelay is the CRI socket the resource manager listens on.
-	ResourceManagerRelay = "/var/run/cri-relay.sock"
+	ResourceManagerRelay = "/var/run/cri-resmgr/cri-resmgr.sock"
 	// ResourceManagerAgent is the socket the resource manager node agent listens on.
-	ResourceManagerAgent = "/var/run/cri-resmgr-agent.sock"
+	ResourceManagerAgent = "/var/run/cri-resmgr/cri-resmgr-agent.sock"
 	// ResourceManagerConfig for resource manager configuration notifications.
-	ResourceManagerConfig = "/var/run/cri-resmgr-config.sock"
+	ResourceManagerConfig = "/var/run/cri-resmgr/cri-resmgr-config.sock"
 )
