@@ -136,5 +136,5 @@ func (r *relay) Server() server.Server {
 
 // relayError creates a formatted relay-specific error.
 func relayError(format string, args ...interface{}) error {
-	return fmt.Errorf("cir/relay: "+format, args...)
+	return fmt.Errorf("cri/relay: "+format, args...)
 }

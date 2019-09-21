@@ -1,0 +1,13 @@
+[Unit]
+Description=A CRI proxy with (hardware) resource aware container placement policies.
+Documentation=https://github.com/intel/cri-resource-manager
+Requires=cri-resource-manager-agent.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/sysconfig/cri-resource-manager
+ExecStart=/usr/bin/cri-resmgr --policy $POLICY $POLICY_OPTIONS $DEBUG_OPTIONS
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -28,14 +28,10 @@ WORKDIR $DIR
 ADD . $DIR
 
 ENV GO111MODULE=on GOFLAGS=-mod=vendor
-RUN make BUILD_DIRS=webhook
+RUN make BUILD_DIRS=cri-resmgr-agent
 
 FROM scratch as final
 ARG DIR=/go/src/build
 COPY --from=builder /install_root /
-
-COPY --from=builder /go/src/build/bin/webhook /bin/webhook
-COPY --from=builder /go/src/build/test/data/cri-resmgr-webhook.cri-resmgr.svc.* /etc/cri-resmgr-webhook/certs.d/
-
-ENTRYPOINT ["/bin/webhook", "-cert-file=/etc/cri-resmgr-webhook/certs.d/cri-resmgr-webhook.cri-resmgr.svc.crt", "-key-file=/etc/cri-resmgr-webhook/certs.d/cri-resmgr-webhook.cri-resmgr.svc.key"]
-
+COPY --from=builder $DIR/bin/cri-resmgr-agent /bin/cri-resmgr-agent
+ENTRYPOINT ["/bin/cri-resmgr-agent"]
