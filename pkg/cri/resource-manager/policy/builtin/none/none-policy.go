@@ -51,8 +51,14 @@ func (n *none) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (n *none) Start(cch cache.Cache) error {
+func (n *none) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
 	n.Debug("got started...")
+	return nil
+}
+
+// Sync synchronizes the active policy state.
+func (n *none) Sync(add []cache.Container, del []cache.Container) error {
+	n.Debug("(not) synchronizing policy state")
 	return nil
 }
 

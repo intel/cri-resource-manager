@@ -79,7 +79,7 @@ func (m *resmgr) syncCache() ([]cache.Container, []cache.Container, error) {
 
 // startPolicy prepares resource manager for making policy decisions for requests.
 func (m *resmgr) startPolicy() error {
-	add, del, err := m.syncCache()
+	added, deleted, err := m.syncCache()
 	if err != nil {
 		return resmgrError("failed to synchronize cache to start policy: %v", err)
 	}
@@ -88,44 +88,20 @@ func (m *resmgr) startPolicy() error {
 		return nil
 	}
 
-	if err := m.policy.Start(m.cache); err != nil {
-		return resmgrError("failed to start policy: %v", err)
+	add := make([]cache.Container, 0, len(added))
+	for _, c := range deleted {
+		m.Info("discovered stale container %s...", c.GetID())
 	}
-
-	for _, c := range del {
-		m.Info("releasing resources of stale container %s...", c.GetID())
-		if err := m.policy.ReleaseResources(c); err != nil {
-			m.Warn("failed to release resources for stale container %s: %v", c.GetID(), err)
-		}
-	}
-
-	added := map[string]struct{}{}
-	for _, c := range add {
+	for _, c := range added {
 		if c.GetState() != cache.ContainerStateRunning {
 			continue
 		}
-
-		m.Info("allocating resources for out-of-sync container %s...", c.GetID())
-		if err := m.policy.AllocateResources(c); err != nil {
-			m.Warn("failed to allocate resources for out-of-sync container %s: %v", c.GetID(), err)
-		}
-
-		added[c.GetID()] = struct{}{}
+		m.Info("discovered out-of-sync running container %s...", c.GetID())
+		add = append(add, c)
 	}
 
-	for _, id := range m.cache.GetContainerIds() {
-		if _, ok := added[id]; ok {
-			continue
-		}
-		c, ok := m.cache.LookupContainer(id)
-		if !ok {
-			continue
-		}
-
-		m.Info("refreshing resource allocation for container %s...", c.GetID())
-		if err := m.policy.AllocateResources(c); err != nil {
-			m.Warn("failed to refresh resource allocation for container %s: %v", c.GetID(), err)
-		}
+	if err := m.policy.Start(m.cache, add, deleted); err != nil {
+		return resmgrError("failed to start policy: %v", err)
 	}
 
 	m.enforcePendingDecisions(context.Background())

@@ -66,8 +66,21 @@ func (eda *eda) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (eda *eda) Start(cch cache.Cache) error {
+func (eda *eda) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
 	eda.Debug("preparing for making decisions...")
+	return nil
+}
+
+// Sync synchronizes the state of this policy.
+func (eda *eda) Sync(add []cache.Container, del []cache.Container) error {
+	eda.Debug("synchronizing state...")
+	for _, c := range del {
+		eda.ReleaseResources(c)
+	}
+	for _, c := range add {
+		eda.AllocateResources(c)
+	}
+
 	return nil
 }
 
