@@ -162,7 +162,7 @@ func (p *staticplus) ReleaseResources(c cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (p *staticplus) UpdateResources(c cache.Container) error {
-	p.Debug("(not) updating container %s...", c.GetCacheID())
+	p.Debug("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 

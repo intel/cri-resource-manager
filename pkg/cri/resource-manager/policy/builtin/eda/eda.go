@@ -112,13 +112,13 @@ func (eda *eda) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (eda *eda) ReleaseResources(c cache.Container) error {
-	eda.Debug("releasing resources of container %s...", c.GetCacheID())
+	eda.Debug("releasing resources of container %s...", c.PrettyName())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (eda *eda) UpdateResources(c cache.Container) error {
-	eda.Debug("updating resource allocations of container %s...", c.GetCacheID())
+	eda.Debug("updating resource allocations of container %s...", c.PrettyName())
 	return nil
 }
 

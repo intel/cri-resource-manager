@@ -211,6 +211,14 @@ func (c *container) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, er
 	}, nil
 }
 
+func (c *container) PrettyName() string {
+	pod, ok := c.GetPod()
+	if !ok {
+		return c.PodID + ":" + c.Name
+	}
+	return pod.GetName() + ":" + c.Name
+}
+
 func (c *container) GetPod() (Pod, bool) {
 	pod, found := c.cache.Pods[c.PodID]
 	return pod, found

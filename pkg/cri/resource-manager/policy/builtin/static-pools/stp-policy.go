@@ -234,14 +234,14 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (stp *stp) ReleaseResources(c cache.Container) error {
-	stp.Debug("releasing resources of container %s...", c.GetCacheID())
+	stp.Debug("releasing resources of container %s...", c.PrettyName())
 	stp.releaseStpResources(c.GetCacheID())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (stp *stp) UpdateResources(c cache.Container) error {
-	stp.Debug("updating resource allocations of container %s...", c.GetCacheID())
+	stp.Debug("updating resource allocations of container %s...", c.PrettyName())
 	return nil
 }
 
