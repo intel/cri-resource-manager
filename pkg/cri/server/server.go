@@ -166,6 +166,11 @@ func (s *server) createGrpcServer() error {
 		return nil
 	}
 
+	if err := os.MkdirAll(filepath.Dir(s.options.Socket), 0700); err != nil {
+		return serverError("failed to create directory for socket %s: %v",
+			s.options.Socket, err)
+	}
+
 	l, err := net.Listen("unix", s.options.Socket)
 	if err != nil {
 		if utils.ServerActiveAt(s.options.Socket) {
