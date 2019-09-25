@@ -102,7 +102,7 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int
 func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, int, bool, int) {
 	req, ok := container.GetResourceRequirements().Requests[corev1.ResourceCPU]
 	if !ok {
-		return 0, 0, true, 0
+		return 0, 0, false, 0
 	}
 
 	qos := pod.GetQOSClass()

@@ -46,6 +46,11 @@ const (
 	VirtualNode NodeKind = "virtual node"
 )
 
+const (
+	// OverfitPenalty is the per layer penalty for overfitting in the node tree.
+	OverfitPenalty = 0.9
+)
+
 // Node is the abstract interface our partition tree nodes implement.
 type Node interface {
 	// IsNil tests if this node is nil.
@@ -80,9 +85,9 @@ type Node interface {
 	Policy() *policy
 	// DiscoverCPU
 	DiscoverCPU() CPUSupply
-	// GetCPU
+	// GetCPU returns the full CPU at this node.
 	GetCPU() CPUSupply
-	// FreeCPU returns the availble CPU supply of the node.
+	// FreeCPU returns the available CPU supply of this node.
 	FreeCPU() CPUSupply
 	// GrantedCPU returns the amount of granted shared CPU capacity of this node.
 	GrantedCPU() int
@@ -90,8 +95,6 @@ type Node interface {
 	GetMemset() system.IDSet
 	// DiscoverMemset
 	DiscoverMemset() system.IDSet
-	// Score calculates the score of the node wrt. the given request.
-	Score(CPURequest) float64
 	// DepthFirst traverse the tree@node calling the function at each node.
 	DepthFirst(func(Node) error) error
 	// BreadthFirst traverse the tree@node calling the function at each node.
@@ -100,6 +103,9 @@ type Node interface {
 	Dump(string, ...int)
 	// Dump type-specific state of the node.
 	dump(string, ...int)
+
+	GetScore(CPURequest) CPUScore
+	HintScore(system.TopologyHint) float64
 }
 
 // node represents data common to all node types.
@@ -321,7 +327,7 @@ func (n *node) Policy() *policy {
 	return n.policy
 }
 
-// Get CPU available at this node.
+// GetCPU returns the full CPU supply of this node.
 func (n *node) GetCPU() CPUSupply {
 	return n.self.node.GetCPU()
 }
@@ -331,15 +337,9 @@ func (n *node) DiscoverCPU() CPUSupply {
 	return n.self.node.DiscoverCPU()
 }
 
-// FreeCpu returns the available CPU supply in this node.
+// FreeCPU returns the available CPU supply of this node.
 func (n *node) FreeCPU() CPUSupply {
 	return n.freecpu
-}
-
-// Get score for a cpu request.
-func (n *node) Score(req CPURequest) float64 {
-	f := n.FreeCPU()
-	return f.Score(req)
 }
 
 // Get the set of memory attached to this node.
@@ -359,6 +359,17 @@ func (n *node) GrantedCPU() int {
 		granted += c.GrantedCPU()
 	}
 	return granted
+}
+
+// Get CPUScore for a cpu request.
+func (n *node) GetScore(req CPURequest) CPUScore {
+	f := n.FreeCPU()
+	return f.GetScore(req)
+}
+
+// HintScore calculates the (CPU) score of the node for the given topology hint.
+func (n *node) HintScore(hint system.TopologyHint) float64 {
+	return n.self.node.HintScore(hint)
 }
 
 // NewNumaNode create a node for a CPU socket.
@@ -404,6 +415,28 @@ func (n *numanode) GetMemset() system.IDSet {
 func (n *numanode) DiscoverMemset() system.IDSet {
 	n.mem = system.NewIDSet(n.sysnode.ID())
 	return n.mem.Clone()
+}
+
+// HintScore calculates the (CPU) score of the node for the given topology hint.
+func (n *numanode) HintScore(hint system.TopologyHint) float64 {
+	switch {
+	case hint.CPUs != "":
+		return cpuHintScore(hint, n.sysnode.CPUSet())
+
+	case hint.NUMAs != "":
+		return numaHintScore(hint, n.id)
+
+	case hint.Sockets != "":
+		pkgID := n.sysnode.PackageID()
+		score := socketHintScore(hint, n.sysnode.PackageID())
+		if score > 0.0 {
+			// penalize underfit reciprocally (inverse-proportionally) to the socket size
+			score /= float64(len(n.System().Package(pkgID).NodeIDs()))
+		}
+		return score
+	}
+
+	return 0.0
 }
 
 // NewSocketNode create a node for a CPU socket.
@@ -462,6 +495,22 @@ func (n *socketnode) DiscoverMemset() system.IDSet {
 	return n.mem.Clone()
 }
 
+// HintScore calculates the (CPU) score of the node for the given topology hint.
+func (n *socketnode) HintScore(hint system.TopologyHint) float64 {
+	switch {
+	case hint.CPUs != "":
+		return cpuHintScore(hint, n.syspkg.CPUSet())
+
+	case hint.NUMAs != "":
+		return OverfitPenalty * numaHintScore(hint, n.syspkg.NodeIDs()...)
+
+	case hint.Sockets != "":
+		return socketHintScore(hint, n.id)
+	}
+
+	return 0.0
+}
+
 // NewVirtualNode creates a new virtual node.
 func (p *policy) NewVirtualNode(name string, parent Node) Node {
 	n := &virtualnode{}
@@ -506,6 +555,23 @@ func (n *virtualnode) DiscoverMemset() system.IDSet {
 		n.mem.Add(c.GetMemset().Members()...)
 	}
 	return n.mem.Clone()
+}
+
+// HintScore calculates the (CPU) score of the node for the given topology hint.
+func (n *virtualnode) HintScore(hint system.TopologyHint) float64 {
+	// don't bother calculating any scores, the root should always score 1.0
+	switch {
+	case hint.CPUs != "":
+		return cpuHintScore(hint, n.System().CPUSet())
+
+	case hint.NUMAs != "":
+		return OverfitPenalty * OverfitPenalty
+
+	case hint.Sockets != "":
+		return OverfitPenalty
+	}
+
+	return 0.0
 }
 
 // Finalize the setup of nilnode.

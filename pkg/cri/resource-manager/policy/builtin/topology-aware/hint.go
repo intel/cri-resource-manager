@@ -22,41 +22,50 @@ import (
 	"strings"
 )
 
-// mask the given cpus by all the given hints.
-func (cs *cpuSupply) maskByHints(cpus cpuset.CPUSet, hints system.TopologyHints) cpuset.CPUSet {
-	log.Debug(" * node %s: masking cpuset %s with topology hints...",
-		cs.node.Name(), cpus.String())
+// Calculate the hint score of the given hint and CPUSet.
+func cpuHintScore(hint system.TopologyHint, CPUs cpuset.CPUSet) float64 {
+	hCPUs, err := cpuset.Parse(hint.CPUs)
+	if err != nil {
+		log.Warn("invalid hint CPUs '%s' from %s", hint.CPUs, hint.Provider)
+		return 0.0
+	}
+	common := hCPUs.Intersection(CPUs)
+	return float64(common.Size()) / float64(hCPUs.Size())
+}
 
-	for _, h := range hints {
-		log.Debug("   - masking with hint %s...", h.String())
+// Calculate the NUMA node score of the given hint and NUMA node.
+func numaHintScore(hint system.TopologyHint, sysIDs ...system.ID) float64 {
+	for _, idstr := range strings.Split(hint.NUMAs, ",") {
+		hID, err := strconv.ParseInt(idstr, 0, 0)
+		if err != nil {
+			log.Warn("invalid hint NUMA node %s from %s", idstr, hint.Provider)
+			return 0.0
+		}
 
-		switch {
-		case h.CPUs != "":
-			cpus = cpus.Intersection(cpuset.MustParse(h.CPUs))
-
-		case h.NUMAs != "":
-			for _, idstr := range strings.Split(h.NUMAs, ",") {
-				if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-					if node := cs.node.System().Node(system.ID(id)); node != nil {
-						cpus = cpus.Intersection(node.CPUSet())
-					}
-				}
-			}
-
-		case h.Sockets != "":
-			for _, idstr := range strings.Split(h.Sockets, ",") {
-				if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-					if pkg := cs.node.System().Package(system.ID(id)); pkg != nil {
-						cpus = cpus.Intersection(pkg.CPUSet())
-					}
-				}
+		for _, id := range sysIDs {
+			if hID == int64(id) {
+				return 1.0
 			}
 		}
 	}
 
-	log.Debug("   = masked cpuset %s", cpus.String())
+	return 0.0
+}
 
-	return cpus
+// Calculate the socket node score of the given hint and NUMA node.
+func socketHintScore(hint system.TopologyHint, sysID system.ID) float64 {
+	for _, idstr := range strings.Split(hint.Sockets, ",") {
+		id, err := strconv.ParseInt(idstr, 0, 0)
+		if err != nil {
+			log.Warn("invalid hint socket '%s' from %s", idstr, hint.Provider)
+			return 0.0
+		}
+		if id == int64(sysID) {
+			return 1.0
+		}
+	}
+
+	return 0.0
 }
 
 // return the cpuset for the CPU, NUMA or socket hints, preferred in this particular order.

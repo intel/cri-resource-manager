@@ -120,12 +120,12 @@ func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (p *policy) AllocateResources(container cache.Container) error {
-	log.Debug("allocating resources for %s...", container.GetCacheID())
+	log.Debug("allocating resources for %s...", container.PrettyName())
 
 	grant, err := p.allocatePool(container)
 	if err != nil {
 		return policyError("failed to allocate resources for %s: %v",
-			container.GetCacheID(), err)
+			container.PrettyName(), err)
 	}
 
 	if err := p.applyGrant(grant); err != nil {
@@ -139,7 +139,7 @@ func (p *policy) AllocateResources(container cache.Container) error {
 
 	if err := p.updateSharedAllocations(grant); err != nil {
 		log.Warn("failed to update shared allocations affected by %s: %v",
-			container.GetCacheID(), err)
+			container.PrettyName(), err)
 	}
 
 	p.root.Dump("<post-alloc>")
@@ -149,18 +149,18 @@ func (p *policy) AllocateResources(container cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (p *policy) ReleaseResources(container cache.Container) error {
-	log.Debug("releasing resources of %s...", container.GetCacheID())
+	log.Debug("releasing resources of %s...", container.PrettyName())
 
 	grant, found, err := p.releasePool(container)
 	if err != nil {
 		return policyError("failed to release resources of %s: %v",
-			container.GetCacheID(), err)
+			container.PrettyName(), err)
 	}
 
 	if found {
 		if err = p.updateSharedAllocations(grant); err != nil {
 			log.Warn("failed to update shared allocations affected by %s: %v",
-				container.GetCacheID(), err)
+				container.PrettyName(), err)
 		}
 	}
 
@@ -171,7 +171,7 @@ func (p *policy) ReleaseResources(container cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (p *policy) UpdateResources(c cache.Container) error {
-	log.Debug("(not) updating container %s...", c.GetCacheID())
+	log.Debug("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 
