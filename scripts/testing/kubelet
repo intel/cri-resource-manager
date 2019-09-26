@@ -23,10 +23,63 @@ if [ -z "$KUBELET" ]; then
     fi
 fi
 
-if [ -z "$NOSUDO"]; then
+if [ "$(whoami)" != "root" ]; then
     SUDO="sudo"
 else
     SUDO=""
 fi
 
-$xeq $SUDO $KUBELET --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --cgroup-driver=systemd --network-plugin=cni --pod-infra-container-image=k8s.gcr.io/pause:3.1 --container-runtime=remote --container-runtime-endpoint=unix:///var/run/cri-relay.sock --image-service-endpoint=unix:///var/run/dockershim.sock $@
+EXTRA_ARGUMENTS=""
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --cgroup-driver*|-cgroup-driver*)
+            opt=${1%=*}; arg=${1#*=}
+            if [ "$opt" != "$arg" ]; then
+                CGROUP_DRIVER="--cgroup-driver $arg"
+            else
+                shift
+                CGROUP_DRIVER="--cgroup-driver $1"
+            fi
+            shift
+            ;;
+
+        --container-runtime-endpoint*|-container-runtime-endpoint*)
+            opt=${1%=*}; arg=${1#*=}
+            if [ "$opt" != "$arg" ]; then
+                RUNTIME_ENDPOINT="--container-runtime-endpoint $arg"
+            else
+                shift
+                RUNTIME_ENDPOINT="--container-runtime-endpoint $1"
+            fi
+            shift
+            ;;
+
+        -v|--v|-v=*|--v=*)
+            opt=${1%=*}; arg=${1#*=}
+            if [ "$opt" != "$arg" ]; then
+                VERBOSITY="-v $arg"
+            else
+                shift
+                VERBOSITY="-v $1"
+            fi
+            shift
+            ;;
+
+        *)
+            EXTRA_ARGUMENTS="$EXTRA_ARGUMENTS $1"
+            shift
+            ;;
+    esac
+done
+
+set - $EXTRA_ARGUMENTS
+
+$xeq $SUDO $KUBELET \
+    --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf \
+    --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml \
+    --network-plugin=cni \
+    --pod-infra-container-image=k8s.gcr.io/pause:3.1 \
+    ${CGROUP_DRIVER:---cgroup-driver=systemd} \
+    --container-runtime=remote \
+    ${RUNTIME_ENDPOINT:---container-runtime-endpoint=unix:///var/run/cri-resmgr/cri-resmgr.sock} \
+    --image-service-endpoint=unix:///var/run/dockershim.sock $@
