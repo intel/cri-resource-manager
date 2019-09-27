@@ -16,9 +16,21 @@ limitations under the License.
 
 package kubernetes
 
+import (
+	core "k8s.io/kubernetes/pkg/apis/core"
+	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
+)
+
 const (
 	// ResmgrKeyNamespace is a CRI Resource Manager namespace
 	ResmgrKeyNamespace = "cri-resource-manager.intel.com"
+
+	// NamespaceSystem is the kubernetes system namespace.
+	NamespaceSystem = core.NamespaceSystem
+	// PodNameLabel is the label key for the kubernetes pod name.
+	PodNameLabel = kubelet.KubernetesPodNameLabel
+	// ContainerNameLabel is the label key for the kubernetes container name.
+	ContainerNameLabel = kubelet.KubernetesContainerNameLabel
 )
 
 // ResmgrKey returns a full namespaced name of a resource manager specific key
