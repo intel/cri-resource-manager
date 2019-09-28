@@ -284,3 +284,53 @@ func (p *pod) GetQOSClass() v1.PodQOSClass {
 
 	return p.QOSClass
 }
+
+// GetContainerAffinity returns the annotated affinity for the named container.
+func (p *pod) GetContainerAffinity(name string) []*Affinity {
+	if p.Affinity != nil {
+		return (*p.Affinity)[name]
+	}
+
+	p.Affinity = &podContainerAffinity{}
+
+	value, ok := p.GetResmgrAnnotation(keyAffinity)
+	if ok {
+		weight := int32(1)
+		if !p.Affinity.parseSimple(p, value, weight) {
+			if err := p.Affinity.parseFull(p, value, weight); err != nil {
+				p.cache.Error("%v", err)
+			}
+		}
+	}
+	value, ok = p.GetResmgrAnnotation(keyAntiAffinity)
+	if ok {
+		weight := int32(-1)
+		if !p.Affinity.parseSimple(p, value, weight) {
+			if err := p.Affinity.parseFull(p, value, weight); err != nil {
+				p.cache.Error("%v", err)
+			}
+		}
+	}
+
+	if p.cache.DebugEnabled() {
+		p.cache.Debug("Pod container affinity for %s:", p.GetName())
+		for id, ca := range *p.Affinity {
+			p.cache.Debug("  - container %s:", id)
+			for _, a := range ca {
+				p.cache.Debug("    * %s", a.String())
+			}
+		}
+	}
+
+	return (*p.Affinity)[name]
+}
+
+// ScopeExpression returns an affinity expression for defining this pod as the scope.
+func (p *pod) ScopeExpression() *Expression {
+	return &Expression{
+		//      Domain: LabelsDomain,
+		Key:    kubernetes.PodNameLabel,
+		Op:     Equals,
+		Values: []string{p.GetName()},
+	}
+}

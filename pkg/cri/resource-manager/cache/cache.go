@@ -106,6 +106,10 @@ type Pod interface {
 	// necessary associated annotation put in place by the CRI resource manager
 	// webhook was found.
 	GetPodResourceRequirements() PodResourceRequirements
+	// GetContainerAffinity returns the affinity expressions for the named container.
+	GetContainerAffinity(string) []*Affinity
+	// ScopeExpression returns an affinity expression for defining this pod as the scope.
+	ScopeExpression() *Expression
 }
 
 // A cached pod.
@@ -122,6 +126,7 @@ type pod struct {
 	CgroupParent string            // cgroup parent directory
 
 	Resources *PodResourceRequirements // annotated resource requirements
+	Affinity  *podContainerAffinity    // annotated container affinity
 }
 
 // ContainerState is the container state in the runtime.
@@ -274,6 +279,9 @@ type Container interface {
 	UpdateCriCreateRequest(*cri.CreateContainerRequest) error
 	// CriUpdateRequest creates a CRI UpdateContainerResourcesRequest for the container.
 	CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error)
+
+	// GetAffinity returns the annotated affinity expressions for this container.
+	GetAffinity() []*Affinity
 }
 
 // A cached container.
@@ -386,6 +394,11 @@ type Cache interface {
 	GetContainerCacheIds() []string
 	// GetContaineIds return the ids of all containers.
 	GetContainerIds() []string
+
+	// FilterScope returns the containers selected by the scope expression.
+	FilterScope(*Expression) []Container
+	// EvaluateAffinity evaluates the given affinity against all known in-scope containers
+	EvaluateAffinity(*Affinity) map[string]int32
 
 	// SetPolicyEntry sets the policy entry for a key.
 	SetPolicyEntry(string, interface{})

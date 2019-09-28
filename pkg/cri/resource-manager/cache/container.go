@@ -688,3 +688,18 @@ func getKubeletHint(cpus, mems string) (ret sysfs.TopologyHints) {
 	}
 	return
 }
+
+func (c *container) GetAffinity() []*Affinity {
+	pod, ok := c.GetPod()
+	if !ok {
+		c.cache.Error("internal error: can't find Pod for container %s", c.PrettyName())
+	}
+
+	affinity := pod.GetContainerAffinity(c.GetName())
+	c.cache.Debug("affinity for container %s:", c.PrettyName())
+	for _, a := range affinity {
+		c.cache.Debug("  - %s", a.String())
+	}
+
+	return affinity
+}
