@@ -23,11 +23,46 @@ if [ -z "$KUBELET" ]; then
     fi
 fi
 
-if [ -z "$NOSUDO"]; then
+if [ "$(whoami)" != "root" ]; then
     SUDO="sudo"
 else
     SUDO=""
 fi
 
+EXTRA_ARGUMENTS=""
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        --cgroup-driver*|-cgroup-driver*)
+            opt=${1%=*}; arg=${1#*=}
+            if [ "$opt" != "$arg" ]; then
+                CGROUP_DRIVER="--cgroup-driver $arg"
+            else
+                shift
+                CGROUP_DRIVER="--cgroup-driver $1"
+            fi
+            shift
+            ;;
+
+        -v|--v|-v=*|--v=*)
+            opt=${1%=*}; arg=${1#*=}
+            if [ "$opt" != "$arg" ]; then
+                VERBOSITY="-v $arg"
+            else
+                shift
+                VERBOSITY="-v $1"
+            fi
+            shift
+            ;;
+
+        *)
+            EXTRA_ARGUMENTS="$EXTRA_ARGUMENTS $1"
+            shift
+            ;;
+    esac
+done
+
+set - $EXTRA_ARGUMENTS
+
 $xeq $SUDO $KUBELET --experimental-dockershim --port 11250 \
-        --cgroup-driver systemd -v 99 $@
+     ${CGROUP_DRIVER:---cgroup-driver systemd} \
+     ${VERBOSITY:--v 99} $@
