@@ -340,7 +340,7 @@ func (m *resmgr) updateContainer(ctx context.Context, c cache.Container) error {
 
 	req, err := c.CriUpdateRequest()
 	if err != nil {
-		return resmgrError("can't update container %s: %v", c.GetCacheID(), err)
+		return resmgrError("can't update container %s: %v", c.PrettyName(), err)
 	}
 
 	_, err = m.relay.Client().UpdateContainerResources(ctx, req)

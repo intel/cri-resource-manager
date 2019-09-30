@@ -15,7 +15,7 @@
 package topologyaware
 
 import (
-	"encoding/json"
+	"github.com/ghodss/yaml"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,7 +42,7 @@ func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, boo
 	}
 
 	preferences := map[string]bool{}
-	if err := json.Unmarshal([]byte(value), &preferences); err != nil {
+	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
 		log.Error("failed to parse isolation preference %s = '%s': %v",
 			keyIsolationPreference, value, err)
 		return opt.PreferIsolated, false
@@ -69,7 +69,7 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int
 	}
 
 	preferences := map[string]string{}
-	if err := json.Unmarshal([]byte(value), &preferences); err != nil {
+	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
 		log.Error("failed to parse shared CPU preference %s = '%s': %v",
 			keySharedCPUPreference, value, err)
 		return opt.PreferShared, 0
@@ -102,7 +102,7 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int
 func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, int, bool, int) {
 	req, ok := container.GetResourceRequirements().Requests[corev1.ResourceCPU]
 	if !ok {
-		return 0, 0, true, 0
+		return 0, 0, false, 0
 	}
 
 	qos := pod.GetQOSClass()

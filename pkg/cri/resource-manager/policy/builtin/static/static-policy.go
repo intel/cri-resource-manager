@@ -138,7 +138,7 @@ func (s *static) Sync(add []cache.Container, del []cache.Container) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (s *static) AllocateResources(c cache.Container) error {
-	s.Info("allocating resource for container %s...", c.GetCacheID())
+	s.Info("allocating resource for container %s...", c.PrettyName())
 
 	container := c
 	containerID := c.GetCacheID()
@@ -154,7 +154,7 @@ func (s *static) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (s *static) ReleaseResources(c cache.Container) error {
-	s.Info("releasing resources of container %s...", c.GetCacheID())
+	s.Info("releasing resources of container %s...", c.PrettyName())
 
 	containerID := c.GetCacheID()
 	err := s.RemoveContainer(containerID)
@@ -164,7 +164,7 @@ func (s *static) ReleaseResources(c cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (s *static) UpdateResources(c cache.Container) error {
-	s.Debug("(not) updating container %s...", c.GetCacheID())
+	s.Debug("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 
@@ -670,7 +670,7 @@ func (s *static) SetCpusetCpus(id, value string) error {
 	}
 
 	c.SetCpusetCpus(value)
-	s.Info("container %s/%s: CpusetCpus set to %s", c.GetCacheID(), c.GetID(), value)
+	s.Info("container %s: CpusetCpus set to %s", c.PrettyName(), value)
 
 	return nil
 }

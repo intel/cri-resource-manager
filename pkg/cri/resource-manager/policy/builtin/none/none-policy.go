@@ -64,19 +64,19 @@ func (n *none) Sync(add []cache.Container, del []cache.Container) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (n *none) AllocateResources(c cache.Container) error {
-	n.Debug("(not) allocating container %s...", c.GetCacheID())
+	n.Debug("(not) allocating container %s...", c.PrettyName())
 	return nil
 }
 
 // ReleaseResources is a resource release request for this policy.
 func (n *none) ReleaseResources(c cache.Container) error {
-	n.Debug("(not) releasing container %s...", c.GetCacheID())
+	n.Debug("(not) releasing container %s...", c.PrettyName())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (n *none) UpdateResources(c cache.Container) error {
-	n.Debug("(not) updating container %s...", c.GetCacheID())
+	n.Debug("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 

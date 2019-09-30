@@ -16,6 +16,7 @@ package topologyaware
 
 import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"sort"
 )
@@ -82,21 +83,28 @@ func (p *policy) buildPoolsByTopology() error {
 
 // Pick a pool and allocate resource from it to the container.
 func (p *policy) allocatePool(container cache.Container) (CPUGrant, error) {
-	log.Debug("* allocating resources for %s", container.GetCacheID())
+	var pool Node
 
 	request := newCPURequest(container)
-	scores, pools := p.sortPoolsByScore(request)
 
-	if log.DebugEnabled() {
-		for idx, n := range pools {
-			log.Debug("* fitting %s: #%d: node %s, score %f",
-				request.String(), idx, n.Name(), scores[n.NodeID()])
+	if container.GetNamespace() == kubernetes.NamespaceSystem {
+		pool = p.root
+	} else {
+		affinity := p.calculatePoolAffinities(request.GetContainer())
+		scores, pools := p.sortPoolsByScore(request, affinity)
+
+		if log.DebugEnabled() {
+			log.Debug("* node fitting for %s", request.String())
+			for idx, n := range pools {
+				log.Debug("    - #%d: node %s, score %s, affinity: %d",
+					idx, n.Name(), scores[n.NodeID()].String(), affinity[n.NodeID()])
+			}
 		}
+
+		pool = pools[0]
 	}
 
-	pool := pools[0]
 	cpus := pool.FreeCPU()
-
 	grant, err := cpus.Allocate(request)
 	if err != nil {
 		return nil, policyError("failed to allocate %s from %s: %v",
@@ -174,7 +182,7 @@ func (p *policy) applyGrant(grant CPUGrant) error {
 
 // Release resources allocated by this grant.
 func (p *policy) releasePool(container cache.Container) (CPUGrant, bool, error) {
-	log.Debug("* releasing resources allocated to %s", container.GetCacheID())
+	log.Debug("* releasing resources allocated to %s", container.PrettyName())
 
 	grant, ok := p.allocations.CPU[container.GetCacheID()]
 	if !ok {
@@ -215,41 +223,208 @@ func (p *policy) updateSharedAllocations(grant CPUGrant) error {
 	return nil
 }
 
+// Calculate pool affinities for the given container.
+func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int32 {
+	log.Debug("=> calculating pool affinities...")
+
+	result := make(map[int]int32, len(p.nodes))
+	for id, w := range p.calculateContainerAffinity(container) {
+		grant, ok := p.allocations.CPU[id]
+		if !ok {
+			continue
+		}
+		node := grant.GetNode()
+		result[node.NodeID()] += w
+	}
+
+	return result
+}
+
+// Caculate affinity of this container (against all other containers).
+func (p *policy) calculateContainerAffinity(container cache.Container) map[string]int32 {
+	log.Debug("* calculating affinity for container %s...", container.PrettyName())
+
+	ca := container.GetAffinity()
+
+	result := make(map[string]int32)
+	for _, a := range ca {
+		for id, w := range p.cache.EvaluateAffinity(a) {
+			result[id] += w
+		}
+	}
+
+	log.Debug("  => affinity: %v", result)
+
+	return result
+}
+
 // Score pools against the request and sort them by score.
-func (p *policy) sortPoolsByScore(request CPURequest) (map[int]float64, []Node) {
-	scores := make(map[int]float64, p.nodeCnt)
+func (p *policy) sortPoolsByScore(req CPURequest, aff map[int]int32) (map[int]CPUScore, []Node) {
+	scores := make(map[int]CPUScore, p.nodeCnt)
 
 	p.root.DepthFirst(func(n Node) error {
-		scores[n.NodeID()] = n.Score(request)
+		scores[n.NodeID()] = n.GetScore(req)
 		return nil
 	})
 
 	sort.Slice(p.pools, func(i, j int) bool {
-		return p.comparePools(request, scores, i, j)
+		return p.compareScores(req, scores, aff, i, j)
 	})
 
 	return scores, p.pools
 }
 
 // Compare two pools by scores for allocation preference.
-func (p *policy) comparePools(request CPURequest, scores map[int]float64, i int, j int) bool {
-	n1, n2 := p.pools[i], p.pools[j]
-	d1, d2 := n1.RootDistance(), n2.RootDistance()
-	id1, id2 := n1.NodeID(), n2.NodeID()
-	s1, s2 := scores[id1], scores[id2]
+func (p *policy) compareScores(request CPURequest, scores map[int]CPUScore,
+	affinity map[int]int32, i int, j int) bool {
+	node1, node2 := p.pools[i], p.pools[j]
+	depth1, depth2 := node1.RootDistance(), node2.RootDistance()
+	id1, id2 := node1.NodeID(), node2.NodeID()
+	score1, score2 := scores[id1], scores[id2]
+	isolated1, shared1 := score1.IsolatedCapacity(), score1.SharedCapacity()
+	isolated2, shared2 := score2.IsolatedCapacity(), score2.SharedCapacity()
+	affinity1, affinity2 := affinity[id1], affinity[id2]
 
+	//
+	// Notes:
+	//
+	// Our scoring/score sorting algorithm is:
+	//
+	// 1) - insufficient isolated or shared capacity loses
+	// 2) - if we have affinity, the higher affinity wins
+	// 3) - if we have topology hints
+	//       * better hint score wins
+	//       * for a tie, prefer the lower node then the smaller id
+	// 4) - if a node is lower in the tree it wins
+	// 5) - for isolated allocations
+	//       * more isolated capacity wins
+	//       * for a tie, prefer the smaller id
+	// 6) - for exclusive allocations
+	//       * more slicable (shared) capacity wins
+	//       * for a tie, prefer the smaller id
+	// 7) - for shared-only allocations
+	//       * fewer colocated containers win
+	//       * for a tie prefer more shared capacity then the smaller id
+	//
+
+	// 1) a node with insufficient isolated or shared capacity loses
 	switch {
-	case s1 > s2:
+	case isolated2 < 0 || shared2 < 0:
 		return true
-	case s1 < s2:
+	case isolated1 < 0 || shared1 < 0:
 		return false
-
-	case d1 == d2:
-		return id1 < id2
-
-	case len(request.GetContainer().GetTopologyHints()) > 0:
-		return d1 > d2
-	default:
-		return d1 < d2
 	}
+
+	// 2) higher affinity wins
+	if affinity1 > affinity2 {
+		return true
+	}
+	if affinity2 > affinity1 {
+		return false
+	}
+
+	// 3) better topology hint score wins
+	hScores1 := score1.HintScores()
+	if len(hScores1) > 0 {
+		hScores2 := score2.HintScores()
+		hs1, nz1 := combineHintScores(hScores1)
+		hs2, nz2 := combineHintScores(hScores2)
+
+		if hs1 > hs2 {
+			return true
+		}
+		if hs2 > hs1 {
+			return false
+		}
+
+		if hs1 == 0 {
+			if nz1 > nz2 {
+				return true
+			}
+			if nz2 > nz1 {
+				return false
+			}
+		}
+
+		// for a tie, prefer lower nodes and smaller ids
+		if hs1 == hs2 && nz1 == nz2 && (hs1 != 0 || nz1 != 0) {
+			if depth1 > depth2 {
+				return true
+			}
+			if depth1 < depth2 {
+				return false
+			}
+			return id1 < id2
+		}
+	}
+
+	// 4) a lower node wins
+	if depth1 > depth2 {
+		return true
+	}
+	if depth1 < depth2 {
+		return false
+	}
+
+	// 5) more isolated capacity wins
+	if request.Isolate() {
+		if isolated1 > isolated2 {
+			return true
+		}
+		if isolated2 > isolated1 {
+			return false
+		}
+		return id1 < id2
+	}
+
+	// 6) more slicable shared capacity wins
+	if request.FullCPUs() > 0 {
+		if shared1 > shared2 {
+			return true
+		}
+		if shared2 > shared1 {
+			return false
+		}
+
+		return id1 < id2
+	}
+
+	// 7) fewer colocated containers win
+	if score1.Colocated() < score2.Colocated() {
+		return true
+	}
+	if score2.Colocated() < score1.Colocated() {
+		return false
+	}
+
+	// more shared capacity wins
+	if shared1 > shared2 {
+		return true
+	}
+	if shared2 > shared1 {
+		return false
+	}
+
+	// lower id wins
+	return id1 < id2
+}
+
+// hintScores calculates combined full and zero-filtered hint scores.
+func combineHintScores(scores map[string]float64) (float64, float64) {
+	if len(scores) == 0 {
+		return 0.0, 0.0
+	}
+
+	combined, filtered := 1.0, 0.0
+	for _, score := range scores {
+		combined *= score
+		if score != 0.0 {
+			if filtered == 0.0 {
+				filtered = score
+			} else {
+				filtered *= score
+			}
+		}
+	}
+	return combined, filtered
 }

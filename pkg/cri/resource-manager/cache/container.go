@@ -211,6 +211,14 @@ func (c *container) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, er
 	}, nil
 }
 
+func (c *container) PrettyName() string {
+	pod, ok := c.GetPod()
+	if !ok {
+		return c.PodID + ":" + c.Name
+	}
+	return pod.GetName() + ":" + c.Name
+}
+
 func (c *container) GetPod() (Pod, bool) {
 	pod, found := c.cache.Pods[c.PodID]
 	return pod, found
@@ -679,4 +687,19 @@ func getKubeletHint(cpus, mems string) (ret sysfs.TopologyHints) {
 				NUMAs:    mems}}
 	}
 	return
+}
+
+func (c *container) GetAffinity() []*Affinity {
+	pod, ok := c.GetPod()
+	if !ok {
+		c.cache.Error("internal error: can't find Pod for container %s", c.PrettyName())
+	}
+
+	affinity := pod.GetContainerAffinity(c.GetName())
+	c.cache.Debug("affinity for container %s:", c.PrettyName())
+	for _, a := range affinity {
+		c.cache.Debug("  - %s", a.String())
+	}
+
+	return affinity
 }

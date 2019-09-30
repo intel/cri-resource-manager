@@ -8,14 +8,12 @@ constructed automatically using runtime-discovered hardware topology information
 about the node. The pools correspond to the topologically relevant HW components:
 sockets, NUMA nodes, and CPUs/cores. The root of the tree corresponds to the full
 HW available in the system, the next level corresponds to individual sockets in the
-system, the next one to individual NUMA nodes. While not actually present as such
-in the tree in the form of nodes, logically the lowest level corresponds to actual
-physical resoruces of interest: CPU cores, memory, etc.
+system, the next one to individual NUMA nodes.
 
 The main goal of the `topology-aware` policy is to try and distribute Containers
-among the pools in a way that both maximizes Container performance and minimizes
-interference between the Containers of different `Pod`s. This is accomplished by
-considering
+among the pools (tree nodes) in a way that both maximizes Container performance
+and minimizes interference between the Containers of different `Pod`s. This is
+accomplished by considering
 
 - topological characteristics of the Container's devices (`topology hints`)
 - potential hints provided by the user (in the form of policy-specific `annotations`)
@@ -144,3 +142,87 @@ the tree. For instance, setting the annotation value to
 
 requests container-1 to be placed to the parent of the pool with the best fitting
 score and container-2 to be placed in the best fitting pool itself.
+
+#### Intra-Pod Container Affinity/Anti-affinity
+
+`Containers` within a `Pod` can be annotated with `affinity` or `anti-affinity`
+rules, using the `cri-resource-manager.intel.com/affinity` and
+`cri-resource-manager.intel.com/anti-affinity` annotations.
+
+`Affinity` indicates a `soft pull` preference while `anti-affinity` indicates
+a `soft push` preference. The `topology-aware` policy will try to colocate `containers`
+with `affinity` to the same pool and `Containers` with `anti-affinity` to different
+pools.
+
+Here is an example snippet of a `Pod Spec` with
+  - `container3` having `affinity` to `container1` and `anti-affinity` to `container2`,
+  - `container4` having `anti-affinity` to `container2`, and `container3`
+
+```
+  annotations:
+    cri-resource-manager.intel.com/affinity: |
+      container3: [ container1 ]
+    cri-resource-manager.intel.com/anti-affinity: |
+      container3: [ container2 ]
+      container4: [ container2, container3 ]
+```
+
+This is actually a shorthand notation for the following, as `key` defaults to
+`io.kubernetes.container.name`, and `operator` defaults to `In`.
+
+```
+metadata:
+  annotations:
+    cri-resource-manager.intel.com/affinity: |+
+      container3:
+      - match:
+          key: io.kubernetes.container.name
+          operator: In
+          values:
+          - container1
+    cri-resource-manager.intel.com/anti-affinity: |+
+      container3:
+      - match:
+          key: io.kubernetes.container.name
+          operator: In
+          values:
+          - container2
+      container4:
+      - match:
+          key: io.kubernetes.container.name
+          operator: In
+          values:
+          - container2
+          - container3
+```
+
+Affinity and anti-affinity can have weights assigned as well. If omitted affinity weights
+default to `1` and anti-affinity weights to `-1`. The above example is actually represented
+internally with something equivalent to the following.
+
+```
+metadata:
+  annotations:
+    cri-resource-manager.intel.com/affinity: |+
+      container3:
+      - match:
+          key: io.kubernetes.container.name
+          operator: In
+          values:
+          - container1
+        weight: 1
+      - match:
+          key: io.kubernetes.container.name
+          operator: In
+          values:
+          - container2
+        weight: -1
+      container4:
+      - match:
+          key: io.kubernetes.container.name
+          operator: In
+          values:
+          - container2
+          - container3
+        weight: -1
+```

@@ -106,6 +106,10 @@ type Pod interface {
 	// necessary associated annotation put in place by the CRI resource manager
 	// webhook was found.
 	GetPodResourceRequirements() PodResourceRequirements
+	// GetContainerAffinity returns the affinity expressions for the named container.
+	GetContainerAffinity(string) []*Affinity
+	// ScopeExpression returns an affinity expression for defining this pod as the scope.
+	ScopeExpression() *Expression
 }
 
 // A cached pod.
@@ -122,6 +126,7 @@ type pod struct {
 	CgroupParent string            // cgroup parent directory
 
 	Resources *PodResourceRequirements // annotated resource requirements
+	Affinity  *podContainerAffinity    // annotated container affinity
 }
 
 // ContainerState is the container state in the runtime.
@@ -144,6 +149,8 @@ const (
 
 // Container is the exposed interface from a cached container.
 type Container interface {
+	// PrettyName returns the user-friendly <podname>:<containername> for the container.
+	PrettyName() string
 	// GetPod returns the pod of the container.
 	GetPod() (Pod, bool)
 	// GetID returns the ID of the container.
@@ -272,6 +279,9 @@ type Container interface {
 	UpdateCriCreateRequest(*cri.CreateContainerRequest) error
 	// CriUpdateRequest creates a CRI UpdateContainerResourcesRequest for the container.
 	CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error)
+
+	// GetAffinity returns the annotated affinity expressions for this container.
+	GetAffinity() []*Affinity
 }
 
 // A cached container.
@@ -375,10 +385,20 @@ type Cache interface {
 	// AbortTransaction discards container changes.
 	AbortTransaction()
 
+	// GetPods returns all the pods known to the cache.
+	GetPods() []Pod
+	// GetContainers returns all the containers known to the cache.
+	GetContainers() []Container
+
 	// GetContainerCacheIds returns the cache ids of all containers.
 	GetContainerCacheIds() []string
-	// GetContaineIds returne the ids of all containers.
+	// GetContaineIds return the ids of all containers.
 	GetContainerIds() []string
+
+	// FilterScope returns the containers selected by the scope expression.
+	FilterScope(*Expression) []Container
+	// EvaluateAffinity evaluates the given affinity against all known in-scope containers
+	EvaluateAffinity(*Affinity) map[string]int32
 
 	// SetPolicyEntry sets the policy entry for a key.
 	SetPolicyEntry(string, interface{})
@@ -816,6 +836,27 @@ func (cch *cache) GetContainerIds() []string {
 	}
 
 	return ids[0:idx]
+}
+
+// GetPods returns all pods present in the cache.
+func (cch *cache) GetPods() []Pod {
+	pods := make([]Pod, 0, len(cch.Pods))
+	for _, pod := range cch.Pods {
+		pods = append(pods, pod)
+	}
+	return pods
+}
+
+// GetContainers returns all the containers present in the cache.
+func (cch *cache) GetContainers() []Container {
+	containers := make([]Container, 0, len(cch.Containers)/2)
+	for id, container := range cch.Containers {
+		if id != container.CacheID {
+			continue
+		}
+		containers = append(containers, container)
+	}
+	return containers
 }
 
 // Set the policy entry for a key.
