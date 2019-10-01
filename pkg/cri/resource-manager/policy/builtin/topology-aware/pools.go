@@ -173,6 +173,7 @@ func (p *policy) applyGrant(grant CPUGrant) error {
 
 	if mems != "" {
 		log.Debug("  => pinning to memory %s", mems)
+		container.SetCpusetMems(mems)
 	} else {
 		log.Debug("  => not pinning memory, memory set is empty...")
 	}
