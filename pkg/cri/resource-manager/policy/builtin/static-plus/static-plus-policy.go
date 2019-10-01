@@ -175,9 +175,19 @@ func (p *staticplus) ExportResourceData(c cache.Container, syntax policy.DataSyn
 		p.Warn("can't find allocation for container %s", id)
 	}
 
-	data := "SHARED_CPUS=\"" + p.shared.String() + "\"\n"
+	data := ""
+	if a.shared != 0 {
+		data = "SHARED_CPUS=\"" + p.shared.String() + "\"\n"
+	}
 	if a != nil && !a.exclusive.IsEmpty() {
-		data += "EXCLUSIVE_CPUS=\"" + a.exclusive.String() + "\"\n"
+		isolated := a.exclusive.Intersection(p.sys.Isolated())
+		if isolated.String() != "" {
+			data += "ISOLATED_CPUS=\"" + isolated.String() + "\"\n"
+		}
+		exclusive := a.exclusive.Difference(p.sys.Isolated())
+		if exclusive.String() != "" {
+			data += "EXCLUSIVE_CPUS=\"" + exclusive.String() + "\"\n"
+		}
 	}
 
 	return []byte(data)
@@ -369,7 +379,7 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
 		p.Info("system container %s allocated (%d mCPU) to reserved pool %s",
-			c.GetCacheID(), a.shared, p.reserved.String())
+			c.PrettyName(), a.shared, p.reserved.String())
 
 		// for shared-only assignments, it's enough to update the container
 	case a.exclusive.IsEmpty():
@@ -377,7 +387,7 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
 		p.Info("container %s allocated (%d mCPU) to shared pool %s",
-			c.GetCacheID(), a.shared, p.shared.String())
+			c.PrettyName(), a.shared, p.shared.String())
 
 		// if we got isolated exclusive cpus, it's enough to update the container
 	case !a.exclusive.Intersection(p.sys.Isolated()).IsEmpty():
@@ -385,7 +395,7 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
 		p.Info("container %s allocated to isolated (%s) and shared (%d mCPU) pool %s",
-			c.GetCacheID(), a.exclusive.String(), a.shared, p.shared.String())
+			c.PrettyName(), a.exclusive.String(), a.shared, p.shared.String())
 
 		// if we sliced off shared cpus, we might need to update other containers as well
 	default:
@@ -468,7 +478,7 @@ func (p *staticplus) updateSharedAllocations() error {
 			cac.SetCpusetCpus(cset.String())
 
 			p.Info("container %s reallocated to exclusive (%s) and shared (%d mCPU) pool %s",
-				cac.GetCacheID(), ca.exclusive.String(), ca.shared, cset.String())
+				cac.PrettyName(), ca.exclusive.String(), ca.shared, cset.String())
 		}
 
 		avail -= ca.shared
