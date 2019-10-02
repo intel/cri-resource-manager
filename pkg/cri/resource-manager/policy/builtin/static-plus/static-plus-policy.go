@@ -17,6 +17,7 @@ package staticplus
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -40,6 +41,8 @@ const (
 	keyAllocations = "allocations"
 	// Cache key for storing the shared pool.
 	keySharedPool = "shared-pool"
+	// keyPreferIsolated is the annotation used to mark pods preferring isolated CPUs.
+	keyPreferIsolated = "prefer-isolated-cpus"
 )
 
 // Assignment tracks resource assignments for a single container.
@@ -331,6 +334,33 @@ func (p *staticplus) requestedCpus(c cache.Container) (int, int) {
 	return full, part
 }
 
+// optOutFromIsolated checks if a container prefers (to opt out from) isolated CPUs.
+func (p *staticplus) optOutFromIsolation(c cache.Container) bool {
+	preferIsolated := true
+
+	if pod, found := c.GetPod(); !found {
+		p.Warn("can't find pod for container %s", c.PrettyName())
+	} else {
+		if value, ok := pod.GetResmgrAnnotation(keyPreferIsolated); ok {
+			if isolated, err := strconv.ParseBool(value); !isolated {
+				if err != nil {
+					p.Error("invalid annotation '%s' on container %s, expecting boolean: %v",
+						keyPreferIsolated, c.PrettyName(), err)
+				} else {
+					p.Info("container %s is opted-out from isolation", c.PrettyName())
+				}
+				preferIsolated = false
+			} else {
+				p.Info("container %s explicitly opted-in for isolation", c.PrettyName())
+			}
+		} else {
+			p.Info("container %s goes with default isolation", c.PrettyName())
+		}
+	}
+
+	return !preferIsolated
+}
+
 // assignCpus allocates cpus for a containers.
 func (p *staticplus) assignCpus(c cache.Container) (*Assignment, error) {
 	full, part := p.requestedCpus(c)
@@ -346,7 +376,7 @@ func (p *staticplus) assignCpus(c cache.Container) (*Assignment, error) {
 	}
 
 	// if there is capacity in the isolated pool, slice cpus off from it
-	if p.isolated.Size() >= full {
+	if p.isolated.Size() >= full && !p.optOutFromIsolation(c) {
 		cpus, err := takeCPUs(&p.isolated, nil, full)
 		if err != nil {
 			return nil, policyError("failed to allocate %d isolated CPUs: %v",
