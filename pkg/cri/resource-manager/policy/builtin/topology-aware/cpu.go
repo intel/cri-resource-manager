@@ -394,6 +394,7 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	score.hints = make(map[string]float64, len(hints))
 
 	for provider, hint := range cr.container.GetTopologyHints() {
+		log.Debug(" - evaluating topology hint %s", hint.String())
 		score.hints[provider] = cs.node.HintScore(hint)
 	}
 
@@ -402,11 +403,13 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	key := pod.GetName() + ":" + cr.container.GetName()
 	if fakeHints, ok := opt.Hints[key]; ok {
 		for provider, hint := range fakeHints {
+			log.Debug(" - evaluating fake hint %s", hint.String())
 			score.hints[provider] = cs.node.HintScore(hint)
 		}
 	}
 	if fakeHints, ok := opt.Hints[cr.container.GetName()]; ok {
 		for provider, hint := range fakeHints {
+			log.Debug(" - evaluating fake hint %s", hint.String())
 			score.hints[provider] = cs.node.HintScore(hint)
 		}
 	}
@@ -444,8 +447,8 @@ func (score *cpuScore) HintScores() map[string]float64 {
 }
 
 func (score *cpuScore) String() string {
-	return fmt.Sprintf("<CPU score: node %s, isolated:%d, shared:%d, colocated:%d>",
-		score.supply.GetNode().Name(), score.isolated, score.shared, score.colocated)
+	return fmt.Sprintf("<CPU score: node %s, isolated:%d, shared:%d, colocated:%d, hints: %v>",
+		score.supply.GetNode().Name(), score.isolated, score.shared, score.colocated, score.hints)
 }
 
 // newCPUGrant creates a CPU grant from the given node for the container.
