@@ -419,24 +419,32 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		p.Info("container %s allocated (%d mCPU) to shared pool %s",
 			c.PrettyName(), a.shared, p.shared.String())
 
-		// if we got isolated exclusive cpus, it's enough to update the container
-	case !a.exclusive.Intersection(p.sys.Isolated()).IsEmpty():
+		// isolated, sliced-off exclusive, or mixed allocation
+	default:
+		var kind string
+		var isolated bool
+		if isolated = !a.exclusive.Intersection(p.sys.Isolated()).IsEmpty(); isolated {
+			kind = "isolated"
+		} else {
+			kind = "exclusive"
+		}
 		if a.shared != 0 {
 			c.SetCpusetCpus(a.exclusive.Union(p.shared).String())
 			c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
-			p.Info("container %s allocated to isolated (%s) and shared (%d mCPU) pool %s",
-				c.PrettyName(), a.exclusive.String(), a.shared, p.shared.String())
+			p.Info("container %s allocated to %s (%s) and shared (%d mCPU) pool %s",
+				c.PrettyName(), kind, a.exclusive.String(), a.shared, p.shared.String())
 		} else {
 			c.SetCpusetCpus(a.exclusive.String())
 			c.SetCPUShares(int64(MilliCPUToShares(1000 * a.exclusive.Size())))
-			p.Info("container %s allocated %s CPUs from isolated pool",
-				c.PrettyName(), a.exclusive.String())
+			p.Info("container %s allocated to %s CPUs %s", c.PrettyName(),
+				kind, a.exclusive.String())
 		}
 
-		// if we sliced off shared cpus, we might need to update other containers as well
-	default:
-		if err := p.updateSharedAllocations(); err != nil {
-			return err
+		// for sliced-off exclusive we might need to update other containers shared allocations
+		if !a.exclusive.IsEmpty() && a.exclusive.Intersection(p.sys.Isolated()).IsEmpty() {
+			if err := p.updateSharedAllocations(); err != nil {
+				return err
+			}
 		}
 	}
 
