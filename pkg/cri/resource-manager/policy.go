@@ -266,6 +266,11 @@ func (m *resmgr) processWithPolicy(ctx context.Context, method string, req inter
 		rpl, err := handler(ctx, req)
 
 		m.Info("StartContainerRequest response %v", rpl)
+
+		if err == nil {
+			c.UpdateState(cache.ContainerStateRunning)
+		}
+
 		policyErr := m.policy.PostStart(c)
 		if policyErr != nil {
 			m.Warn("failed to update affected container %s: %v", c.GetID(), policyErr)
