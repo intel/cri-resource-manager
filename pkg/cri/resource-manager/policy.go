@@ -300,6 +300,7 @@ func (m *resmgr) enforcePendingDecisions(ctx context.Context, updates ...cache.C
 // Forward a(n updated) container create request, followed by an update of resources.
 func (m *resmgr) createContainer(ctx context.Context, handler server.Handler,
 	req *api.CreateContainerRequest, c cache.Container) (*api.CreateContainerResponse, error) {
+	m.Info("creating container %s...", c.PrettyName())
 
 	c.InsertMount(&cache.Mount{
 		Container:   "/.cri-resmgr",
@@ -337,6 +338,8 @@ func (m *resmgr) updateContainer(ctx context.Context, c cache.Container) error {
 	case cache.ContainerStateExited, cache.ContainerStateStale:
 		return nil
 	}
+
+	m.Info("updating container %s...", c.PrettyName())
 
 	req, err := c.CriUpdateRequest()
 	if err != nil {
