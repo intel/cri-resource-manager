@@ -27,6 +27,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
@@ -56,8 +57,8 @@ type static struct {
 var _ policy.Backend = &static{}
 
 const (
-	// labelPreferIsolated is the label used to mark pods preferring isolated CPUs.
-	labelPreferIsolated = "cri.resource-manager.prefer-isolated-cpus"
+	// keyPreferIsolated is the annotation used to mark pods preferring isolated CPUs.
+	keyPreferIsolated = "prefer-isolated-cpus"
 )
 
 // NewStaticPolicy creates a new policy instance.
@@ -170,12 +171,24 @@ func (s *static) UpdateResources(c cache.Container) error {
 
 // ExportResourceData provides resource data to export for the container.
 func (s *static) ExportResourceData(c cache.Container, syntax policy.DataSyntax) []byte {
+	data := ""
+
 	cset, ok := s.GetCPUSet(c.GetCacheID())
 	if !ok {
 		cset = s.GetDefaultCPUSet()
+		data += "SHARED_CPUS=\"" + cset.String() + "\"\n"
+	} else {
+		isolated := cset.Intersection(s.sys.Isolated())
+		if isolated.String() != "" {
+			data += "ISOLATED_CPUS=\"" + isolated.String() + "\"\n"
+		}
+		exclusive := cset.Difference(s.sys.Isolated())
+		if exclusive.String() != "" {
+			data += "EXCLUSIVE_CPUS=\"" + exclusive.String() + "\"\n"
+		}
 	}
 
-	return []byte(fmt.Sprintf("# allocated cpuset:\nCPUSET=%s\n", cset.String()))
+	return []byte(data)
 }
 
 // PostStart allocates resources after container is started
@@ -207,7 +220,8 @@ func (s *static) SetConfig(conf string) error {
 	if opt.RelaxedIsolation {
 		s.Info("isolated exclusive CPUs: globally preferred (all pods)")
 	} else {
-		s.Info("isolated exclusive CPUs: per-pod (by boolean label '%s')", labelPreferIsolated)
+		s.Info("isolated exclusive CPUs: per-pod (by annotation '%s')",
+			kubernetes.ResmgrKey(keyPreferIsolated))
 	}
 
 	s.config = conf
@@ -294,13 +308,13 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 				return false, false
 			}
 
-			if l, ok := p.GetLabel(labelPreferIsolated); ok {
-				if isolated, err := strconv.ParseBool(l); isolated {
+			if value, ok := p.GetResmgrAnnotation(keyPreferIsolated); ok {
+				if isolated, err := strconv.ParseBool(value); isolated {
 					prefer = true
 				} else {
 					if err != nil {
-						s.Error("invalid label '%s' on pod %s container %s, expecting boolean: %v",
-							labelPreferIsolated, p.GetID(), c.GetID(), err)
+						s.Error("invalid annotation '%s' on container %s, expecting boolean: %v",
+							keyPreferIsolated, c.PrettyName(), err)
 					}
 				}
 			}
