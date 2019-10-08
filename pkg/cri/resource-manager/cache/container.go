@@ -244,6 +244,10 @@ func (c *container) GetNamespace() string {
 	return c.Namespace
 }
 
+func (c *container) UpdateState(state ContainerState) {
+	c.State = state
+}
+
 func (c *container) GetState() ContainerState {
 	return c.State
 }

@@ -163,6 +163,8 @@ type Container interface {
 	GetName() string
 	// GetNamespace returns the namespace of the container.
 	GetNamespace() string
+	// UpdateState updates the state of the container.
+	UpdateState(ContainerState)
 	// GetState returns the ContainerState of the container.
 	GetState() ContainerState
 	// GetQOSClass returns the QoS class the pod would have if this was its only container.
