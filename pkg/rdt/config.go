@@ -32,6 +32,22 @@ type ResctrlGroupConfig struct {
 	MBSchema MBSchema `json:"mbSchema,omitempty"`
 }
 
+// SchemaOptions contains the common settings for all resctrl groups
+type SchemaOptions struct {
+	L3 L3Options `json:"l3,omitempty"`
+	MB MBOptions `json:"mb,omitempty"`
+}
+
+// L3 contains the common settings for L3 cache allocation
+type L3Options struct {
+	Optional bool `json:"optional,omitempty"`
+}
+
+// MB contains the common settings for memory bandwidth allocation
+type MBOptions struct {
+	Optional bool `json:"optional,omitempty"`
+}
+
 // L3Schema represents an L3 part of the schemata of a resctrl group
 type L3Schema struct {
 	allocations map[uint64]CacheBitmask

@@ -49,6 +49,12 @@ data:
           Socket: 3
         exclusive: false
   rdt: |+
+    # Common options
+    options:
+      l3:
+        optional: true
+      mb:
+        optional: true
     # This example config specifies three RDT classes (or resctrl groups) with L3
     # CAT configured
     resctrlGroups:
