@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cri-resmgr-config
+  namespace: kube-system
+data:
+  runner: "containerd"
+  cri-resmg.policy: "null"
+  cri-resmg.policy-options: "-dump='reset,full:.*' -dump-file=/tmp/cri.dump"
+  cri-resmg.debub-options: ""

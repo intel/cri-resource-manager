@@ -5,7 +5,7 @@ Documentation=https://github.com/intel/cri-resource-manager
 [Service]
 Type=simple
 EnvironmentFile=/etc/sysconfig/cri-resource-manager
-ExecStart=/usr/bin/cri-resmgr --policy $POLICY $POLICY_OPTIONS $DEBUG_OPTIONS
+ExecStart=/usr/local/bin/cri-resmgr --policy $POLICY $POLICY_OPTIONS $DEBUG_OPTIONS
 Restart=always
 
 [Install]

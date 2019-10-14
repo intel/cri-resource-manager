@@ -1,0 +1,84 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cri-resmgr-deploy
+  namespace: kube-system
+spec:
+  selector:
+      matchLabels:
+        name: cri-resmgr-deploy
+  template:
+    metadata:
+        labels:
+          name: cri-resmgr-deploy
+    spec:
+      serviceAccountName: cri-resmgr-label-node
+      containers:
+      - name: kube-cri-resmgr
+        image: obedmr/cri-resmgr
+        imagePullPolicy: Always
+        command: [ "bash", "-c", "/bin/bootstrap.sh" ]
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: RUNNER
+          valueFrom:
+            configMapKeyRef:
+              name: cri-resmgr-config
+              key: runner
+        - name: CRI_RESMGR_POLICY
+          valueFrom:
+            configMapKeyRef:
+              name: cri-resmgr-config
+              key: cri-resmg.policy
+        - name: CRI_RESMGR_POLICY_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: cri-resmgr-config
+              key: cri-resmg.policy-options
+        - name: CRI_RESMGR_DEBUG_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: cri-resmgr-config
+              key: cri-resmg.debub-options
+        securityContext:
+          privileged: false
+        volumeMounts:
+        - name: dbus
+          mountPath: /var/run/dbus
+        - name: run-path
+          mountPath: /run/
+        - name: systemd-config
+          mountPath: /host/etc/systemd/system/
+        - name: sysconfig
+          mountPath: /host/etc/sysconfig
+        - name: kubelet-data
+          mountPath: /var/lib/kubelet
+        - name: usr-local-bin
+          mountPath: /host/usr/local/bin
+      volumes:
+        - name: dbus
+          hostPath:
+            path: /var/run/dbus
+        - name: run-path
+          hostPath:
+            path: /run/
+        - name: systemd-config
+          hostPath:
+            path: /etc/systemd/system/
+        - name: sysconfig
+          hostPath:
+            path: /etc/sysconfig
+        - name: kubelet-data
+          hostPath:
+            path: /var/lib/kubelet
+        - name: usr-local-bin
+          hostPath:
+            path: /usr/local/bin
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate

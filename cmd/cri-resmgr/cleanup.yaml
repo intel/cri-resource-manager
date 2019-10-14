@@ -1,0 +1,54 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kubelet-cri-resmgr-cleanup
+  namespace: kube-system
+spec:
+  selector:
+      matchLabels:
+        name: kubelet-cri-resmgr-cleanup
+  template:
+    metadata:
+        labels:
+          name: kubelet-cri-resmgr-cleanup
+    spec:
+      serviceAccountName: cri-resmgr-label-node
+      containers:
+      - name: kube-cri-resmgr-cleanup
+        image: obedmr/cri-resmgr
+        imagePullPolicy: Always
+        command: ["bash", "-c", "/bin/cleanup.sh"]
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        securityContext:
+          privileged: false
+        volumeMounts:
+        - name: etc
+          mountPath: /etc/systemd
+        - name: kubelet-data
+          mountPath: /var/lib/kubelet
+        - name: dbus
+          mountPath: /var/run/dbus
+        - name: systemd
+          mountPath: /run/systemd
+      volumes:
+        - name: etc
+          hostPath:
+            path: /etc/systemd
+        - name: kubelet-data
+          hostPath:
+            path: /var/lib/kubelet
+        - name: dbus
+          hostPath:
+            path: /var/run/dbus
+        - name: systemd
+          hostPath:
+            path: /run/systemd
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
