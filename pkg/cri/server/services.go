@@ -16,6 +16,7 @@ package server
 
 import (
 	"context"
+
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
 
@@ -26,7 +27,7 @@ const (
 	apiVersion = "v1alpha2"
 
 	imageService = "ImageService"
-	listImages   = "ListtImages"
+	listImages   = "ListImages"
 	imageStatus  = "ImageStatus"
 	pullImage    = "PullImage"
 	removeImage  = "RemoveImage"
