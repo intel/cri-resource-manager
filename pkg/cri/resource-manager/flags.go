@@ -29,6 +29,8 @@ type options struct {
 	RelayDir      string
 	AgentSocket   string
 	ConfigSocket  string
+	NoRdt         bool
+	ResctrlPath   string
 }
 
 // Relay options with their defaults.
@@ -48,4 +50,8 @@ func init() {
 		"local socket of the cri-resmgr agent to connect")
 	flag.StringVar(&opt.ConfigSocket, "config-socket", sockets.ResourceManagerConfig,
 		"Unix domain socket path where the resource manager listens for cri-resmgr-agent")
+	flag.BoolVar(&opt.NoRdt, "no-rdt", false,
+		"Disable RDT resource management")
+	flag.StringVar(&opt.ResctrlPath, "resctrl-path", "",
+		"Path of the resctrl filesystem mountpoint")
 }

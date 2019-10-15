@@ -23,7 +23,9 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
+	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/rdt"
 )
 
 // ResourceManager is the interface we expose for controlling the CRI resource manager.
@@ -40,10 +42,11 @@ type ResourceManager interface {
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay   // our CRI relay
-	cache        cache.Cache   // cached state
-	policy       policy.Policy // resource manager policy
-	configServer config.Server // configuration management server
+	relay        relay.Relay    // our CRI relay
+	cache        cache.Cache    // cached state
+	policy       policy.Policy  // resource manager policy
+	configServer config.Server  // configuration management server
+	rdt          control.CriRdt // RDT enforcement
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -87,8 +90,22 @@ func NewResourceManager() (ResourceManager, error) {
 		m.Warn("failed to fetch configuration, using last cached data")
 		conf = m.cache.GetConfig()
 	}
+	if conf == nil {
+		conf = &config.RawConfig{}
+	}
 
-	if m.policy, err = policy.NewPolicy(conf, agent); err != nil {
+	if !opt.NoRdt {
+		if err = m.setupRdt(conf.Get("rdt")); err != nil {
+			return nil, resmgrError("failed to create resource manager: %v", err)
+		}
+	}
+
+	policyOpts := &policy.Options{
+		ResmgrConfig: conf,
+		AgentCli:     agent,
+		Rdt:          m.rdt,
+	}
+	if m.policy, err = policy.NewPolicy(policyOpts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
@@ -147,9 +164,32 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	}
 
 	m.Info("updating resource manager configuration")
+	if m.rdt != nil {
+		if err := m.rdt.SetConfig(conf.Get("rdt")); err != nil {
+			return resmgrError("failed to update RDT configuration: %v", err)
+		}
+	}
+
 	if err := m.policy.SetConfig(conf); err != nil {
-		return resmgrError("failed to update configuration: %v", err)
+		return resmgrError("failed to update policy configuration: %v", err)
 	}
 
 	return m.cache.SetConfig(conf)
+}
+
+func (m *resmgr) setupRdt(conf string) error {
+	var err error
+
+	path := opt.ResctrlPath
+	if path == "" {
+		// Try to find the resctrl mount point
+		path, err = rdt.ResctrlMountPath()
+		if err != nil {
+			m.Info("unable to find the resctrl mount point, RDT enforcement is disabled")
+			return nil
+		}
+		m.Info("using auto-discovered resctrl-path %q", path)
+	}
+	m.rdt, err = control.NewCriRdt(path, conf)
+	return err
 }

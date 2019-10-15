@@ -29,6 +29,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
+	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
@@ -51,6 +52,7 @@ type static struct {
 	sys           *sysfs.System        // system/topology information
 	numHT         int                  // number of hyperthreads per core
 	state         cache.Cache          // policy/state cache
+	rdt           control.CriRdt       // RDT resource control interface
 }
 
 // Make sure static implements the policy backend interface.
@@ -62,12 +64,13 @@ const (
 )
 
 // NewStaticPolicy creates a new policy instance.
-func NewStaticPolicy(opts *policy.Options) policy.Backend {
+func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 	s := &static{
 		config:    opts.Config,
 		Logger:    logger.NewLogger(PolicyName),
 		available: opts.Available,
 		reserved:  opts.Reserved,
+		rdt:       opts.Rdt,
 	}
 
 	s.Info("creating policy...")
@@ -193,6 +196,17 @@ func (s *static) ExportResourceData(c cache.Container, syntax policy.DataSyntax)
 
 // PostStart allocates resources after container is started
 func (s *static) PostStart(c cache.Container) error {
+	if s.rdt != nil {
+		pod, ok := c.GetPod()
+		if !ok {
+			return policyError("Pod of container %q not found", c.GetID())
+		}
+		qos := string(pod.GetQOSClass())
+
+		s.Info("setting RDT class of container %q to %q", c.GetID(), qos)
+
+		return s.rdt.SetContainerClass(c, qos)
+	}
 	return nil
 }
 
@@ -694,7 +708,7 @@ func (s *static) SetCpusetCpus(id, value string) error {
 //
 
 // Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.Options) policy.Backend
+type Implementation func(*policy.BackendOptions) policy.Backend
 
 // Name returns the name of this policy implementation.
 func (i Implementation) Name() string {

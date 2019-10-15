@@ -25,6 +25,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
+	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -52,18 +53,30 @@ type ConstraintSet map[Domain]Constraint
 
 // Options describes policy options
 type Options struct {
+	// Full configuration data
+	ResmgrConfig *config.RawConfig
+	// Client interface to cri-resmgr agent
+	AgentCli agent.Interface
+	// Rdt control interface
+	Rdt control.CriRdt
+}
+
+// BackendOptions describes the options for a policy backend instance
+type BackendOptions struct {
 	// Resource availibility constraint
 	Available ConstraintSet
 	// Resource reservation constraint
 	Reserved ConstraintSet
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
+	// Rdt control interface
+	Rdt control.CriRdt
 	// Policy configuration data
 	Config string
 }
 
 // CreateFn is the type for functions used to create a policy instance.
-type CreateFn func(*Options) Backend
+type CreateFn func(*BackendOptions) Backend
 
 // DataSyntax defines the syntax used to export data to a container.
 type DataSyntax string
@@ -152,7 +165,7 @@ func ActivePolicy() string {
 }
 
 // NewPolicy creates a policy instance using the selected backend.
-func NewPolicy(resmgrCfg *config.RawConfig, a agent.Interface) (Policy, error) {
+func NewPolicy(o *Options) (Policy, error) {
 	if opt.policy == NullPolicy {
 		return nil, nil
 	}
@@ -181,18 +194,19 @@ func NewPolicy(resmgrCfg *config.RawConfig, a agent.Interface) (Policy, error) {
 		}
 	}
 
-	conf := extractPolicyConfig(backend.Name(), resmgrCfg)
+	conf := extractPolicyConfig(backend.Name(), o.ResmgrConfig)
 	if len(conf) == 0 {
 		p.Warn("received empty policy configuration")
 	}
 
-	policyOpts := &Options{
+	backendOpts := &BackendOptions{
 		Available: opt.available,
 		Reserved:  opt.reserved,
-		AgentCli:  a,
+		AgentCli:  o.AgentCli,
+		Rdt:       o.Rdt,
 		Config:    conf,
 	}
-	p.backend = backend.CreateFn()(policyOpts)
+	p.backend = backend.CreateFn()(backendOpts)
 
 	return p, nil
 }
@@ -316,7 +330,7 @@ func Register(p Implementation) error {
 	return nil
 }
 
-// String returns the given constraint as a string.
+// ConstraintToString returns the given constraint as a string.
 func ConstraintToString(value Constraint) string {
 	switch value.(type) {
 	case cpuset.CPUSet:
