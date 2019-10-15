@@ -23,11 +23,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
@@ -59,15 +59,6 @@ type stp struct {
 }
 
 var _ policy.Backend = &stp{}
-
-// Dump json-compatible struct in human-readable form
-func stringify(r interface{}) string {
-	out, err := yaml.Marshal(r)
-	if err != nil {
-		return fmt.Sprintf("!!!!!\nUnable to stringify %T: %v\n!!!!!", r, err)
-	}
-	return string(out)
-}
 
 //
 // Policy backend implementation
@@ -108,7 +99,7 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 		stp.Fatal("No STP policy configuration loaded")
 	}
 
-	stp.Debug("policy configuration:\n%s", stringify(stp.conf))
+	stp.Debug("policy configuration:\n%s", utils.DumpJSON(stp.conf))
 
 	return stp
 }
@@ -135,7 +126,7 @@ func (stp *stp) Start(cch cache.Cache, add []cache.Container, del []cache.Contai
 	if err := stp.initializeState(cch); err != nil {
 		return err
 	}
-	stp.Debug("retrieved stp container states from cache:\n%s", stringify(*stp.getContainerRegistry()))
+	stp.Debug("retrieved stp container states from cache:\n%s", utils.DumpJSON(*stp.getContainerRegistry()))
 
 	if err = stp.Sync(add, del); err != nil {
 		return err
@@ -268,7 +259,7 @@ func (stp *stp) SetConfig(conf string) error {
 
 	stp.Info("config updated successfully")
 	stp.conf = newConf
-	stp.Debug("new policy configuration:\n%s", stringify(stp.conf))
+	stp.Debug("new policy configuration:\n%s", utils.DumpJSON(stp.conf))
 	return nil
 }
 
