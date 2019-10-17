@@ -214,11 +214,6 @@ func (p *staticplus) PostStart(cch cache.Container) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (p *staticplus) SetConfig(string) error {
-	return nil
-}
-
 // policyError creates a formatted policy-specific error.
 func policyError(format string, args ...interface{}) error {
 	return fmt.Errorf(PolicyName+": "+format, args...)

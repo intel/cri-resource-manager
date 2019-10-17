@@ -73,25 +73,17 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	stp.Info("creating policy...")
 
 	// Read STP configuration
-	if len(opts.Config) > 0 {
-		stp.Info("using policy config from cri-resmgr configuration")
-		stp.conf, err = parseConfData([]byte(opts.Config))
-		if err != nil {
-			stp.Warn("failed to parse config: %v", err)
-		}
+	if len(opt.conf.value) > 0 {
+		stp.Info("Using configuration given with %s", optConfig)
+		conf := opt.conf.conf
+		stp.conf = &conf
 	} else {
 		if len(opt.confDir) > 0 {
+			stp.Info("Using configuration given with %s", optConfDir)
 			stp.conf, err = readConfDir(opt.confDir)
 			if err != nil {
 				stp.Warn("failed to read configuration directory: %v", err)
 			}
-		}
-		if len(opt.conf.value) > 0 {
-			conf := opt.conf.conf
-			if stp.conf != nil {
-				stp.Info("Overriding configuration from -static-pools-conf-dir with -static-pools-conf-file")
-			}
-			stp.conf = &conf
 		}
 	}
 	if stp.conf == nil {
@@ -258,24 +250,6 @@ func (stp *stp) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	stp.conf = &conf
 	stp.DebugBlock("policy configuration: ", "%s", utils.DumpJSON(stp.conf))
 
-	return nil
-}
-
-// SetConfig sets the policy backend configuration
-func (stp *stp) SetConfig(conf string) error {
-	// Unserialize
-	newConf, err := parseConfData([]byte(conf))
-	if err != nil {
-		return stpError("failed to parse config: %v", err)
-	}
-
-	if err = stp.verifyConfig(newConf); err != nil {
-		return err
-	}
-
-	stp.Info("config updated successfully")
-	stp.conf = newConf
-	stp.DebugBlock("policy configuration:", "%s", utils.DumpJSON(stp.conf))
 	return nil
 }
 

@@ -90,11 +90,6 @@ func (n *none) PostStart(cch cache.Container) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (n *none) SetConfig(string) error {
-	return nil
-}
-
 //
 // Automatically register us as a policy implementation.
 //

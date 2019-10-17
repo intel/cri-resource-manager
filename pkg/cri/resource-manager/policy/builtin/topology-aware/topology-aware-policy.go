@@ -223,12 +223,6 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration.
-func (p *policy) SetConfig(rawConf string) error {
-	log.Warn("ignoring obsolete policy.SetConfig() callback...")
-	return nil
-}
-
 // Discover system topology.
 func (p *policy) discoverSystemTopology() error {
 	var err error

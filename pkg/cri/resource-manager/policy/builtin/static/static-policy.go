@@ -43,7 +43,6 @@ const (
 type static struct {
 	logger.Logger
 
-	config        string               // active configuration
 	available     policy.ConstraintSet // resource availability constraints
 	reserved      policy.ConstraintSet // system/kube-reservation constraints
 	reservedCpus  cpuset.CPUSet        // CPUs reserved for system- and kube-tasks
@@ -66,7 +65,6 @@ const (
 // NewStaticPolicy creates a new policy instance.
 func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 	s := &static{
-		config:    opts.Config,
 		Logger:    logger.NewLogger(PolicyName),
 		available: opts.Available,
 		reserved:  opts.Reserved,
@@ -105,13 +103,6 @@ func (s *static) Description() string {
 // Start prepares this policy for accepting allocation/release requests.
 func (s *static) Start(state cache.Cache, add []cache.Container, del []cache.Container) error {
 	s.Debug("starting up...")
-
-	if s.config != "" {
-		err := s.SetConfig(s.config)
-		if err != nil {
-			return err
-		}
-	}
 
 	if err := s.allocateReserved(); err != nil {
 		return policyError("failed allocate reserved CPUs: %v", err)
@@ -234,12 +225,6 @@ func (s *static) configNotify(event config.Event, source config.Source) error {
 
 	s.Info("RDT support set to %q", opt.Rdt.String())
 
-	return nil
-}
-
-// SetConfig sets the policy backend configuration
-func (s *static) SetConfig(conf string) error {
-	s.Warn("ignoring obsolete policy.SetConfig() callaback...")
 	return nil
 }
 

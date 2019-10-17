@@ -179,6 +179,8 @@ func (m *resmgr) SetConfig(conf *resmgrcfg.RawConfig) error {
 		return resmgrError("failed to activate updated configuration: %v", err)
 	}
 
+	//m.cache.SetConfig(conf)
+
 	m.Info("updated configuration activated")
 	return nil
 }

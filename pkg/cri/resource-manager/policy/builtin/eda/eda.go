@@ -131,11 +131,6 @@ func (eda *eda) PostStart(cch cache.Container) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (eda *eda) SetConfig(conf string) error {
-	return nil
-}
-
 //
 // Helper functions for STP policy backend
 //
