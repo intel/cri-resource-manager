@@ -85,16 +85,6 @@ func parseConfData(raw []byte) (*config, error) {
 	return conf, nil
 }
 
-func readConfFile(filepath string) (*config, error) {
-	// Read config data
-	data, err := ioutil.ReadFile(filepath)
-	if err != nil {
-		return nil, stpError("Failed to read config file: %v", err)
-	}
-
-	return parseConfData(data)
-}
-
 func readConfDir(confDir string) (*config, error) {
 	conf := &config{Pools: map[string]poolConfig{}}
 

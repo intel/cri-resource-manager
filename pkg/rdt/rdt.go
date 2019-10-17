@@ -26,6 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
@@ -42,7 +43,7 @@ type Control interface {
 	SetProcessClass(string, ...string) error
 
 	// SetConfig re-configures RDT resources
-	SetConfig(string) error
+	setConfig(string) error
 }
 
 var rdtInfo Info
@@ -78,7 +79,31 @@ func NewControl(resctrlpath string, config string) (Control, error) {
 		return nil, rdtError("configuration failed: %v", err)
 	}
 
+	cfg.WatchUpdates(func(event pkgcfg.Event, source pkgcfg.Source) error {
+		return r.reconfigure(event, source)
+	})
+
 	return r, nil
+}
+
+func (r *control) reconfigure(event pkgcfg.Event, source pkgcfg.Source) error {
+	/*conf, err := parseConfData([]byte(opt.config))
+	if err != nil {
+		return rdtError("failed to parse configuration: %v", err)
+	}*/
+
+	if opt.value == "" {
+		return nil
+	}
+
+	if err := r.configureResctrl(opt.conf); err != nil {
+		return rdtError("configuration failed: %v", err)
+	}
+	r.conf = opt.conf
+
+	r.Info("RDT configuration updated.")
+
+	return nil
 }
 
 func (r *control) GetClasses() []string {
@@ -109,7 +134,7 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 	return nil
 }
 
-func (r *control) SetConfig(newConfRaw string) error {
+func (r *control) setConfig(newConfRaw string) error {
 	newConf, err := parseConfData([]byte(newConfRaw))
 	if err != nil {
 		return err
@@ -127,6 +152,8 @@ func (r *control) SetConfig(newConfRaw string) error {
 	}
 
 	r.conf = newConf
+
+	r.Info("RDT reconfigured...")
 
 	return nil
 }

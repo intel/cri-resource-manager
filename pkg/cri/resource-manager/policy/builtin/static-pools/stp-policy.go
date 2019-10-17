@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
@@ -85,21 +86,21 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 				stp.Warn("failed to read configuration directory: %v", err)
 			}
 		}
-		if len(opt.confFile) > 0 {
+		if len(opt.conf.value) > 0 {
+			conf := opt.conf.conf
 			if stp.conf != nil {
 				stp.Info("Overriding configuration from -static-pools-conf-dir with -static-pools-conf-file")
 			}
-			stp.conf, err = readConfFile(opt.confFile)
-			if err != nil {
-				stp.Warn("failed to read configuration directory: %v", err)
-			}
+			stp.conf = &conf
 		}
 	}
 	if stp.conf == nil {
 		stp.Fatal("No STP policy configuration loaded")
 	}
 
-	stp.Debug("policy configuration:\n%s", utils.DumpJSON(stp.conf))
+	cfg.WatchUpdates(stp.configNotify)
+
+	stp.DebugBlock("policy configuration: ", "%s", utils.DumpJSON(stp.conf))
 
 	return stp
 }
@@ -245,6 +246,21 @@ func (stp *stp) PostStart(cch cache.Container) error {
 	return nil
 }
 
+func (stp *stp) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+	stp.Info("configuration %s", event)
+
+	conf := opt.conf.conf
+	if err := stp.verifyConfig(&conf); err != nil {
+		return err
+	}
+
+	stp.Info("config updated successfully")
+	stp.conf = &conf
+	stp.DebugBlock("policy configuration: ", "%s", utils.DumpJSON(stp.conf))
+
+	return nil
+}
+
 // SetConfig sets the policy backend configuration
 func (stp *stp) SetConfig(conf string) error {
 	// Unserialize
@@ -259,7 +275,7 @@ func (stp *stp) SetConfig(conf string) error {
 
 	stp.Info("config updated successfully")
 	stp.conf = newConf
-	stp.Debug("new policy configuration:\n%s", utils.DumpJSON(stp.conf))
+	stp.DebugBlock("policy configuration:", "%s", utils.DumpJSON(stp.conf))
 	return nil
 }
 

@@ -34,7 +34,7 @@ var shutdown = func() {}
 
 // IsEnabled returns true if tracing is enabled.
 func IsEnabled() bool {
-	return opt.trace != sampleNever
+	return opt.sampling != sampleNever
 }
 
 // Setup sets up instrumentation (tracing, metrics collection, etc.).
@@ -45,13 +45,13 @@ func Setup(service string) error {
 		return nil
 	}
 
-	switch opt.trace {
+	switch opt.sampling {
 	case sampleNever:
 		return nil
 	case sampleAlways:
 		cfg = &trace.Config{DefaultSampler: trace.AlwaysSample()}
 	default:
-		cfg = &trace.Config{DefaultSampler: trace.ProbabilitySampler(float64(opt.trace))}
+		cfg = &trace.Config{DefaultSampler: trace.ProbabilitySampler(float64(opt.sampling))}
 	}
 	trace.ApplyConfig(*cfg)
 

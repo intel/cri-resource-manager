@@ -38,7 +38,7 @@ choosing the cgroup driver according to your system setup.
 
 For full message dumping you start the CRI relay like this:
 ```
-  ./cmd/cri-resmgr/cri-resmgr -policy null -dump 'reset,full:.*' -dump-file /tmp/cri.dump
+  ./bin/cri-resmgr --policy-activate null --dump 'reset,full:.*' --dump-file /tmp/cri.dump
 ```
 
 ### Running kubelet using the proxy as the runtime
@@ -104,14 +104,14 @@ Node via an environment variable, as well as a valid kubeconfig.  For example:
 You can enable active policying of containers by passing the
 `--policy <policy-name>` commandline option to the relay. For instance,
 ```
-  ./cmd/cri-resmgr/cri-resmgr --policy static --reserved-resources cpu=1000m
+  ./bin/cri-resmgr --policy-activate static --policy-reserved-resources cpu=1000m
 ```
 will start the relay with the kubelet/CPU Manager-equivalent static policy
 enabled and running with 1 CPU reserved for system- and kube- tasks. Similarly,
 you can start the relay with the static+ policy using the following command:
 
 ```
-  ./cmd/cri-resmgr/cri-resmgr --policy static-plus --reserved-resources cpu=1000m
+  ./bin/cri-resmgr --policy-activate static-plus --policy-reserved-resources cpu=1000m
 ```
 
 The list of available policies can be queried with the `--list-policies`

@@ -15,22 +15,28 @@
 package instrumentation
 
 import (
-	"flag"
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"os"
 	"strconv"
 	"strings"
 )
 
-// TraceConfig represents a pre-defined instrumentation configuration.
-type TraceConfig string
-
 const (
-	// Symbolic trace names and their correponding sampling values.
-	traceTesting     = "testing"
-	traceProduction  = "production"
-	traceDisabled    = "disabled"
-	traceAlways      = "always"
-	traceNever       = "never"
+	// Select runtime tracing configuration to use.
+	optSampling = "sampling"
+	// Specify Jaeger collector endpoint to use.
+	optCollector = "jaeger-collector"
+	// Specify the Jaeger agent to use.
+	optAgent = "jaeger-agent"
+	// Specify the HTTP endpoint to server Prometheus metrics on.
+	optMetrics = "prometheus-metrics"
+
+	// Symbolic trace configuration names and their correponding sampling values.
+	configTesting    = "testing"
+	configProduction = "production"
+	configDisabled   = "disabled"
+	configAlways     = "always"
+	configNever      = "never"
 	sampleTesting    = 1.0
 	sampleProduction = 0.1
 	sampleDisabled   = 0.0
@@ -38,36 +44,38 @@ const (
 	sampleNever      = 0.0
 )
 
-type traceValue float64
-
-// options encapsulates our configurable instrumentation parameters.
+// Options captures our configurable instrumentation parameters.
 type options struct {
-	trace     traceValue // instrumentation configuration
+	sampling  traceValue // instrumentation sampling configuration
 	collector string     // collector endpoint
 	agent     string     // agent endpoint
 	metrics   string     // metrics exporter address
 }
 
-// Our instrumentation options.
+// Our configuration module and configurable options.
+var cfg *config.Module
 var opt = options{}
+
+// traceValue is a samplingrepresents a pre-defined instrumentation configuration.
+type traceValue float64
 
 // symbolicTraceNames returns the valid predefined trace configuration names.
 func symbolicTraceNames() string {
-	names := []string{traceTesting, traceProduction, traceDisabled, traceAlways}
+	names := []string{configTesting, configProduction, configDisabled, configAlways}
 	return strings.Join(names, ", ")
 }
 
 func (t *traceValue) Set(value string) error {
 	switch value {
-	case traceTesting:
+	case configTesting:
 		*t = sampleTesting
-	case traceProduction:
+	case configProduction:
 		*t = sampleProduction
-	case traceDisabled:
+	case configDisabled:
 		*t = sampleDisabled
-	case traceAlways:
+	case configAlways:
 		*t = sampleAlways
-	case traceNever:
+	case configNever:
 		*t = sampleNever
 	default:
 		mul := 1.0
@@ -100,19 +108,17 @@ func stringEnvVal(p *string, name, env, value, usage string) (*string, string, s
 
 // Register our command-line flags.
 func init() {
-	// Default for opt.trace
-	opt.trace = sampleDisabled
+	cfg = config.Register("trace", "tracing and instrumentation")
 
-	flag.Var(&opt.trace, "trace",
-		"Tracing configuration to use. The possible values are: "+symbolicTraceNames()+", "+
-			"or a trace sampling probability.")
-	flag.StringVar(stringEnvVal(&opt.collector, "trace-jaeger-collector", "JAEGER_COLLECTOR",
-		"http://localhost:14268/api/traces",
-		"Jaeger collector endpoint URL to use."))
-	flag.StringVar(stringEnvVal(&opt.agent, "trace-jaeger-agent", "JAEGER_AGENT",
-		"localhost:6831",
-		"Jaeger agent address to use."))
-	flag.StringVar(stringEnvVal(&opt.metrics, "trace-prometheus-metrics", "PROMETHEUS_ENDPOINT",
-		":8888",
-		"Address to serve Prometheus /metrics on."))
+	// Default for opt.trace
+	opt.sampling = sampleDisabled
+
+	cfg.Var(&opt.sampling, optSampling,
+		"Tracing configuration to use. One of "+symbolicTraceNames()+" or a sampling probability")
+	cfg.StringVar(&opt.collector, optCollector, "http://localhost:14268/api/traces",
+		"Tracing Jaeger collector endpoint URL to use.")
+	cfg.StringVar(&opt.agent, optAgent, "localhost:6831",
+		"Tracing Jaeger agent address to use.")
+	cfg.StringVar(&opt.metrics, optMetrics, ":8888",
+		"Tracing HTTP server address to serve Prometheus /metrics on.")
 }

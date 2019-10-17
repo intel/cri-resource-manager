@@ -46,33 +46,9 @@ func (p *policy) restoreConfig() bool {
 	if !p.cache.GetPolicyEntry(keyConfig, &cached) {
 		return false
 	}
-
-	// Notes:
-	//   We merge the restored configuration, which is our fallback/default one until we
-	//   get an up-to-date one from the agent, into the current one, which might container
-	//   explicitly overridden defaults. In the merged configuration we want to keep the
-	//   explicitly overridden defaults intact, again until we receive an up-to-date one.
-	//   However, any new fake hints we merge into the restored configuration and save it.
-	restored := &cached.Options
-	opt.mergeFakeHints(restored)
-	restored.Hints = opt.Hints
-	opt.Hints = restored.Hints
+	//cached.Options.hints = opt.hints
+	opt = cached.Options
 	p.saveConfig()
-
-	if opt.IsExplicit(optPinCPU) {
-		restored.PinCPU = opt.PinCPU
-	}
-	if opt.IsExplicit(optPinMem) {
-		restored.PinMem = opt.PinMem
-	}
-	if opt.IsExplicit(optPreferIsolated) {
-		restored.PreferIsolated = opt.PreferIsolated
-	}
-	if opt.IsExplicit(optPreferShared) {
-		restored.PreferShared = opt.PreferShared
-	}
-
-	opt = *restored
 
 	return true
 }

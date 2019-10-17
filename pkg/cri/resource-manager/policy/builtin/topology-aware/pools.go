@@ -141,11 +141,11 @@ func (p *policy) applyGrant(grant CPUGrant) error {
 
 	mems := ""
 	node := grant.GetNode()
-	if !node.IsRootNode() && opt.PinMem {
+	if !node.IsRootNode() && opt.pinMemory {
 		mems = node.GetMemset().String()
 	}
 
-	if opt.PinCPU {
+	if opt.pinCPU {
 		if cpus != "" {
 			log.Debug("  => pinning to (%s) cpuset %s", kind, cpus)
 		} else {
@@ -213,7 +213,7 @@ func (p *policy) updateSharedAllocations(grant CPUGrant) error {
 			continue
 		}
 
-		if opt.PinCPU {
+		if opt.pinCPU {
 			shared := other.GetNode().FreeCPU().SharableCPUs().String()
 			log.Debug("  => updating %s with shared CPUs of %s: %s...",
 				other.String(), other.GetNode().Name(), shared)

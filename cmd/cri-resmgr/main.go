@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 
@@ -30,12 +31,30 @@ import (
 func main() {
 	log := logger.Default()
 
-	flag.Parse()
-
-	if len(flag.Args()) != 0 {
-		log.Error("unknown command-line arguments: %s", strings.Join(flag.Args(), ","))
-		flag.Usage()
+	if err := config.ParseCmdline(); err != nil {
+		if err == flag.ErrHelp {
+			os.Exit(0)
+		}
+		log.Error("failed to parse command line options: %v", err)
 		os.Exit(1)
+	}
+
+	if len(config.Args()) != 0 {
+		args := config.Args()
+		if args[0] != "help" {
+			log.Error("unknown command-line arguments: %s", strings.Join(config.Args(), ","))
+			config.Usage()
+			os.Exit(1)
+		}
+		config.Help(args[1:]...)
+		os.Exit(1)
+	}
+
+	if opt.configFile != "" {
+		if err := config.ParseYAMLFile(opt.configFile); err != nil {
+			log.Error("failed to parse configuration file %s: %v", opt.configFile, err)
+			os.Exit(1)
+		}
 	}
 
 	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)

@@ -44,7 +44,7 @@ As a fallback, the STP policy also supports configuration directory format of
 the original CMK. It tries to read the configuration from a location specified
 with `-static-pools-conf-dir` (`/etc/cmk` by default).
 Alternatively, you can provide a configuration file (YAML) by using the
-`-static-pools-conf-file` flag.
+`-static-pools-config` flag.
 See the [example config](../sample-configs/static-pools-policy.conf.example) for a
 starting point.  However, if `cri-resmgr` at a later time receives a valid
 configuration from the `cri-resmr-agent` this will override the fallback
@@ -80,7 +80,7 @@ Cri-resmgr has some command line flags specific to the STP policy:
 ```
   -static-pools-conf-dir string
         STP pool configuration directory (default "/etc/cmk")
-  -static-pools-conf-file string
+  -static-pools-config string
         STP pool configuration file
   -static-pools-create-cmk-node-label
         Create CMK-related node label for backwards compatibility

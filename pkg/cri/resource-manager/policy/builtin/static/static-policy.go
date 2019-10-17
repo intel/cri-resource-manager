@@ -17,7 +17,6 @@ package static
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,6 +24,7 @@ import (
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
@@ -86,6 +86,8 @@ func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 	if err := s.checkConstraints(); err != nil {
 		s.Fatal("cannot start with given constraints: %v", err)
 	}
+
+	cfg.WatchUpdates(s.configNotify)
 
 	return s
 }
@@ -215,30 +217,9 @@ func (s *static) PostStart(c cache.Container) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (s *static) SetConfig(conf string) error {
-	conf = strings.TrimSpace(conf)
-
-	if conf == s.config {
-		s.Info("no configuration changes")
-		return nil
-	}
-
-	newConf, err := parseConfData([]byte(conf))
-	if err != nil {
-		return policyError("failed to parse configuration: %v", err)
-	}
-
-	if opt == *newConf {
-		s.Info("no configuration changes")
-		return nil
-	}
-
-	if newConf.Rdt == TristateOn && s.rdt == nil {
-		return policyError("RDT requested but not available")
-	}
-
-	opt = *newConf
+// configNotify is our configuration update notification handler.
+func (s *static) configNotify(event config.Event, source config.Source) error {
+	s.Info("configuration %s", event)
 
 	if opt.RelaxedIsolation {
 		s.Info("isolated exclusive CPUs: globally preferred (all pods)")
@@ -247,10 +228,18 @@ func (s *static) SetConfig(conf string) error {
 			kubernetes.ResmgrKey(keyPreferIsolated))
 	}
 
-	s.Info("rdt support set to %q", opt.Rdt.String())
+	if opt.Rdt == TristateOn && s.rdt == nil {
+		return policyError("RDT requested but not available")
+	}
 
-	s.config = conf
+	s.Info("RDT support set to %q", opt.Rdt.String())
 
+	return nil
+}
+
+// SetConfig sets the policy backend configuration
+func (s *static) SetConfig(conf string) error {
+	s.Warn("ignoring obsolete policy.SetConfig() callaback...")
 	return nil
 }
 

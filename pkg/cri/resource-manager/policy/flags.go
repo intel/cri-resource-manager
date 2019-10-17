@@ -15,13 +15,10 @@
 package policy
 
 import (
-	"flag"
-	"fmt"
+	config "github.com/intel/cri-resource-manager/pkg/config"
+
 	"io/ioutil"
-	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,14 +26,17 @@ import (
 )
 
 const (
-	// NullPolicy is the reserved name for disabling policy altogether.
+	// Control which policy backend gets activated.
+	optPolicy = "activate"
+	// Control the amount of available resources passed to the active policy.
+	optAvailableResources = "available-resources"
+	// Control the amount of resources reserved for system- and kube-tasks.
+	optReservedResources = "reserved-resources"
+	// NullPolicy is the name of the "null" policy which prevents any policy initialization.
 	NullPolicy = "null"
-
-	// Flag for listing the available policies.
-	optionListPolicies = "list-policies"
 )
 
-// Policy options configurable via the command line.
+// Options captures the configurable parameters of the policy layer.
 type options struct {
 	policy    string                    // active policy
 	policies  map[string]Implementation // registered policies
@@ -44,12 +44,9 @@ type options struct {
 	reserved  ConstraintSet             // resource reservations
 }
 
-// Policy options with their defaults.
-var opt = options{
-	available: ConstraintSet{},
-	reserved:  ConstraintSet{},
-	policies:  make(map[string]Implementation),
-}
+// Our configuration module and configurable options.
+var cfg *config.Module
+var opt = options{}
 
 //
 // XXX TODO: write missing constraint parsers as needed...
@@ -138,6 +135,10 @@ func parseMemBWConstraint(mbw string) (interface{}, error) {
 
 // Set implements the Set() function of flags.Value interface
 func (c *ConstraintSet) Set(value string) error {
+	if value == "" {
+		return nil
+	}
+
 	for _, constraint := range strings.Split(value, ",") {
 		if err := (*c).setConstraint(constraint); err != nil {
 			return policyError("invalid constraint: %v", err)
@@ -186,38 +187,20 @@ func (c *ConstraintSet) String() string {
 	return ret
 }
 
-// listPolicies is a helper type used for implementing the "list-policies"
-// option which acts like a sub-command
-type listPolicies bool
-
-var listCmd listPolicies
-
-func (l *listPolicies) Set(value string) error {
-	fmt.Printf("The available policies are:\n")
-	names := make([]string, 0, len(opt.policies))
-	for name := range opt.policies {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		fmt.Printf("  %s: %s\n", name, opt.policies[name].Description())
-	}
-	os.Exit(0)
-	return nil
-}
-
-func (l *listPolicies) IsBoolFlag() bool { return true }
-
-func (l *listPolicies) String() string { return strconv.FormatBool(bool(*l)) }
-
+// Register us for configuration handling.
 func init() {
-	flag.StringVar(&opt.policy, "policy", NullPolicy,
-		"select the policy to use for hardware resource decision making.\n"+
-			"You can list the available policies with the --"+optionListPolicies+" option.")
-	flag.Var(&opt.available, "available-resources",
-		"specify the amount of resources available for allocation by the active policy.")
-	flag.Var(&opt.reserved, "reserved-resources",
-		"specify the amount of resources reserved for system- and kube-tasks.")
-	flag.Var(&listCmd, optionListPolicies,
-		"list the available resource management policies.")
+	opt = options{
+		available: ConstraintSet{},
+		reserved:  ConstraintSet{},
+		policies:  make(map[string]Implementation),
+	}
+
+	cfg = config.Register("policy", "Implementation-agnostic policy layer.")
+
+	cfg.StringVar(&opt.policy, optPolicy, NullPolicy,
+		"Selects the policy backend to use for decision making.")
+	cfg.Var(&opt.available, optAvailableResources,
+		"Specify the amount of resources available for the active policy to allocate.")
+	cfg.Var(&opt.reserved, optReservedResources,
+		"Specify the amount of resources reserved for system- and kube-tasks.")
 }

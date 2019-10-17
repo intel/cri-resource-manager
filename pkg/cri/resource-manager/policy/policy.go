@@ -16,6 +16,7 @@ package policy
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -375,4 +376,18 @@ func extractPolicyConfig(policyName string, rawConfig *config.RawConfig) string 
 func defaultPolicyConfig(policyName string) string {
 	// Just a stub for now, always returning empty.
 	return ""
+}
+
+// ListAvailablePolicies lists all available policies.
+func ListAvailablePolicies() {
+	names := make([]string, 0, len(opt.policies))
+	for name := range opt.policies {
+		names = append(names, name)
+	}
+	sort.StringSlice(names).Sort()
+
+	fmt.Printf("There are %d avaialble policy implmentations:\n", len(names))
+	for _, name := range names {
+		fmt.Printf("  - %s: %s\n", name, opt.policies[name].Description())
+	}
 }

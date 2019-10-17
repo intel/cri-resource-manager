@@ -36,7 +36,7 @@ You can activate the tpology-aware policy by setting the `--policy` option of
 `cri-resmgr` to `topology-aware`. For instance like this:
 
 ```
-cri-resmgr --policy topology-aware --reserved-resources cpu=750m
+cri-resmgr --policy-activate topology-aware --policy-reserved-resources cpu=750m
 ```
 
 ## Configuration

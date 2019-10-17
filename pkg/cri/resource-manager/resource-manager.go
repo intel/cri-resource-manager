@@ -15,13 +15,15 @@
 package resmgr
 
 import (
+	"strings"
 	"sync"
 	"time"
 
+	config "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/relay"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
-	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
+	resmgrcfg "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
@@ -35,18 +37,18 @@ type ResourceManager interface {
 	// Stop stops the resource manager.
 	Stop()
 	// SetConfig dynamically updates the resource manager  configuration
-	SetConfig(*config.RawConfig) error
+	SetConfig(*resmgrcfg.RawConfig) error
 }
 
 // resmgr is the implementation of ResourceManager.
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay    // our CRI relay
-	cache        cache.Cache    // cached state
-	policy       policy.Policy  // resource manager policy
-	configServer config.Server  // configuration management server
-	rdt          control.CriRdt // RDT enforcement
+	relay        relay.Relay      // our CRI relay
+	cache        cache.Cache      // cached state
+	policy       policy.Policy    // resource manager policy
+	configServer resmgrcfg.Server // configuration management server
+	rdt          control.CriRdt   // RDT enforcement
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -91,7 +93,7 @@ func NewResourceManager() (ResourceManager, error) {
 		conf = m.cache.GetConfig()
 	}
 	if conf == nil {
-		conf = &config.RawConfig{}
+		conf = &resmgrcfg.RawConfig{}
 	}
 
 	if !opt.NoRdt {
@@ -117,7 +119,7 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
-	if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
+	if m.configServer, err = resmgrcfg.NewConfigServer(m.SetConfig); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
@@ -154,27 +156,44 @@ func (m *resmgr) Stop() {
 }
 
 // Set new resource manager configuration.
-func (m *resmgr) SetConfig(conf *config.RawConfig) error {
+func (m *resmgr) SetConfig(conf *resmgrcfg.RawConfig) error {
+	m.Info("received configuration update")
+
 	m.Lock()
 	defer m.Unlock()
 
-	if m.cache.GetConfig().HasIdenticalData(conf.Data) {
-		m.Warn("ignoring config change without any change in data...")
-		return nil
+	data, key := m.extractNodeConfig(conf, conf.NodeName)
+	if key == "" {
+		m.Error("failed to extract node (%s) or default configuration", conf.NodeName)
+		return resmgrError("failed to extract node (%s) or default configuration", conf.NodeName)
 	}
 
-	m.Info("updating resource manager configuration")
-	if m.rdt != nil {
-		if err := m.rdt.SetConfig(conf.Get("rdt")); err != nil {
-			return resmgrError("failed to update RDT configuration: %v", err)
+	if m.DebugEnabled() {
+		for _, line := range strings.Split(data, "\n") {
+			m.Debug("config '%s': %s", key, line)
 		}
 	}
 
-	if err := m.policy.SetConfig(conf); err != nil {
-		return resmgrError("failed to update policy configuration: %v", err)
+	if err := config.ParseYAMLData([]byte(data), config.External); err != nil {
+		m.Error("failed to activate updated configuration: %v", err)
+		return resmgrError("failed to activate updated configuration: %v", err)
 	}
 
-	return m.cache.SetConfig(conf)
+	m.Info("updated configuration activated")
+	return nil
+}
+
+// extractNodeConfig picks configuration for this node from the raw resmgrcfg.
+func (m *resmgr) extractNodeConfig(rawConfig *resmgrcfg.RawConfig, node string) (string, string) {
+	keys := []string{node, "default"}
+
+	for _, key := range keys {
+		if cfg, ok := rawConfig.Data[key]; ok {
+			return cfg, key
+		}
+	}
+
+	return "", ""
 }
 
 func (m *resmgr) setupRdt(conf string) error {

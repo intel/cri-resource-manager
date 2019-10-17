@@ -15,23 +15,69 @@
 package stp
 
 import (
-	"flag"
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
+)
+
+const (
+	// Control configuration file or data to use.
+	optConfig = "config"
+	// Control configuration directory to use.
+	optConfDir = "conf-dir"
+	// Control whether legacy CMK node labels are set.
+	optNodeLabel = "create-cmk-node-label"
+	// Control whether legacy CMK node taints are set.
+	optNodeTaint = "create-cmk-node-taint"
 )
 
 // CRI resource manager command line options related to STP policy
 type options struct {
-	confFile        string
 	confDir         string
 	createNodeLabel bool
 	createNodeTaint bool
+	conf            yamlConf
 }
 
 var opt = options{}
+var cfg *pkgcfg.Module
+
+// yamlConf is our flag.Value for configuration.
+type yamlConf struct {
+	value string // configuration as a string
+	conf  config // parsed configuration
+}
+
+// Set STP configuration data.
+func (yc *yamlConf) Set(value string) error {
+	if yc == nil || value == "" {
+		return nil
+	}
+
+	conf, err := parseConfData([]byte(value))
+	if err != nil {
+		return stpError("failed to parse configuration: %v", err)
+	}
+	yc.value = value
+	yc.conf = *conf
+
+	return nil
+}
+
+// String returns STP configuration data as a string.
+func (yc *yamlConf) String() string {
+	if yc == nil {
+		return ""
+	}
+	return yc.value
+}
 
 // Register our command-line flags.
 func init() {
-	flag.StringVar(&opt.confFile, "static-pools-conf-file", "", "STP pool configuration file")
-	flag.StringVar(&opt.confDir, "static-pools-conf-dir", "/etc/cmk", "STP pool configuration directory")
-	flag.BoolVar(&opt.createNodeLabel, "static-pools-create-cmk-node-label", false, "Create CMK-related node label for backwards compatibility")
-	flag.BoolVar(&opt.createNodeTaint, "static-pools-create-cmk-node-taint", false, "Create CMK-related node taint for backwards compatibility")
+	cfg = pkgcfg.Register(PolicyName, PolicyDescription)
+
+	cfg.YamlVar(&opt.conf, optConfig, "STP pool configuration file")
+	cfg.StringVar(&opt.confDir, optConfDir, "/etc/cmk", "STP pool configuration directory")
+	cfg.BoolVar(&opt.createNodeLabel, optNodeLabel, false,
+		"Create CMK-related node label for backwards compatibility")
+	cfg.BoolVar(&opt.createNodeTaint, optNodeTaint, false,
+		"Create CMK-related node taint for backwards compatibility")
 }

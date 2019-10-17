@@ -16,7 +16,7 @@ package resmgr
 
 import (
 	"flag"
-
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 )
@@ -34,10 +34,12 @@ type options struct {
 }
 
 // Relay options with their defaults.
+var cfg *config.Module
 var opt = options{}
 
 // Register our command-line flags.
 func init() {
+	// Declare command line-only options first.
 	flag.StringVar(&opt.ImageSocket, "image-socket", client.DontConnect,
 		"Unix domain socket path where CRI image service requests should be relayed to.")
 	flag.StringVar(&opt.RuntimeSocket, "runtime-socket", sockets.DockerShim,
@@ -50,8 +52,11 @@ func init() {
 		"local socket of the cri-resmgr agent to connect")
 	flag.StringVar(&opt.ConfigSocket, "config-socket", sockets.ResourceManagerConfig,
 		"Unix domain socket path where the resource manager listens for cri-resmgr-agent")
-	flag.BoolVar(&opt.NoRdt, "no-rdt", false,
-		"Disable RDT resource management")
 	flag.StringVar(&opt.ResctrlPath, "resctrl-path", "",
 		"Path of the resctrl filesystem mountpoint")
+
+	// Declare options that we accept from any source.
+	cfg = config.GetModule(config.MainModule)
+	cfg.BoolVar(&opt.NoRdt, "no-rdt", false,
+		"Disable RDT resource management")
 }

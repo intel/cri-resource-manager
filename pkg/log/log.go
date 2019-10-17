@@ -123,16 +123,15 @@ func (l *logger) Stop() {
 	delete(opt.loggers, l.source)
 }
 
-func (level Level) String() string {
-	if name, ok := LevelNames[level]; ok {
-		return name
-	}
-
-	return fmt.Sprintf("<unknown log level %d>", level)
-}
-
 func (l *logger) shouldPrefix() bool {
-	return opt.prefix == 1 || (opt.prefix == -1 && opt.active.PrefixPreference())
+	switch opt.prefix {
+	case 1:
+		return true
+	case 0:
+		return false
+	default:
+		return opt.active == nil || opt.active.PrefixPreference()
+	}
 }
 
 func (l *logger) passthrough(level Level) bool {
@@ -316,7 +315,7 @@ func RegisterBackend(b Backend) {
 
 	opt.backends[name] = b
 
-	if opt.logger == name {
+	if opt.logger == backendName(name) {
 		opt.active = b
 	}
 }

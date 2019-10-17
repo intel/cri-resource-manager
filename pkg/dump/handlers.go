@@ -24,7 +24,6 @@ package dump
 //
 
 import (
-	"flag"
 	"fmt"
 	"strings"
 	"time"
@@ -36,7 +35,7 @@ const (
 	// DefaultHandler is the default dump handler.
 	DefaultHandler = "full"
 	// DefaultPeriod is the default count period for the 'count' dumper.
-	DefaultPeriod Period = Period(60 * time.Second)
+	DefaultPeriod = 60 * time.Second
 	// stampLayout is the timestamp format used in dump files.
 	stampLayout = "2006-Jan-02 15:04:05.000"
 	// latencyLen is the length we adjust our printed latencies to.
@@ -254,46 +253,21 @@ func dumpFull(msg interface{}) {
 //   We should change it to be smrter and timer-based.
 //
 
-// Period is a collection period.
-type Period time.Duration
-
-// Set is the flag.Value setter for Period.
-func (p *Period) Set(value string) error {
-	v, err := time.ParseDuration(value)
-	if err != nil {
-		return err
-	}
-
-	*p = Period(v)
-	return nil
-}
-
-// String is the flag.Value getter for period.
-func (p *Period) String() string {
-	return time.Duration(*p).String()
-}
-
-// Register command line option for counter period.
-func init() {
-	flag.Var(&cnt.Period, "count-period", "count period for 'count' dump target")
-}
-
-// A counter for method calls.
 type counter struct {
 	calls  map[string]*call // per method counts
-	Period Period           // collection period
+	Period time.Duration    // collection period
 }
 
 // Counter for a single call.
 type call struct {
-	start  uint64    // count at begining of period
-	count  uint64    // current count
-	began  time.Time // beginning of period
-	period Period    // measurement period
+	start  uint64        // count at begining of period
+	count  uint64        // current count
+	began  time.Time     // beginning of period
+	period time.Duration // measurement period
 }
 
 // Create counter for the given method call.
-func newCall(now time.Time, period Period) *call {
+func newCall(now time.Time, period time.Duration) *call {
 	return &call{start: 0, count: 1, began: now, period: period}
 }
 
@@ -310,7 +284,7 @@ func (c *call) Count() uint64 {
 // Increase counter.
 func (c *call) Increase(now time.Time) bool {
 	c.count++
-	return Period(c.Age(now)) > c.period
+	return c.Age(now) > c.period
 }
 
 // Get the length of the current measurement period.
@@ -320,7 +294,7 @@ func (c *call) Age(now time.Time) time.Duration {
 
 // Calculate average for the current period.
 func (c *call) Average(now time.Time) float64 {
-	sec := float64(c.period / Period(time.Second))
+	sec := float64(c.period / time.Second)
 	avg := float64(c.Count()) / sec
 
 	c.start, c.began = c.count, now

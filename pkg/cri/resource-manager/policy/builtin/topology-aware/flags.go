@@ -15,143 +15,75 @@
 package topologyaware
 
 import (
-	"flag"
-	"fmt"
-	"github.com/ghodss/yaml"
+	config "github.com/intel/cri-resource-manager/pkg/config"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-	"strconv"
 )
 
 const (
-	// optPrefix is our common option prefix.
-	optPrefix = "topology-aware-"
 	// Control whether containers are CPU-pinned using the cpuset cgroup controller.
-	optPinCPU = optPrefix + "pin-cpu"
+	optPinCPU = "pin-cpu"
 	// Control whether containers are memory-pinned using the cpuset cgroup controller.
-	optPinMem = optPrefix + "pin-memory"
+	optPinMem = "pin-memory"
 	// Control whether isolated CPUs are preferred for exclusive allocation.
-	optPreferIsolated = optPrefix + "prefer-isolated-cpus"
+	optPreferIsolated = "prefer-isolated-cpus"
 	// Control whether shared CPU allocation is preferred over exclusive by default
-	optPreferShared = optPrefix + "prefer-shared-cpus"
+	optPreferShared = "prefer-shared-cpus"
 	// Provide pod-/container-based fake topology hint.
-	optFakeHint = optPrefix + "fake-hint"
+	optFakeHints = "fake-hints"
+
+	optTestInt     = "int"
+	optTestFloat64 = "float64"
 )
 
 // Options captures our configurable policy parameters.
 type options struct {
-	PinCPU         bool `json:"PinCPU"`             // pin workloads to CPU
-	PinMem         bool `json:"PinMemory"`          // pin workloads to memory
-	PreferIsolated bool `json:"PreferIsolatedCPUs"` // prefer isolated CPUs for exclusive usage
-	PreferShared   bool `json:"PreferSharedCPUs"`   // prefer shared CPU allocation
-	Hints          map[string]system.TopologyHints
-	explicit       map[string]struct{}
+	pinCPU         bool      // pin containers to CPU
+	pinMemory      bool      // pin containers to memory
+	preferIsolated bool      // prefer isolated CPUs for exclusive allocations
+	preferShared   bool      // prefer shared CPU allocations by default
+	hints          fakehints // fake TopologyHints (for testing)
 }
 
-// Our configurable options with their defaults.
-var opt = options{
-	PinCPU:         true,
-	PinMem:         true,
-	PreferIsolated: true,
-	PreferShared:   false,
-	Hints:          make(map[string]system.TopologyHints),
-	explicit:       make(map[string]struct{}),
+// Our configuration module and configurable options.
+var cfg *config.Module
+var opt = options{hints: make(fakehints)}
+
+// fakeHints is our flag.Value for per-pod or per-container faked system.TopologyHints.
+type fakehints map[string]system.TopologyHints
+
+// newFakeHints creates a new set of fake hints.
+func newFakeHints() fakehints {
+	return make(fakehints)
 }
 
-func parseConfig(raw []byte) (*options, error) {
-	conf := &options{}
-
-	if len(raw) != 0 {
-		if err := yaml.Unmarshal(raw, conf); err != nil {
-			return nil, policyError("failed to parse configuration: %v", err)
-		}
-	}
-
-	return conf, nil
-}
-
-func (o *options) Set(name, value string) error {
-	var err error
-
-	switch name {
-	case optPinCPU:
-		o.PinCPU, err = strconv.ParseBool(value)
-	case optPinMem:
-		o.PinMem, err = strconv.ParseBool(value)
-	case optPreferIsolated:
-		o.PreferIsolated, err = strconv.ParseBool(value)
-	case optPreferShared:
-		o.PreferShared, err = strconv.ParseBool(value)
-	case optFakeHint:
-		err = o.parseFakeHint(value)
-	default:
-		return policyError("unknown %s policy option '%s' with value '%s'",
-			PolicyName, name, value)
-	}
-
-	if err != nil {
-		return policyError("invalid value '%s' for option '%s': %v", value, name, err)
-	}
-
-	o.explicit[name] = struct{}{}
-
-	return nil
-}
-
-func (o *options) Get(name string) string {
-	switch name {
-	case optPinCPU:
-		return fmt.Sprintf("%v", o.PinCPU)
-	case optPinMem:
-		return fmt.Sprintf("%v", o.PinMem)
-	case optPreferIsolated:
-		return fmt.Sprintf("%v", o.PreferIsolated)
-	case optPreferShared:
-		return fmt.Sprintf("%v", o.PreferShared)
-	case optFakeHint:
-		return ""
-	default:
-		return fmt.Sprintf("<no value, unknown instrumentation option '%s'>", name)
+// merge merges the given hints to the existing set.
+func (fh *fakehints) merge(hints fakehints) {
+	if fh == nil {
+		*fh = newFakeHints()
 	}
 }
 
-func (o *options) IsExplicit(option string) bool {
-	_, explicit := o.explicit[option]
-	return explicit
+// Set parses and accumulates the given hints to the existing ones.
+func (h *fakehints) Set(value string) error {
+	if value == "" {
+		return nil
+	}
+
+	return h.parse(value)
 }
 
-type wrappedOption struct {
-	name     string
-	opt      *options
-	explicit bool
-}
-
-func wrapOption(name, usage string) (*wrappedOption, string, string) {
-	return &wrappedOption{name: name, opt: &opt}, name, usage
-}
-
-func (wo *wrappedOption) Name() string {
-	return wo.name
-}
-
-func (wo *wrappedOption) Set(value string) error {
-	return wo.opt.Set(wo.Name(), value)
-}
-
-func (wo *wrappedOption) String() string {
-	return wo.opt.Get(wo.Name())
-}
-
-// Register our command-line flags.
+// Register us for configuration handling.
 func init() {
-	flag.Var(wrapOption(optPinCPU,
-		"Whether container should be CPU-pinned using the cpuset cgroup controller."))
-	flag.Var(wrapOption(optPinMem,
-		"Whether container should be memory-pinned using the cpuset cgroup controller."))
-	flag.Var(wrapOption(optPreferIsolated,
-		"Try to allocate kernel-isolated CPUs for exclusive usage unless the Pod or "+
-			"Container is explicitly annotated otherwise."))
-	flag.Var(wrapOption(optPreferShared,
-		"Allocate shared CPUs unless the Pod or Container is explicitly annotated otherwise."))
-	flag.Var(wrapOption(optFakeHint,
-		"A fake hint to pass to specified the pod or container."))
+	cfg = config.Register(PolicyName, "A topology-aware container placement policy.")
+
+	cfg.BoolVar(&opt.pinCPU, optPinCPU, true,
+		"Pin containers to CPUs using the cpuset cgroup controller.")
+	cfg.BoolVar(&opt.pinMemory, optPinMem, true,
+		"Pin containers to memory using the cpuset cgroup controller.")
+	cfg.BoolVar(&opt.preferIsolated, optPreferIsolated, true,
+		"Prefer isolated CPUs for exclusive CPU allocations.")
+	cfg.BoolVar(&opt.preferShared, optPreferShared, false,
+		"Prefer shared CPU allocation for containers not annotated otherwise.")
+	cfg.Var(&opt.hints, optFakeHints,
+		"Assign fake topology hints for testing to the given pods/containers.")
 }

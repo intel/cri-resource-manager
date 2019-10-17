@@ -35,7 +35,7 @@ const (
 func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, bool) {
 	value, ok := pod.GetResmgrAnnotation(keyIsolationPreference)
 	if !ok {
-		return opt.PreferIsolated, false
+		return opt.preferIsolated, false
 	}
 	if value == "false" || value == "true" {
 		return (value[0] == 't'), true
@@ -45,7 +45,7 @@ func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, boo
 	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
 		log.Error("failed to parse isolation preference %s = '%s': %v",
 			keyIsolationPreference, value, err)
-		return opt.PreferIsolated, false
+		return opt.preferIsolated, false
 	}
 
 	name := container.GetName()
@@ -54,15 +54,15 @@ func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, boo
 		return pref, true
 	}
 
-	log.Debug("%s defaults to isolation preference '%v'", name, opt.PreferIsolated)
-	return opt.PreferIsolated, false
+	log.Debug("%s defaults to isolation preference '%v'", name, opt.preferIsolated)
+	return opt.preferIsolated, false
 }
 
 // podSharedCPUPreference checks if a container wants to opt-out from exclusive allocation.
 func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int) {
 	value, ok := pod.GetResmgrAnnotation(keySharedCPUPreference)
 	if !ok {
-		return opt.PreferShared, 0
+		return opt.preferShared, 0
 	}
 	if value == "false" || value == "true" {
 		return value[0] == 't', 0
@@ -72,13 +72,13 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int
 	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
 		log.Error("failed to parse shared CPU preference %s = '%s': %v",
 			keySharedCPUPreference, value, err)
-		return opt.PreferShared, 0
+		return opt.preferShared, 0
 	}
 
 	name := container.GetName()
 	pref, ok := preferences[name]
 	if !ok {
-		return opt.PreferShared, 0
+		return opt.preferShared, 0
 	}
 	if pref == "false" || pref == "true" {
 		return pref[0] == 't', 0
@@ -87,12 +87,12 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int
 	elevate, err := strconv.ParseInt(pref, 0, 8)
 	if err != nil {
 		log.Error("invalid shared CPU preference for container %s (%s): %v", name, pref, err)
-		return opt.PreferShared, 0
+		return opt.preferShared, 0
 	}
 
 	if elevate > 0 {
 		log.Error("invalid (> 0) node displacement for container %s: %d", name, elevate)
-		return opt.PreferShared, 0
+		return opt.preferShared, 0
 	}
 
 	return true, int(elevate)

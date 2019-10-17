@@ -130,16 +130,6 @@ func DefaultDumper() Dumper {
 	return defaultDumper
 }
 
-// Create default dumper and register '-dump' command line option for it.
-func init() {
-	defaultDumper, _ = NewDumper(DefaultDumpConfig)
-	flag.Var(defaultDumper, "dump",
-		"value is a dump specification of the format [target:]message[,...].\n"+
-			"The possible targets are:\n"+DefaultHandlerFlagHelp("    "))
-	flag.StringVar(&dumpFileName, "dump-file", "",
-		"file to also save message dumps to")
-}
-
 // NewDumper creates a new request dumper instance.
 func NewDumper(specs ...string) (Dumper, error) {
 	log.Info("creating request dumper...")

@@ -15,19 +15,32 @@
 package static
 
 import (
-	"flag"
+	config "github.com/intel/cri-resource-manager/pkg/config"
 	"strconv"
-
-	"github.com/ghodss/yaml"
 )
 
-// Policy options configurable via the command line.
+const (
+	// Control whether isolated CPUs are used for multi-CPU exclusive allocations.
+	optRelaxedIsolation = "relaxed-isolation"
+	// Control whether containers are assigned RDT classes.
+	optRdt = "rdt"
+)
+
+// Options captures our configurable policy parameters.
 type options struct {
 	// relax exclusive isolated CPU allocation criteria
-	RelaxedIsolation bool     `json:"RelaxedIsolation"`
-	Rdt              Tristate `json:"Rdt"`
+	RelaxedIsolation bool `json:"RelaxedIsolation"`
+	// RDT class assignments: off, on, auto (use if available, disable otherwise)
+	Rdt Tristate `json:"Rdt"`
 }
 
+// Our configuration module and configurable options.
+var cfg *config.Module
+var opt = options{
+	Rdt: TristateAuto,
+}
+
+// A tristate boolean: on, off, automatically decide based on other conditions.
 type Tristate int
 
 const (
@@ -37,8 +50,8 @@ const (
 )
 
 // UnmarshalJSON implements the unmarshaller function for "encoding/json"
-func (t *Tristate) UnmarshalJSON(data []byte) error {
-	val, err := strconv.ParseBool(string(data))
+func (t *Tristate) Set(value string) error {
+	val, err := strconv.ParseBool(value)
 	switch {
 	case err != nil:
 		*t = TristateAuto
@@ -61,28 +74,11 @@ func (t *Tristate) String() string {
 	return "auto"
 }
 
-// Policy options with their defaults.
-var opt = options{
-	Rdt: TristateAuto,
-}
-
-// parseConfData parses options from a YAML data.
-func parseConfData(raw []byte) (*options, error) {
-	conf := &options{
-		Rdt: TristateAuto, // Rdt defaults to 'auto'
-	}
-
-	if len(raw) != 0 {
-		if err := yaml.Unmarshal(raw, conf); err != nil {
-			return nil, policyError("failed to parse configuration data: %v", err)
-		}
-	}
-
-	return conf, nil
-}
-
 // Register our command-line flags.
 func init() {
-	flag.BoolVar(&opt.RelaxedIsolation, PolicyName+"-policy-relaxed-isolation", false,
+	cfg = config.Register(PolicyName, "A proof-of-concept port of the static CPU Manager policy.")
+	cfg.BoolVar(&opt.RelaxedIsolation, optRelaxedIsolation, false,
 		"Allow allocating multiple available isolated CPUs exclusively to any single container.")
+	cfg.Var(&opt.Rdt, optRdt,
+		"Control whether RDT CLOS assignments are enabled.")
 }
