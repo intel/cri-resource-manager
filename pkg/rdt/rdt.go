@@ -27,6 +27,7 @@ import (
 	"github.com/ghodss/yaml"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const resctrlGroupPrefix = "cri-resmgr."
@@ -53,6 +54,7 @@ type control struct {
 }
 
 type config struct {
+	Options       SchemaOptions                 `json:"options,omitempty"`
 	ResctrlGroups map[string]ResctrlGroupConfig `json:"resctrlGroups"`
 }
 
@@ -128,6 +130,8 @@ func (r *control) SetConfig(newConfRaw string) error {
 }
 
 func (r *control) configureResctrl(conf config) error {
+	r.Debug("applying new configuration:\n%s", utils.DumpJSON(conf))
+
 	// Remove stale resctrl groups
 	existingGroups, err := r.getResctrlGroups()
 	if err != nil {
@@ -152,8 +156,8 @@ func (r *control) configureResctrl(conf config) error {
 	}
 
 	// Try to apply given configuration
-	for name, conf := range conf.ResctrlGroups {
-		err := r.configureResctrlGroup(name, conf)
+	for name, grpConf := range conf.ResctrlGroups {
+		err := r.configureResctrlGroup(name, grpConf, conf.Options)
 		if err != nil {
 			return err
 		}
@@ -172,27 +176,43 @@ func parseConfData(raw []byte) (config, error) {
 	return conf, nil
 }
 
-func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig) error {
+func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, options SchemaOptions) error {
 	path := r.resctrlGroupPath(name)
 	if err := os.Mkdir(path, 0755); err != nil && !os.IsExist(err) {
 		return err
 	}
 
 	schemata := ""
-	if !config.L3Schema.IsNil() {
-		// User specified L3 allocation so use it
-		schemata += config.L3Schema.ToStr()
-	} else if rdtInfo.l3.Supported() {
-		// L3 is enabled but user did not specify a config -> use to defaults
-		schemata += config.L3Schema.DefaultStr()
+	if rdtInfo.l3.Supported() {
+		if !config.L3Schema.IsNil() {
+			// User specified L3 allocation so use it
+			schemata += config.L3Schema.ToStr()
+		} else {
+			// L3 is enabled but user did not specify a config -> use to defaults
+			schemata += config.L3Schema.DefaultStr()
+		}
+	} else if !config.L3Schema.IsNil() {
+		if options.L3.Optional {
+			r.Debug("omitting optional L3 schema")
+		} else {
+			return rdtError("L3 schema specified but not supported by the system")
+		}
 	}
 
-	if !config.MBSchema.IsNil() {
-		// User specified MB allocation so use it
-		schemata += config.MBSchema.ToStr()
-	} else if rdtInfo.mb.Supported() {
-		// MB is enabled but user did not specify a config -> use to defaults
-		schemata += config.MBSchema.DefaultStr()
+	if rdtInfo.mb.Supported() {
+		if !config.MBSchema.IsNil() {
+			// User specified MB allocation so use it
+			schemata += config.MBSchema.ToStr()
+		} else {
+			// MB is enabled but user did not specify a config -> use to defaults
+			schemata += config.MBSchema.DefaultStr()
+		}
+	} else if !config.MBSchema.IsNil() {
+		if options.MB.Optional {
+			r.Debug("omitting optional MB schema")
+		} else {
+			return rdtError("MB schema specified but not supported by the system")
+		}
 	}
 
 	if len(schemata) > 0 {

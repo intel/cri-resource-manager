@@ -32,25 +32,41 @@ type ResctrlGroupConfig struct {
 	MBSchema MBSchema `json:"mbSchema,omitempty"`
 }
 
+// SchemaOptions contains the common settings for all resctrl groups
+type SchemaOptions struct {
+	L3 L3Options `json:"l3,omitempty"`
+	MB MBOptions `json:"mb,omitempty"`
+}
+
+// L3 contains the common settings for L3 cache allocation
+type L3Options struct {
+	Optional bool `json:"optional,omitempty"`
+}
+
+// MB contains the common settings for memory bandwidth allocation
+type MBOptions struct {
+	Optional bool `json:"optional,omitempty"`
+}
+
 // L3Schema represents an L3 part of the schemata of a resctrl group
 type L3Schema struct {
-	allocations map[uint64]CacheBitmask
+	Allocations map[uint64]CacheBitmask
 }
 
 // MBSchema represents an MB part of the schemata of a resctrl group
 type MBSchema struct {
-	allocations map[uint64]uint64
+	Allocations map[uint64]uint64
 }
 
 // IsNil returns true if the schema is empty
 func (s *L3Schema) IsNil() bool {
-	return s.allocations == nil
+	return s.Allocations == nil
 }
 
 // ToStr returns the L3 schema in a format accepted by the Linux kernel
 // resctrl (schemata) interface
 func (s *L3Schema) ToStr() string {
-	if len(s.allocations) == 0 {
+	if len(s.Allocations) == 0 {
 		return ""
 	}
 
@@ -58,7 +74,7 @@ func (s *L3Schema) ToStr() string {
 	sep := ""
 
 	// We get cache ids but that doesn't matter
-	for id, bitmask := range s.allocations {
+	for id, bitmask := range s.Allocations {
 		schema += fmt.Sprintf("%s%d=%x", sep, id, bitmask)
 		sep = ";"
 	}
@@ -88,7 +104,7 @@ func (s *L3Schema) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	s.allocations = map[uint64]CacheBitmask{}
+	s.Allocations = map[uint64]CacheBitmask{}
 
 	// Set default allocations
 	defaultMask, ok := allocations["all"]
@@ -99,7 +115,7 @@ func (s *L3Schema) UnmarshalJSON(b []byte) error {
 	delete(allocations, "all")
 
 	for _, i := range rdtInfo.cacheIds {
-		s.allocations[i] = defaultMask
+		s.Allocations[i] = defaultMask
 	}
 
 	// Parse per-cacheId allocations
@@ -109,8 +125,8 @@ func (s *L3Schema) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		for _, id := range ids {
-			if _, ok := s.allocations[uint64(id)]; ok {
-				s.allocations[uint64(id)] = mask
+			if _, ok := s.Allocations[uint64(id)]; ok {
+				s.Allocations[uint64(id)] = mask
 			}
 		}
 	}
@@ -120,7 +136,7 @@ func (s *L3Schema) UnmarshalJSON(b []byte) error {
 
 // IsNil returns true if the schema is empty
 func (s *MBSchema) IsNil() bool {
-	return s.allocations == nil
+	return s.Allocations == nil
 }
 
 // ToStr returns the MB schema in a format accepted by the Linux kernel
@@ -130,7 +146,7 @@ func (s *MBSchema) ToStr() string {
 	sep := ""
 
 	// We get cache ids but that doesn't matter
-	for id, percentage := range s.allocations {
+	for id, percentage := range s.Allocations {
 		schema += fmt.Sprintf("%s%d=%d", sep, id, percentage)
 		sep = ";"
 	}
@@ -160,7 +176,7 @@ func (s *MBSchema) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	s.allocations = map[uint64]uint64{}
+	s.Allocations = map[uint64]uint64{}
 
 	// Set default allocations
 	defaultVal, ok := allocations["all"]
@@ -171,7 +187,7 @@ func (s *MBSchema) UnmarshalJSON(b []byte) error {
 	delete(allocations, "all")
 
 	for _, i := range rdtInfo.cacheIds {
-		s.allocations[i] = defaultVal
+		s.Allocations[i] = defaultVal
 	}
 
 	// Parse per-cacheId allocations
@@ -181,8 +197,8 @@ func (s *MBSchema) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		for _, id := range ids {
-			if _, ok := s.allocations[uint64(id)]; ok {
-				s.allocations[uint64(id)] = val
+			if _, ok := s.Allocations[uint64(id)]; ok {
+				s.Allocations[uint64(id)] = val
 			}
 		}
 	}

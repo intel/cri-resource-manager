@@ -17,20 +17,37 @@ limitations under the License.
 package config
 
 var defaultRdtRawConf = `{
+  "options": {
+    "l3": {
+      "optional": true
+    },
+    "mb": {
+      "optional": true
+    }
+  },
   "resctrlGroups": {
     "Guaranteed": {
-	  "l3schema": {
+      "l3schema": {
         "all": "100%"
+      },
+      "mbschema": {
+        "all": 100
       }
     },
     "Burstable": {
-	  "l3schema": {
+      "l3schema": {
         "all": "100%"
+      },
+      "mbschema": {
+        "all": 100
       }
     },
     "BestEffort": {
-	  "l3schema": {
+      "l3schema": {
         "all": "100%"
+      },
+      "mbschema": {
+        "all": 100
       }
     }
   }
