@@ -196,6 +196,11 @@ func (s *static) ExportResourceData(c cache.Container, syntax policy.DataSyntax)
 
 // PostStart allocates resources after container is started
 func (s *static) PostStart(c cache.Container) error {
+	if opt.Rdt == TristateOff {
+		return nil
+	} else if opt.Rdt == TristateOn && s.rdt == nil {
+		return policyError("RDT required but not available")
+	}
 	if s.rdt != nil {
 		pod, ok := c.GetPod()
 		if !ok {
@@ -224,12 +229,16 @@ func (s *static) SetConfig(conf string) error {
 		return policyError("failed to parse configuration: %v", err)
 	}
 
-	if opt.RelaxedIsolation == newConf.RelaxedIsolation {
+	if opt == *newConf {
 		s.Info("no configuration changes")
 		return nil
 	}
 
-	opt.RelaxedIsolation = newConf.RelaxedIsolation
+	if newConf.Rdt == TristateOn && s.rdt == nil {
+		return policyError("RDT requested but not available")
+	}
+
+	opt = *newConf
 
 	if opt.RelaxedIsolation {
 		s.Info("isolated exclusive CPUs: globally preferred (all pods)")
@@ -237,6 +246,8 @@ func (s *static) SetConfig(conf string) error {
 		s.Info("isolated exclusive CPUs: per-pod (by annotation '%s')",
 			kubernetes.ResmgrKey(keyPreferIsolated))
 	}
+
+	s.Info("rdt support set to %q", opt.Rdt.String())
 
 	s.config = conf
 

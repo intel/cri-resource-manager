@@ -11,6 +11,7 @@ data:
     PreferSharedCPUs: false
   policy.static: |
     RelaxedIsolation: true
+    Rdt: auto
   policy.stp: |+
     # This is an example configuration file for the builtin cmk policy
     # The imaginary example system here consists of 4 sockets, 4 cores (8
