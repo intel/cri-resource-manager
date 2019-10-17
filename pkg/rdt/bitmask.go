@@ -34,7 +34,7 @@ type CacheBitmask Bitmask
 // UnmarshalJSON is the unmarshaller function for "encoding/json"
 func (b *CacheBitmask) UnmarshalJSON(data []byte) error {
 	// Number of bits available in CacheBitmask
-	cacheBitmaskNumBits := uint64(rdtInfo.l3.cbmMask.lsbZero())
+	cacheBitmaskNumBits := uint64(rdtInfo.l3FullMask().lsbZero())
 
 	// Drop string quotes
 	str := strings.TrimSpace(string(data[1 : len(data)-1]))

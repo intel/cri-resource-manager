@@ -54,6 +54,13 @@ data:
     options:
       l3:
         optional: true
+      # If l3code or l3data is NOT set to optional CDP must be enabled in
+      # the system in case 'l3codeschema' and/or 'l3dataschema' are specified
+      # in the groups below
+      l3code:
+        optional: true
+      l3data:
+        optional: true
       mb:
         optional: true
     # This example config specifies three RDT classes (or resctrl groups) with L3
@@ -71,6 +78,11 @@ data:
       Burstable:
         l3schema:
           all: "66%"
+        # Separate schema for L3 code and data paths specified
+        l3codeschema:
+          all: "100%"
+        l3dataschema:
+          all: "50%"
     # MBA (Memory Bandwidth Allocation)
     #    mbschema:
     #      all: 66

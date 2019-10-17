@@ -30,6 +30,8 @@ type Info struct {
 	numClosids  uint64
 	cacheIds    []uint64
 	l3          l3Info
+	l3code      l3Info
+	l3data      l3Info
 	mb          mbInfo
 }
 
@@ -43,6 +45,18 @@ type mbInfo struct {
 	bandwidthGran uint64
 	delayLinear   uint64
 	minBandwidth  uint64
+}
+
+func (i Info) l3FullMask() Bitmask {
+	switch {
+	case i.l3.Supported():
+		return rdtInfo.l3.cbmMask
+	case i.l3code.Supported():
+		return rdtInfo.l3code.cbmMask
+	case i.l3data.Supported():
+		return rdtInfo.l3data.cbmMask
+	}
+	return Bitmask(^uint64(0))
 }
 
 func getRdtInfo(resctrlpath string) (Info, error) {
@@ -60,6 +74,22 @@ func getRdtInfo(resctrlpath string) (Info, error) {
 		info.l3, info.numClosids, err = getL3Info(l3path)
 		if err != nil {
 			return info, rdtError("failed to get L3 info from %q: %v", l3path, err)
+		}
+	}
+
+	l3path = filepath.Join(infopath, "L3CODE")
+	if _, err = os.Stat(l3path); err == nil {
+		info.l3code, info.numClosids, err = getL3Info(l3path)
+		if err != nil {
+			return info, rdtError("failed to get L3CODE info from %q: %v", l3path, err)
+		}
+	}
+
+	l3path = filepath.Join(infopath, "L3DATA")
+	if _, err = os.Stat(l3path); err == nil {
+		info.l3data, info.numClosids, err = getL3Info(l3path)
+		if err != nil {
+			return info, rdtError("failed to get L3DATA info from %q: %v", l3path, err)
 		}
 	}
 
@@ -152,7 +182,7 @@ func getCacheIds(basepath string) ([]uint64, error) {
 		trimmed := strings.TrimSpace(line)
 
 		// Find line with L3 or MB schema
-		if strings.HasPrefix(trimmed, "L3:") || strings.HasPrefix(trimmed, "MB:") {
+		if strings.HasPrefix(trimmed, "L3") || strings.HasPrefix(trimmed, "MB:") {
 			schema := strings.Split(trimmed[3:], ";")
 			ids = make([]uint64, len(schema))
 

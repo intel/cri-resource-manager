@@ -28,14 +28,18 @@ import (
 // ResctrlGroupConfig represents configuration of one CTRL group in the Linux
 // resctrl interface
 type ResctrlGroupConfig struct {
-	L3Schema L3Schema `json:"l3Schema,omitempty"`
-	MBSchema MBSchema `json:"mbSchema,omitempty"`
+	L3Schema     L3Schema `json:"l3Schema,omitempty"`
+	L3CodeSchema L3Schema `json:"l3CodeSchema,omitempty"`
+	L3DataSchema L3Schema `json:"l3DataSchema,omitempty"`
+	MBSchema     MBSchema `json:"mbSchema,omitempty"`
 }
 
 // SchemaOptions contains the common settings for all resctrl groups
 type SchemaOptions struct {
-	L3 L3Options `json:"l3,omitempty"`
-	MB MBOptions `json:"mb,omitempty"`
+	L3     L3Options `json:"l3,omitempty"`
+	L3Code L3Options `json:"l3code,omitempty"`
+	L3Data L3Options `json:"l3data,omitempty"`
+	MB     MBOptions `json:"mb,omitempty"`
 }
 
 // L3 contains the common settings for L3 cache allocation
@@ -58,6 +62,14 @@ type MBSchema struct {
 	Allocations map[uint64]uint64
 }
 
+type L3SchemaType string
+
+const (
+	L3SchemaTypeUnified = ""
+	L3SchemaTypeData    = "DATA"
+	L3SchemaTypeCode    = "CODE"
+)
+
 // IsNil returns true if the schema is empty
 func (s *L3Schema) IsNil() bool {
 	return s.Allocations == nil
@@ -65,12 +77,12 @@ func (s *L3Schema) IsNil() bool {
 
 // ToStr returns the L3 schema in a format accepted by the Linux kernel
 // resctrl (schemata) interface
-func (s *L3Schema) ToStr() string {
-	if len(s.Allocations) == 0 {
-		return ""
+func (s *L3Schema) ToStr(typ L3SchemaType) string {
+	if s.IsNil() {
+		return s.DefaultStr(typ)
 	}
 
-	schema := "L3:"
+	schema := "L3" + string(typ) + ":"
 	sep := ""
 
 	// We get cache ids but that doesn't matter
@@ -83,13 +95,15 @@ func (s *L3Schema) ToStr() string {
 }
 
 // DefaultStr returns the L3 default schema
-func (s *L3Schema) DefaultStr() string {
-	schema := "L3:"
+func (s *L3Schema) DefaultStr(typ L3SchemaType) string {
+	schema := "L3" + string(typ) + ":"
 	sep := ""
+
+	mask := rdtInfo.l3FullMask()
 
 	for _, id := range rdtInfo.cacheIds {
 		// Set all to full mask (i.e. 100%)
-		schema += fmt.Sprintf("%s%d=%x", sep, id, rdtInfo.l3.cbmMask)
+		schema += fmt.Sprintf("%s%d=%x", sep, id, mask)
 		sep = ";"
 	}
 
@@ -110,7 +124,7 @@ func (s *L3Schema) UnmarshalJSON(b []byte) error {
 	defaultMask, ok := allocations["all"]
 	if !ok {
 		// Set to 100% if "all" is not specified
-		defaultMask = CacheBitmask(rdtInfo.l3.cbmMask)
+		defaultMask = CacheBitmask(rdtInfo.l3FullMask())
 	}
 	delete(allocations, "all")
 
@@ -142,6 +156,10 @@ func (s *MBSchema) IsNil() bool {
 // ToStr returns the MB schema in a format accepted by the Linux kernel
 // resctrl (schemata) interface
 func (s *MBSchema) ToStr() string {
+	if s.IsNil() {
+		return s.DefaultStr()
+	}
+
 	schema := "MB:"
 	sep := ""
 
