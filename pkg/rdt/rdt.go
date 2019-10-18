@@ -99,10 +99,12 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 	}
 
 	path := filepath.Join(r.resctrlGroupDirName(class), "tasks")
+	data := []byte{}
 	for _, pid := range pids {
-		if err := r.writeRdtFile(path, []byte(pid)); err != nil {
-			return rdtError("failed to assign process %s to class %q: %v", pid, class, err)
-		}
+		data = append(data, []byte(pid+"\n")...)
+	}
+	if err := r.writeRdtFile(path, data); err != nil {
+		return rdtError("failed to assign processes %v to class %q: %v", pids, class, err)
 	}
 	return nil
 }
