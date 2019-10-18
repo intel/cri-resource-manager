@@ -98,9 +98,9 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 		return rdtError("unknown RDT class %q", class)
 	}
 
-	path := filepath.Join(r.resctrlGroupPath(class), "tasks")
+	path := filepath.Join(r.resctrlGroupDirName(class), "tasks")
 	for _, pid := range pids {
-		if err := ioutil.WriteFile(path, []byte(pid), 0644); err != nil {
+		if err := r.writeRdtFile(path, []byte(pid)); err != nil {
 			return rdtError("failed to assign process %s to class %q: %v", pid, class, err)
 		}
 	}
@@ -140,11 +140,11 @@ func (r *control) configureResctrl(conf config) error {
 
 	for _, name := range existingGroups {
 		if _, ok := conf.ResctrlGroups[name]; !ok {
-			path := r.resctrlGroupPath(name)
 			tasks, err := r.resctrlGroupTasks(name)
 			if err != nil {
 				return rdtError("failed to get resctrl group tasks: %v", err)
 			}
+			path := r.resctrlGroupPath(name)
 			if len(tasks) > 0 {
 				return rdtError("refusing to remove non-empty resctrl group %q", path)
 			}
@@ -177,8 +177,7 @@ func parseConfData(raw []byte) (config, error) {
 }
 
 func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, options SchemaOptions) error {
-	path := r.resctrlGroupPath(name)
-	if err := os.Mkdir(path, 0755); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(r.resctrlGroupPath(name), 0755); err != nil && !os.IsExist(err) {
 		return err
 	}
 
@@ -231,7 +230,8 @@ func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, 
 
 	if len(schemata) > 0 {
 		r.Debug("writing schemata %q", schemata)
-		if err := ioutil.WriteFile(filepath.Join(path, "schemata"), []byte(schemata), 0644); err != nil {
+		dirName := r.resctrlGroupDirName(name)
+		if err := r.writeRdtFile(filepath.Join(dirName, "schemata"), []byte(schemata)); err != nil {
 			return err
 		}
 	} else {
@@ -241,8 +241,12 @@ func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, 
 	return nil
 }
 
+func (r *control) resctrlGroupDirName(name string) string {
+	return resctrlGroupPrefix + name
+}
+
 func (r *control) resctrlGroupPath(name string) string {
-	return filepath.Join(rdtInfo.resctrlPath, resctrlGroupPrefix+name)
+	return filepath.Join(rdtInfo.resctrlPath, r.resctrlGroupDirName(name))
 }
 
 func (r *control) getResctrlGroups() ([]string, error) {
@@ -262,8 +266,7 @@ func (r *control) getResctrlGroups() ([]string, error) {
 }
 
 func (r *control) resctrlGroupTasks(name string) ([]string, error) {
-	path := filepath.Join(r.resctrlGroupPath(name), "tasks")
-	data, err := ioutil.ReadFile(path)
+	data, err := r.readRdtFile(filepath.Join(r.resctrlGroupDirName(name), "tasks"))
 	if err != nil {
 		return []string{}, err
 	}
@@ -272,6 +275,25 @@ func (r *control) resctrlGroupTasks(name string) ([]string, error) {
 		return split, nil
 	}
 	return []string{}, nil
+}
+
+func (r *control) readRdtFile(rdtPath string) ([]byte, error) {
+	return ioutil.ReadFile(filepath.Join(rdtInfo.resctrlPath, rdtPath))
+}
+
+func (r *control) writeRdtFile(rdtPath string, data []byte) error {
+	if err := ioutil.WriteFile(filepath.Join(rdtInfo.resctrlPath, rdtPath), data, 0644); err != nil {
+		errData, readErr := r.readRdtFile(filepath.Join("info", "last_cmd_status"))
+		if readErr != nil {
+			return err
+		}
+		cmdStatus := strings.TrimSpace(string(errData))
+		if len(cmdStatus) > 0 && cmdStatus != "ok" {
+			return fmt.Errorf(cmdStatus)
+		}
+		return err
+	}
+	return nil
 }
 
 func rdtError(format string, args ...interface{}) error {
