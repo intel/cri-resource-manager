@@ -28,6 +28,9 @@ func setupTestEnv(t *testing.T) func() {
 	if err != nil {
 		t.Fatal("unable to get current directory")
 	}
+	if path, err := filepath.EvalSymlinks(pwd); err == nil {
+		pwd = path
+	}
 	mockRoot = pwd + "/testdata"
 	teardown := func() {
 		mockRoot = ""
