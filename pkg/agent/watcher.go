@@ -21,8 +21,7 @@ import (
 	"time"
 
 	core_v1 "k8s.io/api/core/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/watch"
+	k8swatch "k8s.io/apimachinery/pkg/watch"
 	k8sclient "k8s.io/client-go/kubernetes"
 
 	"github.com/intel/cri-resource-manager/pkg/log"
@@ -30,7 +29,9 @@ import (
 
 type cachedConfig struct {
 	sync.RWMutex
-	config resmgrConfig
+	nodeCfg  *resmgrConfig // node-specific configuration
+	groupCfg *resmgrConfig // group-specific configuration
+	group    string        // group name, "" for default
 }
 
 // k8sWatcher is our interface to K8s control plane watcher
@@ -51,7 +52,8 @@ type watcher struct {
 	stop          chan struct{}        // Flag to stop the watcher
 	k8sCli        *k8sclient.Clientset // Client interface for kubernetes control plane
 	currentConfig cachedConfig         // Current cri-resmgr config, cached
-	configChan    chan resmgrConfig    // Chan for sending config updates
+
+	configChan chan resmgrConfig // Chan for sending config updates
 }
 
 // newK8sWatcher creates a new K8sWatcher instance
@@ -60,7 +62,7 @@ func newK8sWatcher(k8sCli *k8sclient.Clientset) (k8sWatcher, error) {
 		Logger:        log.NewLogger("watcher"),
 		k8sCli:        k8sCli,
 		stop:          make(chan struct{}, 1),
-		currentConfig: cachedConfig{config: resmgrConfig{}},
+		currentConfig: cachedConfig{},
 		configChan:    make(chan resmgrConfig, 1),
 	}
 
@@ -69,18 +71,6 @@ func newK8sWatcher(k8sCli *k8sclient.Clientset) (k8sWatcher, error) {
 
 // Start runs a k8sWatcher instance
 func (w *watcher) Start() error {
-	// First, get and cache initial configuration
-	w.Debug("getting ConfigMap %q in ns %q", opts.configMapName, opts.configNs)
-	config, err := w.k8sCli.CoreV1().ConfigMaps(opts.configNs).Get(opts.configMapName, meta_v1.GetOptions{})
-	if err != nil {
-		w.Info("empty initial config, failed to get configmap: %v", err)
-	} else {
-		w.currentConfig.set(config.Data)
-	}
-	// Send initial config
-	w.configChan <- w.currentConfig.get()
-
-	// Then, start to watch for changes in configuration
 	w.Info("starting watcher...")
 	go func() {
 		w.watch()
@@ -104,86 +94,155 @@ func (w *watcher) ConfigChan() <-chan resmgrConfig {
 
 // GetConfig returns the current cri-resmgr configuration
 func (w *watcher) GetConfig() resmgrConfig {
-	return w.currentConfig.get()
+	cfg, kind := w.currentConfig.get()
+	w.Info("giving %s configuration in reply to query", kind)
+	return cfg
+}
+
+// sendConfig sends the current configuration.
+func (w *watcher) sendConfig() {
+	cfg, kind := w.currentConfig.get()
+	w.Info("pushing %s configuration to client", kind)
+	w.configChan <- cfg
 }
 
 func (w *watcher) watch() error {
-	var cmw watch.Interface
-	// Start with a closed channel. We want this so that we end up in creating
-	// a new watch in the main event loop below
-	eventChan := func() <-chan watch.Event {
-		c := make(chan watch.Event)
-		close(c)
-		return c
-	}()
+	nodew := newNodeWatch(w)
+	group := ""
+
+	if node, err := nodew.Query(); err != nil {
+		w.Warn("failed to query node %s: %v", nodeName, err)
+	} else {
+		group = node.(*core_v1.Node).Labels[opts.labelName]
+		w.Info("configuration group is set to '%s'", group)
+	}
+
+	cfgw := newConfigMapWatch(w, opts.configMapName+".node."+nodeName, namespace(opts.configNs))
+	grpw := newConfigMapWatch(w, groupMapName(group), namespace(opts.configNs))
 
 	w.Info("watcher running")
+	w.sendConfig()
+
 	for {
 		select {
 		case _ = <-w.stop:
-			if cmw != nil {
-				cmw.Stop()
-			}
-			w.Info("watcher stopped")
+			w.Info("stopping configuration watcher")
+			nodew.Stop()
+			cfgw.Stop()
+			grpw.Stop()
 			return nil
-		case event, ok := <-eventChan:
+
+		case e, ok := <-nodew.ResultChan():
 			if ok {
-				w.Debug("received %s event", event.Type)
-				w.handleEvent(event)
-			} else {
-				var err error
-				w.Debug("creating watch for ConfigMap %q in ns %q", opts.configMapName, opts.configNs)
-				cmw, err = watchConfigMap(w.k8sCli, opts.configNs, opts.configMapName)
-				if err != nil {
-					w.Error("failed to create watch: %v", err)
-					time.Sleep(1 * time.Second)
-				} else {
-					eventChan = cmw.ResultChan()
+				switch e.Type {
+				case k8swatch.Added, k8swatch.Modified:
+					w.Info("node (%s) configuration updated", nodeName)
+					label, _ := e.Object.(*core_v1.Node).Labels[opts.labelName]
+					if group != label {
+						group = label
+						w.Info("configuration group is set to '%s'", group)
+						grpw.Start(groupMapName(group))
+					}
+				case k8swatch.Deleted:
+					w.Warn("Hmm, our node got removed...")
 				}
+				continue
+			}
+
+		case e, ok := <-cfgw.ResultChan():
+			if ok {
+				switch e.Type {
+				case k8swatch.Added, k8swatch.Modified:
+					w.Info("node ConfigMap updated")
+					cm := e.Object.(*core_v1.ConfigMap)
+					w.currentConfig.setNode(&cm.Data)
+					w.sendConfig()
+
+				case k8swatch.Deleted, SyntheticMissing:
+					w.Info("node ConfigMap deleted")
+					w.currentConfig.setNode(nil)
+					w.sendConfig()
+				}
+				continue
+			}
+
+		case e, ok := <-grpw.ResultChan():
+			if ok {
+				switch e.Type {
+				case k8swatch.Added, k8swatch.Modified:
+					w.Info("group/default ConfigMap updated")
+					cm := e.Object.(*core_v1.ConfigMap)
+					if w.currentConfig.setGroup(group, &cm.Data) {
+						w.sendConfig()
+					}
+				case k8swatch.Deleted, SyntheticMissing:
+					w.Info("group/default ConfigMap deleted")
+					if w.currentConfig.setGroup(group, nil) {
+						w.sendConfig()
+					}
+				}
+				continue
 			}
 		}
+
+		// shouln't be necessary, but just in case avoid spinning on a closed channel
+		time.Sleep(1 * time.Second)
 	}
 }
 
-func (w *watcher) handleEvent(event watch.Event) error {
-	switch event.Object.(type) {
-	case *core_v1.ConfigMap:
-		switch t := event.Type; t {
-		case watch.Added, watch.Modified:
-			configMap := event.Object.(*core_v1.ConfigMap)
-			w.currentConfig.set(configMap.Data)
-		case watch.Deleted:
-			w.currentConfig.set(resmgrConfig{})
-		default:
-			w.Debug("Ignoring event %q", t)
-			return nil
-		}
-
-		// Pop possible outdated config from the chan
-		select {
-		case <-w.configChan:
-			w.Debug("trashed outdated config update event")
-		default:
-		}
-
-		// Send in new config
-		w.configChan <- w.currentConfig.get()
-	default:
-		w.Error("BUG: object type %T instead of *core_v1.ConfigMap", event.Object)
+// groupMapName returns the our group ConfigMap, or the default one is we have no group.
+func groupMapName(group string) string {
+	if group == "" {
+		return opts.configMapName + ".default"
 	}
-	return nil
+	return opts.configMapName + ".group." + group
 }
 
 // get is a helper method for getting the config data
-func (c *cachedConfig) get() resmgrConfig {
+func (c *cachedConfig) get() (resmgrConfig, string) {
 	c.RLock()
 	defer c.RUnlock()
-	return c.config
+
+	var cfg *resmgrConfig
+	var kind string
+
+	switch {
+	case c.nodeCfg != nil:
+		kind = "node"
+		cfg = c.nodeCfg
+	case c.group != "":
+		kind = "group " + c.group
+		cfg = c.groupCfg
+	case c.groupCfg != nil:
+		kind = "default"
+		cfg = c.groupCfg
+	default:
+		kind = "fallback"
+	}
+
+	if cfg == nil {
+		kind = "empty " + kind
+		cfg = &resmgrConfig{}
+	}
+
+	return *cfg, kind
 }
 
-// set is a helper method for setting the config data
-func (c *cachedConfig) set(newConfig resmgrConfig) {
+// set node-specific configuration
+func (c *cachedConfig) setNode(data *map[string]string) bool {
 	c.Lock()
-	c.config = newConfig
-	c.Unlock()
+	defer c.Unlock()
+
+	c.nodeCfg = (*resmgrConfig)(data)
+	return true
+}
+
+// set group-specific or default configuration
+func (c *cachedConfig) setGroup(group string, data *map[string]string) bool {
+	c.Lock()
+	defer c.Unlock()
+
+	c.groupCfg = (*resmgrConfig)(data)
+	c.group = group
+	return c.nodeCfg == nil
 }
