@@ -37,10 +37,6 @@ const (
 	// memory limit to OOM score adjustement
 	guaranteedOOMScoreAdj int = -998
 	besteffortOOMScoreAdj int = 1000
-
-	// cgroup parent to Pod QoS class mapping prefixes
-	cgroupBestEffortPrefix = "/kubepods.slice/kubepods-besteffort.slice/"
-	cgroupBurstablePrefix  = "/kubepods.slice/kubepods-burstable.slice/"
 )
 
 var memoryCapacity int64
@@ -198,12 +194,15 @@ func getMemoryCapacity() int64 {
 func cgroupParentToQOS(dir string) corev1.PodQOSClass {
 	var qos corev1.PodQOSClass
 
+	// The parent directory naming scheme depends on the cgroup driver in use.
+	// Thus, rely on substring matching
+	split := strings.Split(strings.TrimPrefix(dir, "/"), "/")
 	switch {
-	case dir == "":
+	case len(split) < 2:
 		qos = corev1.PodQOSClass("")
-	case strings.HasPrefix(dir, cgroupBurstablePrefix):
+	case strings.Index(split[1], "burstable") != -1:
 		qos = corev1.PodQOSBurstable
-	case strings.HasPrefix(dir, cgroupBestEffortPrefix):
+	case strings.Index(split[1], "besteffort") != -1:
 		qos = corev1.PodQOSBestEffort
 	default:
 		qos = corev1.PodQOSGuaranteed
