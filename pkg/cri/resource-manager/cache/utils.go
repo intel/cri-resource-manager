@@ -200,9 +200,9 @@ func cgroupParentToQOS(dir string) corev1.PodQOSClass {
 	switch {
 	case len(split) < 2:
 		qos = corev1.PodQOSClass("")
-	case strings.Index(split[1], "burstable") != -1:
+	case strings.Index(split[1], strings.ToLower(string(corev1.PodQOSBurstable))) != -1:
 		qos = corev1.PodQOSBurstable
-	case strings.Index(split[1], "besteffort") != -1:
+	case strings.Index(split[1], strings.ToLower(string(corev1.PodQOSBestEffort))) != -1:
 		qos = corev1.PodQOSBestEffort
 	default:
 		qos = corev1.PodQOSGuaranteed
