@@ -25,8 +25,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ghodss/yaml"
-
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
@@ -46,21 +44,18 @@ type Control interface {
 
 var rdtInfo Info
 
+var log logger.Logger = logger.NewLogger("rdt")
+
 type control struct {
 	logger.Logger
 
 	conf config
 }
 
-type config struct {
-	Options       SchemaOptions                 `json:"options,omitempty"`
-	ResctrlGroups map[string]ResctrlGroupConfig `json:"resctrlGroups"`
-}
-
 // NewControl returns new instance of the RDT Control interface
 func NewControl(resctrlpath string) (Control, error) {
 	var err error
-	r := &control{Logger: logger.NewLogger("rdt")}
+	r := &control{Logger: log}
 
 	// Get info from the resctrl filesystem
 	rdtInfo, err = getRdtInfo(resctrlpath)
@@ -69,7 +64,11 @@ func NewControl(resctrlpath string) (Control, error) {
 	}
 
 	// Configure resctrl
-	r.conf = opt.Config
+	r.conf, err = opt.resolve()
+	if err != nil {
+		return nil, rdtError("invalid configuration: %v", err)
+	}
+
 	if err := r.configureResctrl(r.conf); err != nil {
 		// Temporary hack to get rdt properly configured.
 		// Corresponging hack located in pkg/cri/resource-manager/resource-manager.go
@@ -83,10 +82,10 @@ func NewControl(resctrlpath string) (Control, error) {
 }
 
 func (r *control) GetClasses() []string {
-	ret := make([]string, len(r.conf.ResctrlGroups))
+	ret := make([]string, len(r.conf.Classes))
 
 	i := 0
-	for k := range r.conf.ResctrlGroups {
+	for k := range r.conf.Classes {
 		ret[i] = k
 		i++
 	}
@@ -95,7 +94,7 @@ func (r *control) GetClasses() []string {
 }
 
 func (r *control) SetProcessClass(class string, pids ...string) error {
-	if _, ok := r.conf.ResctrlGroups[class]; !ok {
+	if _, ok := r.conf.Classes[class]; !ok {
 		return rdtError("unknown RDT class %q", class)
 	}
 
@@ -125,12 +124,18 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 func (r *control) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	r.Info("configuration %s", event)
 
-	err := r.configureResctrl(opt.Config)
+	conf, err := opt.resolve()
+	if err != nil {
+		return rdtError("invalid configuration: %v", err)
+	}
+
+	err = r.configureResctrl(conf)
 	if err != nil {
 		return rdtError("resctrl configuration failed: %v", err)
 	}
 
-	r.conf = opt.Config
+	r.conf = conf
+	r.Info("configuration finished")
 
 	return nil
 }
@@ -139,14 +144,14 @@ func (r *control) configureResctrl(conf config) error {
 	r.DebugBlock("  applying ", "%s", utils.DumpJSON(conf))
 
 	// Remove stale resctrl groups
-	existingGroups, err := r.getResctrlGroups()
+	existingClasses, err := r.getClasses()
 	if err != nil {
 		return err
 	}
 
-	for _, name := range existingGroups {
-		if _, ok := conf.ResctrlGroups[name]; !ok {
-			tasks, err := r.resctrlGroupTasks(name)
+	for _, name := range existingClasses {
+		if _, ok := conf.Classes[name]; !ok {
+			tasks, err := r.getClassTasks(name)
 			if err != nil {
 				return rdtError("failed to get resctrl group tasks: %v", err)
 			}
@@ -162,8 +167,9 @@ func (r *control) configureResctrl(conf config) error {
 	}
 
 	// Try to apply given configuration
-	for name, grpConf := range conf.ResctrlGroups {
-		err := r.configureResctrlGroup(name, grpConf, conf.Options)
+	for name, class := range conf.Classes {
+		partition := conf.Partitions[class.Partition]
+		err := r.configureResctrlGroup(name, class, partition, conf.Options)
 		if err != nil {
 			return err
 		}
@@ -172,18 +178,10 @@ func (r *control) configureResctrl(conf config) error {
 	return nil
 }
 
-func parseConfData(raw []byte) (config, error) {
-	conf := config{}
-
-	err := yaml.Unmarshal(raw, &conf)
-	if err != nil {
-		return conf, rdtError("failed to parse configuration: %v", err)
-	}
-	return conf, nil
-}
-
-func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, options SchemaOptions) error {
-	if err := os.Mkdir(r.resctrlGroupPath(name), 0755); err != nil && !os.IsExist(err) {
+func (r *control) configureResctrlGroup(name string, class classConfig,
+	partition partitionConfig, options schemaOptions) error {
+	if err :=
+		os.Mkdir(r.resctrlGroupPath(name), 0755); err != nil && !os.IsExist(err) {
 		return err
 	}
 
@@ -191,12 +189,25 @@ func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, 
 	// Handle L3 cache allocation
 	switch {
 	case rdtInfo.l3.Supported():
-		schemata += config.L3Schema.ToStr(L3SchemaTypeUnified)
+		schema, err := class.L3Schema.ToStr(l3SchemaTypeUnified, partition.L3)
+		if err != nil {
+			return err
+		}
+		schemata += schema
 	case rdtInfo.l3data.Supported() || rdtInfo.l3code.Supported():
-		schemata += config.L3Schema.ToStr(L3SchemaTypeCode)
-		schemata += config.L3Schema.ToStr(L3SchemaTypeData)
+		schema, err := class.L3Schema.ToStr(l3SchemaTypeCode, partition.L3)
+		if err != nil {
+			return err
+		}
+		schemata += schema
+
+		schema, err = class.L3Schema.ToStr(l3SchemaTypeData, partition.L3)
+		if err != nil {
+			return err
+		}
+		schemata += schema
 	default:
-		if !config.L3Schema.IsNil() && !options.L3.Optional {
+		if class.L3Schema != nil && !options.L3.Optional {
 			return rdtError("L3 cache allocation for %q specified in configuration but not supported by system", name)
 		}
 	}
@@ -204,15 +215,15 @@ func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, 
 	// Handle memory bandwidth allocation
 	switch {
 	case rdtInfo.mb.Supported():
-		schemata += config.MBSchema.ToStr()
+		schemata += class.MBSchema.ToStr(partition.MB)
 	default:
-		if !config.MBSchema.IsNil() && !options.MB.Optional {
+		if class.MBSchema != nil && !options.MB.Optional {
 			return rdtError("memory bandwidth allocation specified in configuration but not supported by system")
 		}
 	}
 
 	if len(schemata) > 0 {
-		r.Debug("writing schemata %q", schemata)
+		r.Debug("writing schemata %q to %q", schemata, r.resctrlGroupDirName(name))
 		dirName := r.resctrlGroupDirName(name)
 		if err := r.writeRdtFile(filepath.Join(dirName, "schemata"), []byte(schemata)); err != nil {
 			return err
@@ -232,23 +243,23 @@ func (r *control) resctrlGroupPath(name string) string {
 	return filepath.Join(rdtInfo.resctrlPath, r.resctrlGroupDirName(name))
 }
 
-func (r *control) getResctrlGroups() ([]string, error) {
+func (r *control) getClasses() ([]string, error) {
 
 	files, err := ioutil.ReadDir(rdtInfo.resctrlPath)
 	if err != nil {
 		return nil, err
 	}
-	groups := make([]string, 0, len(files))
+	classes := make([]string, 0, len(files))
 	for _, file := range files {
 		fullName := file.Name()
 		if strings.HasPrefix(fullName, resctrlGroupPrefix) {
-			groups = append(groups, fullName[len(resctrlGroupPrefix):])
+			classes = append(classes, fullName[len(resctrlGroupPrefix):])
 		}
 	}
-	return groups, nil
+	return classes, nil
 }
 
-func (r *control) resctrlGroupTasks(name string) ([]string, error) {
+func (r *control) getClassTasks(name string) ([]string, error) {
 	data, err := r.readRdtFile(filepath.Join(r.resctrlGroupDirName(name), "tasks"))
 	if err != nil {
 		return []string{}, err

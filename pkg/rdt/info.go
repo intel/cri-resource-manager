@@ -48,16 +48,27 @@ type mbInfo struct {
 	minBandwidth  uint64
 }
 
-func (i Info) l3FullMask() Bitmask {
+// l3Info is a helper method for a "unified API" for getting L3 information
+func (i Info) l3Info() l3Info {
 	switch {
-	case i.l3.Supported():
-		return rdtInfo.l3.cbmMask
 	case i.l3code.Supported():
-		return rdtInfo.l3code.cbmMask
+		return rdtInfo.l3code
 	case i.l3data.Supported():
-		return rdtInfo.l3data.cbmMask
+		return rdtInfo.l3data
+	}
+	return rdtInfo.l3
+}
+
+func (i Info) l3CbmMask() Bitmask {
+	mask := i.l3Info().cbmMask
+	if mask != 0 {
+		return mask
 	}
 	return Bitmask(^uint64(0))
+}
+
+func (i Info) l3MinCbmBits() uint64 {
+	return i.l3Info().minCbmBits
 }
 
 func getRdtInfo(resctrlpath string) (Info, error) {
