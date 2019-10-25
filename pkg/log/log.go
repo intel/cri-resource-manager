@@ -45,6 +45,11 @@ type Logger interface {
 
 	DebugEnabled() bool
 	Debug(format string, args ...interface{})
+	Block(fn func(string, ...interface{}), prefix string, format string, args ...interface{})
+	DebugBlock(prefix string, format string, args ...interface{})
+	InfoBlock(prefix string, format string, args ...interface{})
+	WarnBlock(prefix string, format string, args ...interface{})
+	ErrorBlock(prefix string, format string, args ...interface{})
 
 	Stop()
 }
@@ -67,6 +72,7 @@ type logger struct {
 	enabled bool   // logger source module
 	level   Level  // first non-suppressed severity level
 	debug   bool   // debugging for this instance
+	prefix  string // message prefix
 }
 
 // Get an existing logger or create a new one.
@@ -135,17 +141,24 @@ func (l *logger) passthrough(level Level) bool {
 func (l *logger) formatMessage(format string, args ...interface{}) string {
 	if len(l.source) > opt.srcalign {
 		opt.srcalign = len(l.source)
+		l.prefix = ""
+		for _, l := range opt.loggers {
+			l.prefix = ""
+		}
+
 	}
-
-	msg := ""
-
-	if l.shouldPrefix() {
+	if l.prefix == "" {
 		suf := (opt.srcalign - len(l.source)) / 2
 		pre := opt.srcalign - (len(l.source) + suf)
-		msg = "[" + fmt.Sprintf("%-*s", pre, "") + l.source + fmt.Sprintf("%*s", suf, "") + "] "
+		l.prefix = "[" + fmt.Sprintf("%-*s", pre, "") + l.source + fmt.Sprintf("%*s", suf, "") + "] "
 	}
 
-	return msg + fmt.Sprintf(format, args...)
+	prefix := ""
+	if l.shouldPrefix() {
+		prefix = l.prefix
+	}
+
+	return prefix + fmt.Sprintf(format, args...)
 }
 
 // Emit an info message (lowest priority).
@@ -186,7 +199,7 @@ func (l *logger) Panic(format string, args ...interface{}) {
 }
 
 // Default logger/source.
-var defLogger Logger
+var defLogger = NewLogger("default")
 
 // Default gets the default logger.
 func Default() Logger {
@@ -223,6 +236,31 @@ func Debug(format string, args ...interface{}) {
 	defLogger.Debug(format, args...)
 }
 
+// Block emits a block of messages with the default source.
+func Block(fn func(string, ...interface{}), prefix string, format string, args ...interface{}) {
+	defLogger.Block(fn, prefix, format, args...)
+}
+
+// DebugBlock emits a block of debug messages with the default source.
+func DebugBlock(prefix string, format string, args ...interface{}) {
+	defLogger.DebugBlock(prefix, format, args...)
+}
+
+// InfoBlock emits a block of info messages with the default source.
+func InfoBlock(prefix string, format string, args ...interface{}) {
+	defLogger.InfoBlock(prefix, format, args...)
+}
+
+// WarnBlock emits a block of warning messages with the default source.
+func WarnBlock(prefix string, format string, args ...interface{}) {
+	defLogger.WarnBlock(prefix, format, args...)
+}
+
+// ErrorBlock emits a block of error messages with the default source.
+func ErrorBlock(prefix string, format string, args ...interface{}) {
+	defLogger.ErrorBlock(prefix, format, args...)
+}
+
 // Check if debugging is enabled.
 func (l *logger) DebugEnabled() bool {
 	return l.debug
@@ -234,6 +272,37 @@ func (l *logger) Debug(format string, args ...interface{}) {
 		return
 	}
 	opt.active.Debug(l.formatMessage(format, args...))
+}
+
+// Block emits a block of messages with using the given emitting function.
+func (l *logger) Block(fn func(string, ...interface{}), prefix string, format string, args ...interface{}) {
+	for _, line := range strings.Split(fmt.Sprintf(format, args...), "\n") {
+		fn("%s%s", prefix, line)
+	}
+}
+
+// Emit a block of debug messages.
+func (l *logger) DebugBlock(prefix string, format string, args ...interface{}) {
+	if !l.debug {
+		return
+	}
+
+	l.Block(l.Debug, prefix, format, args...)
+}
+
+// Emit a block of info messages.
+func (l *logger) InfoBlock(prefix string, format string, args ...interface{}) {
+	l.Block(l.Info, prefix, format, args...)
+}
+
+// Emit a block of warning messages.
+func (l *logger) WarnBlock(prefix string, format string, args ...interface{}) {
+	l.Block(l.Warn, prefix, format, args...)
+}
+
+// Emit a block of error messages.
+func (l *logger) ErrorBlock(prefix string, format string, args ...interface{}) {
+	l.Block(l.Error, prefix, format, args...)
 }
 
 // RegisterBackend registers a logger backend.
@@ -254,7 +323,7 @@ func RegisterBackend(b Backend) {
 // SelectBackend selects the logger backend to activate.
 func SelectBackend(name string) {
 	if name != "" {
-		name = opt.logger
+		name = string(opt.logger)
 	}
 
 	if b, ok := opt.backends[name]; ok {
