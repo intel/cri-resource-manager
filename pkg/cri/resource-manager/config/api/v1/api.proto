@@ -31,4 +31,6 @@ message SetConfigRequest {
 }
 
 message SetConfigReply {
+     // If not empty, indicate an error that happened while trying to apply new configuration.
+    string error = 1;
 }

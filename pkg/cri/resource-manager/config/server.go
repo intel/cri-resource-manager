@@ -93,8 +93,16 @@ func (s *server) Stop() {
 func (s *server) SetConfig(ctx context.Context, req *v1.SetConfigRequest) (*v1.SetConfigReply, error) {
 	s.Lock()
 	defer s.Unlock()
+
 	s.Debug("REQUEST: %s", req)
-	return &v1.SetConfigReply{}, s.setConfigCb(&RawConfig{NodeName: req.NodeName, Data: req.Config})
+
+	reply := &v1.SetConfigReply{}
+	err := s.setConfigCb(&RawConfig{NodeName: req.NodeName, Data: req.Config})
+	if err != nil {
+		reply.Error = fmt.Sprintf("failed to apply configuration: %v", err)
+	}
+
+	return reply, nil
 }
 
 func serverError(format string, args ...interface{}) error {

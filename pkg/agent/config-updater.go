@@ -18,6 +18,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -32,6 +33,8 @@ const (
 	rateLimitTimeout = 2 * time.Second
 	// setConfigTimeout is the duration we wait at most for a SetConfig reply
 	setConfigTimeout = 5 * time.Second
+	// retryTimeout is the timeout after we retry sending configuration updates upon failure
+	retryTimeout = 5 * time.Second
 )
 
 // configUpdater handles sending configuration to cri-resmgr
@@ -77,9 +80,14 @@ func (u *updater) Start() error {
 				ratelimit = time.After(rateLimitTimeout)
 
 			case _ = <-ratelimit:
-				if _, err := u.setConfig(pending); err != nil {
+				mgrErr, err := u.setConfig(pending)
+				if err != nil {
 					u.Error("failed to send configuration update: %v", err)
+					ratelimit = time.After(retryTimeout)
 				} else {
+					if mgrErr != nil {
+						u.Error("cri-resmgr error: %v", mgrErr)
+					}
 					pending = nil
 					ratelimit = nil
 				}
@@ -97,13 +105,23 @@ func (u *updater) Update(c *resmgrConfig) {
 	u.newConfig <- c
 }
 
-func (u *updater) setConfig(cfg *resmgrConfig) (*resmgr_v1.SetConfigReply, error) {
+func (u *updater) setConfig(cfg *resmgrConfig) (error, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), setConfigTimeout)
 	defer cancel()
 
 	req := &resmgr_v1.SetConfigRequest{NodeName: nodeName, Config: *cfg}
 	u.Debug("sending SetConfig request to cri-resmgr")
-	return u.resmgrCli.SetConfig(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
+
+	reply, err := u.resmgrCli.SetConfig(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
+
+	switch {
+	case err != nil:
+		return nil, err
+	case reply.Error != "":
+		return fmt.Errorf("%s", reply.Error), nil
+	default:
+		return nil, nil
+	}
 }
 
 func newResmgrCli(socket string) (resmgr_v1.ConfigClient, error) {
