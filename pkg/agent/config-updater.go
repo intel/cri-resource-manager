@@ -27,6 +27,13 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/log"
 )
 
+const (
+	// configuration update rate-limiting timeout
+	rateLimitTimeout = 2 * time.Second
+	// setConfigTimeout is the duration we wait at most for a SetConfig reply
+	setConfigTimeout = 5 * time.Second
+)
+
 // configUpdater handles sending configuration to cri-resmgr
 type configUpdater interface {
 	Start() error
@@ -38,7 +45,7 @@ type configUpdater interface {
 type updater struct {
 	log.Logger
 	resmgrCli resmgr_v1.ConfigClient
-	newConfig chan resmgrConfig
+	newConfig chan *resmgrConfig
 }
 
 func newConfigUpdater(socket string) (configUpdater, error) {
@@ -50,7 +57,7 @@ func newConfigUpdater(socket string) (configUpdater, error) {
 	}
 	u.resmgrCli = c
 
-	u.newConfig = make(chan resmgrConfig)
+	u.newConfig = make(chan *resmgrConfig)
 
 	return u, nil
 
@@ -58,33 +65,24 @@ func newConfigUpdater(socket string) (configUpdater, error) {
 
 func (u *updater) Start() error {
 	u.Info("Starting config-updater")
-
 	go func() {
-		var c resmgrConfig
+		var pending *resmgrConfig
+		var ratelimit <-chan time.Time
 
 		for {
-			// Wait for new config
-			if c == nil {
-				c = <-u.newConfig
-			} else {
-				// Check for possible new config in case we're in re-try loop
-				select {
-				case c = <-u.newConfig:
-				default:
-				}
-			}
+			select {
+			case cfg := <-u.newConfig:
+				u.Info("scheduling update after %v rate-limiting timeout...", rateLimitTimeout)
+				pending = cfg
+				ratelimit = time.After(rateLimitTimeout)
 
-			// Try to send updated configuration to cri-resmgr
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-			defer cancel()
-			req := &resmgr_v1.SetConfigRequest{NodeName: nodeName, Config: c}
-			u.Debug("sending SetConfig request to cri-resmgr")
-			_, err := u.resmgrCli.SetConfig(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
-			if err != nil {
-				u.Warn("failed to update cri-resmgr config: %v", err)
-				time.Sleep(1 * time.Second)
-			} else {
-				c = nil
+			case _ = <-ratelimit:
+				if _, err := u.setConfig(pending); err != nil {
+					u.Error("failed to send configuration update: %v", err)
+				} else {
+					pending = nil
+					ratelimit = nil
+				}
 			}
 		}
 	}()
@@ -96,13 +94,16 @@ func (u *updater) Stop() {
 }
 
 func (u *updater) Update(c *resmgrConfig) {
-	// Pop out possible out entry from the chan
-	select {
-	case <-u.newConfig:
-		u.Debug("popped out old config entry from queue")
-	default:
-	}
-	u.newConfig <- *c
+	u.newConfig <- c
+}
+
+func (u *updater) setConfig(cfg *resmgrConfig) (*resmgr_v1.SetConfigReply, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), setConfigTimeout)
+	defer cancel()
+
+	req := &resmgr_v1.SetConfigRequest{NodeName: nodeName, Config: *cfg}
+	u.Debug("sending SetConfig request to cri-resmgr")
+	return u.resmgrCli.SetConfig(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
 }
 
 func newResmgrCli(socket string) (resmgr_v1.ConfigClient, error) {
