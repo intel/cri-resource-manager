@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
-	"syscall"
 
 	"google.golang.org/grpc"
 	core_v1 "k8s.io/api/core/v1"
@@ -60,8 +60,13 @@ func newAgentServer(cli *k8sclient.Clientset, getFn getConfigFn) (agentServer, e
 
 // Start runs server instance.
 func (s *server) Start(socket string) error {
-	// Remove pre-existing socket
-	if err := syscall.Unlink(socket); err != nil && !os.IsNotExist(err) {
+	// Make sure we have a directory for the socket.
+	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
+		return agentError("failed to create directory for socket %s: %v", socket, err)
+	}
+
+	// Remove any leftover sockets.
+	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
 		return agentError("failed to unlink socket file: %s", err)
 	}
 
