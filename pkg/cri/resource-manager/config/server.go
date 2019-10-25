@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 
 	"google.golang.org/grpc"
 
@@ -40,6 +41,7 @@ type Server interface {
 // server implements Server.
 type server struct {
 	log.Logger
+	sync.Mutex               // lock for gRPC server against concurrent per-request goroutines.
 	server      *grpc.Server // gRPC server instance
 	setConfigCb SetConfigCb
 }
@@ -89,6 +91,8 @@ func (s *server) Stop() {
 
 // GetNode gets K8s node object.
 func (s *server) SetConfig(ctx context.Context, req *v1.SetConfigRequest) (*v1.SetConfigReply, error) {
+	s.Lock()
+	defer s.Unlock()
 	s.Debug("REQUEST: %s", req)
 	return &v1.SetConfigReply{}, s.setConfigCb(&RawConfig{NodeName: req.NodeName, Data: req.Config})
 }
