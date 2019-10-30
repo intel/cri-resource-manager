@@ -199,6 +199,13 @@ func NewPolicy(o *Options) (Policy, error) {
 		p.Warn("received empty policy configuration")
 	}
 
+	if p.DebugEnabled() {
+		p.Debug("*** enabling debugging for %s", opt.policy)
+		logger.Get(opt.policy).EnableDebug(true)
+	} else {
+		p.Debug("*** leaving debugging for %s alone", opt.policy)
+	}
+
 	backendOpts := &BackendOptions{
 		Available: opt.available,
 		Reserved:  opt.reserved,
