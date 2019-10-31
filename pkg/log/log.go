@@ -43,6 +43,7 @@ type Logger interface {
 	Fatal(format string, args ...interface{})
 	Panic(format string, args ...interface{})
 
+	EnableDebug(bool) bool
 	DebugEnabled() bool
 	Debug(format string, args ...interface{})
 	Block(fn func(string, ...interface{}), prefix string, format string, args ...interface{})
@@ -236,6 +237,16 @@ func Debug(format string, args ...interface{}) {
 	defLogger.Debug(format, args...)
 }
 
+// EnableDebug controls debugging for the default source.
+func EnableDebug(enable bool) bool {
+	return defLogger.EnableDebug(enable)
+}
+
+// DebugEnabled returns the debugging state of the default source.
+func DebugEnabled() bool {
+	return defLogger.DebugEnabled()
+}
+
 // Block emits a block of messages with the default source.
 func Block(fn func(string, ...interface{}), prefix string, format string, args ...interface{}) {
 	defLogger.Block(fn, prefix, format, args...)
@@ -259,6 +270,13 @@ func WarnBlock(prefix string, format string, args ...interface{}) {
 // ErrorBlock emits a block of error messages with the default source.
 func ErrorBlock(prefix string, format string, args ...interface{}) {
 	defLogger.ErrorBlock(prefix, format, args...)
+}
+
+// EnableDebug controls debugging for the logger and returns the its previous debugging state.
+func (l *logger) EnableDebug(enable bool) bool {
+	previous := l.debug
+	opt.Set(optionDebug, l.source+":"+map[bool]string{false: "false", true: "true"}[enable])
+	return previous
 }
 
 // Check if debugging is enabled.
