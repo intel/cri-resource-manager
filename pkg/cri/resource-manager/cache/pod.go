@@ -96,12 +96,14 @@ func (p *pod) GetContainers() []Container {
 	containers := []Container{}
 
 	for _, c := range p.cache.Containers {
+		if c.PodID != p.ID {
+			continue
+		}
 		if p.Resources != nil {
 			if _, ok := p.Resources.Containers[c.ID]; !ok {
 				continue
 			}
 		}
-
 		containers = append(containers, c)
 	}
 
