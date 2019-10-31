@@ -67,9 +67,9 @@ all: build
 
 build: $(BUILD_BINS)
 
-install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-$(dir)) \
-    $(foreach dir,$(SYSTEMD_DIRS),install-systemd-$(dir)) \
-    $(foreach dir,$(SYSCONF_DIRS),install-sysconf-$(dir))
+install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
+    $(foreach dir,$(BUILD_DIRS),install-systemd-$(dir)) \
+    $(foreach dir,$(BUILD_DIRS),install-sysconf-$(dir))
 
 clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec
 
@@ -87,17 +87,14 @@ bin/%:
 	cd $$src && \
 	    $(GO_BUILD) $(LDFLAGS) -o ../../bin/$$bin
 
-install-%: bin/%
-	$(Q)bin=$(patsubst install-%,%,$@); dir=cmd/$$bin; \
+install-bin-%: bin/%
+	$(Q)bin=$(patsubst install-bin-%,%,$@); dir=cmd/$$bin; \
 	echo "Installing $$bin in $(DESTDIR)$(BINDIR)..."; \
 	$(INSTALL) -d $(DESTDIR)$(BINDIR) && \
-	$(INSTALL) -m 0755 -t $(DESTDIR)$(BINDIR) bin/$$bin
+	$(INSTALL) -m 0755 -t $(DESTDIR)$(BINDIR) bin/$$bin; \
 
 install-systemd-%:
 	$(Q)bin=$(patsubst install-systemd-%,%,$@); dir=cmd/$$bin; \
-	if [ ! -f bin/$$bin ]; then \
-	    exit 0; \
-	fi; \
 	echo "Installing systemd collateral for $$bin..."; \
 	$(INSTALL) -d $(DESTDIR)$(UNITDIR) && \
 	for f in $(shell find $(dir) -name \*.service -o -name \*.socket); do \
@@ -107,9 +104,6 @@ install-systemd-%:
 
 install-sysconf-%:
 	$(Q)bin=$(patsubst install-sysconf-%,%,$@); dir=cmd/$$bin; \
-	if [ ! -f bin/$$bin ]; then \
-	    exit 0; \
-	fi; \
 	echo "Installing sysconf collateral for $$bin..."; \
 	$(INSTALL) -d $(DESTDIR)$(SYSCONFDIR)/sysconfig && \
 	for f in $(shell find $(dir) -name \*.sysconf); do \
