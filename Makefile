@@ -14,12 +14,16 @@ PROTOC    := protoc
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
+CLANG := clang
+KERNEL_VERSION ?= $(shell uname -r)
+KERNEL_SRC_DIR ?= /usr/src/kernels/$(KERNEL_VERSION)
+
 # Binaries and directories for installation.
 PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 UNITDIR    ?= $(PREFIX)/lib/systemd/system
 SYSCONFDIR ?= /etc
-INSTALL    := install 
+INSTALL    := install
 
 # Directories (in cmd) with go code we'll want to build and install.
 BUILD_DIRS = $(shell find cmd -name \*.go | sed 's:cmd/::g;s:/.*::g' | uniq)
@@ -78,6 +82,11 @@ images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 #
 # Rules for building and installing binaries, or building docker images, and cleaning up.
 #
+
+libexec/%.o: elf/%.c
+	$(Q)echo "Building $@"
+	$(Q)mkdir -p libexec
+	$(CLANG) -I$(KERNEL_SRC_DIR)/arch/x86/include -I$(KERNEL_SRC_DIR)/include -O2 -Wall -target bpf -c $< -o $@
 
 bin/%:
 	$(Q)bin=$(notdir $@); src=cmd/$$bin; \
