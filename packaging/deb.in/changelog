@@ -1,0 +1,5 @@
+__PACKAGE__ (__VERSION__) unstable; urgency=low
+
+  * Release build of __PACKAGE__ __VERSION__ for debian/ubuntu.
+
+ -- __AUTHOR__ <__EMAIL__>  __DATE__
