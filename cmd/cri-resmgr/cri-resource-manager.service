@@ -1,7 +1,6 @@
 [Unit]
 Description=A CRI proxy with (hardware) resource aware container placement policies.
 Documentation=https://github.com/intel/cri-resource-manager
-Requires=cri-resource-manager-agent.service
 
 [Service]
 Type=simple
