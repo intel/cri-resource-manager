@@ -181,13 +181,12 @@ test:
 
 dist:
 	$(Q)eval `$(GIT_ID) .` && \
-	tarid=`echo $$gitversion | tr '+-' '_'` && \
-	tardir=cri-resource-manager-$$tarid; \
-	tarball=cri-resource-manager-$$tarid.tar; \
+	tardir=cri-resource-manager-$$gitversion; \
+	tarball=cri-resource-manager-$$gitversion.tar; \
 	echo "Creating $$tarball.$(TAR_SUFFIX)..."; \
 	rm -fr $$tardir $$tarball* && \
 	git archive --format=tar --prefix=$$tardir/ HEAD > $$tarball && \
-	mkdir -p $$tardir && cp git-{version,buildid} $$tardir && \
+	mkdir -p $$tardir && cp git-version git-buildid $$tardir && \
 	$(TAR_UPDATE) $$tarball $$tardir && \
 	$(TAR_COMPRESS) $$tarball && \
 	rm -fr $$tardir
@@ -196,10 +195,12 @@ spec: clean-spec $(SPEC_FILES)
 
 %.spec:
 	$(Q)echo "Generating RPM spec file $@..."; \
-	eval `$(GIT_ID)`; \
-	tarid=`echo $$gitversion | tr '+-' '_'`; \
-	cat $@.in | sed "s/__VERSION__/$$tarid/g;s/__BUILDID__/$$gitbuildid/g" \
-	    > $@
+	eval `$(GIT_ID) .` && \
+	cat $@.in | \
+	    sed "s/__VERSION__/$$rpmversion/g" | \
+	    sed "s/__TARVERSION__/$$gitversion/g" | \
+	    sed "s/__BUILDID__/$$gitbuildid/g" \
+	> $@
 
 clean-spec:
 	$(Q)rm -f $(SPEC_FILES)
