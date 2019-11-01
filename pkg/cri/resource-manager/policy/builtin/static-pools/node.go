@@ -28,7 +28,7 @@ const (
 )
 
 // Update Node object with STP/CMK-specific things
-func (stp *stp) updateNode(conf config) error {
+func (stp *stp) updateNode(conf conf) error {
 	// We require an agent connection
 	if stp.agent == nil {
 		return stpError("stp requires cri-resource-manageent-agent connection")

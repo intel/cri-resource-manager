@@ -29,39 +29,45 @@ import (
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
-// Function to run when shutting down instrumentation.
-var shutdown = func() {}
+const (
+	Service = "CRI-RM"
+)
+
+// Our logger instance.
+var log logger.Logger = logger.NewLogger("tracing")
+
+// shutdownFn is the type of function we run during shutdown.
+type shutdownFn func()
+
+// Our shutdown function.
+var shutdown shutdownFn
 
 // IsEnabled returns true if tracing is enabled.
 func IsEnabled() bool {
-	return opt.trace != sampleNever
+	return opt.Trace != Disabled
 }
 
 // Setup sets up instrumentation (tracing, metrics collection, etc.).
-func Setup(service string) error {
+func Setup() error {
 	var cfg *trace.Config
 
 	if !IsEnabled() {
 		return nil
 	}
 
-	switch opt.trace {
-	case sampleNever:
-		return nil
-	case sampleAlways:
-		cfg = &trace.Config{DefaultSampler: trace.AlwaysSample()}
-	default:
-		cfg = &trace.Config{DefaultSampler: trace.ProbabilitySampler(float64(opt.trace))}
-	}
+	cfg = &trace.Config{DefaultSampler: opt.Trace.Sampler()}
 	trace.ApplyConfig(*cfg)
 
-	jlog := logger.NewLogger("jaeger/" + service)
+	if shutdown != nil {
+		return nil
+	}
+
 	jopt := jaeger.Options{
-		ServiceName:       service,
-		CollectorEndpoint: opt.collector,
-		AgentEndpoint:     opt.agent,
-		Process:           jaeger.Process{ServiceName: service},
-		OnError:           func(err error) { jlog.Error("%v", err) },
+		ServiceName:       Service,
+		CollectorEndpoint: opt.Collector,
+		AgentEndpoint:     opt.Agent,
+		Process:           jaeger.Process{ServiceName: Service},
+		OnError:           func(err error) { log.Error("jaeger: %v", err) },
 	}
 	je, err := jaeger.NewExporter(jopt)
 	if err != nil {
@@ -76,10 +82,9 @@ func Setup(service string) error {
 		return traceError("failed to register default gRPC server views: %v", err)
 	}
 
-	plog := logger.NewLogger("metrics/" + service)
 	popt := prometheus.Options{
-		Namespace: prometheusNamespace(service),
-		OnError:   func(err error) { plog.Error("%v", err) },
+		Namespace: prometheusNamespace(Service),
+		OnError:   func(err error) { log.Error("prometheus: %v", err) },
 	}
 	pe, err := prometheus.NewExporter(popt)
 	if err != nil {
@@ -89,7 +94,7 @@ func Setup(service string) error {
 
 	view.SetReportingPeriod(5 * time.Second)
 
-	go serveMetrics(plog, pe)
+	go serveMetrics(pe)
 
 	shutdown = func() {
 		je.Flush()
@@ -100,7 +105,9 @@ func Setup(service string) error {
 
 // Finish shuts down instrumentation.
 func Finish() {
-	shutdown()
+	if shutdown != nil {
+		shutdown()
+	}
 }
 
 // InjectGrpcClientTrace injects gRPC dial options for instrumentation if necessary.
@@ -143,10 +150,10 @@ func prometheusNamespace(service string) string {
 }
 
 // serveMetrics runs the Prometheus /metrics endpoint.
-func serveMetrics(log logger.Logger, pe *prometheus.Exporter) {
+func serveMetrics(pe *prometheus.Exporter) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", pe)
-	if err := http.ListenAndServe(opt.metrics, mux); err != nil {
+	if err := http.ListenAndServe(opt.Metrics, mux); err != nil {
 		log.Fatal("failed to run Prometheus /metrics endpoint: %v", err)
 	}
 }

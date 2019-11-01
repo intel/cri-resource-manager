@@ -67,16 +67,12 @@ type poolConfig struct {
 	CPULists []*cpuList `json:"cpuLists"`
 }
 
-type config struct {
-	Pools map[string]poolConfig `json:"pools"`
-}
-
 var (
 	cpusetValidationRe = regexp.MustCompile(`^(([\d]+)|([\d]+-[\d]+))(,(([\d]+)|([\d]+-[\d]+)))*$`)
 )
 
-func parseConfData(raw []byte) (*config, error) {
-	conf := &config{}
+func parseConfData(raw []byte) (*conf, error) {
+	conf := &conf{}
 
 	err := yaml.Unmarshal(raw, &conf)
 	if err != nil {
@@ -85,7 +81,7 @@ func parseConfData(raw []byte) (*config, error) {
 	return conf, nil
 }
 
-func readConfFile(filepath string) (*config, error) {
+func readConfFile(filepath string) (*conf, error) {
 	// Read config data
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -95,8 +91,8 @@ func readConfFile(filepath string) (*config, error) {
 	return parseConfData(data)
 }
 
-func readConfDir(confDir string) (*config, error) {
-	conf := &config{Pools: map[string]poolConfig{}}
+func readConfDir(confDir string) (*conf, error) {
+	conf := &conf{Pools: map[string]poolConfig{}}
 
 	// List pools in the pools configuration directory
 	poolsDir := path.Join(confDir, "pools")

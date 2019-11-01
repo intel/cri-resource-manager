@@ -26,6 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
@@ -40,9 +41,6 @@ type Control interface {
 
 	// SetProcessClass assigns a set of processes to a RDT class
 	SetProcessClass(string, ...string) error
-
-	// SetConfig re-configures RDT resources
-	SetConfig(string) error
 }
 
 var rdtInfo Info
@@ -70,13 +68,12 @@ func NewControl(resctrlpath string, config string) (Control, error) {
 	}
 
 	// Configure resctrl
-	r.conf, err = parseConfData([]byte(config))
-	if err != nil {
-		return nil, err
-	}
+	r.conf = opt.Config
 	if err := r.configureResctrl(r.conf); err != nil {
 		return nil, rdtError("configuration failed: %v", err)
 	}
+
+	pkgcfg.GetModule("rdt").AddNotify(r.configNotify)
 
 	return r, nil
 }
@@ -109,24 +106,15 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 	return nil
 }
 
-func (r *control) SetConfig(newConfRaw string) error {
-	newConf, err := parseConfData([]byte(newConfRaw))
+func (r *control) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+	r.Info("configuration %s", event)
+
+	err := r.configureResctrl(opt.Config)
 	if err != nil {
-		return err
+		return rdtError("resctrl configuration failed: %v", err)
 	}
 
-	err = r.configureResctrl(newConf)
-	if err != nil {
-		// Try to roll-back
-		r.Error("failed to configure resctrl: %v", err)
-		r.Error("attempting configuration roll-back")
-		if err := r.configureResctrl(r.conf); err != nil {
-			r.Error("rollback failed: %v", err)
-		}
-		return rdtError("resctrl confuguration failed: %v", err)
-	}
-
-	r.conf = newConf
+	r.conf = opt.Config
 
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/relay"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -155,26 +156,22 @@ func (m *resmgr) Stop() {
 
 // Set new resource manager configuration.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
+	m.Info("received new configuration")
+
 	m.Lock()
 	defer m.Unlock()
 
-	if m.cache.GetConfig().HasIdenticalData(conf.Data) {
-		m.Warn("ignoring config change without any change in data...")
-		return nil
+	err := pkgcfg.SetConfig(conf.Data)
+	if err != nil {
+		err = resmgrError("failed to update configuration: %v", err)
+		m.Error("%v", err)
+		return err
 	}
 
-	m.Info("updating resource manager configuration")
-	if m.rdt != nil {
-		if err := m.rdt.SetConfig(conf.Get("rdt")); err != nil {
-			return resmgrError("failed to update RDT configuration: %v", err)
-		}
-	}
+	//m.cache.SetConfig(conf)
 
-	if err := m.policy.SetConfig(conf); err != nil {
-		return resmgrError("failed to update policy configuration: %v", err)
-	}
-
-	return m.cache.SetConfig(conf)
+	m.Info("configuration updated")
+	return nil
 }
 
 func (m *resmgr) setupRdt(conf string) error {

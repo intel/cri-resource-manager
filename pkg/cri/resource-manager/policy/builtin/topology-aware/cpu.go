@@ -401,13 +401,13 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	// calculate any fake hint scores
 	pod, _ := cr.container.GetPod()
 	key := pod.GetName() + ":" + cr.container.GetName()
-	if fakeHints, ok := opt.Hints[key]; ok {
+	if fakeHints, ok := opt.FakeHints[key]; ok {
 		for provider, hint := range fakeHints {
 			log.Debug(" - evaluating fake hint %s", hint.String())
 			score.hints[provider] = cs.node.HintScore(hint)
 		}
 	}
-	if fakeHints, ok := opt.Hints[cr.container.GetName()]; ok {
+	if fakeHints, ok := opt.FakeHints[cr.container.GetName()]; ok {
 		for provider, hint := range fakeHints {
 			log.Debug(" - evaluating fake hint %s", hint.String())
 			score.hints[provider] = cs.node.HintScore(hint)

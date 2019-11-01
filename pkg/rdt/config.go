@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/ghodss/yaml"
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 )
 
 // ResctrlGroupConfig represents configuration of one CTRL group in the Linux
@@ -261,4 +262,23 @@ func listStrToArray(str string) ([]int, error) {
 	}
 	sort.Ints(a)
 	return a, nil
+}
+
+// Options captures our configurable parameters.
+type options struct {
+	// Config is our RDT configuration.
+	Config config `json:"config,omitempty"`
+}
+
+// Our runtime configuration.
+var opt = defaultOptions().(*options)
+
+// defaultOptions returns a new config instance, all initialized to defaults.
+func defaultOptions() interface{} {
+	return &options{}
+}
+
+// Register us for configuration handling.
+func init() {
+	pkgcfg.Register("rdt", "RDT control", opt, defaultOptions)
 }

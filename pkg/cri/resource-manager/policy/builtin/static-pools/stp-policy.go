@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
@@ -35,6 +36,8 @@ const (
 	PolicyName = "static-pools"
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A reimplementation of CMK (CPU Manager for Kubernetes)."
+	// PolicyPath is the path of this policy in the configuration hierarchy.
+	PolicyPath = "policy." + PolicyName
 	// StpEnvPool is the name of the env variable for selecting STP pool of a container
 	StpEnvPool = "STP_POOL"
 	// StpEnvSocketID is the name of the env variable for selecting cpu socket of a container
@@ -53,7 +56,7 @@ const (
 type stp struct {
 	logger.Logger
 
-	conf  *config         // STP policy configuration
+	conf  *conf           // STP policy configuration
 	state cache.Cache     // state cache
 	agent agent.Interface // client connection to cri-resmgr agent gRPC server
 }
@@ -98,6 +101,8 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	if stp.conf == nil {
 		stp.Fatal("No STP policy configuration loaded")
 	}
+
+	config.GetModule(PolicyPath).AddNotify(stp.configNotify)
 
 	stp.Debug("policy configuration:\n%s", utils.DumpJSON(stp.conf))
 
@@ -245,21 +250,24 @@ func (stp *stp) PostStart(cch cache.Container) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (stp *stp) SetConfig(conf string) error {
-	// Unserialize
-	newConf, err := parseConfData([]byte(conf))
-	if err != nil {
-		return stpError("failed to parse config: %v", err)
-	}
+func (stp *stp) configNotify(event config.Event, source config.Source) error {
+	stp.Info("configuration %s", event)
 
-	if err = stp.verifyConfig(newConf); err != nil {
+	if err := stp.verifyConfig(cfg); err != nil {
 		return err
 	}
 
+	opt.createNodeLabel = cfg.LabelNode
+	opt.createNodeTaint = cfg.TaintNode
+	stp.conf = cfg
 	stp.Info("config updated successfully")
-	stp.conf = newConf
 	stp.Debug("new policy configuration:\n%s", utils.DumpJSON(stp.conf))
+
+	return nil
+}
+
+// SetConfig sets the policy backend configuration
+func (stp *stp) SetConfig(conf string) error {
 	return nil
 }
 
@@ -288,9 +296,9 @@ func (stp *stp) initializeState(state cache.Cache) error {
 }
 
 // Verify configuration against the existing set of containers
-func (stp *stp) verifyConfig(conf *config) error {
+func (stp *stp) verifyConfig(cfg *conf) error {
 	//  Sanity check for config
-	if conf == nil || conf.Pools == nil {
+	if cfg == nil || cfg.Pools == nil {
 		return stpError("invalid config, no pools configured")
 	}
 
@@ -298,7 +306,7 @@ func (stp *stp) verifyConfig(conf *config) error {
 	ccr := stp.getContainerRegistry()
 	for id, cs := range *ccr {
 		// Check that pool for container exists
-		pool, ok := conf.Pools[cs.Pool]
+		pool, ok := cfg.Pools[cs.Pool]
 		if !ok {
 			return stpError("invalid stp configuration: pool %q for container %q not found", cs.Pool, id)
 		}
