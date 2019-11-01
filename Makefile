@@ -10,7 +10,7 @@ GO_CILINT := golangci-lint
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
 
 # Protoc compiler and protobuf definitions we might need to recompile.
-PROTOC    := protoc
+PROTOC    := $(shell command -v protoc || echo echo 'WARNING: no protoc, cannot run protoc ')
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
