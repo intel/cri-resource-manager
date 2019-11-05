@@ -29,341 +29,191 @@ package dump
 //
 
 import (
-	"flag"
+	"fmt"
+	"github.com/ghodss/yaml"
 	"os"
-	re "regexp"
 	"strings"
+	"sync"
 	"time"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
 const (
-	// DefaultDumpConfig is the default dump configuration.
-	DefaultDumpConfig = "full:.*,off:Version,.*List.*,.*Status.*,.*Info.*,.*Log.*,.*Reopen.*"
+	// stampLayout is the timestamp format used in dump files.
+	stampLayout = "2006-Jan-02 15:04:05.000"
+	// stampLen is the length we adjust our printed latencies to.
+	stampLen = len(stampLayout)
 )
 
-// Types to tell requests and replies/errors apart in a HandlerFunc.
-type handlerRequest struct {
-	kind   string
-	method string
-	msg    interface{}
-}
+// Mutex used to serialize parallel dumps and file switching.
+var mutex sync.Mutex
 
-type handlerReply struct {
-	kind    string
-	method  string
-	msg     interface{}
-	latency time.Duration
-}
+// Our logger instances, one for generic logging and another for message dumps.
+var log = logger.NewLogger("dump")
+var message = logger.NewLogger("message")
 
-// A HandlerFunc dumps method <request, response> tuplets.
-type HandlerFunc func(interface{})
+func checkAndScheduleDumpFileSwitch() {
+	mutex.Lock()
+	defer mutex.Unlock()
 
-// Handler is the interface used to introspect and access a HandlerFunc.
-type Handler interface {
-	// Provide the name the dump handler should be referenced by.
-	Name() string
-	// Provide a verbose description of this handler.
-	Description() string
-	// Dump the given method with its request and reply.
-	Dump(msg interface{})
-}
-
-// Dumper is the request dumper interface.
-type Dumper interface {
-	// RegisterHandler registers the given dump handler function.
-	RegisterHandler(Handler)
-	// Verify verifies that all the named dump handlers are resolvable.
-	Verify() error
-	// Parse parses the given dump specification string.
-	Parse(string) error
-	// DumpRequest handles the dumping of the given method request.
-	DumpRequest(string, string, interface{})
-	// DumpReply handles the dumping of the given method reply.
-	DumpReply(string, string, interface{}, time.Duration)
-	// Dumper implements command line option handling.
-	flag.Value
-}
-
-// Request dumper.
-type dumper struct {
-	methods  map[string]*spec   // specs for exact method names
-	regexps  []*spec            // specs for matching regexps
-	handlers map[string]Handler // registered dump handlers
-	resolve  bool               // unresolved handlers present
-	enabled  bool               // dumping globally enabled
-}
-
-// A request dump spec
-type spec struct {
-	method  string     // method name, or regular expression
-	regexp  *re.Regexp // compiled regexp, if any
-	handler string     // handler name
-	h       Handler    // resolved handler
-}
-
-// Our default dumper (created later from an init()).
-var defaultDumper Dumper
-
-// Name of file to also save dumps to.
-var dumpFileName string
-
-// File to also save dumps to.
-var dumpFile *os.File
-
-// Our logger instance.
-var log = logger.NewLogger("message")
-
-// DefaultDumper returns the default dumper.
-func DefaultDumper() Dumper {
-	if dumpFileName != "" && dumpFile == nil {
-		var err error
-
-		if dumpFile, err = os.Create(dumpFileName); err != nil {
-			log.Error("failed to open dump file '%s': %v", dumpFileName, err)
-		}
-
-		log.Info("also saving message dumps to file '%s'...", dumpFileName)
-	}
-
-	return defaultDumper
-}
-
-// Create default dumper and register '-dump' command line option for it.
-func init() {
-	defaultDumper, _ = NewDumper(DefaultDumpConfig)
-	flag.Var(defaultDumper, "dump",
-		"value is a dump specification of the format [target:]message[,...].\n"+
-			"The possible targets are:\n"+DefaultHandlerFlagHelp("    "))
-	flag.StringVar(&dumpFileName, "dump-file", "",
-		"file to also save message dumps to")
-}
-
-// NewDumper creates a new request dumper instance.
-func NewDumper(specs ...string) (Dumper, error) {
-	log.Info("creating request dumper...")
-
-	d := &dumper{
-		methods:  make(map[string]*spec),
-		regexps:  []*spec{},
-		handlers: make(map[string]Handler),
-		resolve:  false,
-		enabled:  true,
-	}
-
-	RegisterDefaultHandlers(d)
-
-	for _, spec := range specs {
-		if err := d.Parse(spec); err != nil {
-			return &dumper{}, err
-		}
-	}
-
-	return d, nil
-}
-
-// Register the given dump handler.
-func (d *dumper) RegisterHandler(h Handler) {
-	name := h.Name()
-	_, duplicate := d.handlers[name]
-	d.handlers[name] = h
-
-	if duplicate {
-		for _, spec := range d.methods {
-			if spec.handler == name {
-				spec.h = h
-			}
-		}
-
-		for _, spec := range d.regexps {
-			if spec.handler == name {
-				spec.h = h
-			}
+	if fileName != string(opt.File) {
+		if file != nil {
+			file.Close()
+			file = nil
+			log.Info("old message dump file '%s' closed", fileName)
 		}
 	}
 }
 
-// Verify the validity of the effective dump configuration.
-func (d *dumper) Verify() error {
-	if !d.resolve {
-		return nil
+func checkDumpFile() bool {
+	// this must be closed with mutex.Lock()'ed
+	switch {
+	case file != nil:
+		return true
+	case opt.File == "":
+		return false
 	}
 
-	for _, spec := range d.methods {
-		if spec.h == nil {
-			if h, ok := d.handlers[spec.handler]; ok {
-				spec.h = h
+	f, err := os.Create(string(opt.File))
+	if err != nil {
+		log.Error("failed to open message dump file '%v': %v", opt.File, err)
+		opt.File = dumpFile("")
+		return false
+	}
+
+	log.Info("opened new message dump file '%v'", opt.File)
+	file = f
+	fileName = string(opt.File)
+	return true
+}
+
+// RequestMessage dumps a CRI request.
+func RequestMessage(kind, name string, request interface{}) {
+	method := name[strings.LastIndex(name, "/")+1:]
+	switch opt.verbosityOf(method) {
+	case NameOnly:
+		dumpName("request", kind, method, request, 0)
+	case Full:
+		dumpFull("request", kind, method, request, 0)
+	}
+}
+
+// ReplyMessage dumps a CRI reply.
+func ReplyMessage(kind, name string, reply interface{}, latency time.Duration) {
+	method := name[strings.LastIndex(name, "/")+1:]
+	switch opt.verbosityOf(method) {
+	case NameOnly:
+		dumpName("reply", kind, method, reply, latency)
+	case Full:
+		dumpFull("reply", kind, method, reply, latency)
+	}
+}
+
+func dumpName(dir, kind, method string, msg interface{}, latency time.Duration) {
+	go func() {
+		mutex.Lock()
+		defer mutex.Unlock()
+		switch dir {
+		case "request":
+			return
+		case "reply":
+			if _, ok := msg.(error); ok {
+				dumpWarn(dir, latency, "(%s) FAILED %s: %vs", kind, method, msg.(error))
 			} else {
-				return dumpError("unknown dump handler '%s' for method '%s'",
-					spec.handler, spec.method)
+				dumpLine(dir, latency, "(%s) REQUEST %s", kind, method)
 			}
 		}
-	}
+	}()
+}
 
-	for _, spec := range d.regexps {
-		if spec.h == nil {
-			if h, ok := d.handlers[spec.handler]; ok {
-				spec.h = h
+func dumpFull(dir, kind, method string, msg interface{}, latency time.Duration) {
+	go func() {
+		mutex.Lock()
+		defer mutex.Unlock()
+		switch dir {
+		case "request":
+			raw, _ := yaml.Marshal(msg)
+			str := strings.TrimRight(string(raw), "\n")
+			if strings.LastIndexByte(str, '\n') > 0 {
+				dumpLine(dir, latency, "(%s) REQUEST %s", kind, method)
+				dumpBlock(dir, latency, "    "+method+" => ", str)
 			} else {
-				dumpError("unknown dump handler '%s' for method matcher '%s'",
-					spec.handler, spec.method)
+				dumpLine(dir, latency, "(%s) REQUEST %s => %s", kind, method, str)
+			}
+
+		case "reply":
+			switch msg.(type) {
+			case error:
+				dumpWarn(dir, latency, "(%s) FAILED %s", kind, method)
+				dumpWarn(dir, latency, "  %s <= %s", method, msg.(error))
+			default:
+				raw, _ := yaml.Marshal(msg)
+				str := strings.TrimRight(string(raw), "\n")
+				if strings.LastIndexByte(str, '\n') > 0 {
+					dumpLine(dir, latency, "(%s) REPLY %s", kind, method)
+					dumpBlock(dir, latency, "    "+method+" <= ", str)
+				} else {
+					dumpLine(dir, latency, "(%s) REPLY %s <= %s", kind, method, str)
+				}
 			}
 		}
-	}
-
-	d.resolve = false
-
-	return nil
+	}()
 }
 
-// Parse the given request dump specification.
-func (d *dumper) Parse(specStr string) error {
-	handler := DefaultHandler
-
-	for _, req := range strings.Split(specStr, ",") {
-		switch {
-		case req == "enable" || req == "on":
-			d.Enable()
-			continue
-		case req == "disable" || req == "off":
-			d.Disable()
-			continue
-		case req == "reset":
-			d.Reset()
-			continue
-		}
-
-		spec := &spec{}
-		hreq := strings.Split(req, ":")
-		method := ""
-
-		// pick optional handler and method spec apart
-		switch len(hreq) {
-		case 1:
-			method = hreq[0]
-		case 2:
-			handler = hreq[0]
-			method = hreq[1]
-		default:
-			return dumpError("invalid dump spec '%s'", req)
-		}
-
-		spec.method = method
-		spec.handler = handler
-
-		if h, ok := d.handlers[handler]; ok {
-			spec.h = h
-		} else {
-			d.resolve = true
-		}
-
-		// parse method, handle regexps
-		if method == "*" || !strings.ContainsAny(method, ".*?+()[]|") {
-			log.Info("dumping method '%s': %s", method, handler)
-			d.methods[method] = spec
-		} else {
-			log.Info("dumping methods matching '%s': %s", method, handler)
-			regexp, err := re.Compile(method)
-			if err != nil {
-				return dumpError("invalid method regexp '%s': %v", method, err)
-			}
-			spec.regexp = regexp
-			d.regexps = append(d.regexps, spec)
-		}
-	}
-
-	return nil
-}
-
-// Get the effective dump specification for a method.
-func (d *dumper) spec(method string) *spec {
-	var spec *spec
-
-	if s, ok := d.methods[method]; ok {
-		spec = s
-	} else if s, ok := d.methods["*"]; ok {
-		spec = s
+func dumpLine(dir string, latency time.Duration, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	if !opt.Debug {
+		message.Info("%s", msg)
 	} else {
-		for _, s := range d.regexps {
-			if s.regexp.MatchString(method) {
-				spec = s
-			}
-		}
+		message.Debug("%s", msg)
 	}
-
-	if spec == nil {
-		return nil
-	}
-
-	if spec.h == nil {
-		d.Verify()
-		if spec.h == nil {
-			log.Warn("unknown dump handler '%s' (for dumping '%s')",
-				spec.handler, spec.method)
-			return nil
-		}
-	}
-
-	return spec
-}
-
-// Dump the given method request.
-func (d *dumper) DumpRequest(kind, name string, request interface{}) {
-	method := name[strings.LastIndex(name, "/")+1:]
-
-	if spec := d.spec(method); spec != nil {
-		spec.h.Dump(&handlerRequest{kind: kind, method: method, msg: request})
+	if opt.File != "" {
+		dumpToFile(dir, latency, "%s", msg)
 	}
 }
 
-// Dump the given method reply.
-func (d *dumper) DumpReply(kind, name string, reply interface{}, latency time.Duration) {
-	method := name[strings.LastIndex(name, "/")+1:]
-
-	if spec := d.spec(method); spec != nil {
-		spec.h.Dump(&handlerReply{kind: kind, method: method, msg: reply, latency: latency})
+func dumpBlock(dir string, latency time.Duration, prefix, msg string) {
+	if !opt.Debug {
+		message.InfoBlock(prefix, msg)
+	} else {
+		message.DebugBlock(prefix, msg)
+	}
+	if opt.File != "" {
+		log.Block(
+			func(format string, args ...interface{}) {
+				dumpToFile(dir, latency, format, args...)
+			},
+			prefix, "%s", msg)
 	}
 }
 
-// Enable dumping globally.
-func (d *dumper) Enable() {
-	d.enabled = true
-}
-
-// Disable dumping globally.
-func (d *dumper) Disable() {
-	d.enabled = false
-}
-
-// Reset all dump specifications.
-func (d *dumper) Reset() {
-	d.methods = make(map[string]*spec)
-	d.regexps = []*spec{}
-}
-
-//
-// flag.Value interface for command-line handling.
-//
-
-// Parse the given request dump specification given on the command line.
-func (d *dumper) Set(value string) error {
-	return d.Parse(value)
-}
-
-// Return the current dump configuration as a string.
-func (d *dumper) String() string {
-	cfg := ""
-	sep := ""
-
-	for _, spec := range d.methods {
-		cfg += sep + spec.handler + ":" + spec.method
-		sep = ","
+func dumpWarn(dir string, latency time.Duration, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	log.Warn("%s", msg)
+	if opt.File != "" {
+		dumpToFile(dir, latency, "%s", msg)
 	}
-	for _, spec := range d.regexps {
-		cfg += sep + spec.handler + ":" + spec.method
-		sep = ","
+}
+
+func dumpToFile(dir string, latency time.Duration, format string, args ...interface{}) {
+	if !checkDumpFile() {
+		return
 	}
 
-	return cfg
+	fmt.Fprintf(file, "["+stamp(dir, latency)+"] "+format+"\n", args...)
+}
+
+func stamp(dir string, latency time.Duration) string {
+	switch dir {
+	case "request":
+		return time.Now().Format(stampLayout)
+	case "reply":
+		return fmt.Sprintf("%*s", stampLen, fmt.Sprintf("+%f", latency.Seconds()))
+	}
+	return ""
+}
+
+func dumpError(format string, args ...interface{}) error {
+	return fmt.Errorf("dump: "+format, args...)
 }
