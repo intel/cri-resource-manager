@@ -1,0 +1,21 @@
+#!/usr/bin/make -f
+#-*- make -*-
+
+DISTRIBUTION = $(shell sed -n "s/^VERSION_CODENAME=//p" /etc/os-release)
+VERSION = __VERSION__
+PACKAGEVERSION = $(VERSION)
+TARBALL = __TARBALL__
+URL = http://github.com/intel/cri-resource-manager
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+override_dh_auto_test:
+override_dh_auto_build:
+override_dh_auto_install:
+	export PATH="$$PATH:$$(go env GOPATH)/bin"; \
+	make BUILD_DIRS="__BUILD_DIRS__" install DESTDIR=debian/__PACKAGE__
+
+override_dh_gencontrol:
+	dh_gencontrol -- -v$(PACKAGEVERSION)

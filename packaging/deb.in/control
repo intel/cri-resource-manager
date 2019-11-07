@@ -1,0 +1,6 @@
+Source: __PACKAGE__
+Maintainer: __AUTHOR__ <__EMAIL__>
+
+Package: __PACKAGE__
+Architecture: any
+Description: A CRI Proxy for Hardware Resource Management

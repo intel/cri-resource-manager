@@ -10,7 +10,7 @@ GO_CILINT := golangci-lint
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
 
 # Protoc compiler and protobuf definitions we might need to recompile.
-PROTOC    := protoc
+PROTOC    := $(shell command -v protoc || echo echo 'WARNING: no protoc, cannot run protoc ')
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
@@ -52,12 +52,31 @@ TAR_UPDATE   := $(TAR) -uf
 TAR_COMPRESS := bzip2
 TAR_SUFFIX   := bz2
 
+# Metadata for packages, changelog, etc.
+USER_NAME  ?= $(shell git config user.name)
+USER_EMAIL ?= $(shell git config user.email)
+BUILD_DATE ?= $(shell date -R)
+
+HOST_DISTRO ?= $(shell [ -f /etc/os-release ] && eval `cat /etc/os-release`; echo $$ID)
+DEB_DISTRO  ?= ubuntu
+
 # RPM spec files we might want to generate.
 SPEC_FILES = $(shell find packaging -name \*.spec.in | sed 's/.spec.in/.spec/g' | uniq)
 
 # Systemd collateral.
 SYSTEMD_DIRS = $(shell find cmd -name \*.service -o -name \*.socket | sed 's:cmd/::g;s:/.*::g'|uniq)
 SYSCONF_DIRS = $(shell find cmd -name \*.sysconf | sed 's:cmd/::g;s:/.*::g' | uniq)
+
+# Extra options to pass to docker (for instance --network host).
+DOCKER_OPTIONS =
+
+# Docker boilerplate/commands to build debian/ubuntu packages.
+DOCKER_DEB_BUILD := mkdir -p /build && cd /build && \
+    git clone /input/cri-resource-manager && cd /build/cri-resource-manager && \
+    make BUILD_DIRS=cri-resmgr deb
+
+# Where to leave built packages, if/when we build them in containers.
+PACKAGES_DIR = packages
 
 # Be quiet by default but let folks override it with Q= on the command line.
 Q := @
@@ -71,9 +90,9 @@ all: build
 
 build: $(BUILD_BINS)
 
-install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-$(dir)) \
-    $(foreach dir,$(SYSTEMD_DIRS),install-systemd-$(dir)) \
-    $(foreach dir,$(SYSCONF_DIRS),install-sysconf-$(dir))
+install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
+    $(foreach dir,$(BUILD_DIRS),install-systemd-$(dir)) \
+    $(foreach dir,$(BUILD_DIRS),install-sysconf-$(dir))
 
 clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec
 
@@ -96,17 +115,14 @@ bin/%:
 	cd $$src && \
 	    $(GO_BUILD) $(LDFLAGS) -o ../../bin/$$bin
 
-install-%: bin/%
-	$(Q)bin=$(patsubst install-%,%,$@); dir=cmd/$$bin; \
+install-bin-%: bin/%
+	$(Q)bin=$(patsubst install-bin-%,%,$@); dir=cmd/$$bin; \
 	echo "Installing $$bin in $(DESTDIR)$(BINDIR)..."; \
 	$(INSTALL) -d $(DESTDIR)$(BINDIR) && \
-	$(INSTALL) -m 0755 -t $(DESTDIR)$(BINDIR) bin/$$bin
+	$(INSTALL) -m 0755 -t $(DESTDIR)$(BINDIR) bin/$$bin; \
 
 install-systemd-%:
 	$(Q)bin=$(patsubst install-systemd-%,%,$@); dir=cmd/$$bin; \
-	if [ ! -f bin/$$bin ]; then \
-	    exit 0; \
-	fi; \
 	echo "Installing systemd collateral for $$bin..."; \
 	$(INSTALL) -d $(DESTDIR)$(UNITDIR) && \
 	for f in $(shell find $(dir) -name \*.service -o -name \*.socket); do \
@@ -116,9 +132,6 @@ install-systemd-%:
 
 install-sysconf-%:
 	$(Q)bin=$(patsubst install-sysconf-%,%,$@); dir=cmd/$$bin; \
-	if [ ! -f bin/$$bin ]; then \
-	    exit 0; \
-	fi; \
 	echo "Installing sysconf collateral for $$bin..."; \
 	$(INSTALL) -d $(DESTDIR)$(SYSCONFDIR)/sysconfig && \
 	for f in $(shell find $(dir) -name \*.sysconf); do \
@@ -144,7 +157,7 @@ image-%:
 	    fi; \
 	    echo "Vendoring dependencies..."; \
 	    go mod vendor && \
-	        scripts/build/docker-build --network=host $$buildopts $$src; \
+	        scripts/build/docker-build $(DOCKER_OPTIONS) $$buildopts $$src; \
 	        rc=$$?; \
 	    rm -fr vendor; \
 	    exit $$rc
@@ -191,18 +204,17 @@ test:
 	    $(GO_MODULES)
 
 #
-# Rules for building dist-tarballs, SPEC-files and RPMs.
+# Rule for building dist-tarballs, SPEC files, RPMs, debian collateral, deb's.
 #
 
 dist:
 	$(Q)eval `$(GIT_ID) .` && \
-	tarid=`echo $$gitversion | tr '+-' '_'` && \
-	tardir=cri-resource-manager-$$tarid; \
-	tarball=cri-resource-manager-$$tarid.tar; \
+	tardir=cri-resource-manager-$$gitversion; \
+	tarball=cri-resource-manager-$$gitversion.tar; \
 	echo "Creating $$tarball.$(TAR_SUFFIX)..."; \
 	rm -fr $$tardir $$tarball* && \
 	git archive --format=tar --prefix=$$tardir/ HEAD > $$tarball && \
-	mkdir -p $$tardir && cp git-{version,buildid} $$tardir && \
+	mkdir -p $$tardir && cp git-version git-buildid $$tardir && \
 	$(TAR_UPDATE) $$tarball $$tardir && \
 	$(TAR_COMPRESS) $$tarball && \
 	rm -fr $$tardir
@@ -211,10 +223,11 @@ spec: clean-spec $(SPEC_FILES)
 
 %.spec:
 	$(Q)echo "Generating RPM spec file $@..."; \
-	eval `$(GIT_ID)`; \
-	tarid=`echo $$gitversion | tr '+-' '_'`; \
-	cat $@.in | sed "s/__VERSION__/$$tarid/g;s/__BUILDID__/$$gitbuildid/g" \
-	    > $@
+	eval `$(GIT_ID) .` && \
+	cp $@.in $@ && \
+	sed -E -i -e "s/__VERSION__/$$rpmversion/g"    \
+	          -e "s/__TARVERSION__/$$gitversion/g" \
+	          -e "s/__BUILDID__/$$gitbuildid/g" $@
 
 clean-spec:
 	$(Q)rm -f $(SPEC_FILES)
@@ -230,6 +243,59 @@ src.rpm source-rpm: spec dist
 	cp packaging/rpm/cri-resource-manager.spec ~/rpmbuild/SPECS && \
 	cp cri-resource-manager*.tar.bz2 ~/rpmbuild/SOURCES && \
 	rpmbuild -bs ~/rpmbuild/SPECS/cri-resource-manager.spec
+
+debian/%: packaging/deb.in/%
+	$(Q)echo "Generating debian packaging file $@..."; \
+	mkdir -p debian; \
+	eval `$(GIT_ID) .` && \
+	tarball=cri-resource-manager-$$gitversion.tar && \
+	cp $< $@ && \
+	sed -E -i -e "s/__PACKAGE__/cri-resource-manager/g" \
+	          -e "s/__TARBALL__/$$tarball/g"            \
+	          -e "s/__VERSION__/$$debversion/g"         \
+	          -e "s/__AUTHOR__/$(USER_NAME)/g"          \
+	          -e "s/__EMAIL__/$(USER_EMAIL)/g"          \
+	          -e "s/__DATE__/$(BUILD_DATE)/g"           \
+	          -e "s/__BUILD_DIRS__/$(BUILD_DIRS)/g" $@
+
+clean-deb:
+	$(Q)rm -f debian
+
+deb: debian/changelog debian/control debian/rules debian/compat dist
+	$(Q)if [ -z "$$BUILD_CONTAINER" -a "$(HOST_DISTRO)" != "$(DEB_DISTRO)" ]; then \
+	    $(MAKE) deb-docker-$(DEB_DISTRO); \
+	    exit $$?; \
+	fi; \
+	dpkg-buildpackage -uc
+
+deb-docker-%: docker/%-build
+	$(Q)distro=$(patsubst deb-docker-%,%,$@); \
+	builddir=build/docker/$$distro; \
+	outdir=$(PACKAGES_DIR)/$$distro; \
+	echo "Docker cross-building $$distro packages..."; \
+	mkdir -p $(PACKAGES_DIR)/$$distro && \
+	rm -fr $$builddir && mkdir -p $$builddir && \
+	docker run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
+	    -v $$(pwd):/input/cri-resource-manager \
+	    -v $$(pwd)/$$builddir:/build \
+	    -v $$(pwd)/$$outdir:/output \
+	    $$distro-build /bin/bash -c "export DEB_DISTRO=$$distro; $(DOCKER_DEB_BUILD)" && \
+	cp $$builddir/cri-resource-manager*.* $$outdir && \
+	rm -fr $$builddir
+
+ubuntu-packages:
+	$(MAKE) DEB_DISTRO=ubuntu deb
+
+debian-packages:
+	$(MAKE) DEB_DISTRO=debian deb
+
+# Build a docker image (for distro cross-building).
+docker/%: dockerfiles/Dockerfile.%
+	$(Q)img=$(patsubst docker/%,%,$@); \
+	docker rm $$img || : && \
+	echo "Building cross-build docker image $$img..."; \
+	scripts/build/docker-build-image $$img --container $(DOCKER_OPTIONS)
 
 # Rule for recompiling a changed protobuf.
 %.pb.go: %.proto

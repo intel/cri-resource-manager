@@ -1,12 +1,18 @@
 #!/bin/bash
 # get/save/load git-described version + SHA1 build id, usage: git-id [dir-to-save/read-ids]
 
+clean_dirty() {
+    if [ -n "$dirty" ]; then
+        dirty=$(git diff --quiet -- ':!go.mod' ':!go.sum' || echo "-dirty")
+    fi
+}
+
 unknown_version() {
     v=0.0.0
     if [ -d .git ]; then
         sha=$(git rev-parse --short HEAD)
         commits=$(git rev-list --count HEAD)
-        dirty=$(git diff --quiet || echo "-dirty")
+        dirty=$(git diff --quiet -- ':!go.mod' ':!go.sum' || echo "-dirty")
         echo "v$v-$commits-g$sha$dirty"
     else
         echo "v$v-$(date +%Y%m%d%H%M)"
@@ -45,6 +51,7 @@ print_gitids () {
             [ -n "$prerel" ] && prerel="+$prerel"
             [ "$commits" != "0" ] && commits="-$commits-g${shaone}" || commits=""
             #echo "version:[$version], numver:[$numver], prerel:[$prerel], commits:[$commits], shaone:[$shaone], dirty:[$dirty]" 1>&2
+            clean_dirty
             version=$numver$prerel$commits$dirty
             buildid=$buildid
             ;;
@@ -52,8 +59,12 @@ print_gitids () {
             version="$(unknown_version)"
             ;;
     esac
-    echo "gitversion=$version"
     echo "gitbuildid=$buildid"
+    echo "gitversion=$version"
+    rpmversion=$(echo $numver$prerel$commits$dirty | tr '+-' '_')
+    debversion=$numver$prerel$commits$dirty
+    echo "rpmversion=$rpmversion"
+    echo "debversion=$debversion"
 }
 
 #######
