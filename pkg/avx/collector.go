@@ -4,10 +4,6 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
-	"regexp"
-	"strconv"
-	"strings"
 	"sync"
 	"unsafe"
 
@@ -42,8 +38,6 @@ var (
 			"cgroup",
 		}, nil,
 	)
-
-	procVersionRegex = regexp.MustCompile(`Linux version (\d+\.\d+\.\d+)`)
 )
 
 func kernelVersionCode(major, minor, patch uint8) uint32 {
@@ -72,50 +66,22 @@ func getElfKernelVersion(path string) (uint8, uint8, uint8, error) {
 	return data[2], data[1], data[0], nil
 }
 
-func getHostKernelVersion(procVersionPath string) (uint8, uint8, uint8, error) {
-	data, err := ioutil.ReadFile(procVersionPath)
-	if err != nil {
-		return 0, 0, 0, errors.Wrapf(err, "unable to read %s", procVersionPath)
-	}
-
-	matches := procVersionRegex.FindSubmatch(data)
-	if len(matches) != 2 {
-		return 0, 0, 0, errors.New("Unable to parse kernel version")
-	}
-
-	ver := strings.Split(string(matches[1]), ".")
-	major, err := strconv.ParseUint(ver[0], 10, 8)
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "unable to read major")
-	}
-	minor, err := strconv.ParseUint(ver[1], 10, 8)
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "unable to read minor")
-	}
-	patch, err := strconv.ParseUint(ver[2], 10, 8)
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "unable to read patch")
-	}
-
-	return uint8(major), uint8(minor), uint8(patch), nil
-}
-
 func checkElfKernelVersion(path string) error {
 	elfMajor, elfMinor, _, err := getElfKernelVersion(path)
 	if err != nil {
 		return err
 	}
 
-	hostMajor, hostMinor, hostPatch, err := getHostKernelVersion("/proc/version")
+	currentCode, err := bpf.CurrentKernelVersion()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to get current kernel version")
 	}
 
-	if kernelVersionCode(hostMajor, hostMinor, hostPatch) < kernelVersionCode(elfMajor, elfMinor, 0) {
+	if currentCode < kernelVersionCode(elfMajor, elfMinor, 0) {
 		return errors.New("host kernel is too old, consider rebuilding eBPF")
 	}
 
-	if kernelVersionCode(hostMajor, hostMinor, hostPatch) > kernelVersionCode(elfMajor, elfMinor, 255) {
+	if currentCode > kernelVersionCode(elfMajor, elfMinor, 255) {
 		return errors.New("host kernel is too new, consider rebuilding eBPF")
 	}
 
