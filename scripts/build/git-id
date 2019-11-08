@@ -21,7 +21,7 @@ unknown_version() {
 
 get_gitids () {
     if [ -d .git ]; then
-        version=$(git describe --long --dirty 2>/dev/null || unknown_version)
+        version=$(git describe --tags --long --dirty 2>/dev/null || unknown_version)
         buildid=$(git rev-parse --short HEAD || echo unknown)
         if [ -n "$DIR" ]; then
             if [ "$version" != "$(cat $DIR/git-version 2>/dev/null)" ]; then
