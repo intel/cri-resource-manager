@@ -23,10 +23,9 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
-	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	"github.com/intel/cri-resource-manager/pkg/rdt"
 )
 
 // ResourceManager is the interface we expose for controlling the CRI resource manager.
@@ -43,11 +42,11 @@ type ResourceManager interface {
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay    // our CRI relay
-	cache        cache.Cache    // cached state
-	policy       policy.Policy  // resource manager policy
-	configServer config.Server  // configuration management server
-	rdt          control.CriRdt // RDT enforcement
+	relay        relay.Relay     // our CRI relay
+	cache        cache.Cache     // cached state
+	policy       policy.Policy   // resource manager policy
+	configServer config.Server   // configuration management server
+	control      control.Control // policy controllers/enforcement
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -87,15 +86,8 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
-	if !opt.NoRdt {
-		if err = m.setupRdt(); err != nil {
-			return nil, resmgrError("failed to create resource manager: %v", err)
-		}
-	}
-
 	policyOpts := &policy.Options{
 		AgentCli: agent,
-		Rdt:      m.rdt,
 	}
 	if m.policy, err = policy.NewPolicy(policyOpts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
@@ -115,6 +107,10 @@ func NewResourceManager() (ResourceManager, error) {
 	}
 	if conf != nil && len(conf.Data) > 0 {
 		m.SetConfig(conf)
+	}
+
+	if m.control, err = control.NewControl(); err != nil {
+		return nil, resmgrError("failed to create controller: %v", err)
 	}
 
 	if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
@@ -139,6 +135,10 @@ func (m *resmgr) Start() error {
 		return err
 	}
 
+	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+		return resmgrError("failed to start controller: %v", err)
+	}
+
 	if err := m.relay.Start(); err != nil {
 		return resmgrError("failed to start relay: %v", err)
 	}
@@ -155,35 +155,29 @@ func (m *resmgr) Stop() {
 
 // Set new resource manager configuration.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
+	var cfgErr error
+
 	m.Info("received new configuration")
 
 	m.Lock()
 	defer m.Unlock()
 
-	err := pkgcfg.SetConfig(conf.Data)
-	if err != nil {
-		err = resmgrError("failed to update configuration: %v", err)
-		m.Error("%v", err)
-		return err
+	if err := pkgcfg.SetConfig(conf.Data); err != nil {
+		m.Error("failed to update configuration: %v", err)
+		cfgErr = resmgrError("configuration rejected: %v", err)
 	}
 
-	m.Info("configuration updated")
-	return nil
-}
-
-func (m *resmgr) setupRdt() error {
-	var err error
-
-	path := opt.ResctrlPath
-	if path == "" {
-		// Try to find the resctrl mount point
-		path, err = rdt.ResctrlMountPath()
-		if err != nil {
-			m.Info("unable to find the resctrl mount point, RDT enforcement is disabled")
-			return nil
+	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+		m.Error("failed to activate configuration: %v", err)
+		if cfgErr == nil {
+			cfgErr = resmgrError("failed to activate configuration: %v", err)
 		}
-		m.Info("using auto-discovered resctrl-path %q", path)
 	}
-	m.rdt, err = control.NewCriRdt(path)
-	return err
+
+	if cfgErr == nil {
+		m.Info("configuration successfully updated")
+		m.cache.SetConfig(conf)
+	}
+
+	return cfgErr
 }

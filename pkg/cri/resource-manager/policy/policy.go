@@ -25,7 +25,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
-	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -55,8 +54,6 @@ type ConstraintSet map[Domain]Constraint
 type Options struct {
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
-	// Rdt control interface
-	Rdt control.CriRdt
 }
 
 // BackendOptions describes the options for a policy backend instance
@@ -67,8 +64,6 @@ type BackendOptions struct {
 	Reserved ConstraintSet
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
-	// Rdt control interface
-	Rdt control.CriRdt
 }
 
 // CreateFn is the type for functions used to create a policy instance.
@@ -201,7 +196,6 @@ func NewPolicy(o *Options) (Policy, error) {
 		Available: opt.Available,
 		Reserved:  opt.Reserved,
 		AgentCli:  o.AgentCli,
-		Rdt:       o.Rdt,
 	}
 	p.backend = backend.CreateFn()(backendOpts)
 

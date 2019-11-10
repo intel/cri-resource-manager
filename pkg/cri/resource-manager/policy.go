@@ -271,9 +271,9 @@ func (m *resmgr) processWithPolicy(ctx context.Context, method string, req inter
 			c.UpdateState(cache.ContainerStateRunning)
 		}
 
-		policyErr := m.policy.PostStart(c)
-		if policyErr != nil {
-			m.Warn("failed to update affected container %s: %v", c.GetID(), policyErr)
+		hookErr := m.control.RunPostStartHooks(c)
+		if hookErr != nil {
+			m.Warn("post-start hook failed for %s: %v", c.PrettyName(), hookErr)
 		}
 		return rpl, err
 
