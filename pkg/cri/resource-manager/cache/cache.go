@@ -284,6 +284,16 @@ type Container interface {
 
 	// GetAffinity returns the annotated affinity expressions for this container.
 	GetAffinity() []*Affinity
+
+	// SetRDTClass assigns this container to the given RDT class.
+	SetRDTClass(string)
+	// GetRDTClass returns the RDT class for this container.
+	GetRDTClass() string
+
+	// SetBlockIOClass assigns this container to the given BlockIO class.
+	SetBlockIOClass(string)
+	// GetBlockIOClass returns the BlockIO class for this container.
+	GetBlockIOClass() string
 }
 
 // A cached container.
@@ -308,6 +318,9 @@ type container struct {
 
 	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
+
+	RDTClass     string // RDT class this container is assigned to.
+	BlockIOClass string // Block I/O class this container is assigned to.
 }
 
 // MountType is a propagation type.
