@@ -707,3 +707,21 @@ func (c *container) GetAffinity() []*Affinity {
 
 	return affinity
 }
+
+func (c *container) SetRDTClass(class string) {
+	c.RDTClass = class
+	c.cache.markChanged(c)
+}
+
+func (c *container) GetRDTClass() string {
+	return c.RDTClass
+}
+
+func (c *container) SetBlockIOClass(class string) {
+	c.BlockIOClass = class
+	c.cache.markChanged(c)
+}
+
+func (c *container) GetBlockIOClass() string {
+	return c.BlockIOClass
+}
