@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	intelRdtTasks   = "tasks"
+	cgroupTasks     = "tasks"
 	cpusetCgroupDir = "/sys/fs/cgroup/cpuset/"
 )
 
@@ -48,8 +48,8 @@ func GetContainerCgroupDir(subsystemDir, containerID string) string {
 }
 
 // GetProcessInContainer gets the IDs of all processes in the container.
-func GetProcessInContainer(cgroupParentDir, containerID string) ([]int, error) {
-	var pids []int
+func GetProcessInContainer(cgroupParentDir, containerID string, pidsptr *[]int) ([]string, error) {
+	var entries []string
 
 	// Find Cpuset sub-cgroup directory of this container
 	containerDir := ""
@@ -72,26 +72,31 @@ func GetProcessInContainer(cgroupParentDir, containerID string) ([]int, error) {
 	if containerDir == "" {
 		containerDir = GetContainerCgroupDir(cpusetCgroupDir, containerID)
 		if containerDir == "" {
-			return pids, fmt.Errorf("failed to find corresponding cgroups directory for container %s", containerID)
+			return nil, fmt.Errorf("failed to find corresponding cgroups directory for container %s", containerID)
 		}
 	}
 
 	// Find all processes listed in cgroup tasks file and apply to RDT CLOS
-	cgroupTasksFileName := path.Join(containerDir, intelRdtTasks)
+	cgroupTasksFileName := path.Join(containerDir, cgroupTasks)
 
 	file, err := os.Open(cgroupTasksFileName)
 	if err != nil {
-		return pids, fmt.Errorf("failed to open file %s", cgroupTasksFileName)
+		return nil, fmt.Errorf("failed to open file %s", cgroupTasksFileName)
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		pid, err := strconv.Atoi(scanner.Text())
-		if err != nil {
-			return pids, err
+		entry := scanner.Text()
+		entries = append(entries, entry)
+
+		if pidsptr != nil {
+			pid, err := strconv.Atoi(entry)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse task file entry '%s': %v", entry, err)
+			}
+			*pidsptr = append(*pidsptr, pid)
 		}
-		pids = append(pids, pid)
 	}
-	return pids, nil
+	return entries, nil
 }
