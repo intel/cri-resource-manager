@@ -6,24 +6,15 @@ require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/gogo/protobuf v1.2.0 // indirect
 	github.com/golang/protobuf v1.3.1
 	github.com/google/go-cmp v0.3.0
-	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/iovisor/gobpf v0.0.0-20191024162143-7c8f8e040b4b
-	github.com/json-iterator/go v1.1.6 // indirect
-	github.com/onsi/ginkgo v1.7.0 // indirect
-	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/pkg/errors v0.8.0
 	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829
-	github.com/stretchr/testify v1.3.0 // indirect
 	go.opencensus.io v0.22.0
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	golang.org/x/sys v0.0.0-20190502145724-3ef323f4f1fd
-	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
 	google.golang.org/grpc v1.20.1
-	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
