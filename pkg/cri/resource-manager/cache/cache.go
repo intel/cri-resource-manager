@@ -179,6 +179,8 @@ type Container interface {
 	GetLabelKeys() []string
 	// GetLabel returns the value of a container label.
 	GetLabel(string) (string, bool)
+	// GetLabels returns a copy of all container labels.
+	GetLabels() map[string]string
 	// GetResmgrLabelKeys returns container label keys (without the namespace
 	// part) in cri-resource-manager namespace.
 	GetResmgrLabelKeys() []string
@@ -195,6 +197,8 @@ type Container interface {
 	// GetAnnotation returns the value of a container annotation from the
 	// cri-resource-manager namespace.
 	GetResmgrAnnotation(key string, objPtr interface{}) (string, bool)
+	// GetAnnotations returns a copy of all container annotations.
+	GetAnnotations() map[string]string
 	// GetEnvKeys returns the keys of all container environment variables.
 	GetEnvKeys() []string
 	// GetEnv returns the value of a container environment variable.
@@ -294,6 +298,20 @@ type Container interface {
 	SetBlockIOClass(string)
 	// GetBlockIOClass returns the BlockIO class for this container.
 	GetBlockIOClass() string
+
+	// SetCRIRequest sets the current pending CRI request of the container.
+	SetCRIRequest(req interface{}) error
+	// GetCRIRequest returns the current pending CRI request of the container.
+	GetCRIRequest() (interface{}, bool)
+	// ClearCRIRequest returns the current pending CRI request of the container.
+	ClearCRIRequest() (interface{}, bool)
+
+	// GetCRIEnvs returns container environment variables.
+	GetCRIEnvs() []*cri.KeyValue
+	// GetCRIMounts returns container mounts.
+	GetCRIMounts() []*cri.Mount
+	// GetCRIDevices returns container devices.
+	GetCRIDevices() []*cri.Device
 }
 
 // A cached container.
@@ -318,6 +336,7 @@ type container struct {
 
 	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
+	req       *interface{}                 // pending CRI request
 
 	RDTClass     string // RDT class this container is assigned to.
 	BlockIOClass string // Block I/O class this container is assigned to.
