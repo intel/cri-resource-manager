@@ -71,9 +71,10 @@ type staticplus struct {
 var _ policy.Backend = &staticplus{}
 
 // CreateStaticPlusPolicy creates a new policy instance.
-func CreateStaticPlusPolicy(opts *policy.BackendOptions) policy.Backend {
+func CreateStaticPlusPolicy(cache cache.Cache, opts *policy.BackendOptions) policy.Backend {
 	p := &staticplus{
 		Logger: logger.NewLogger(PolicyName),
+		cache:  cache,
 	}
 
 	p.Info("creating policy...")
@@ -102,9 +103,7 @@ func (p *staticplus) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (p *staticplus) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
-	p.cache = cch
-
+func (p *staticplus) Start(add []cache.Container, del []cache.Container) error {
 	if err := p.restoreCache(); err != nil {
 		return policyError("failed to start: %v", err)
 	}
@@ -194,23 +193,6 @@ func (p *staticplus) ExportResourceData(c cache.Container, syntax policy.DataSyn
 	}
 
 	return []byte(data)
-}
-
-func (p *staticplus) PostStart(cch cache.Container) error {
-	/*
-		if p.rdt != nil {
-			pod, ok := cch.GetPod()
-			if !ok {
-				return policyError("Pod of container %q not found", cch.GetID())
-			}
-			qos := string(pod.GetQOSClass())
-
-			p.Info("setting RDT class of container %q to %q", cch.GetID(), qos)
-
-			return p.rdt.SetContainerClass(cch, qos)
-		}
-	*/
-	return nil
 }
 
 // SetConfig sets the policy backend configuration
@@ -771,30 +753,7 @@ func MilliCPUToShares(milliCPU int) int64 {
 	return int64(shares)
 }
 
-//
-// Automatically register us as a policy implementation.
-//
-
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.BackendOptions) policy.Backend
-
-// Name returns the name of this policy implementation.
-func (n Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (n Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (n Implementation) CreateFn() policy.CreateFn {
-	return policy.CreateFn(n)
-}
-
-var _ policy.Implementation = Implementation(nil)
-
+// Register us as a policy implementation.
 func init() {
-	policy.Register(Implementation(CreateStaticPlusPolicy))
+	policy.Register(PolicyName, PolicyDescription, CreateStaticPlusPolicy)
 }

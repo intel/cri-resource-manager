@@ -63,9 +63,10 @@ const (
 )
 
 // NewStaticPolicy creates a new policy instance.
-func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
+func NewStaticPolicy(state cache.Cache, opts *policy.BackendOptions) policy.Backend {
 	s := &static{
 		Logger:    logger.NewLogger(PolicyName),
+		state:     state,
 		available: opts.Available,
 		reserved:  opts.Reserved,
 	}
@@ -100,7 +101,7 @@ func (s *static) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (s *static) Start(state cache.Cache, add []cache.Container, del []cache.Container) error {
+func (s *static) Start(add []cache.Container, del []cache.Container) error {
 	s.Debug("starting up...")
 
 	if err := s.allocateReserved(); err != nil {
@@ -110,7 +111,7 @@ func (s *static) Start(state cache.Cache, add []cache.Container, del []cache.Con
 	s.Info("using reserved CPUs: %s", s.reservedCpus.String())
 	s.Info("using available CPUs: %s", s.availableCpus.String())
 
-	if err := s.validateState(state); err != nil {
+	if err := s.validateState(s.state); err != nil {
 		return policyError("failed to start with given cache/state: %v", err)
 	}
 
@@ -186,37 +187,9 @@ func (s *static) ExportResourceData(c cache.Container, syntax policy.DataSyntax)
 	return []byte(data)
 }
 
-// PostStart allocates resources after container is started
-func (s *static) PostStart(c cache.Container) error {
-	/*
-		if opt.Rdt == TristateOff {
-			return nil
-		} else if opt.Rdt == TristateOn && s.rdt == nil {
-			return policyError("RDT required but not available")
-		}
-		if s.rdt != nil {
-			pod, ok := c.GetPod()
-			if !ok {
-				return policyError("Pod of container %q not found", c.GetID())
-			}
-			qos := string(pod.GetQOSClass())
-
-			s.Info("setting RDT class of container %q to %q", c.GetID(), qos)
-
-			return s.rdt.SetContainerClass(c, qos)
-		}
-	*/
-	return nil
-}
-
 func (s *static) configNotify(event config.Event, source config.Source) error {
 	s.Info("configuration %s", event)
 
-	/*
-		if opt.Rdt == TristateOn && s.rdt == nil {
-			return policyError("RDT requested but not available")
-		}
-	*/
 	if opt.RelaxedIsolation {
 		s.Info("isolated exclusive CPUs: globally preferred (all pods)")
 	} else {
@@ -694,30 +667,7 @@ func (s *static) SetCpusetCpus(id, value string) error {
 	return nil
 }
 
-//
-// Automatically register us as a policy implementation.
-//
-
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.BackendOptions) policy.Backend
-
-// Name returns the name of this policy implementation.
-func (i Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (i Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (i Implementation) CreateFn() policy.CreateFn {
-	return policy.CreateFn(i)
-}
-
-var _ policy.Implementation = Implementation(nil)
-
+// Register us as a policy implementation.
 func init() {
-	policy.Register(Implementation(NewStaticPolicy))
+	policy.Register(PolicyName, PolicyDescription, NewStaticPolicy)
 }

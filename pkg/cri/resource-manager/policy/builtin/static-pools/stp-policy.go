@@ -21,7 +21,6 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
@@ -68,9 +67,13 @@ var _ policy.Backend = &stp{}
 //
 
 // CreateStpPolicy creates a new policy instance.
-func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
+func CreateStpPolicy(state cache.Cache, opts *policy.BackendOptions) policy.Backend {
 	var err error
-	stp := &stp{Logger: logger.NewLogger(PolicyName), agent: opts.AgentCli}
+	stp := &stp{
+		Logger: logger.NewLogger(PolicyName),
+		agent:  opts.AgentCli,
+		state:  state,
+	}
 
 	stp.Info("creating policy...")
 
@@ -109,7 +112,7 @@ func (stp *stp) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (stp *stp) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
+func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
 	var err error
 
 	err = stp.updateNode(*stp.conf)
@@ -117,7 +120,7 @@ func (stp *stp) Start(cch cache.Cache, add []cache.Container, del []cache.Contai
 		stp.Fatal("%v", err)
 	}
 
-	if err := stp.initializeState(cch); err != nil {
+	if err := stp.initializeState(); err != nil {
 		return err
 	}
 	stp.Debug("retrieved stp container states from cache:\n%s", utils.DumpJSON(*stp.getContainerRegistry()))
@@ -268,9 +271,7 @@ func stpError(format string, args ...interface{}) error {
 	return fmt.Errorf(PolicyName+": "+format, args...)
 }
 
-func (stp *stp) initializeState(state cache.Cache) error {
-	stp.state = state
-
+func (stp *stp) initializeState() error {
 	ccr := stp.getContainerRegistry()
 
 	for id := range *ccr {
@@ -551,32 +552,7 @@ func (stp *stp) setContainerRegistry(ccr *stpContainerCache) {
 	stp.state.SetPolicyEntry(cacheKeyContainerRegistry, cache.Cachable(ccr))
 }
 
-//
-// Automatically register us as a policy implementation.
-//
-
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.BackendOptions) policy.Backend
-
-// Name returns the name of this policy implementation.
-func (i Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (i Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (i Implementation) CreateFn() policy.CreateFn {
-	return policy.CreateFn(i)
-}
-
-var _ policy.Implementation = Implementation(nil)
-
+// Register us as a policy implementation.
 func init() {
-	policy.Register(Implementation(CreateStpPolicy))
-
-	rand.Seed(time.Now().Unix())
+	policy.Register(PolicyName, PolicyDescription, CreateStpPolicy)
 }

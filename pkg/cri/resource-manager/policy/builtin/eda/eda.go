@@ -48,8 +48,11 @@ var _ policy.Backend = &eda{}
 //
 
 // CreateEdaPolicy creates a new policy instance.
-func CreateEdaPolicy(opts *policy.BackendOptions) policy.Backend {
-	eda := &eda{Logger: logger.NewLogger(PolicyName)}
+func CreateEdaPolicy(state cache.Cache, opts *policy.BackendOptions) policy.Backend {
+	eda := &eda{
+		Logger: logger.NewLogger(PolicyName),
+		state:  state,
+	}
 	eda.Info("creating policy...")
 	// TODO: policy configuration (if any)
 	return eda
@@ -66,7 +69,7 @@ func (eda *eda) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (eda *eda) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
+func (eda *eda) Start(add []cache.Container, del []cache.Container) error {
 	eda.Debug("preparing for making decisions...")
 	return nil
 }
@@ -127,10 +130,6 @@ func (eda *eda) ExportResourceData(c cache.Container, syntax policy.DataSyntax) 
 	return nil
 }
 
-func (eda *eda) PostStart(cch cache.Container) error {
-	return nil
-}
-
 // SetConfig sets the policy backend configuration
 func (eda *eda) SetConfig(conf string) error {
 	return nil
@@ -144,30 +143,7 @@ func edaError(format string, args ...interface{}) error {
 	return fmt.Errorf(PolicyName+": "+format, args...)
 }
 
-//
-// Automatically register us as a policy implementation.
-//
-
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.BackendOptions) policy.Backend
-
-// Name returns the name of this policy implementation.
-func (i Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (i Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (i Implementation) CreateFn() policy.CreateFn {
-	return policy.CreateFn(i)
-}
-
-var _ policy.Implementation = Implementation(nil)
-
+// Register us as a policy implementation.
 func init() {
-	policy.Register(Implementation(CreateEdaPolicy))
+	policy.Register(PolicyName, PolicyDescription, CreateEdaPolicy)
 }

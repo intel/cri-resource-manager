@@ -100,7 +100,7 @@ func (m *resmgr) startPolicy() error {
 		add = append(add, c)
 	}
 
-	if err := m.policy.Start(m.cache, add, deleted); err != nil {
+	if err := m.policy.Start(add, deleted); err != nil {
 		return resmgrError("failed to start policy: %v", err)
 	}
 
