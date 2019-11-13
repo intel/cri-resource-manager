@@ -120,7 +120,7 @@ func (r *control) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 }
 
 func (r *control) configureResctrl(conf config) error {
-	r.Debug("applying new configuration:\n%s", utils.DumpJSON(conf))
+	r.DebugBlock("  applying ", "%s", utils.DumpJSON(conf))
 
 	// Remove stale resctrl groups
 	existingGroups, err := r.getResctrlGroups()
