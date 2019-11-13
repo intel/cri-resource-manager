@@ -130,11 +130,6 @@ func (eda *eda) ExportResourceData(c cache.Container, syntax policy.DataSyntax) 
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (eda *eda) SetConfig(conf string) error {
-	return nil
-}
-
 //
 // Helper functions for STP policy backend
 //

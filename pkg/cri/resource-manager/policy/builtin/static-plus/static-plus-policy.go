@@ -195,11 +195,6 @@ func (p *staticplus) ExportResourceData(c cache.Container, syntax policy.DataSyn
 	return []byte(data)
 }
 
-// SetConfig sets the policy backend configuration
-func (p *staticplus) SetConfig(string) error {
-	return nil
-}
-
 // policyError creates a formatted policy-specific error.
 func policyError(format string, args ...interface{}) error {
 	return fmt.Errorf(PolicyName+": "+format, args...)

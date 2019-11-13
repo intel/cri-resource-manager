@@ -86,11 +86,6 @@ func (n *none) ExportResourceData(c cache.Container, syntax policy.DataSyntax) [
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (n *none) SetConfig(string) error {
-	return nil
-}
-
 // Register us as a policy implementation.
 func init() {
 	policy.Register(PolicyName, PolicyDescription, CreateNonePolicy)

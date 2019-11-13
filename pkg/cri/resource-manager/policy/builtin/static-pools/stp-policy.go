@@ -115,6 +115,10 @@ func (stp *stp) Description() string {
 func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
 	var err error
 
+	if stp.conf == nil {
+		return stpError("cannot start without any configuration")
+	}
+
 	err = stp.updateNode(*stp.conf)
 	if err != nil {
 		stp.Fatal("%v", err)
@@ -255,11 +259,6 @@ func (stp *stp) configNotify(event config.Event, source config.Source) error {
 	stp.Info("config updated successfully")
 	stp.Debug("new policy configuration:\n%s", utils.DumpJSON(stp.conf))
 
-	return nil
-}
-
-// SetConfig sets the policy backend configuration
-func (stp *stp) SetConfig(conf string) error {
 	return nil
 }
 

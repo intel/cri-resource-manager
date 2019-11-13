@@ -223,11 +223,6 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration.
-func (p *policy) SetConfig(rawConf string) error {
-	return nil
-}
-
 // Discover system topology.
 func (p *policy) discoverSystemTopology() error {
 	var err error

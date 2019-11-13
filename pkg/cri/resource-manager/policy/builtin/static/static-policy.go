@@ -202,11 +202,6 @@ func (s *static) configNotify(event config.Event, source config.Source) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (s *static) SetConfig(conf string) error {
-	return nil
-}
-
 // assignableCPUs returns the set of unassigned CPUs minus the reserved set.
 func (s *static) assignableCPUs(numCPUs int) cpuset.CPUSet {
 	cset := s.GetDefaultCPUSet().Difference(s.reservedCpus)

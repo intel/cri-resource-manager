@@ -17,14 +17,12 @@ package policy
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -101,8 +99,6 @@ type Backend interface {
 	UpdateResources(cache.Container) error
 	// ExportResourceData provides resource data to export for the container.
 	ExportResourceData(cache.Container, DataSyntax) []byte
-	// SetConfig sets the policy backend configuration
-	SetConfig(string) error
 }
 
 // Policy is the exposed interface for container resource allocations decision making.
@@ -125,8 +121,6 @@ type Policy interface {
 	ReleaseResources(cache.Container) error
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
-	// SetConfig sets the policy configuration
-	SetConfig(*config.RawConfig) error
 }
 
 // Policy instance/state.
@@ -272,24 +266,6 @@ func (p *policy) UpdateResources(c cache.Container) error {
 	return p.backend.UpdateResources(c)
 }
 
-// SetConfig updates the configuration of policy backend(s)
-func (p *policy) SetConfig(conf *config.RawConfig) error {
-	log.Info("updating configuration for policy %s...", p.backend.Name())
-
-	c := extractPolicyConfig(p.backend.Name(), conf)
-	err := p.backend.SetConfig(c)
-
-	if err != nil {
-		log.Error("failed to update configuration: %v", err)
-		return policyError("failed to update configuration for policy %s: %v",
-			p.backend.Name(), err)
-	}
-
-	log.Info("configuration update OK")
-
-	return nil
-}
-
 // Register registers a policy backend.
 func Register(name, description string, create CreateFn) error {
 	log.Info("registering policy '%s'...", name)
@@ -322,34 +298,4 @@ func ConstraintToString(value Constraint) string {
 	default:
 		return fmt.Sprintf("<???(type:%T)>", value)
 	}
-}
-
-// extractPolicyConfig gets the policy/node specific configuration from the
-// full cri-resmgr raw config
-func extractPolicyConfig(policyName string, rawConfig *config.RawConfig) string {
-	config := defaultPolicyConfig(policyName)
-
-	// Go through keys in allconfig (map) and try to find the policy configuration
-	// Scheme for the policy config key is policy.<policy name>[.<node name>]
-	if rawConfig != nil {
-		for k, v := range rawConfig.Data {
-			split := strings.SplitN(k, ".", 3)
-			if split[0] == "policy" && len(split) > 1 && split[1] == policyName {
-				if len(split) == 2 {
-					config = v
-				} else if split[2] == rawConfig.NodeName {
-					config = v
-					break
-				}
-			}
-		}
-	}
-
-	return config
-}
-
-// Return the default configuration for the specified policy.
-func defaultPolicyConfig(policyName string) string {
-	// Just a stub for now, always returning empty.
-	return ""
 }
