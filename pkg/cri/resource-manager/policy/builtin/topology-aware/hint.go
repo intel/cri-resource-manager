@@ -15,7 +15,6 @@
 package topologyaware
 
 import (
-	"fmt"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"strconv"
@@ -99,91 +98,29 @@ func (cs *cpuSupply) hintCpus(h system.TopologyHint) cpuset.CPUSet {
 }
 
 // a fake hint is of the format: target=[cpus:cpus[/nodes:nodes[/sockets:sockets]]];...
-func (o *options) parseFakeHint(value string) error {
-	specs := strings.Split(value, ";")
-	for _, spec := range specs {
-		targetfake := strings.Split(spec, "=")
-		if len(targetfake) != 2 {
-			return policyError("invalid fake hint spec '%s' among fake hints '%s'", spec, value)
-		}
+func (fh fakehints) String() string {
+	str := ""
+	sep := ""
 
-		target := targetfake[0]
-		fake := targetfake[1]
-
-		if fake == "-" {
-			// mark for deletion during merge
-			log.Debug("marking fake hints of %s for deletion...", target)
-			opt.Hints[target] = system.TopologyHints{}
-			continue
-		}
-
-		hints, ok := opt.Hints[target]
-		if !ok {
-			hints = system.TopologyHints{}
-		}
-		hintCnt := len(hints)
-		hint := system.TopologyHint{Provider: fmt.Sprintf("fake-hint#%d", hintCnt)}
-
-		for _, keyval := range strings.Split(fake, "/") {
-			kv := strings.Split(keyval, ":")
-			if len(kv) != 2 {
-				return policyError("invalid fake hint '%s' among fake hint '%s'", keyval, fake)
+	for target, hints := range fh {
+		hstr := ""
+		hsep := ""
+		for _, h := range hints {
+			if h.CPUs != "" {
+				hstr = "cpus:" + h.CPUs
+				hsep = "/"
 			}
-
-			switch kv[0] {
-			case "cpu", "cpus":
-				hint.CPUs = kv[1]
-			case "node", "nodes", "numas":
-				hint.NUMAs = kv[1]
-			case "socket", "sockets":
-				hint.Sockets = kv[1]
-			default:
-				return policyError("invalid hint parameter %s in fake hint %s", kv[0], keyval)
+			if h.NUMAs != "" {
+				hstr += hsep + "nodes:" + h.NUMAs
+				hsep = "/"
+			}
+			if h.Sockets != "" {
+				hstr += hsep + "sockets:" + h.Sockets
 			}
 		}
-
-		hints[hint.Provider] = hint
-		opt.Hints[target] = hints
+		str += sep + target + "=" + hstr
+		sep = ";"
 	}
 
-	return nil
-}
-
-// mergeFakeHints merges two sets of fake hints, removing effective duplicates.
-func (o *options) mergeFakeHints(n *options) {
-	if o.Hints == nil {
-		o.Hints = make(map[string]system.TopologyHints)
-	}
-
-	for c, ohints := range o.Hints {
-		if len(ohints) == 0 {
-			log.Debug("deleting hints of %s", c)
-			delete(o.Hints, c)
-			delete(n.Hints, c)
-		}
-	}
-
-	for c, nhints := range n.Hints {
-		if ohints, ok := o.Hints[c]; !ok {
-			if len(nhints) != 0 {
-				o.Hints[c] = nhints
-			}
-		} else {
-			for _, nh := range nhints {
-				duplicate := false
-				for _, oh := range ohints {
-					if nh.CPUs == oh.CPUs && nh.NUMAs == oh.NUMAs && nh.Sockets == oh.Sockets {
-						duplicate = true
-						break
-					}
-				}
-				if duplicate {
-					continue
-				}
-				oh := nh
-				oh.Provider = fmt.Sprintf("fake-hint#%d", len(o.Hints[c]))
-				o.Hints[c][oh.Provider] = oh
-			}
-		}
-	}
+	return str
 }

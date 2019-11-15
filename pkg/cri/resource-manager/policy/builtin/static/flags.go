@@ -15,74 +15,84 @@
 package static
 
 import (
-	"flag"
-	"strconv"
-
 	"github.com/ghodss/yaml"
+	"github.com/intel/cri-resource-manager/pkg/config"
 )
 
-// Policy options configurable via the command line.
+// Options captures our configurable policy parameters.
 type options struct {
-	// relax exclusive isolated CPU allocation criteria
-	RelaxedIsolation bool     `json:"RelaxedIsolation"`
-	Rdt              Tristate `json:"Rdt"`
+	// Relax exclusive isolated CPU allocation criteria
+	RelaxedIsolation bool `json:"RelaxedIsolation"`
+	// Control whether containers are assigned to RDT classes by this policy.
+	Rdt Tristate `json:"Rdt"`
 }
 
+// Tristate is boolean-like value with 3 states: on, off, automatically-determined.
 type Tristate int
 
 const (
+	// TristateOff is unconditional boolean false
 	TristateOff = iota
+	// TristateOn is unconditional boolean true
 	TristateOn
+	// TristateAuto indicates boolean value should be inferred using other data.
 	TristateAuto
 )
 
+// Our runtime configuration.
+var opt = defaultOptions().(*options)
+
 // UnmarshalJSON implements the unmarshaller function for "encoding/json"
 func (t *Tristate) UnmarshalJSON(data []byte) error {
-	val, err := strconv.ParseBool(string(data))
-	switch {
-	case err != nil:
-		*t = TristateAuto
-	case val == true:
-		*t = TristateOn
-	default:
-		*t = TristateOff
+	var value interface{}
+	if err := yaml.Unmarshal(data, &value); err != nil {
+		return policyError("invalid Tristate value '%s': %v", string(data), err)
 	}
-	return nil
+
+	switch value.(type) {
+	case bool:
+		*t = map[bool]Tristate{false: TristateOff, true: TristateOn}[value.(bool)]
+		return nil
+	case string:
+		if value.(string) == "auto" {
+			*t = TristateAuto
+			return nil
+		}
+	}
+
+	return policyError("invalid Tristate value %v of type %T", value, value)
+}
+
+// MarshalJSON implements the marshaller function for "encoding/json"
+func (t Tristate) MarshalJSON() ([]byte, error) {
+	switch t {
+	case TristateOff:
+		return []byte("false"), nil
+	case TristateOn:
+		return []byte("true"), nil
+	case TristateAuto:
+		return []byte("\"auto\""), nil
+	}
+	return nil, policyError("invalid tristate value %v", t)
 }
 
 // String returns the value of Tristate as a string
 func (t *Tristate) String() string {
 	switch *t {
 	case TristateOff:
-		return "off"
+		return "false"
 	case TristateOn:
-		return "on"
+		return "true"
 	}
 	return "auto"
 }
 
-// Policy options with their defaults.
-var opt = options{
-	Rdt: TristateAuto,
+// defaultOptions returns a new options instance, all initialized to defaults.
+func defaultOptions() interface{} {
+	return &options{Rdt: TristateAuto}
 }
 
-// parseConfData parses options from a YAML data.
-func parseConfData(raw []byte) (*options, error) {
-	conf := &options{
-		Rdt: TristateAuto, // Rdt defaults to 'auto'
-	}
-
-	if len(raw) != 0 {
-		if err := yaml.Unmarshal(raw, conf); err != nil {
-			return nil, policyError("failed to parse configuration data: %v", err)
-		}
-	}
-
-	return conf, nil
-}
-
-// Register our command-line flags.
+// Register us for configuration handling.
 func init() {
-	flag.BoolVar(&opt.RelaxedIsolation, PolicyName+"-policy-relaxed-isolation", false,
-		"Allow allocating multiple available isolated CPUs exclusively to any single container.")
+	config.Register(PolicyPath, PolicyDescription, opt, defaultOptions)
 }

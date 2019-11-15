@@ -18,10 +18,11 @@ import (
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-	"strings"
 )
 
 const (
@@ -29,6 +30,8 @@ const (
 	PolicyName = "topology-aware"
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A policy for HW-topology aware workload placement."
+	// PolicyPath is the path of this policy in the configuration hierarchy.
+	PolicyPath = "policy." + PolicyName
 )
 
 // allocations is our cache.Cachable for saving resource allocations in the cache.
@@ -76,6 +79,8 @@ func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend
 	if err := p.buildPoolsByTopology(); err != nil {
 		log.Fatal("failed to create topology-aware policy: %v", err)
 	}
+
+	config.GetModule(PolicyPath).AddNotify(p.configNotify)
 
 	p.root.Dump("<pre-start>")
 
@@ -205,37 +210,12 @@ func (p *policy) PostStart(cch cache.Container) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration.
-func (p *policy) SetConfig(rawConf string) error {
-	if rawConf = strings.TrimSpace(rawConf); rawConf == "" {
-		return nil
-	}
-
-	conf, err := parseConfig([]byte(rawConf))
-	if err != nil {
-		return err
-	}
-
-	if opt.PinCPU != conf.PinCPU {
-		opt.PinCPU = conf.PinCPU
-		log.Info("pin containers to CPUs: %v", opt.PinCPU)
-	}
-
-	if opt.PinMem != conf.PinMem {
-		opt.PinMem = conf.PinMem
-		log.Info("pin containers to memory: %v", opt.PinMem)
-	}
-
-	if opt.PreferIsolated != conf.PreferIsolated {
-		opt.PreferIsolated = conf.PreferIsolated
-		log.Info("use kernel-isolated CPUs for exclusive allocation: %v",
-			opt.PreferIsolated)
-	}
-
-	if opt.PreferShared != conf.PreferShared {
-		opt.PreferShared = conf.PreferShared
-		log.Info("prefer shared CPU allocation: %v", opt.PreferShared)
-	}
+func (p *policy) configNotify(event config.Event, source config.Source) error {
+	log.Info("configuration %s:", event)
+	log.Info("  - pin containers to CPUs: %v", opt.PinCPU)
+	log.Info("  - pin containers to memory: %v", opt.PinMemory)
+	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
+	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
 
 	// TODO: We probably should release and reallocate resources for all containers
 	//   to honor the latest configuration. Depending on the changes that might be
@@ -244,6 +224,11 @@ func (p *policy) SetConfig(rawConf string) error {
 
 	p.saveConfig()
 
+	return nil
+}
+
+// SetConfig sets the policy backend configuration.
+func (p *policy) SetConfig(rawConf string) error {
 	return nil
 }
 

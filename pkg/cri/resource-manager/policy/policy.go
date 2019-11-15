@@ -34,15 +34,15 @@ type Domain string
 
 const (
 	// DomainCPU is the CPU resource domain.
-	DomainCPU Domain = "cpu"
+	DomainCPU Domain = "CPU"
 	// DomainMemory is the memory resource domain.
-	DomainMemory Domain = "memory"
+	DomainMemory Domain = "Memory"
 	// DomainHugePage is the hugepages resource domain.
-	DomainHugePage Domain = "hugepages"
+	DomainHugePage Domain = "HugePages"
 	// DomainCache is the CPU cache resource domain.
-	DomainCache Domain = "cache"
+	DomainCache Domain = "Cache"
 	// DomainMemoryBW is the memory resource bandwidth.
-	DomainMemoryBW Domain = "memory-bandwidth"
+	DomainMemoryBW Domain = "MBW"
 )
 
 // Constraint describes constraint of one hardware domain
@@ -161,18 +161,18 @@ type policy struct {
 
 // ActivePolicy returns the name of the policy to be activated.
 func ActivePolicy() string {
-	return opt.policy
+	return opt.Policy
 }
 
 // NewPolicy creates a policy instance using the selected backend.
 func NewPolicy(o *Options) (Policy, error) {
-	if opt.policy == NullPolicy {
+	if opt.Policy == NullPolicy {
 		return nil, nil
 	}
 
-	backend, ok := opt.policies[opt.policy]
+	backend, ok := policies[opt.Policy]
 	if !ok {
-		return nil, policyError("unknown policy '%s'", opt.policy)
+		return nil, policyError("unknown policy '%s'", opt.Policy)
 	}
 
 	p := &policy{
@@ -180,17 +180,17 @@ func NewPolicy(o *Options) (Policy, error) {
 	}
 
 	p.Info("creating new policy '%s'...", backend.Name())
-	if len(opt.available) != 0 {
+	if len(opt.Available) != 0 {
 		p.Info("  with resource availability constraints:")
-		for d := range opt.available {
-			p.Info("    - %s=%s", d, ConstraintToString(opt.available[d]))
+		for d := range opt.Available {
+			p.Info("    - %s=%s", d, ConstraintToString(opt.Available[d]))
 		}
 	}
 
-	if len(opt.reserved) != 0 {
+	if len(opt.Reserved) != 0 {
 		p.Info("  with resource reservation constraints:")
-		for d := range opt.reserved {
-			p.Info("    - %s=%s", d, ConstraintToString(opt.reserved[d]))
+		for d := range opt.Reserved {
+			p.Info("    - %s=%s", d, ConstraintToString(opt.Reserved[d]))
 		}
 	}
 
@@ -200,15 +200,15 @@ func NewPolicy(o *Options) (Policy, error) {
 	}
 
 	if p.DebugEnabled() {
-		p.Debug("*** enabling debugging for %s", opt.policy)
-		logger.Get(opt.policy).EnableDebug(true)
+		p.Debug("*** enabling debugging for %s", opt.Policy)
+		logger.Get(opt.Policy).EnableDebug(true)
 	} else {
-		p.Debug("*** leaving debugging for %s alone", opt.policy)
+		p.Debug("*** leaving debugging for %s alone", opt.Policy)
 	}
 
 	backendOpts := &BackendOptions{
-		Available: opt.available,
-		Reserved:  opt.reserved,
+		Available: opt.Available,
+		Reserved:  opt.Reserved,
 		AgentCli:  o.AgentCli,
 		Rdt:       o.Rdt,
 		Config:    conf,
@@ -220,7 +220,7 @@ func NewPolicy(o *Options) (Policy, error) {
 
 // Start starts up policy, preparing it for resving requests.
 func (p *policy) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
-	if opt.policy == NullPolicy {
+	if opt.Policy == NullPolicy {
 		return nil
 	}
 
@@ -328,11 +328,11 @@ func Register(p Implementation) error {
 
 	log.Info("registering policy '%s'...", name)
 
-	if _, ok := opt.policies[name]; ok {
+	if _, ok := policies[name]; ok {
 		return policyError("policy '%s' already registered", name)
 	}
 
-	opt.policies[name] = p
+	policies[name] = p
 
 	return nil
 }

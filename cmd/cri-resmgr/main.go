@@ -23,24 +23,49 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 
+	"github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	version "github.com/intel/cri-resource-manager/pkg/version"
 )
 
 func main() {
+	var configFile string
+	var printConfig bool
+
 	log := logger.Default()
 
+	flag.StringVar(&configFile, "config", "", "Read initial configuration from given file.")
+	flag.BoolVar(&printConfig, "print-config", false, "Print configuration and exit.")
 	flag.Parse()
 
 	if len(flag.Args()) != 0 {
-		log.Error("unknown command-line arguments: %s", strings.Join(flag.Args(), ","))
-		flag.Usage()
+		args := flag.Args()
+
+		switch args[0] {
+		case "config-help", "help":
+			config.Describe(args[1:]...)
+			os.Exit(0)
+		default:
+			log.Error("unknown command line arguments: %s", strings.Join(flag.Args(), ","))
+			flag.Usage()
+		}
 		os.Exit(1)
+	}
+
+	if configFile != "" {
+		if err := config.SetConfigFromFile(configFile); err != nil {
+			log.Error("failed to set configuraton from file '%s': %v", configFile, err)
+			os.Exit(1)
+		}
+	}
+	if printConfig {
+		config.Print(nil)
+		os.Exit(0)
 	}
 
 	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
 
-	if err := instrumentation.Setup("CRI-RM"); err != nil {
+	if err := instrumentation.Setup(); err != nil {
 		log.Fatal("failed to set up instrumentation: %v", err)
 	}
 	defer instrumentation.Finish()

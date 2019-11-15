@@ -15,16 +15,15 @@
 package log
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"strconv"
 	"strings"
 )
 
 const (
-	// DefaultLogger is the name of the default logging backend.
-	DefaultLogger = "fmt"
 	// DefaultLevel is the default lowest unsuppressed severity.
 	DefaultLevel = LevelInfo
 
@@ -36,12 +35,6 @@ const (
 	optionSource = "logger-source"
 	// Flag for enabling/disabling logging sources.
 	optionDebug = "logger-debug"
-	// Flag for controlling message prefixing with log source name.
-	optionPrefix = "logger-prefix"
-	// Flag for listing registered logging backends.
-	optionList = "list-loggers"
-	// Use prefixing preference of backend.
-	dontCare = -1
 )
 
 // LevelNames maps severity levels to names.
@@ -54,283 +47,319 @@ var LevelNames = map[Level]string{
 
 // NamedLevels maps severity names to levels.
 var NamedLevels = map[string]Level{
-	"debug": LevelDebug,
-	"info":  LevelInfo,
-	"warn":  LevelWarn,
-	"error": LevelError,
+	"debug":   LevelDebug,
+	"info":    LevelInfo,
+	"warn":    LevelWarn,
+	"warning": LevelWarn,
+	"error":   LevelError,
 }
 
-// Backend names in default order of preference.
-var defaultBackends = []string{DefaultLogger}
+// Logging can be configured both from the command line and through pkg/config.
+// Options given on the command line change both the defaults and the runtime
+// configuration. Configuration received via pkg/config only changes the runtime
+// configuration. An empty runtime configuration is initialized to the defaults.
 
-// Logger options configurable via the command line.
+// Logger options configurable via the command line or pkg/config.
 type options struct {
-	level    Level              // lowest unsuppressed severity
-	sources  map[string]bool    // enabled logger sources, all if nil
-	debugs   map[string]bool    // enabled debug flags, all if nil
-	loggers  map[string]*logger // running loggers (log sources)
-	logger   string             // name of active/selected backend
-	active   Backend            // active backend
-	prefix   int                // prefix messages with source ?
-	backends map[string]Backend // registered backends (real loggers)
-	srcalign int
+	Level  Level       // lowest unsuppressed severity
+	Logger backendName // name of active backend
+	Enable stateMap    // enabled logger sources, all if nil
+	Debug  stateMap    // enable debug flags, all if nil
 }
 
-// Logger options with their defaults.
-var opt = options{
-	level:  DefaultLevel,
-	debugs: map[string]bool{},
-	logger: DefaultLogger,
-	prefix: dontCare,
+type stateMap map[string]bool
+type backendName string
+
+// Our default and runtime configuration.
+var defaults = &options{
+	Level:  DefaultLevel,
+	Logger: backendName(fmtBackendName),
+	Enable: stateMap{"*": true},
+	Debug:  stateMap{"*": false},
 }
+var opt = defaultOptions().(*options)
 
-func (o *options) sourceEnabled(source string) bool {
-	if o.sources == nil {
-		return true
+// Set is the flag.Value setter for Level.
+func (l *Level) Set(value string) error {
+	level, ok := NamedLevels[value]
+	if !ok {
+		return loggerError("unknown log level '%s'", value)
 	}
+	*l = level
 
-	_, enabled := o.sources[source]
-	return enabled
-}
-
-func (o *options) debugEnabled(source string) bool {
-	if o.debugs == nil {
-		return true
-	}
-
-	_, enabled := o.debugs[source]
-	return enabled
-}
-
-func (o *options) splitFlagsAndState(value string) (string, bool, error) {
-	var err error
-
-	state := true
-	split := strings.Split(value, ":")
-	flags := split[0]
-	switch {
-	case len(split) > 2:
-		return "", false, fmt.Errorf("log: invalid source spec '%s'", value)
-	case len(split) == 2:
-		if state, err = strconv.ParseBool(split[1]); err != nil {
-			return "", false, err
-		}
-	}
-
-	return flags, state, nil
-}
-
-func (o *options) parseFlags(optName, values string, state bool) {
-	var flags map[string]bool
-
-	if optName == optionSource {
-		flags = o.sources
-	} else {
-		flags = o.debugs
-	}
-
-	if flags == nil {
-		flags = make(map[string]bool)
-	}
-
-	for _, f := range strings.Split(values, ",") {
-		switch f {
-		case "all", "*":
-			if state {
-				flags = nil
-			} else {
-				flags = make(map[string]bool)
-			}
-		case "none":
-			if state {
-				flags = make(map[string]bool)
-			} else {
-				flags = nil
-			}
-		default:
-			flags[f] = state
-		}
-	}
-
-	if optName == optionSource {
-		o.sources = flags
-		for name, state := range flags {
-			if l, ok := opt.loggers[name]; ok {
-				l.enabled = state
-			}
-		}
-	} else {
-		o.debugs = flags
-		if o.debugs != nil {
-			for _, l := range opt.loggers {
-				l.debug = false
-			}
-			for name, state := range flags {
-				if l, ok := opt.loggers[name]; ok {
-					l.debug = state
-					if l.debug {
-						l.enabled = true
-					}
-				}
-			}
-		} else {
-			for _, l := range opt.loggers {
-				l.debug = true
-			}
-		}
-	}
-}
-
-func (o *options) Set(name, value string) error {
-	switch name {
-	case optionLogger:
-		o.logger = value
-		SelectBackend(o.logger)
-
-	case optionLevel:
-		level, ok := NamedLevels[value]
-		if !ok {
-			return fmt.Errorf("log: unknown log level '%s'", value)
-		}
-		o.level = level
-		o.updateLoggers()
-
-	case optionSource:
-		sources, state, err := o.splitFlagsAndState(value)
-		if err != nil {
-			return err
-		}
-		o.parseFlags(optionSource, sources, state)
-
-	case optionDebug:
-		sources, state, err := o.splitFlagsAndState(value)
-		if err != nil {
-			return err
-		}
-		o.parseFlags(optionDebug, sources, state)
-
-	case optionPrefix:
-		switch value {
-		case "off", "false":
-			o.prefix = 0
-		default:
-			o.prefix = 1
-		}
-
-	case optionList:
-		fmt.Printf("The available logger backends are: %s\n", registeredBackendNames())
-		os.Exit(0)
-
-	default:
-		return fmt.Errorf("can't set unknown logger option '%s' to '%s'", name, value)
+	if l == &defaults.Level {
+		opt.updateLoggers()
+		opt.Level = level
 	}
 
 	return nil
 }
 
-func (o *options) Get(name string) string {
-	switch name {
-	case optionLogger:
-		return o.logger
+// String is the flag.Value stringification for Level.
+func (l Level) String() string {
+	if name, ok := LevelNames[l]; ok {
+		return name
+	}
 
-	case optionLevel:
-		return o.level.String()
+	return LevelNames[LevelInfo]
+}
 
-	case optionSource:
-		switch {
-		case o.sources == nil:
-			return "all"
-		case len(o.sources) == 0:
-			return "none"
-		default:
-			value := ""
-			sep := ""
-			for source, state := range o.sources {
-				value += sep + source + ":" + strconv.FormatBool(state)
-			}
-			return value
-		}
+func (n *backendName) Set(value string) error {
+	*n = backendName(value)
+	activateBackend(value)
 
-	case optionDebug:
-		switch {
-		case o.debugs == nil:
-			return "all"
-		case len(o.debugs) == 0:
-			return "none"
-		default:
-			value := ""
-			sep := ""
-			for source, state := range o.debugs {
-				value += sep + source + ":" + strconv.FormatBool(state)
-			}
-			return value
-		}
+	if n == &defaults.Logger {
+		opt.Logger = *n
+	}
 
-	case optionPrefix:
-		switch o.prefix {
-		case 0:
-			return "off"
+	return nil
+}
+
+func (n backendName) String() string {
+	return string(n)
+}
+
+func (m *stateMap) Set(value string) error {
+	var err error
+
+	if m != &defaults.Enable && m != &defaults.Debug { // from the command line we cumulate these
+		*m = make(stateMap)
+	}
+
+	prev := "on"
+	for _, req := range strings.Split(strings.TrimSpace(value), ",") {
+		var state bool
+		status := prev
+		names := ""
+		split := strings.SplitN(req, ":", 2)
+
+		switch len(split) {
 		case 1:
-			return "on"
+			names = split[0]
+		case 2:
+			status = split[0]
+			names = split[1]
+			prev = status
 		default:
-			return "<by backend preference>"
+			continue
 		}
 
-	default:
-		return fmt.Sprintf("<no value for unknown logger option '%s'>", name)
+		switch status {
+		case "on", "enable", "enabled":
+			state = true
+		case "off", "disable", "disabled":
+			state = false
+		default:
+			if state, err = strconv.ParseBool(status); err != nil {
+				return loggerError("invalid state '%s' in spec '%s': %v", status, value, err)
+			}
+		}
+
+		for _, f := range strings.Split(names, ",") {
+			switch f {
+			case "all", "*":
+				(*m)["*"] = state
+			case "none":
+				(*m)["*"] = !state
+			default:
+				(*m)[f] = state
+			}
+		}
 	}
-}
 
-type wrappedOption struct {
-	name   string
-	opt    *options
-	isBool bool
-}
+	var optMap *stateMap
 
-func wrapOption(name, usage string) (flag.Value, string, string) {
-	return wrappedOption{name: name, opt: &opt}, name, usage
-}
-
-func (wo wrappedOption) Name() string {
-	return wo.name
-}
-
-func (wo wrappedOption) Set(value string) error {
-	err := wo.opt.Set(wo.Name(), value)
-
-	return err
-}
-
-func (wo wrappedOption) String() string {
-	if wo.isBool {
-		return ""
+	switch {
+	case m == &defaults.Enable:
+		optMap = &opt.Enable
+	case m == &defaults.Debug:
+		optMap = &opt.Debug
 	}
-	return wo.opt.Get(wo.Name())
+
+	if optMap != nil {
+		opt.updateLoggers()
+		*optMap = make(stateMap)
+		for key, value := range *m {
+			(*optMap)[key] = value
+		}
+	}
+
+	return nil
 }
 
-func (wo *wrappedOption) IsBoolFlag() bool {
-	return wo.isBool
+func (m *stateMap) String() string {
+	if *m == nil {
+		return "all"
+	}
+	if len(*m) == 0 {
+		return "none"
+	}
+
+	tVal, tSep := "", ""
+	fVal, fSep := "", ""
+
+	for name, state := range *m {
+		if name == "*" {
+			name = "all"
+		}
+		if state {
+			tVal += tSep + name
+			tSep = ","
+		} else {
+			fVal += fSep + name
+			fSep = ","
+		}
+	}
+
+	if tVal != "" {
+		tVal = "on:" + tVal
+	}
+	if fVal != "" {
+		fVal = "off:" + fVal
+	}
+
+	switch {
+	case fVal == "":
+		return tVal
+	case tVal == "":
+		return fVal
+	case tVal != "" && fVal != "":
+		return tVal + "," + fVal
+	}
+	return ""
 }
 
-func wrapBoolean(name, usage string) (flag.Value, string, string) {
-	return &wrappedOption{name: name, opt: &opt, isBool: true}, name, usage
+func (m *stateMap) isEnabled(name string) bool {
+	if m == nil || *m == nil {
+		return false
+	}
+
+	if state, ok := (*m)[name]; ok {
+		return state
+	}
+	if state, ok := (*m)["*"]; ok {
+		return state
+	}
+
+	return false
 }
 
+func (o *options) MarshalJSON() ([]byte, error) {
+	cfg := map[string]string{
+		"Level":  o.Level.String(),
+		"Logger": string(o.Logger),
+	}
+	if o.Enable != nil {
+		cfg["Enable"] = o.Enable.String()
+	}
+	if o.Debug != nil {
+		cfg["Debug"] = o.Debug.String()
+	}
+
+	return json.Marshal(cfg)
+}
+
+func (o *options) UnmarshalJSON(raw []byte) error {
+	cfg := map[string]string{}
+
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return loggerError("failed to unmarshal logger configuration: %v", err)
+	}
+
+	*o = *defaults
+
+	for key, value := range cfg {
+		switch key {
+		case "Level":
+			if err := o.Level.Set(value); err != nil {
+				return err
+			}
+		case "Logger":
+			o.Logger = backendName(value)
+			activateBackend(value)
+		case "Enable":
+			if err := o.Enable.Set(value); err != nil {
+				return err
+			}
+		case "Debug":
+			if err := o.Debug.Set(value); err != nil {
+				return err
+			}
+		default:
+			return loggerError("unknown configuration entry '%s' (%s)", key, value)
+		}
+	}
+
+	return nil
+}
+
+func (o *options) sourceEnabled(source string) bool {
+	return o.Enable.isEnabled(source)
+}
+
+func (o *options) debugEnabled(source string) bool {
+	return o.Debug.isEnabled(source)
+}
+
+func loggerError(format string, args ...interface{}) error {
+	return fmt.Errorf("log: "+format, args...)
+}
+
+// defaultOptions returns a new options instance initialized to defaults.
+func defaultOptions() interface{} {
+	o := &options{
+		Level:  defaults.Level,
+		Logger: defaults.Logger,
+		Enable: make(stateMap),
+		Debug:  make(stateMap),
+	}
+	for key, value := range defaults.Enable {
+		o.Enable[key] = value
+	}
+	for key, value := range defaults.Debug {
+		o.Debug[key] = value
+	}
+	return o
+}
+
+// configNotify updates our runtime configuration.
+func (o *options) configNotify(event config.Event, source config.Source) error {
+	defLogger.Info("logger configuration %v", event)
+
+	opt.updateLoggers()
+
+	defLogger.Info(" * log level: %v", opt.Level)
+	defLogger.Info(" * enabled sources: %v", opt.Enable.String())
+	defLogger.Info(" * enabled debugging: %v", opt.Debug.String())
+
+	return nil
+}
+
+// Register us for command line parsing and configuration handling.
 func init() {
-	flag.Var(wrapOption(optionLevel,
-		"least severity of log messages to start passsing through.\n"))
-	flag.Var(wrapOption(optionSource,
-		"value is a comma-separated logger source names to enable.\n"+
-			"Specify '*' or all for enabling logging for all sources."))
-	flag.Var(wrapOption(optionDebug,
-		"value is a comma-separated logger source names to enable debug for.\n"+
-			"Specify '*' or all for enabling debugging for all sources."))
-	flag.Var(wrapOption(optionLogger,
-		"select logging backends to use.\n"+
-			"The available backends are "+registeredBackendNames()+"."))
-	flag.Var(wrapOption(optionPrefix,
-		"whether to prefix logged messages with log source"))
-	flag.Var(wrapBoolean(optionList,
-		"list available logger backends"))
+	cfglog := NewLogger("config")
+	config.SetLogger(config.Logger{
+		DebugEnabled: cfglog.DebugEnabled,
+		Debug:        cfglog.Debug,
+		Info:         cfglog.Info,
+		Warning:      cfglog.Warn,
+		Error:        cfglog.Error,
+		Fatal:        cfglog.Fatal,
+		Panic:        cfglog.Panic,
+		Block:        cfglog.Block,
+	})
 
+	flag.Var(&defaults.Level, optionLevel,
+		"least severity of log messages to start passing through.")
+	flag.Var(&defaults.Enable, optionSource,
+		"value is a comma-separated logger source names to enable.\n"+
+			"Specify '*' or all for enabling logging for all sources.")
+	flag.Var(&defaults.Debug, optionDebug,
+		"value is a comma-separated logger source names to enable debug for.\n"+
+			"Specify '*' or all for enabling debugging for all sources.")
+	flag.Var(&defaults.Logger, optionLogger,
+		"select logging backend to use")
+
+	config.Register("logger", configHelp, opt, defaultOptions,
+		config.WithNotify(opt.configNotify))
 }

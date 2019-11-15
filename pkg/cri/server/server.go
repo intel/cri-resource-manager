@@ -68,7 +68,6 @@ type server struct {
 	server       *grpc.Server              // our gRPC server
 	options      Options                   // server options
 	interceptors map[string]Interceptor    // request intercepting hooks
-	dumper       dump.Dumper               // request/reply dumper
 	runtime      *api.RuntimeServiceServer // CRI runtime service
 	image        *api.ImageServiceServer   // CRI image service
 }
@@ -82,7 +81,6 @@ func NewServer(options Options) (Server, error) {
 
 	s := &server{
 		Logger:  logger.NewLogger("cri/server"),
-		dumper:  dump.DefaultDumper(),
 		options: options,
 	}
 
@@ -239,7 +237,7 @@ func (s *server) intercept(ctx context.Context, req interface{},
 		}
 	}
 
-	s.dumper.DumpRequest(kind, info.FullMethod, req)
+	dump.RequestMessage(kind, info.FullMethod, req)
 
 	if span := trace.FromContext(ctx); span != nil {
 		span.AddAttributes(trace.StringAttribute("kind", kind))
@@ -251,9 +249,9 @@ func (s *server) intercept(ctx context.Context, req interface{},
 	elapsed := end.Sub(start)
 
 	if err != nil {
-		s.dumper.DumpReply(kind, info.FullMethod, err, elapsed)
+		dump.ReplyMessage(kind, info.FullMethod, err, elapsed)
 	} else {
-		s.dumper.DumpReply(kind, info.FullMethod, rpl, elapsed)
+		dump.ReplyMessage(kind, info.FullMethod, rpl, elapsed)
 	}
 
 	s.collectStatistics(kind, name, start, send, recv, end)

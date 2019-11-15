@@ -101,17 +101,30 @@ Node via an environment variable, as well as a valid kubeconfig.  For example:
 
 ## Running the relay with policies enabled
 
-You can enable active policying of containers by passing the
-`--policy <policy-name>` commandline option to the relay. For instance,
-```
-  ./cmd/cri-resmgr/cri-resmgr --policy static --reserved-resources cpu=1000m
-```
-will start the relay with the kubelet/CPU Manager-equivalent static policy
-enabled and running with 1 CPU reserved for system- and kube- tasks. Similarly,
-you can start the relay with the static+ policy using the following command:
+You can enable active policying of containers by using an appropriate ConfigMap
+or a configuration file and setting the `Active` field of the `policy` section
+to the desired policy implementation. Note however, that currently you cannot
+switch the active policy when you reconfigure cri-resmgr by updating its ConfigMap.
+
+For instance, you can use the following configuration to enable the `static`
+policy:
 
 ```
-  ./cmd/cri-resmgr/cri-resmgr --policy static-plus --reserved-resources cpu=1000m
+policy:
+  ReservedResources:
+    CPU: 1
+  Active: static
+```
+
+This will start the relay with the kubelet/CPU Manager-equivalent static policy
+enabled and running with 1 CPU reserved for system- and kube- tasks. Similarly,
+you can start the relay with the static+ policy using the following configuration:
+
+```
+policy:
+  ReservedResources:
+    CPU: 1
+  Active: static-plus
 ```
 
 The list of available policies can be queried with the `--list-policies`
@@ -141,76 +154,44 @@ for more details.
 ### Dynamic Configuration
 
 `cri-resmgr` can be configured dynamically using `cri-resmgr-agent`, the
-CRI Resource Manager node agent, and Kubernetes ConfigMaps. Simply start
-`cri-resmgr-agent` providing credentials for accessing the Kubernetes
-cluster if necessary using the `-kubeconfig` command line option. It
-will monitor the default ConfigMap (`cri-resmgr-config` and send update
-notification to `cri-resmgr` whenever the ConfigMap changes.
+CRI Resource Manager node agent, and Kubernetes ConfigMaps. To run the
+agent, set the environment variable NODE_NAME to the name of the node
+the agent is running on and pass credentials, if necessary, for accessing
+the Kubernetes using the the `-kubeconfig` command line option.
 
-Currently, only policy-specific configuration is supported via this method.
-Each policy has its config under a separate key in the ConfigMap with
-further support for Node-specific configuration overrides. ConfigMap keys for
-policy configuration adhere the following scheme:
-`policy.<policy name>[.<node name>]`'.
+The agent monitors two ConfigMaps for the node, the primary node-specific
+ConfigMap and the secondary group-specific or the default one, depending
+on whether the node belongs to a configuration group. The node-specific
+ConfigMap always takes precedence if it exists. Otherwise the secondary
+one is used to configure the node.
 
-The data format of the policy configuration is policy-specific and may be
-different between policies (the `static` and `stp` policies use YAML).
-There is a
-[sample ConfigMap spec](sample-configs/cri-resmgr-configmap.example.yaml)
-that contains referential policy configuration for the static and stp policies.
-See the policy-specific documentation for more information on the policy
-configurations ([STP policy documentation](docs/policy-static-pools.md))
+The names of these ConfigMaps are
 
+1. cri-resmgr-config.node.$NODE_NAME: primary, node-specific configuration
+2. cri-resmgr-config.group.$GROUP_NAME: secondary, group-specific node configuration
+3. cri-resmgr-config.default: secondary, default node configuration
 
-
-**Tips:**
-You can easily populate the default `cri-resmgr-agent` ConfigMap from a
-local directory like this:
+You can assign a node to a configuration group by setting the
+`cri-resource-manager.intel.com/group` label on the node to the name of
+the configuration group. For instance, the command
 
 ```
-[root@cl0-slave1 tests]# for i in test-configs/static-test/*; do echo "$i:"; cat $i | sed -E 's/^(.)/    \1/g'; done
-test-configs/static-test/policy.static:
-    RelaxedIsolation: true
-[root@cl0-slave1 tests]# kubectl create configmap --namespace kube-system cri-resmgr-config --from-file test-configs/static-test/
-configmap/cri-resmgr-config created
-[root@cl0-slave1 tests]# kubectl get configmap --namespace kube-system cri-resmgr-config -oyaml
-apiVersion: v1
-data:
-  policy.static: |
-    RelaxedIsolation: true
-kind: ConfigMap
-metadata:
-  creationTimestamp: "2019-08-21T18:55:14Z"
-  name: cri-resmgr-config
-  namespace: kube-system
-  resourceVersion: "23689355"
-  selfLink: /api/v1/namespaces/kube-system/configmaps/cri-resmgr-config
-  uid: 359be72d-c445-11e9-bd86-000001000001
+kubectl label --overwrite nodes cl0-slave1 cri-resource-manager.intel.com/group=foo
 ```
 
-You can easily update the default `cri-resmgr-agent` ConfigMap from a local
-directory like this:
+assigns node `cl0-slave1` to the `foo` configuration group.
+
+You can remove a node from its group by deleting the node group label, for
+instance like this:
 
 ```
-[root@cl0-slave1 tests]# for i in test-configs/static-test/*; do echo "$i:"; cat $i | sed -E 's/^(.)/    \1/g'; done
-test-configs/static-test/policy.static:
-    RelaxedIsolation: false
-[root@cl0-slave1 tests]# kubectl create configmap --namespace kube-system cri-resmgr-config --from-file test-configs/static-test/ --dry-run -oyaml | kubectl replace -f -
-configmap/cri-resmgr-config replaced
-[root@cl0-slave1 tests]# kubectl get configmap --namespace kube-system cri-resmgr-config -oyaml
-apiVersion: v1
-data:
-  policy.static: |
-    RelaxedIsolation: false
-kind: ConfigMap
-metadata:
-  creationTimestamp: "2019-08-21T18:55:14Z"
-  name: cri-resmgr-config
-  namespace: kube-system
-  resourceVersion: "23689639"
-  selfLink: /api/v1/namespaces/kube-system/configmaps/cri-resmgr-config
-  uid: 359be72d-c445-11e9-bd86-000001000001
+kubectl label nodes cl0-slave1 cri-resource-manager.intel.com/group-
 ```
+
+There is a [sample ConfigMap spec](sample-configs/cri-resmgr-configmap.example.yaml)
+that contains a node-specific, a group-specific, and a default sample ConfigMap.
+See [any available policy-specific documentation](docs) for more information on the
+policy configurations.
 
 ## Logging and Debugging
 

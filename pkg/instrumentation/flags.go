@@ -15,104 +15,146 @@
 package instrumentation
 
 import (
-	"flag"
+	"encoding/json"
+	"github.com/intel/cri-resource-manager/pkg/config"
+	"go.opencensus.io/trace"
 	"os"
 	"strconv"
 	"strings"
 )
 
 // TraceConfig represents a pre-defined instrumentation configuration.
-type TraceConfig string
+type TraceConfig float64
 
 const (
-	// Symbolic trace names and their correponding sampling values.
-	traceTesting     = "testing"
-	traceProduction  = "production"
-	traceDisabled    = "disabled"
-	traceAlways      = "always"
-	traceNever       = "never"
-	sampleTesting    = 1.0
-	sampleProduction = 0.1
-	sampleDisabled   = 0.0
-	sampleAlways     = 1.0
-	sampleNever      = 0.0
+	// Disabled is the trace configuration for disabling tracing.
+	Disabled TraceConfig = 0.0
+	// Production is a trace configuration for production use.
+	Production TraceConfig = 0.1
+	// Testing is a trace configuration for testing.
+	Testing TraceConfig = 1.0
+	// Full is the trace configuration for full probabilistic sampling.
+	Full TraceConfig = 1.0
 )
-
-type traceValue float64
 
 // options encapsulates our configurable instrumentation parameters.
 type options struct {
-	trace     traceValue // instrumentation configuration
-	collector string     // collector endpoint
-	agent     string     // agent endpoint
-	metrics   string     // metrics exporter address
+	// Trace is the tracing configuration.
+	Trace TraceConfig
+	// Collector is the Jaeger collector endpoint.
+	Collector string
+	// Agent is the Jaeger agent endpoint.
+	Agent string
+	// Metrics is the Prometheus metrics exporter endpoint.
+	Metrics string
 }
 
 // Our instrumentation options.
-var opt = options{}
+var opt = defaultOptions().(*options)
 
-// symbolicTraceNames returns the valid predefined trace configuration names.
-func symbolicTraceNames() string {
-	names := []string{traceTesting, traceProduction, traceDisabled, traceAlways}
-	return strings.Join(names, ", ")
+// MarshalJSON is the JSON marshaller for TraceConfig values.
+func (tc TraceConfig) MarshalJSON() ([]byte, error) {
+	switch {
+	case tc <= 0.005:
+		return json.Marshal("disabled")
+	case tc <= 0.1:
+		return json.Marshal("production")
+	case tc == 1.0:
+		return json.Marshal("full")
+	case tc >= 0.95:
+		return json.Marshal("testing")
+	}
+	return json.Marshal(tc)
 }
 
-func (t *traceValue) Set(value string) error {
-	switch value {
-	case traceTesting:
-		*t = sampleTesting
-	case traceProduction:
-		*t = sampleProduction
-	case traceDisabled:
-		*t = sampleDisabled
-	case traceAlways:
-		*t = sampleAlways
-	case traceNever:
-		*t = sampleNever
-	default:
-		mul := 1.0
-		val := value
-		if strings.HasSuffix(value, "%") {
-			mul = 0.01
-			val = value[0 : len(value)-1]
-		}
-		v, err := strconv.ParseFloat(val, 64)
-		if err != nil {
-			return err
-		}
-		*t = traceValue(mul * v)
+// UnmarshalJSON is the JSON unmarshaller for TraceConfig values.
+func (tc *TraceConfig) UnmarshalJSON(raw []byte) error {
+	var obj interface{}
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return traceError("failed to unmarshal TraceConfig value:%v", err)
 	}
-
+	switch obj.(type) {
+	case string:
+		switch strings.ToLower(obj.(string)) {
+		case "disabled":
+			*tc = Disabled
+		case "testing":
+			*tc = Testing
+		case "production":
+			*tc = Production
+		case "full":
+			*tc = Full
+		default:
+			return traceError("invalid TraceConfig value '%s'", obj.(string))
+		}
+	case float64:
+		*tc = obj.(TraceConfig)
+	default:
+		return traceError("invalid TraceConfig value of type %T: %v", obj, obj)
+	}
 	return nil
 }
 
-func (t *traceValue) String() string { return strconv.FormatFloat(float64(*t), 'f', -1, 64) }
-
-func stringEnvVal(p *string, name, env, value, usage string) (*string, string, string, string) {
-	usage += " Default is inherited from the environment variable '" + env + "', if set."
-
-	if e := os.Getenv(env); e != "" {
-		value = e
+// Sampler returns a trace.Sampler corresponding to the TraceConfig value.
+func (tc TraceConfig) String() string {
+	switch {
+	case tc <= 0.005:
+		return "disabled"
+	case tc <= 0.1:
+		return "production"
+	case tc == 1.0:
+		return "full"
+	case tc >= 0.95:
+		return "testing"
 	}
-
-	return p, name, value, usage
+	return strconv.FormatFloat(float64(tc), 'f', -1, 64)
 }
 
-// Register our command-line flags.
-func init() {
-	// Default for opt.trace
-	opt.trace = sampleDisabled
+// Sampler returns a trace.Sampler corresponding to the TraceConfig value.
+func (tc TraceConfig) Sampler() trace.Sampler {
+	switch {
+	case tc >= 0.95:
+		return trace.AlwaysSample()
+	case tc <= 0.005:
+		return trace.NeverSample()
+	default:
+		return trace.ProbabilitySampler(float64(tc))
+	}
+}
 
-	flag.Var(&opt.trace, "trace",
-		"Tracing configuration to use. The possible values are: "+symbolicTraceNames()+", "+
-			"or a trace sampling probability.")
-	flag.StringVar(stringEnvVal(&opt.collector, "trace-jaeger-collector", "JAEGER_COLLECTOR",
-		"http://localhost:14268/api/traces",
-		"Jaeger collector endpoint URL to use."))
-	flag.StringVar(stringEnvVal(&opt.agent, "trace-jaeger-agent", "JAEGER_AGENT",
-		"localhost:6831",
-		"Jaeger agent address to use."))
-	flag.StringVar(stringEnvVal(&opt.metrics, "trace-prometheus-metrics", "PROMETHEUS_ENDPOINT",
-		":8888",
-		"Address to serve Prometheus /metrics on."))
+// defaultOptions returns a new options instance, all initialized to defaults.
+func defaultOptions() interface{} {
+	collector := os.Getenv("JAEGER_COLLECTOR")
+	agent := os.Getenv("JAEGER_AGENT")
+	metrics := os.Getenv("PROMETHEUS_ENDPOINT")
+
+	if collector == "" {
+		collector = "http://localhost:14268/api/traces"
+	}
+	if agent == "" {
+		agent = "localhost:6831"
+	}
+	if metrics == "" {
+		metrics = ":8888"
+	}
+
+	return &options{
+		Trace:     Disabled,
+		Collector: collector,
+		Agent:     agent,
+		Metrics:   metrics,
+	}
+}
+
+// configNotify is our configuration udpate notification handler.
+func configNotify(event config.Event, source config.Source) error {
+	log.Info("tracing configuration is now %v", opt.Trace)
+	Setup()
+	return nil
+}
+
+// Register us for for configuration handling.
+func init() {
+	config.Register("instrumentation", "Instrumentation for traces and metrics.",
+		opt, defaultOptions, config.WithNotify(configNotify))
 }

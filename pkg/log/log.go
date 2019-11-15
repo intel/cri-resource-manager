@@ -76,9 +76,22 @@ type logger struct {
 	prefix  string // message prefix
 }
 
+// log is our runtime state.
+type log struct {
+	level    Level              // lowest unsuppressed severity
+	active   Backend            // active backend
+	loggers  map[string]*logger // running loggers (log sources)
+	backends map[string]Backend // registered backends (real loggers)
+	srcalign int                // longest name of active source seen
+}
+
+var logging = &log{
+	active: &fmtBackend{},
+}
+
 // Get an existing logger or create a new one.
 func Get(source string) Logger {
-	l, ok := opt.loggers[source]
+	l, ok := logging.loggers[source]
 	if !ok {
 		return newLogger(source)
 	}
@@ -94,11 +107,11 @@ func NewLogger(source string) Logger {
 func newLogger(source string) Logger {
 	source = strings.Trim(source, "[] ")
 
-	if opt.loggers == nil {
-		opt.loggers = make(map[string]*logger)
+	if logging.loggers == nil {
+		logging.loggers = make(map[string]*logger)
 	}
 
-	if l := opt.loggers[source]; l != nil {
+	if l := logging.loggers[source]; l != nil {
 		return l
 	}
 
@@ -106,13 +119,9 @@ func newLogger(source string) Logger {
 		source:  source,
 		enabled: opt.sourceEnabled(source),
 		debug:   opt.debugEnabled(source),
-		level:   opt.level,
+		level:   opt.Level,
 	}
-	opt.loggers[source] = l
-
-	if opt.active == nil {
-		SelectBackend("")
-	}
+	logging.loggers[source] = l
 
 	return l
 }
@@ -120,19 +129,11 @@ func newLogger(source string) Logger {
 // Optional call to stop a logger once it is not needed any more.
 func (l *logger) Stop() {
 	l.enabled = false
-	delete(opt.loggers, l.source)
-}
-
-func (level Level) String() string {
-	if name, ok := LevelNames[level]; ok {
-		return name
-	}
-
-	return fmt.Sprintf("<unknown log level %d>", level)
+	delete(logging.loggers, l.source)
 }
 
 func (l *logger) shouldPrefix() bool {
-	return opt.prefix == 1 || (opt.prefix == -1 && opt.active.PrefixPreference())
+	return logging.active.PrefixPreference()
 }
 
 func (l *logger) passthrough(level Level) bool {
@@ -140,17 +141,17 @@ func (l *logger) passthrough(level Level) bool {
 }
 
 func (l *logger) formatMessage(format string, args ...interface{}) string {
-	if len(l.source) > opt.srcalign {
-		opt.srcalign = len(l.source)
+	if len(l.source) > logging.srcalign {
+		logging.srcalign = len(l.source)
 		l.prefix = ""
-		for _, l := range opt.loggers {
+		for _, l := range logging.loggers {
 			l.prefix = ""
 		}
 
 	}
 	if l.prefix == "" {
-		suf := (opt.srcalign - len(l.source)) / 2
-		pre := opt.srcalign - (len(l.source) + suf)
+		suf := (logging.srcalign - len(l.source)) / 2
+		pre := logging.srcalign - (len(l.source) + suf)
 		l.prefix = "[" + fmt.Sprintf("%-*s", pre, "") + l.source + fmt.Sprintf("%*s", suf, "") + "] "
 	}
 
@@ -167,7 +168,7 @@ func (l *logger) Info(format string, args ...interface{}) {
 	if !l.passthrough(LevelInfo) {
 		return
 	}
-	opt.active.Info(l.formatMessage(format, args...))
+	logging.active.Info(l.formatMessage(format, args...))
 }
 
 // Emit a warning message.
@@ -175,7 +176,7 @@ func (l *logger) Warn(format string, args ...interface{}) {
 	if !l.passthrough(LevelWarn) {
 		return
 	}
-	opt.active.Warn(l.formatMessage(format, args...))
+	logging.active.Warn(l.formatMessage(format, args...))
 }
 
 // Emit an error message.
@@ -183,19 +184,19 @@ func (l *logger) Error(format string, args ...interface{}) {
 	if !l.passthrough(LevelError) {
 		return
 	}
-	opt.active.Error(l.formatMessage(format, args...))
+	logging.active.Error(l.formatMessage(format, args...))
 }
 
 // Emit a fatal error message and exit.
 func (l *logger) Fatal(format string, args ...interface{}) {
-	opt.active.Error(l.formatMessage(format, args...))
+	logging.active.Error(l.formatMessage(format, args...))
 	os.Exit(1)
 }
 
 // Emit a fatal error message and panic.
 func (l *logger) Panic(format string, args ...interface{}) {
 	message := l.formatMessage(format, args...)
-	opt.active.Error(message)
+	logging.active.Error(message)
 	panic(message)
 }
 
@@ -247,7 +248,7 @@ func DebugEnabled() bool {
 	return defLogger.DebugEnabled()
 }
 
-// Block emits a block of messages with the default source.
+// Block emits a block of messages with the given emitting/printing function.
 func Block(fn func(string, ...interface{}), prefix string, format string, args ...interface{}) {
 	defLogger.Block(fn, prefix, format, args...)
 }
@@ -275,7 +276,7 @@ func ErrorBlock(prefix string, format string, args ...interface{}) {
 // EnableDebug controls debugging for the logger and returns the its previous debugging state.
 func (l *logger) EnableDebug(enable bool) bool {
 	previous := l.debug
-	opt.Set(optionDebug, l.source+":"+map[bool]string{false: "false", true: "true"}[enable])
+	opt.Debug.Set(l.source + ":" + map[bool]string{false: "false", true: "true"}[enable])
 	return previous
 }
 
@@ -289,7 +290,7 @@ func (l *logger) Debug(format string, args ...interface{}) {
 	if !l.debug {
 		return
 	}
-	opt.active.Debug(l.formatMessage(format, args...))
+	logging.active.Debug(l.formatMessage(format, args...))
 }
 
 // Block emits a block of messages with using the given emitting function.
@@ -327,63 +328,44 @@ func (l *logger) ErrorBlock(prefix string, format string, args ...interface{}) {
 func RegisterBackend(b Backend) {
 	name := b.Name()
 
-	if opt.backends == nil {
-		opt.backends = make(map[string]Backend)
+	if logging.backends == nil {
+		logging.backends = make(map[string]Backend)
 	}
 
-	opt.backends[name] = b
+	logging.backends[name] = b
 
-	if opt.logger == name {
-		opt.active = b
+	if string(opt.Logger) == name {
+		logging.active = b
 	}
 }
 
-// SelectBackend selects the logger backend to activate.
-func SelectBackend(name string) {
-	if name != "" {
-		name = string(opt.logger)
-	}
-
-	if b, ok := opt.backends[name]; ok {
-		opt.active = b
+// activateBackend selects the logger backend to activate.
+func activateBackend(name string) {
+	if b, ok := logging.backends[string(opt.Logger)]; ok {
+		logging.active = b
 	} else {
-		for _, name := range defaultBackends {
-			if b, ok := opt.backends[name]; ok {
-				opt.active = b
-				break
-			}
-		}
+		logging.active = &fmtBackend{}
 	}
 
-	if opt.active != nil {
-		opt.active.Info(fmt.Sprintf("activated logger backend '%s'",
-			opt.active.Name()))
-	}
-}
-
-// Get the names of registered backends.
-func registeredBackendNames() string {
-	names := ""
-	sep := ""
-	for name := range opt.backends {
-		names += sep + name
-		sep = ","
-	}
-	return names
+	logging.active.Info(fmt.Sprintf("activated logger backend '%s'", logging.active.Name()))
 }
 
 // Update loggers when debug flags or sources change.
 func (o *options) updateLoggers() {
-	for s, l := range o.loggers {
+	for s, l := range logging.loggers {
 		l.enabled = opt.sourceEnabled(s)
 		l.debug = opt.debugEnabled(s)
-		l.level = opt.level
+		l.level = opt.Level
 	}
 }
 
 //
 // fallback fmt backend, using fmt.*Printf
 //
+
+const (
+	fmtBackendName = "fmt"
+)
 
 type fmtBackend struct{}
 
@@ -414,7 +396,7 @@ func (f *fmtBackend) Debug(message string) {
 }
 
 func (f *fmtBackend) Enabled(l Level) bool {
-	return l >= opt.level
+	return l >= opt.Level
 }
 
 func init() {

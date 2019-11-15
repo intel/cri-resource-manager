@@ -15,209 +15,141 @@
 package policy
 
 import (
-	"flag"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
-
+	"encoding/json"
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"strconv"
+	"strings"
 )
 
 const (
 	// NullPolicy is the reserved name for disabling policy altogether.
 	NullPolicy = "null"
-
-	// Flag for listing the available policies.
-	optionListPolicies = "list-policies"
 )
 
-// Policy options configurable via the command line.
+// Options captures our configurable parameters.
 type options struct {
-	policy    string                    // active policy
-	policies  map[string]Implementation // registered policies
-	available ConstraintSet             // resource availability
-	reserved  ConstraintSet             // resource reservations
+	// Policy is the name of the policy backend to activate.
+	Policy string `json:"Active"`
+	// Available hardware resources to use.
+	Available ConstraintSet `json:"AvailableResources,omitempty"`
+	// Reserved hardware resources, for system and kube tasks.
+	Reserved ConstraintSet `json:"ReservedResources,omitempty"`
 }
 
-// Policy options with their defaults.
-var opt = options{
-	available: ConstraintSet{},
-	reserved:  ConstraintSet{},
-	policies:  make(map[string]Implementation),
-}
+// Registered policy implementations.
+var policies = map[string]Implementation{}
 
-//
-// XXX TODO: write missing constraint parsers as needed...
-//
+// Our runtime configuration.
+var opt = defaultOptions().(*options)
 
-func parseCPUConstraint(cpus string) (interface{}, error) {
-	switch {
-	case strings.Contains(cpus, ":"):
-		split := strings.Split(cpus, ":")
-		qualifier, value := split[0], split[1]
-
-		switch qualifier {
-		case "cpuset":
-			return parseCpuset(cpus, value)
-
-		case "quantity":
-			return parseCPUQuantity(cpus, value)
-
-		case "cgroup":
-			return parseCgroupCpuset(cpus, value)
-		}
-
-		return nil, policyError("invalid qualifier '%s' cpu constraint '%s'",
-			qualifier, cpus)
-
-	case strings.ContainsAny(cpus, "-,"):
-		return parseCpuset(cpus, cpus)
-
-	case cpus[0] == '#':
-		return parseCpuset(cpus, cpus[1:])
-
-	case cpus[0] == '/':
-		return parseCgroupCpuset(cpus, cpus)
-
-	default:
-		return parseCPUQuantity(cpus, cpus)
-	}
-}
-
-func parseCPUQuantity(constraint, value string) (interface{}, error) {
-	qty, err := resource.ParseQuantity(value)
-	if err != nil {
-		return nil, policyError("invalid cpu quantity '%s' in constraint '%s': %v",
-			value, constraint, err)
-	}
-	return qty, nil
-}
-
-func parseCpuset(constraint, value string) (interface{}, error) {
-	cset, err := cpuset.Parse(value)
-	if err != nil {
-		return nil, policyError("invalid cpuset '%s' in constraint '%s': %v",
-			value, constraint, err)
-	}
-	return cset, nil
-}
-
-func parseCgroupCpuset(constraint, value string) (interface{}, error) {
-	if !strings.HasSuffix(value, "cpuset.cpus") {
-		value = filepath.Join(value, "cpuset.cpus")
-	}
-
-	data, err := ioutil.ReadFile(value)
-	if err != nil {
-		return nil, policyError("can't read constraint ('%s' )cpuset file '%s': %v",
-			constraint, value, err)
-	}
-	return parseCpuset(constraint, string(data))
-}
-
-func parseMemConstraint(mems string) (interface{}, error) {
-	return mems, nil
-}
-
-func parseHugePagesConstraint(hp string) (interface{}, error) {
-	return hp, nil
-}
-
-func parseCacheConstraint(c string) (interface{}, error) {
-	return c, nil
-}
-
-func parseMemBWConstraint(mbw string) (interface{}, error) {
-	return mbw, nil
-}
-
-// Set implements the Set() function of flags.Value interface
-func (c *ConstraintSet) Set(value string) error {
-	for _, constraint := range strings.Split(value, ",") {
-		if err := (*c).setConstraint(constraint); err != nil {
-			return policyError("invalid constraint: %v", err)
+// MarshalJSON implements JSON marshalling for ConstraintSets.
+func (cs ConstraintSet) MarshalJSON() ([]byte, error) {
+	obj := map[string]interface{}{}
+	for domain, constraint := range cs {
+		name := string(domain)
+		switch constraint.(type) {
+		case cpuset.CPUSet:
+			obj[name] = "cpuset:" + constraint.(cpuset.CPUSet).String()
+		case resource.Quantity:
+			qty := constraint.(resource.Quantity)
+			obj[name] = qty.String()
+		case int:
+			obj[name] = strconv.Itoa(constraint.(int))
+		default:
+			return nil, policyError("invalid %v constraint of type %T", domain, constraint)
 		}
 	}
+	return json.Marshal(obj)
+}
+
+// UnmarshalJSON implements JSON unmarshalling for ConstraintSets.
+func (cs *ConstraintSet) UnmarshalJSON(raw []byte) error {
+	set := make(ConstraintSet)
+	obj := map[string]interface{}{}
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return policyError("failed unmarshal ConstraintSet: %v", err)
+	}
+	for name, value := range obj {
+		switch {
+		case DomainCPU.isEqual(name):
+			switch value.(type) {
+			case string:
+				kind, val := "", ""
+				split := strings.SplitN(value.(string), ":", 2)
+				switch len(split) {
+				case 0:
+				case 1:
+					kind, val = "", split[0]
+				case 2:
+					kind, val = split[0], split[1]
+				}
+				switch kind {
+				case "cpuset":
+					cset, err := cpuset.Parse(val)
+					if err != nil {
+						return policyError("failed to unmarshal cpuset constraint: %v", err)
+					}
+					set[DomainCPU] = cset
+				case "":
+					qty, err := resource.ParseQuantity(val)
+					if err != nil {
+						return policyError("failed to unmarshal CPU Quantity constraint: %v", err)
+					}
+					set[DomainCPU] = qty
+				default:
+					return policyError("invalid CPU constraint qualifier '%s'", kind)
+				}
+			case int:
+				set[DomainCPU] = resource.NewMilliQuantity(int64(value.(int)), resource.DecimalSI)
+			case float64:
+				qty := resource.NewMilliQuantity(int64(1000.0*value.(float64)), resource.DecimalSI)
+				set[DomainCPU] = *qty
+			default:
+				return policyError("invalid CPU constraint of type %T", value)
+			}
+
+		default:
+			return policyError("internal error: unhandled ConstraintSet domain %s", name)
+		}
+	}
+
+	*cs = set
 	return nil
 }
 
-// setConstraint sets a single constraint
-func (c ConstraintSet) setConstraint(constraint string) error {
-	var err error
-	var domain, value string
-
-	domval := strings.Split(constraint, "=")
-	if len(domval) != 2 {
-		return policyError("invalid constraint '%s' (not of form: domain=value)", constraint)
-	}
-
-	domain, value = domval[0], domval[1]
-
-	switch domain {
-	case string(DomainCPU):
-		c[DomainCPU], err = parseCPUConstraint(value)
-	case string(DomainMemory):
-		c[DomainMemory], err = parseMemConstraint(value)
-	case string(DomainHugePage):
-		c[DomainHugePage], err = parseHugePagesConstraint(value)
-	case string(DomainCache):
-		c[DomainCache], err = parseCacheConstraint(value)
-	case string(DomainMemoryBW):
-		c[DomainMemoryBW], err = parseMemBWConstraint(value)
-	default:
-		err = policyError("unknown resource domain in constraint %s=%s", domain, value)
-	}
-
-	return err
-}
-
-func (c *ConstraintSet) String() string {
+func (cs *ConstraintSet) String() string {
 	ret := ""
 	sep := ""
-	for domain, value := range *c {
+	for domain, value := range *cs {
 		ret += sep + string(domain) + "=" + ConstraintToString(value)
 		sep = ","
 	}
 	return ret
 }
 
-// listPolicies is a helper type used for implementing the "list-policies"
-// option which acts like a sub-command
-type listPolicies bool
-
-var listCmd listPolicies
-
-func (l *listPolicies) Set(value string) error {
-	fmt.Printf("The available policies are:\n")
-	names := make([]string, 0, len(opt.policies))
-	for name := range opt.policies {
-		names = append(names, name)
+func (d Domain) isEqual(domain interface{}) bool {
+	switch domain.(type) {
+	case string:
+		return strings.ToLower(string(d)) == strings.ToLower(domain.(string))
+	case Domain:
+		return strings.ToLower(string(d)) == strings.ToLower(string(domain.(Domain)))
+	default:
+		return false
 	}
-	sort.Strings(names)
-	for _, name := range names {
-		fmt.Printf("  %s: %s\n", name, opt.policies[name].Description())
-	}
-	os.Exit(0)
-	return nil
 }
 
-func (l *listPolicies) IsBoolFlag() bool { return true }
+// defaultOptions returns a new options instance, all initialized to defaults.
+func defaultOptions() interface{} {
+	return &options{
+		Policy:    NullPolicy,
+		Available: ConstraintSet{},
+		Reserved:  ConstraintSet{},
+	}
+}
 
-func (l *listPolicies) String() string { return strconv.FormatBool(bool(*l)) }
-
+// Register us for configuration handling.
 func init() {
-	flag.StringVar(&opt.policy, "policy", NullPolicy,
-		"select the policy to use for hardware resource decision making.\n"+
-			"You can list the available policies with the --"+optionListPolicies+" option.")
-	flag.Var(&opt.available, "available-resources",
-		"specify the amount of resources available for allocation by the active policy.")
-	flag.Var(&opt.reserved, "reserved-resources",
-		"specify the amount of resources reserved for system- and kube-tasks.")
-	flag.Var(&listCmd, optionListPolicies,
-		"list the available resource management policies.")
+	config.Register("policy", "Generic policy layer.", opt, defaultOptions)
 }

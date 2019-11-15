@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package dump
+package config
 
 import (
 	"fmt"
 )
 
-// Create a formatted error for the dump package.
-func dumpError(format string, args ...interface{}) error {
-	return fmt.Errorf("dump: "+format, args...)
+// configError creates a formatted configuration-specific error.
+func configError(format string, args ...interface{}) error {
+	return fmt.Errorf("config error: "+format, args...)
 }

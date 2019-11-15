@@ -17,12 +17,12 @@ package static
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
+	"github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
@@ -38,12 +38,13 @@ const (
 	PolicyName = "static"
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A reimplementation of the static CPU Manager policy."
+	// PolicyPath is the path of this policy in the configuration hierarchy.
+	PolicyPath = "policy." + PolicyName
 )
 
 type static struct {
 	logger.Logger
 
-	config        string               // active configuration
 	available     policy.ConstraintSet // resource availability constraints
 	reserved      policy.ConstraintSet // system/kube-reservation constraints
 	reservedCpus  cpuset.CPUSet        // CPUs reserved for system- and kube-tasks
@@ -66,7 +67,6 @@ const (
 // NewStaticPolicy creates a new policy instance.
 func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 	s := &static{
-		config:    opts.Config,
 		Logger:    logger.NewLogger(PolicyName),
 		available: opts.Available,
 		reserved:  opts.Reserved,
@@ -87,6 +87,8 @@ func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 		s.Fatal("cannot start with given constraints: %v", err)
 	}
 
+	config.GetModule(PolicyPath).AddNotify(s.configNotify)
+
 	return s
 }
 
@@ -103,13 +105,6 @@ func (s *static) Description() string {
 // Start prepares this policy for accepting allocation/release requests.
 func (s *static) Start(state cache.Cache, add []cache.Container, del []cache.Container) error {
 	s.Debug("starting up...")
-
-	if s.config != "" {
-		err := s.SetConfig(s.config)
-		if err != nil {
-			return err
-		}
-	}
 
 	if err := s.allocateReserved(); err != nil {
 		return policyError("failed allocate reserved CPUs: %v", err)
@@ -215,31 +210,12 @@ func (s *static) PostStart(c cache.Container) error {
 	return nil
 }
 
-// SetConfig sets the policy backend configuration
-func (s *static) SetConfig(conf string) error {
-	conf = strings.TrimSpace(conf)
+func (s *static) configNotify(event config.Event, source config.Source) error {
+	s.Info("configuration %s", event)
 
-	if conf == s.config {
-		s.Info("no configuration changes")
-		return nil
-	}
-
-	newConf, err := parseConfData([]byte(conf))
-	if err != nil {
-		return policyError("failed to parse configuration: %v", err)
-	}
-
-	if opt == *newConf {
-		s.Info("no configuration changes")
-		return nil
-	}
-
-	if newConf.Rdt == TristateOn && s.rdt == nil {
+	if opt.Rdt == TristateOn && s.rdt == nil {
 		return policyError("RDT requested but not available")
 	}
-
-	opt = *newConf
-
 	if opt.RelaxedIsolation {
 		s.Info("isolated exclusive CPUs: globally preferred (all pods)")
 	} else {
@@ -247,10 +223,13 @@ func (s *static) SetConfig(conf string) error {
 			kubernetes.ResmgrKey(keyPreferIsolated))
 	}
 
-	s.Info("rdt support set to %q", opt.Rdt.String())
+	s.Info("rdt support set to %v", opt.Rdt)
 
-	s.config = conf
+	return nil
+}
 
+// SetConfig sets the policy backend configuration
+func (s *static) SetConfig(conf string) error {
 	return nil
 }
 
