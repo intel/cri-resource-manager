@@ -3,11 +3,14 @@ package avx
 import (
 	"debug/elf"
 	"encoding/binary"
+	"flag"
 	"fmt"
+	"path"
 	"sync"
 	"unsafe"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
 	bpf "github.com/iovisor/gobpf/elf"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -38,6 +41,10 @@ var (
 			"cgroup",
 		}, nil,
 	)
+
+	bpfBinaryName  = "avx512.o"
+	bpfInstallpath = "/usr/libexec/bpf"
+	cgroupV2path   = "/sys/fs/cgroup/unified"
 )
 
 func kernelVersionCode(major, minor, patch uint8) uint32 {
@@ -94,7 +101,10 @@ type collector struct {
 }
 
 // NewCollector creates new Prometheus collector for AVX metrics
-func NewCollector(root, elfFilepath string) (prometheus.Collector, error) {
+func NewCollector() (prometheus.Collector, error) {
+
+	elfFilepath := path.Join(bpfInstallpath, bpfBinaryName)
+
 	if err := checkElfKernelVersion(elfFilepath); err != nil {
 		return nil, err
 	}
@@ -130,7 +140,7 @@ func NewCollector(root, elfFilepath string) (prometheus.Collector, error) {
 	}
 
 	return &collector{
-		root:                     root,
+		root:                     cgroupV2path,
 		bpfModule:                bpfModule,
 		avxContextSwitchCounters: avxSwitchCounters,
 		allContextSwitchCounters: allSwitchCounters,
@@ -248,4 +258,19 @@ func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
 			float64(binary.LittleEndian.Uint32(counters[idx])),
 			fmt.Sprintf("CPU%d", binary.LittleEndian.Uint32(lastCPU)))
 	}
+}
+
+func init() {
+	err := metrics.RegisterCollector("avx", NewCollector)
+	if err != nil {
+		fmt.Printf("Failed to register AVX collector: %v", err)
+		return
+	}
+}
+
+func init() {
+	flag.StringVar(&cgroupV2path, "cgroupv2-path", cgroupV2path,
+		"Path to cgroup-v2 mountpoint")
+	flag.StringVar(&bpfInstallpath, "bpf-install-path", bpfInstallpath,
+		"Path to eBPF install directory")
 }
