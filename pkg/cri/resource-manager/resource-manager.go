@@ -168,8 +168,6 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 		return err
 	}
 
-	//m.cache.SetConfig(conf)
-
 	m.Info("configuration updated")
 	return nil
 }
