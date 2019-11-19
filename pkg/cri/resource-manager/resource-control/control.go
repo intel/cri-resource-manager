@@ -59,12 +59,11 @@ func (c *criRdt) SetContainerClass(container cache.Container, class string) erro
 		return controlError("failed to get PIDs of container %s: %v", cID, err)
 	}
 
-	for _, pid := range pids {
-		if err = c.SetProcessClass(class, strconv.Itoa(pid)); err != nil {
-			return err
-		}
+	strPids := make([]string, len(pids))
+	for i, pid := range pids {
+		strPids[i] = strconv.Itoa(pid)
 	}
-	return nil
+	return c.SetProcessClass(class, strPids...)
 }
 
 func controlError(format string, args ...interface{}) error {
