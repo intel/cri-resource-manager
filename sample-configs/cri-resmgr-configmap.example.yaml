@@ -19,6 +19,10 @@ metadata:
 data:
   policy: |+
     Active: topology-aware
+    AvailableResources:
+      cpu: cpuset:0-63
+    ReservedResources:
+      cpu: cpuset:0-1
     topology-aware:
       PinCPU: true
       PinMemory: true
@@ -108,6 +112,10 @@ metadata:
 data:
   policy: |+
     Active: topology-aware
+    AvailableResources:
+      cpu: cpuset:0-63
+    ReservedResources:
+      cpu: cpuset:0-1
     topology-aware:
       PinCPU: true
       PinMemory: false
@@ -192,6 +200,10 @@ metadata:
 data:
   policy: |+
     Active: topology-aware
+    AvailableResources:
+      cpu: cpuset:0-63
+    ReservedResources:
+      cpu: cpuset:0-1
     topology-aware:
       PinCPU: false
       PinMemory: true
