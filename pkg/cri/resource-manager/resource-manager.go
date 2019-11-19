@@ -93,18 +93,9 @@ func NewResourceManager() (ResourceManager, error) {
 		}
 	}
 
-	if conf == nil || len(conf.Data) == 0 {
-		m.Warn("failed to fetch configuration, using last cached data")
-		conf = m.cache.GetConfig()
-	}
-	if conf != nil && len(conf.Data) > 0 {
-		m.SetConfig(conf)
-	}
-
 	policyOpts := &policy.Options{
-		ResmgrConfig: conf,
-		AgentCli:     agent,
-		Rdt:          m.rdt,
+		AgentCli: agent,
+		Rdt:      m.rdt,
 	}
 	if m.policy, err = policy.NewPolicy(policyOpts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
@@ -116,6 +107,14 @@ func NewResourceManager() (ResourceManager, error) {
 
 	if err = m.setupPolicyHooks(); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
+	}
+
+	if conf == nil || len(conf.Data) == 0 {
+		m.Warn("failed to fetch configuration, using last cached data")
+		conf = m.cache.GetConfig()
+	}
+	if conf != nil && len(conf.Data) > 0 {
+		m.SetConfig(conf)
 	}
 
 	if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
