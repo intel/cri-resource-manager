@@ -87,18 +87,18 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
-	if conf == nil || len(conf.Data) == 0 {
-		m.Warn("failed to fetch configuration, using last cached data")
-		conf = m.cache.GetConfig()
-	}
-	if conf == nil {
-		conf = &config.RawConfig{}
-	}
-
 	if !opt.NoRdt {
 		if err = m.setupRdt(conf.Get("rdt")); err != nil {
 			return nil, resmgrError("failed to create resource manager: %v", err)
 		}
+	}
+
+	if conf == nil || len(conf.Data) == 0 {
+		m.Warn("failed to fetch configuration, using last cached data")
+		conf = m.cache.GetConfig()
+	}
+	if conf != nil && len(conf.Data) > 0 {
+		m.SetConfig(conf)
 	}
 
 	policyOpts := &policy.Options{
