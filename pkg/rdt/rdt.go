@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/ghodss/yaml"
 
@@ -104,7 +105,15 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 
 	for _, pid := range pids {
 		if _, err := f.WriteString(pid + "\n"); err != nil {
-			return rdtError("failed to assign processes %v to class %q: %v", pids, class, r.cmdError(err))
+			unwrapped := err
+			if pathError, ok := err.(*os.PathError); ok {
+				unwrapped = pathError.Unwrap()
+			}
+			if unwrapped == syscall.ESRCH {
+				r.Debug("no task %s", pid)
+			} else {
+				return rdtError("failed to assign processes %v to class %q: %v", pids, class, r.cmdError(err))
+			}
 		}
 	}
 	return nil
