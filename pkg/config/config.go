@@ -356,7 +356,7 @@ func (m *Module) validate(data Data) error {
 	for name, child := range m.children {
 		childcfg, err := subcfg.pick(name, true)
 		if err != nil {
-			return configError("module %s: failed to pick configuration for child: %v",
+			return configError("module %s: failed to pick configuration for child %s: %v",
 				m.path, child.path, err)
 		}
 		err = child.validate(childcfg)
