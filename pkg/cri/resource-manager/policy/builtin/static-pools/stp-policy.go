@@ -104,7 +104,7 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 
 	config.GetModule(PolicyPath).AddNotify(stp.configNotify)
 
-	stp.Debug("policy configuration:\n%s", utils.DumpJSON(stp.conf))
+	stp.DebugBlock("  configuration ", "%s", utils.DumpJSON(stp.conf))
 
 	return stp
 }
