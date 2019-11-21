@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/ghodss/yaml"
 
@@ -95,13 +96,25 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 		return rdtError("unknown RDT class %q", class)
 	}
 
-	path := filepath.Join(r.resctrlGroupDirName(class), "tasks")
-	data := []byte{}
-	for _, pid := range pids {
-		data = append(data, []byte(pid+"\n")...)
+	path := filepath.Join(r.resctrlGroupPath(class), "tasks")
+	f, err := os.OpenFile(path, os.O_WRONLY, 0644)
+	if err != nil {
+		return err
 	}
-	if err := r.writeRdtFile(path, data); err != nil {
-		return rdtError("failed to assign processes %v to class %q: %v", pids, class, err)
+	defer f.Close()
+
+	for _, pid := range pids {
+		if _, err := f.WriteString(pid + "\n"); err != nil {
+			unwrapped := err
+			if pathError, ok := err.(*os.PathError); ok {
+				unwrapped = pathError.Unwrap()
+			}
+			if unwrapped == syscall.ESRCH {
+				r.Debug("no task %s", pid)
+			} else {
+				return rdtError("failed to assign processes %v to class %q: %v", pids, class, r.cmdError(err))
+			}
+		}
 	}
 	return nil
 }
@@ -273,17 +286,21 @@ func (r *control) readRdtFile(rdtPath string) ([]byte, error) {
 
 func (r *control) writeRdtFile(rdtPath string, data []byte) error {
 	if err := ioutil.WriteFile(filepath.Join(rdtInfo.resctrlPath, rdtPath), data, 0644); err != nil {
-		errData, readErr := r.readRdtFile(filepath.Join("info", "last_cmd_status"))
-		if readErr != nil {
-			return err
-		}
-		cmdStatus := strings.TrimSpace(string(errData))
-		if len(cmdStatus) > 0 && cmdStatus != "ok" {
-			return fmt.Errorf(cmdStatus)
-		}
-		return err
+		return r.cmdError(err)
 	}
 	return nil
+}
+
+func (r *control) cmdError(origErr error) error {
+	errData, readErr := r.readRdtFile(filepath.Join("info", "last_cmd_status"))
+	if readErr != nil {
+		return origErr
+	}
+	cmdStatus := strings.TrimSpace(string(errData))
+	if len(cmdStatus) > 0 && cmdStatus != "ok" {
+		return fmt.Errorf("%s", cmdStatus)
+	}
+	return origErr
 }
 
 func rdtError(format string, args ...interface{}) error {
