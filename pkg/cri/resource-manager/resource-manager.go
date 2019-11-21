@@ -96,7 +96,7 @@ func NewResourceManager() (ResourceManager, error) {
 	}
 
 	if !opt.NoRdt {
-		if err = m.setupRdt(conf.Get("rdt")); err != nil {
+		if err = m.setupRdt(); err != nil {
 			return nil, resmgrError("failed to create resource manager: %v", err)
 		}
 	}
@@ -168,13 +168,11 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 		return err
 	}
 
-	//m.cache.SetConfig(conf)
-
 	m.Info("configuration updated")
 	return nil
 }
 
-func (m *resmgr) setupRdt(conf string) error {
+func (m *resmgr) setupRdt() error {
 	var err error
 
 	path := opt.ResctrlPath
@@ -187,6 +185,6 @@ func (m *resmgr) setupRdt(conf string) error {
 		}
 		m.Info("using auto-discovered resctrl-path %q", path)
 	}
-	m.rdt, err = control.NewCriRdt(path, conf)
+	m.rdt, err = control.NewCriRdt(path)
 	return err
 }

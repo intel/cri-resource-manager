@@ -58,7 +58,7 @@ type config struct {
 }
 
 // NewControl returns new instance of the RDT Control interface
-func NewControl(resctrlpath string, config string) (Control, error) {
+func NewControl(resctrlpath string) (Control, error) {
 	var err error
 	r := &control{Logger: logger.NewLogger("rdt")}
 

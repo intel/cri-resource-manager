@@ -37,10 +37,10 @@ type criRdt struct {
 }
 
 // NewCriRdt creates a new CriRdt instance
-func NewCriRdt(resctrlpath string, config string) (CriRdt, error) {
+func NewCriRdt(resctrlpath string) (CriRdt, error) {
 	var err error
 	c := &criRdt{}
-	c.Control, err = rdt.NewControl(resctrlpath, config)
+	c.Control, err = rdt.NewControl(resctrlpath)
 	return c, err
 
 }
