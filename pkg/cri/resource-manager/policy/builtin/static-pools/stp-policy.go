@@ -75,31 +75,20 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	stp.Info("creating policy...")
 
 	// Read STP configuration
-	if len(opts.Config) > 0 {
-		stp.Info("using policy config from cri-resmgr configuration")
-		stp.conf, err = parseConfData([]byte(opts.Config))
+	if len(opt.confDir) > 0 {
+		stp.conf, err = readConfDir(opt.confDir)
 		if err != nil {
-			stp.Warn("failed to parse config: %v", err)
-		}
-	} else {
-		if len(opt.confDir) > 0 {
-			stp.conf, err = readConfDir(opt.confDir)
-			if err != nil {
-				stp.Warn("failed to read configuration directory: %v", err)
-			}
-		}
-		if len(opt.confFile) > 0 {
-			if stp.conf != nil {
-				stp.Info("Overriding configuration from -static-pools-conf-dir with -static-pools-conf-file")
-			}
-			stp.conf, err = readConfFile(opt.confFile)
-			if err != nil {
-				stp.Warn("failed to read configuration directory: %v", err)
-			}
+			stp.Warn("failed to read configuration directory: %v", err)
 		}
 	}
-	if stp.conf == nil {
-		stp.Fatal("No STP policy configuration loaded")
+	if len(opt.confFile) > 0 {
+		if stp.conf != nil {
+			stp.Info("Overriding configuration from -static-pools-conf-dir with -static-pools-conf-file")
+		}
+		stp.conf, err = readConfFile(opt.confFile)
+		if err != nil {
+			stp.Warn("failed to read configuration directory: %v", err)
+		}
 	}
 
 	config.GetModule(PolicyPath).AddNotify(stp.configNotify)

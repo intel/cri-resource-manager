@@ -53,8 +53,6 @@ type ConstraintSet map[Domain]Constraint
 
 // Options describes policy options
 type Options struct {
-	// Full configuration data
-	ResmgrConfig *config.RawConfig
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
 	// Rdt control interface
@@ -71,8 +69,6 @@ type BackendOptions struct {
 	AgentCli agent.Interface
 	// Rdt control interface
 	Rdt control.CriRdt
-	// Policy configuration data
-	Config string
 }
 
 // CreateFn is the type for functions used to create a policy instance.
@@ -194,11 +190,6 @@ func NewPolicy(o *Options) (Policy, error) {
 		}
 	}
 
-	conf := extractPolicyConfig(backend.Name(), o.ResmgrConfig)
-	if len(conf) == 0 {
-		p.Warn("received empty policy configuration")
-	}
-
 	if p.DebugEnabled() {
 		p.Debug("*** enabling debugging for %s", opt.Policy)
 		logger.Get(opt.Policy).EnableDebug(true)
@@ -211,7 +202,6 @@ func NewPolicy(o *Options) (Policy, error) {
 		Reserved:  opt.Reserved,
 		AgentCli:  o.AgentCli,
 		Rdt:       o.Rdt,
-		Config:    conf,
 	}
 	p.backend = backend.CreateFn()(backendOpts)
 
