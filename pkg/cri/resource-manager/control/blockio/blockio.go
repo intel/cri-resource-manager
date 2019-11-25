@@ -75,12 +75,28 @@ func (ctl *blockio) PreStartHook(c cache.Container) error {
 
 // PostStartHook is the block I/O controller post-start hook.
 func (ctl *blockio) PostStartHook(c cache.Container) error {
-	return ctl.assign(c, ctl.BlockIOClass(c))
+	// Notes:
+	//   Unlike in our PostUpdateHook, we don't filter here by checking
+	//   if there are pending block I/O changes (c.HasPending(BlockIOController))
+	//   because ATM we want to assign otherwise unassigned containers
+	//   based on their QOS class.
+
+	if err := ctl.assign(c, ctl.BlockIOClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(BlockIOController)
+	return nil
 }
 
 // PostUpdateHook is the block I/O controller post-update hook.
 func (ctl *blockio) PostUpdateHook(c cache.Container) error {
-	// Note: We don't dynamically reassign containers to block I/O groups...
+	if !c.HasPending(BlockIOController) {
+		return nil
+	}
+	if err := ctl.assign(c, ctl.BlockIOClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(BlockIOController)
 	return nil
 }
 

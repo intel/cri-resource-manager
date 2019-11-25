@@ -87,12 +87,29 @@ func (ctl *rdtctl) PreStartHook(c cache.Container) error {
 
 // PostStartHook is the RDT controller post-start hook.
 func (ctl *rdtctl) PostStartHook(c cache.Container) error {
-	return ctl.assign(c, ctl.RDTClass(c))
+	// Notes:
+	//   Unlike in our PostUpdateHook, we don't filter here by checking
+	//   if there are pending RDT changes (c.HasPending(RDTController))
+	//   because ATM we want to assign otherwise unassigned containers
+	//   based on their QOS class.
+
+	if err := ctl.assign(c, ctl.RDTClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(RDTController)
+	return nil
 }
 
 // PostUpdateHook is the RDT controller post-update hook.
 func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
-	return ctl.assign(c, ctl.RDTClass(c))
+	if !c.HasPending(RDTController) {
+		return nil
+	}
+	if err := ctl.assign(c, ctl.RDTClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(RDTController)
+	return nil
 }
 
 // PostStop is the RDT controller post-stop hook.
