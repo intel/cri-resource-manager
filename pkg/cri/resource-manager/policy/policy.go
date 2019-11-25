@@ -121,6 +121,8 @@ type Policy interface {
 	ReleaseResources(cache.Container) error
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
+	// ExportResourceData exports/updates resource data for the container.
+	ExportResourceData(cache.Container, DataSyntax)
 }
 
 // Policy instance/state.
@@ -264,6 +266,13 @@ func (p *policy) ReleaseResources(c cache.Container) error {
 // UpdateResources updates resource allocations of a container.
 func (p *policy) UpdateResources(c cache.Container) error {
 	return p.backend.UpdateResources(c)
+}
+
+// ExportResourceData exports/updates resource data for the container.
+func (p *policy) ExportResourceData(c cache.Container, syntax DataSyntax) {
+	if data := p.backend.ExportResourceData(c, ExportShell); data != nil {
+		p.cache.WriteFile(c.GetCacheID(), ExportedResources, 0644, data)
+	}
 }
 
 // Register registers a policy backend.
