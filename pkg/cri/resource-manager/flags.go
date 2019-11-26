@@ -16,7 +16,6 @@ package resmgr
 
 import (
 	"flag"
-	"github.com/intel/cri-resource-manager/pkg/config"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
@@ -31,44 +30,16 @@ type options struct {
 	AgentSocket   string `json:",omitempty"`
 	ConfigSocket  string `json:",omitempty"`
 	ResctrlPath   string `json:",omitempty"`
-	NoRdt         bool
-}
-
-// conf captures our runtime configurable parameters.
-type conf struct {
-	// NoRdt disables RDT resource management.
-	NoRdt bool
 }
 
 // Relay command line options and runtime configuration with their defaults.
-var opt = defaultOptions().(*options)
-var cfg = defaultConfig().(*conf)
-
-// configNotify propagates runtime configurable changes to our options.
-func (o *options) configNotify(event config.Event, source config.Source) error {
-	o.NoRdt = cfg.NoRdt
-	return nil
-}
-
-// defaultOptions returns a new options instance, all initialized to defaults.
-func defaultOptions() interface{} {
-	return &options{
-		ImageSocket:   client.DontConnect,
-		RuntimeSocket: sockets.DockerShim,
-		RelaySocket:   sockets.ResourceManagerRelay,
-		RelayDir:      "/var/libb/cri-resmgr",
-		AgentSocket:   sockets.ResourceManagerAgent,
-		ConfigSocket:  sockets.ResourceManagerConfig,
-		ResctrlPath:   "",
-		NoRdt:         defaultConfig().(*conf).NoRdt,
-	}
-}
-
-// defaultConfig returns a new conf instance, all initialized to defaults.
-func defaultConfig() interface{} {
-	return &conf{
-		NoRdt: false,
-	}
+var opt = options{
+	ImageSocket:   client.DontConnect,
+	RuntimeSocket: sockets.DockerShim,
+	RelaySocket:   sockets.ResourceManagerRelay,
+	RelayDir:      "/var/libb/cri-resmgr",
+	AgentSocket:   sockets.ResourceManagerAgent,
+	ConfigSocket:  sockets.ResourceManagerConfig,
 }
 
 // Register us for command line option processing and configuration handling.
@@ -85,11 +56,4 @@ func init() {
 		"local socket of the cri-resmgr agent to connect")
 	flag.StringVar(&opt.ConfigSocket, "config-socket", sockets.ResourceManagerConfig,
 		"Unix domain socket path where the resource manager listens for cri-resmgr-agent")
-	flag.BoolVar(&opt.NoRdt, "no-rdt", false,
-		"Disable RDT resource management")
-	flag.StringVar(&opt.ResctrlPath, "resctrl-path", "",
-		"Path of the resctrl filesystem mountpoint")
-
-	config.Register("resource-manager", "Resource Management", cfg, defaultConfig,
-		config.WithNotify(opt.configNotify))
 }

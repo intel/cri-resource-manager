@@ -29,7 +29,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
-	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
@@ -58,15 +57,14 @@ type Allocations map[string]*Assignment
 // static-plus policy runtime state.
 type staticplus struct {
 	logger.Logger
-	offline     cpuset.CPUSet  // offlined cpus
-	available   cpuset.CPUSet  // bounding set of cpus available for us
-	reserved    cpuset.CPUSet  // pool (primarily) for system-/kube-tasks
-	isolated    cpuset.CPUSet  // primary pool for exclusive allocations
-	allocations Allocations    // container cpu allocations
-	sys         *sysfs.System  // system/topologu information
-	cache       cache.Cache    // system state/cache
-	shared      cpuset.CPUSet  // pool for fractional and shared allocations
-	rdt         control.CriRdt // RDT resource control interface
+	offline     cpuset.CPUSet // offlined cpus
+	available   cpuset.CPUSet // bounding set of cpus available for us
+	reserved    cpuset.CPUSet // pool (primarily) for system-/kube-tasks
+	isolated    cpuset.CPUSet // primary pool for exclusive allocations
+	allocations Allocations   // container cpu allocations
+	sys         *sysfs.System // system/topologu information
+	cache       cache.Cache   // system state/cache
+	shared      cpuset.CPUSet // pool for fractional and shared allocations
 }
 
 // Make sure staticplus implements the policy backend interface.
@@ -76,7 +74,6 @@ var _ policy.Backend = &staticplus{}
 func CreateStaticPlusPolicy(opts *policy.BackendOptions) policy.Backend {
 	p := &staticplus{
 		Logger: logger.NewLogger(PolicyName),
-		rdt:    opts.Rdt,
 	}
 
 	p.Info("creating policy...")
@@ -197,21 +194,6 @@ func (p *staticplus) ExportResourceData(c cache.Container, syntax policy.DataSyn
 	}
 
 	return []byte(data)
-}
-
-func (p *staticplus) PostStart(cch cache.Container) error {
-	if p.rdt != nil {
-		pod, ok := cch.GetPod()
-		if !ok {
-			return policyError("Pod of container %q not found", cch.GetID())
-		}
-		qos := string(pod.GetQOSClass())
-
-		p.Info("setting RDT class of container %q to %q", cch.GetID(), qos)
-
-		return p.rdt.SetContainerClass(cch, qos)
-	}
-	return nil
 }
 
 // SetConfig sets the policy backend configuration
