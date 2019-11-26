@@ -100,7 +100,7 @@ func (m *resmgr) startPolicy() error {
 		add = append(add, c)
 	}
 
-	if err := m.policy.Start(m.cache, add, deleted); err != nil {
+	if err := m.policy.Start(add, deleted); err != nil {
 		return resmgrError("failed to start policy: %v", err)
 	}
 
@@ -271,10 +271,6 @@ func (m *resmgr) processWithPolicy(ctx context.Context, method string, req inter
 			c.UpdateState(cache.ContainerStateRunning)
 		}
 
-		policyErr := m.policy.PostStart(c)
-		if policyErr != nil {
-			m.Warn("failed to update affected container %s: %v", c.GetID(), policyErr)
-		}
 		return rpl, err
 
 	default:

@@ -29,12 +29,13 @@ const (
 
 type none struct {
 	logger.Logger
+	cch cache.Cache
 }
 
 var _ policy.Backend = &none{}
 
 // CreateNonePolicy creates a new policy instance.
-func CreateNonePolicy(opts *policy.BackendOptions) policy.Backend {
+func CreateNonePolicy(cache cache.Cache, opts *policy.BackendOptions) policy.Backend {
 	n := &none{Logger: logger.NewLogger(PolicyName)}
 	n.Info("creating policy...")
 	return n
@@ -51,7 +52,7 @@ func (n *none) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (n *none) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
+func (n *none) Start(add []cache.Container, del []cache.Container) error {
 	n.Debug("got started...")
 	return nil
 }
@@ -85,40 +86,7 @@ func (n *none) ExportResourceData(c cache.Container, syntax policy.DataSyntax) [
 	return nil
 }
 
-func (n *none) PostStart(cch cache.Container) error {
-	n.Debug("post start container...")
-	return nil
-}
-
-// SetConfig sets the policy backend configuration
-func (n *none) SetConfig(string) error {
-	return nil
-}
-
-//
-// Automatically register us as a policy implementation.
-//
-
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.BackendOptions) policy.Backend
-
-// Name returns the name of this policy implementation.
-func (n Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (n Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (n Implementation) CreateFn() policy.CreateFn {
-	return policy.CreateFn(n)
-}
-
-var _ policy.Implementation = Implementation(nil)
-
+// Register us as a policy implementation.
 func init() {
-	policy.Register(Implementation(CreateNonePolicy))
+	policy.Register(PolicyName, PolicyDescription, CreateNonePolicy)
 }

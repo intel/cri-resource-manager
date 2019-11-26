@@ -88,7 +88,7 @@ func NewResourceManager() (ResourceManager, error) {
 	policyOpts := &policy.Options{
 		AgentCli: agent,
 	}
-	if m.policy, err = policy.NewPolicy(policyOpts); err != nil {
+	if m.policy, err = policy.NewPolicy(m.cache, policyOpts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
