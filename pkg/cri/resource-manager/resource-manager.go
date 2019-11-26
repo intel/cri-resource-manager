@@ -79,7 +79,6 @@ func NewResourceManager() (ResourceManager, error) {
 
 	copts := cache.Options{
 		CacheDir: opt.RelayDir,
-		Policy:   policy.ActivePolicy(),
 	}
 	if m.cache, err = cache.NewCache(copts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)

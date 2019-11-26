@@ -402,6 +402,11 @@ type Cache interface {
 	// EvaluateAffinity evaluates the given affinity against all known in-scope containers
 	EvaluateAffinity(*Affinity) map[string]int32
 
+	// GetActivePolicy returns the name of the active policy stored in the cache.
+	GetActivePolicy() string
+	// SetActivePolicy updates the name of the active policy stored in the cache.
+	SetActivePolicy(string) error
+
 	// SetPolicyEntry sets the policy entry for a key.
 	SetPolicyEntry(string, interface{})
 	// GetPolicyEntry gets the policy entry for a key.
@@ -459,8 +464,6 @@ var _ Cache = &cache{}
 type Options struct {
 	// CacheDir is the directory the cache should save its state in.
 	CacheDir string
-	// Policy is the name of the active policy.
-	Policy string
 }
 
 // NewCache instantiates a new cache. Load it from the given path if it exists.
@@ -472,7 +475,6 @@ func NewCache(options Options) (Cache, error) {
 		Pods:       make(map[string]*pod),
 		Containers: make(map[string]*container),
 		NextID:     1,
-		PolicyName: options.Policy,
 		policyData: make(map[string]interface{}),
 		PolicyJSON: make(map[string]string),
 	}
@@ -482,6 +484,17 @@ func NewCache(options Options) (Cache, error) {
 	}
 
 	return cch, nil
+}
+
+// GetActivePolicy returns the name of the active policy stored in the cache.
+func (cch *cache) GetActivePolicy() string {
+	return cch.PolicyName
+}
+
+// SetActivePolicy updaes the name of the active policy stored in the cache.
+func (cch *cache) SetActivePolicy(policy string) error {
+	cch.PolicyName = policy
+	return cch.Save()
 }
 
 // SetConfig caches the given configuration.
@@ -1121,21 +1134,12 @@ func (cch *cache) Restore(data []byte) error {
 			s.Version, CacheVersion)
 	}
 
-	if s.PolicyName != cch.PolicyName {
-		if s.PolicyName != "none" {
-			return cacheError("can't load stored state of policy '%s' for running '%s'",
-				s.PolicyName, cch.PolicyName)
-		}
-
-		cch.Warn("state stored by  '%s' will be used by running policy '%s'",
-			s.PolicyName, cch.PolicyName)
-	}
-
 	cch.Pods = s.Pods
 	cch.Containers = s.Containers
 	cch.Cfg = s.Cfg
 	cch.NextID = s.NextID
 	cch.PolicyJSON = s.PolicyJSON
+	cch.PolicyName = s.PolicyName
 	cch.policyData = make(map[string]interface{})
 
 	for _, p := range cch.Pods {

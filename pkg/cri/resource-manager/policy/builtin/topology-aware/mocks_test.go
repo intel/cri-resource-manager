@@ -391,6 +391,12 @@ func (m *mockCache) EvaluateAffinity(*cache.Affinity) map[string]int32 {
 		"fake key": 1,
 	}
 }
+func (m *mockCache) GetActivePolicy() string {
+	panic("unimplemented")
+}
+func (m *mockCache) SetActivePolicy(string) error {
+	panic("unimplemented")
+}
 func (m *mockCache) SetPolicyEntry(string, interface{}) {
 }
 func (m *mockCache) GetPolicyEntry(string, interface{}) bool {
