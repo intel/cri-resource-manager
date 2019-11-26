@@ -38,9 +38,6 @@ type options struct {
 	Reserved ConstraintSet `json:"ReservedResources,omitempty"`
 }
 
-// Registered policy implementations.
-var policies = map[string]Implementation{}
-
 // Our runtime configuration.
 var opt = defaultOptions().(*options)
 

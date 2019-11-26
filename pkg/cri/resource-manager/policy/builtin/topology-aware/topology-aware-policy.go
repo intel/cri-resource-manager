@@ -62,8 +62,11 @@ type policy struct {
 var _ policyapi.Backend = &policy{}
 
 // CreateTopologyAwarePolicy creates a new policy instance.
-func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
-	p := &policy{options: *opts}
+func CreateTopologyAwarePolicy(cache cache.Cache, opts *policyapi.BackendOptions) policyapi.Backend {
+	p := &policy{
+		cache:   cache,
+		options: *opts,
+	}
 
 	p.nodes = make(map[string]Node)
 	p.allocations = allocations{policy: p, CPU: make(map[string]CPUGrant, 32)}
@@ -98,9 +101,7 @@ func (p *policy) Description() string {
 }
 
 // Start prepares this policy for accepting allocation/release requests.
-func (p *policy) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
-	p.cache = cch
-
+func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	if err := p.restoreCache(); err != nil {
 		return policyError("failed to start: %v", err)
 	}
@@ -205,11 +206,6 @@ func (p *policy) ExportResourceData(c cache.Container, syntax policyapi.DataSynt
 	return []byte(data)
 }
 
-func (p *policy) PostStart(cch cache.Container) error {
-	log.Debug("post start container...")
-	return nil
-}
-
 func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("configuration %s:", event)
 	log.Info("  - pin containers to CPUs: %v", opt.PinCPU)
@@ -224,11 +220,6 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 
 	p.saveConfig()
 
-	return nil
-}
-
-// SetConfig sets the policy backend configuration.
-func (p *policy) SetConfig(rawConf string) error {
 	return nil
 }
 
@@ -299,30 +290,7 @@ func (p *policy) restoreCache() error {
 	return nil
 }
 
-//
-// Automatically register us as a policy implementation.
-//
-
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policyapi.BackendOptions) policyapi.Backend
-
-// Name returns the name of this policy implementation.
-func (Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (i Implementation) CreateFn() policyapi.CreateFn {
-	return policyapi.CreateFn(i)
-}
-
-var _ policyapi.Implementation = Implementation(nil)
-
+// Register us as a policy implementation.
 func init() {
-	policyapi.Register(Implementation(CreateTopologyAwarePolicy))
+	policyapi.Register(PolicyName, PolicyDescription, CreateTopologyAwarePolicy)
 }
