@@ -32,8 +32,6 @@ type options struct {
 	ResctrlPath    string `json:",omitempty"`
 	FallbackConfig string `json:",omitempty"`
 	ForceConfig    string `json:",omitempty"`
-
-	CriController bool `json:",omitempty"`
 }
 
 // Relay command line options and runtime configuration with their defaults.
@@ -65,7 +63,4 @@ func init() {
 		"Fallback configuration to use unless/until one is available from the cache or agent.")
 	flag.StringVar(&opt.ForceConfig, "force-config", "",
 		"Configuration used to override the one stored in the cache. Does not override the agent.")
-
-	flag.BoolVar(&opt.CriController, "controller-based-policy", true,
-		"Use controller-based CRI request processing and policy enforcement")
 }

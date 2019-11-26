@@ -109,14 +109,8 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
-	if !opt.CriController {
-		if err = m.setupPolicyHooks(); err != nil {
-			return nil, resmgrError("failed to create resource manager: %v", err)
-		}
-	} else {
-		if err = m.setupRequestProcessing(); err != nil {
-			return nil, resmgrError("failed to create resource manager: %v", err)
-		}
+	if err = m.setupRequestProcessing(); err != nil {
+		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
 	if m.control, err = control.NewControl(); err != nil {
@@ -147,14 +141,8 @@ func (m *resmgr) Start() error {
 		}
 	}
 
-	if !opt.CriController {
-		if err := m.startPolicy(); err != nil {
-			return err
-		}
-	} else {
-		if err := m.activateRequestProcessing(); err != nil {
-			return err
-		}
+	if err := m.activateRequestProcessing(); err != nil {
+		return err
 	}
 
 	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
