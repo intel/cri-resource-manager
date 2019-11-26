@@ -26,7 +26,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	"github.com/intel/cri-resource-manager/pkg/rdt"
 )
 
 // ResourceManager is the interface we expose for controlling the CRI resource manager.
@@ -43,11 +42,10 @@ type ResourceManager interface {
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay    // our CRI relay
-	cache        cache.Cache    // cached state
-	policy       policy.Policy  // resource manager policy
-	configServer config.Server  // configuration management server
-	rdt          control.CriRdt // RDT enforcement
+	relay        relay.Relay   // our CRI relay
+	cache        cache.Cache   // cached state
+	policy       policy.Policy // resource manager policy
+	configServer config.Server // configuration management server
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -87,15 +85,8 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
-	if !opt.NoRdt {
-		if err = m.setupRdt(); err != nil {
-			return nil, resmgrError("failed to create resource manager: %v", err)
-		}
-	}
-
 	policyOpts := &policy.Options{
 		AgentCli: agent,
-		Rdt:      m.rdt,
 	}
 	if m.policy, err = policy.NewPolicy(policyOpts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
@@ -169,21 +160,4 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 
 	m.Info("configuration updated")
 	return nil
-}
-
-func (m *resmgr) setupRdt() error {
-	var err error
-
-	path := opt.ResctrlPath
-	if path == "" {
-		// Try to find the resctrl mount point
-		path, err = rdt.ResctrlMountPath()
-		if err != nil {
-			m.Info("unable to find the resctrl mount point, RDT enforcement is disabled")
-			return nil
-		}
-		m.Info("using auto-discovered resctrl-path %q", path)
-	}
-	m.rdt, err = control.NewCriRdt(path)
-	return err
 }
