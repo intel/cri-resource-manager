@@ -825,13 +825,13 @@ func (c *container) markPending(controller string) {
 		c.pending = make(map[string]struct{})
 	}
 	c.pending[controller] = struct{}{}
-	c.cache.markChanged(c)
+	c.cache.markPending(c)
 }
 
 func (c *container) ClearPending(controller string) {
 	delete(c.pending, controller)
 	if len(c.pending) == 0 {
-		c.cache.clearChanged(c)
+		c.cache.clearPending(c)
 	}
 }
 

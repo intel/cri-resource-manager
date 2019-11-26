@@ -427,15 +427,6 @@ type Cache interface {
 	// LookupContainer looks up a container in the cache.
 	LookupContainer(id string) (Container, bool)
 
-	// StartTransaction start recording container changes.
-	StartTransaction() error
-	// CommitTransaction returns the set of containers that have changed.
-	CommitTransaction() []Container
-	// QueryTransaction queries the set of containers that have changed.
-	QueryTransaction() []Container
-	// AbortTransaction discards container changes.
-	AbortTransaction()
-
 	// GetPendingContainers returs all containers with pending changes.
 	GetPendingContainers() []Container
 
@@ -504,10 +495,7 @@ type cache struct {
 	policyData map[string]interface{} // opaque policy data
 	PolicyJSON map[string]string      // ditto in raw, unmarshaled form
 
-	updated  []Container         // transaction
-	changed  map[string]struct{} // change marker
-	snapshot []byte              // pre-transaction state snapshot
-	pending  map[string]struct{} // cache IDs of containers with pending changes
+	pending map[string]struct{} // cache IDs of containers with pending changes
 }
 
 // Make sure cache implements Cache.
@@ -802,85 +790,6 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 	return add, del
 }
 
-// Start a transaction by taking a snapshot of the current cache state.
-func (cch *cache) StartTransaction() error {
-	if cch.snapshot != nil {
-		return nil
-	}
-
-	cch.updated = []Container{}
-	cch.changed = make(map[string]struct{})
-
-	ss, err := cch.Snapshot()
-	if err != nil {
-		return err
-	}
-
-	cch.snapshot = ss
-	return nil
-}
-
-// Commit a transaction and return a slice of containers with changes.
-func (cch *cache) CommitTransaction() []Container {
-	if cch.snapshot == nil {
-		return nil
-	}
-
-	updated := cch.updated
-
-	cch.snapshot = nil
-	cch.changed = nil
-	cch.updated = nil
-
-	cch.Save()
-
-	return updated
-}
-
-// Abort a transaction restoring the saved state of the cache.
-func (cch *cache) AbortTransaction() {
-	if cch.snapshot == nil {
-		return
-	}
-
-	cch.Restore(cch.snapshot)
-
-	cch.snapshot = nil
-	cch.updated = nil
-	cch.changed = nil
-
-	cch.Save()
-}
-
-// Query the state of the current transaction.
-func (cch *cache) QueryTransaction() []Container {
-	updated := make([]Container, len(cch.updated))
-	copy(updated, cch.updated)
-
-	return updated
-}
-
-// Add a container to the current transaction.
-func (cch *cache) markChanged(c *container) {
-	cch.markPending(c)
-	if cch.updated == nil {
-		return
-	}
-
-	if _, marked := cch.changed[c.CacheID]; marked {
-		return
-	}
-
-	cch.updated = append(cch.updated, c)
-	cch.changed[c.CacheID] = struct{}{}
-}
-
-// Mark a container as up-to-date.
-func (cch *cache) clearChanged(c *container) {
-	cch.clearPending(c)
-	delete(cch.changed, c.CacheID)
-}
-
 // Mark a container as having pending changes.
 func (cch *cache) markPending(c *container) {
 	if cch.pending == nil {
@@ -1161,10 +1070,6 @@ type snapshot struct {
 
 // Snapshot takes a restorable snapshot of the current state of the cache.
 func (cch *cache) Snapshot() ([]byte, error) {
-	if len(cch.updated) != 0 {
-		return nil, cacheError("active transaction, refusing to take a snapshot")
-	}
-
 	s := snapshot{
 		Version:    CacheVersion,
 		Pods:       make(map[string]*pod),
@@ -1243,11 +1148,6 @@ func (cch *cache) Restore(data []byte) error {
 
 // Save the state of the cache.
 func (cch *cache) Save() error {
-	if cch.snapshot != nil {
-		cch.Debug("delaying Save() until current transaction is over")
-		return nil
-	}
-
 	cch.Debug("saving cache to file '%s'...", cch.filePath)
 
 	data, err := cch.Snapshot()
