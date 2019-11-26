@@ -23,13 +23,15 @@ import (
 
 // Options captures our command line or runtime configurable parameters.
 type options struct {
-	ImageSocket   string `json:",omitempty"`
-	RuntimeSocket string `json:",omitempty"`
-	RelaySocket   string `json:",omitempty"`
-	RelayDir      string `json:",omitempty"`
-	AgentSocket   string `json:",omitempty"`
-	ConfigSocket  string `json:",omitempty"`
-	ResctrlPath   string `json:",omitempty"`
+	ImageSocket    string `json:",omitempty"`
+	RuntimeSocket  string `json:",omitempty"`
+	RelaySocket    string `json:",omitempty"`
+	RelayDir       string `json:",omitempty"`
+	AgentSocket    string `json:",omitempty"`
+	ConfigSocket   string `json:",omitempty"`
+	ResctrlPath    string `json:",omitempty"`
+	FallbackConfig string `json:",omitempty"`
+	ForceConfig    string `json:",omitempty"`
 }
 
 // Relay command line options and runtime configuration with their defaults.
@@ -56,4 +58,9 @@ func init() {
 		"local socket of the cri-resmgr agent to connect")
 	flag.StringVar(&opt.ConfigSocket, "config-socket", sockets.ResourceManagerConfig,
 		"Unix domain socket path where the resource manager listens for cri-resmgr-agent")
+
+	flag.StringVar(&opt.FallbackConfig, "fallback-config", "",
+		"Fallback configuration to use unless/until one is available from the cache or agent.")
+	flag.StringVar(&opt.ForceConfig, "force-config", "",
+		"Configuration used to override the one stored in the cache. Does not override the agent.")
 }

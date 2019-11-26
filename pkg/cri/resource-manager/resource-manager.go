@@ -24,7 +24,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
-	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -42,30 +41,31 @@ type ResourceManager interface {
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay   // our CRI relay
-	cache        cache.Cache   // cached state
-	policy       policy.Policy // resource manager policy
-	configServer config.Server // configuration management server
+	relay        relay.Relay     // our CRI relay
+	cache        cache.Cache     // cached state
+	policy       policy.Policy   // resource manager policy
+	configServer config.Server   // configuration management server
+	agent        agent.Interface // connection to cri-resmgr agent
+	conf         *config.RawConfig
 }
 
 // NewResourceManager creates a new ResourceManager instance.
 func NewResourceManager() (ResourceManager, error) {
 	var err error
 
+	if opt.ForceConfig != "" && opt.FallbackConfig != "" {
+		return nil, resmgrError("both fallback (%s) and forced (%s) configuration given",
+			opt.FallbackConfig, opt.ForceConfig)
+	}
+
 	m := &resmgr{
 		Logger: logger.NewLogger("resource-manager"),
 	}
 
 	// Set-up connection to cri-resmgr agent
-	agent, err := agent.NewAgentInterface(opt.AgentSocket)
+	m.agent, err = agent.NewAgentInterface(opt.AgentSocket)
 	if err != nil {
 		m.Warn("failed to connect to cri-resmgr agent: %v", err)
-	}
-
-	// Get configuration
-	conf, err := agent.GetConfig(1 * time.Second)
-	if err != nil {
-		m.Error("failed to retrieve configuration")
 	}
 
 	ropts := relay.Options{
@@ -84,8 +84,20 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
+	if err = m.loadInitialConfig(); err != nil {
+		return nil, resmgrError("failed to load initial configuration: %v", err)
+	}
+
+	if policy.ActivePolicy() != m.cache.GetActivePolicy() {
+		if m.cache.GetActivePolicy() != "" {
+			return nil, resmgrError("trying to load cache with policy %s for active policy %s",
+				m.cache.GetActivePolicy(), policy.ActivePolicy())
+		}
+		m.cache.SetActivePolicy(policy.ActivePolicy())
+	}
+
 	policyOpts := &policy.Options{
-		AgentCli: agent,
+		AgentCli: m.agent,
 	}
 	if m.policy, err = policy.NewPolicy(m.cache, policyOpts); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
@@ -99,16 +111,12 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
-	if conf == nil || len(conf.Data) == 0 {
-		m.Warn("failed to fetch configuration, using last cached data")
-		conf = m.cache.GetConfig()
-	}
-	if conf != nil && len(conf.Data) > 0 {
-		m.SetConfig(conf)
-	}
-
-	if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
-		return nil, resmgrError("failed to create resource manager: %v", err)
+	if opt.ForceConfig != "" {
+		m.Warn("using forced configuration %s, not starting config server...", opt.ForceConfig)
+	} else {
+		if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
+			return nil, resmgrError("failed to create resource manager: %v", err)
+		}
 	}
 
 	return m, nil
@@ -121,8 +129,10 @@ func (m *resmgr) Start() error {
 	m.Lock()
 	defer m.Unlock()
 
-	if err := m.configServer.Start(opt.ConfigSocket); err != nil {
-		return resmgrError("failed to start config-server: %v", err)
+	if opt.ForceConfig == "" {
+		if err := m.configServer.Start(opt.ConfigSocket); err != nil {
+			return resmgrError("failed to start config-server: %v", err)
+		}
 	}
 
 	if err := m.startPolicy(); err != nil {
@@ -150,13 +160,59 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	m.Lock()
 	defer m.Unlock()
 
-	err := pkgcfg.SetConfig(conf.Data)
-	if err != nil {
-		err = resmgrError("failed to update configuration: %v", err)
-		m.Error("%v", err)
-		return err
+	if err := pkgcfg.SetConfig(conf.Data); err != nil {
+		m.Error("failed to update configuration: %v", err)
+		return resmgrError("configuration rejected: %v", err)
 	}
 
-	m.Info("configuration updated")
+	m.cache.SetConfig(conf)
+	m.Info("configuration successfully updated")
+
+	return nil
+}
+
+// loadInitialConfig tries to load initial configuration using the agent, a file, or the cache.
+func (m *resmgr) loadInitialConfig() error {
+	//
+	// Notes/TODO:
+	//
+	//   If the agent is already up and running when cri-resmgr is being started the
+	//   first configuration update will be polled using GetConfig(), unlike latter
+	//   updates which are pushed by the agent. Since there is no way to report about
+	//   problems with a polled configuration the agent will not know about problems
+	//   with the initial one...
+	//
+
+	m.Info("loading initial configuration...")
+
+	if opt.ForceConfig != "" {
+		m.Info("using forced configuration %s...", opt.ForceConfig)
+		return pkgcfg.SetConfigFromFile(opt.ForceConfig)
+	}
+
+	m.Info("trying configuration from agent...")
+	if conf, err := m.agent.GetConfig(1 * time.Second); err == nil {
+		if err = pkgcfg.SetConfig(conf.Data); err == nil {
+			m.conf = conf // save to be stored if we manage to start up
+			return nil
+		}
+		m.Error("configuration from agent failed to apply: %v", err)
+	}
+
+	m.Info("trying saved configuration from cache...")
+	if conf := m.cache.GetConfig(); conf != nil {
+		err := pkgcfg.SetConfig(conf.Data)
+		if err == nil {
+			return nil
+		}
+		m.Error("configuration from cache failed to apply: %v", err)
+	}
+
+	if opt.FallbackConfig != "" {
+		m.Info("trying fallback configuration %s...", opt.FallbackConfig)
+		return pkgcfg.SetConfigFromFile(opt.FallbackConfig)
+	}
+
+	m.Warn("no initial configuration found")
 	return nil
 }
