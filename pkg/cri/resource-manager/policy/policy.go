@@ -105,14 +105,6 @@ type Backend interface {
 type Policy interface {
 	// Start starts up policy, prepare for serving resource management requests.
 	Start([]cache.Container, []cache.Container) error
-	// PrepareDecisions prepares policy decisions.
-	PrepareDecisions() error
-	// QueryDecisions queries pending policy decisions.
-	QueryDecisions() []cache.Container
-	// CommitDecisions commits pending policy decisions.
-	CommitDecisions() []cache.Container
-	// AbortDecisions aborts (discard) pending policy decisions.
-	AbortDecisions()
 	// Sync synchronizes the state of the active policy.
 	Sync([]cache.Container, []cache.Container) error
 	// AlocateResources allocates resources to a container.
@@ -205,34 +197,6 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	log.Info("starting policy '%s'...", p.backend.Name())
 
 	return p.backend.Start(add, del)
-}
-
-// PrepareDecisions prepares a policy decision making round.
-func (p *policy) PrepareDecisions() error {
-	return p.cache.StartTransaction()
-}
-
-// QueryDecisions queries pending policy decisions.
-func (p *policy) QueryDecisions() []cache.Container {
-	return p.cache.QueryTransaction()
-}
-
-// CommitDecisions commits pending policy decisions.
-func (p *policy) CommitDecisions() []cache.Container {
-	updated := p.cache.CommitTransaction()
-
-	for _, c := range updated {
-		if data := p.backend.ExportResourceData(c, ExportShell); data != nil {
-			p.cache.WriteFile(c.GetCacheID(), ExportedResources, 0644, data)
-		}
-	}
-
-	return updated
-}
-
-// AbortDecisions reverts changes made in the current policy decision making round.
-func (p *policy) AbortDecisions() {
-	p.cache.AbortTransaction()
 }
 
 // Sync synchronizes the active policy state.
