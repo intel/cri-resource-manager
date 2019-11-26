@@ -33,6 +33,15 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
+const (
+	// CRI marks changes that can be applied by the CRI controller.
+	CRI = "cri"
+	// RDT marks changes that can be applied by the RDT controller.
+	RDT = "rdt"
+	// BlockIO marks changes that can be applied by the BlockIO controller.
+	BlockIO = "blockio"
+)
+
 // PodState is the pod state in the runtime.
 type PodState int32
 
