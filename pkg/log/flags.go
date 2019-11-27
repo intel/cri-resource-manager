@@ -177,11 +177,11 @@ func (m *stateMap) Set(value string) error {
 	}
 
 	if optMap != nil {
-		opt.updateLoggers()
 		*optMap = make(stateMap)
 		for key, value := range *m {
 			(*optMap)[key] = value
 		}
+		opt.updateLoggers()
 	}
 
 	return nil
