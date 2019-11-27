@@ -57,7 +57,7 @@ func TestGetKubeletHint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			output := getKubeletHint(tc.cpus, tc.mems)
 			if len(output) != tc.expectedLen {
-				t.Fatalf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
+				t.Errorf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
 			}
 		})
 	}
@@ -114,7 +114,7 @@ func TestGetTopologyHints(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			output := getTopologyHints(tc.hostPath, tc.containerPath, tc.readOnly)
 			if len(output) != tc.expectedLen {
-				t.Fatalf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
+				t.Errorf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
 			}
 		})
 	}
