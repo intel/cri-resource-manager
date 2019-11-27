@@ -278,10 +278,10 @@ func (c *container) GetArgs() []string {
 	return args
 }
 
-func keysInNamespace(m *map[string]string, namespace string) []string {
-	keys := make([]string, 0, len(*m))
+func keysInNamespace(m map[string]string, namespace string) []string {
+	keys := make([]string, 0, len(m))
 
-	for key := range *m {
+	for key := range m {
 		split := strings.SplitN(key, "/", 2)
 		if len(split) == 2 && split[0] == namespace {
 			keys = append(keys, split[1])
@@ -311,7 +311,7 @@ func (c *container) GetLabel(key string) (string, bool) {
 }
 
 func (c *container) GetResmgrLabelKeys() []string {
-	return keysInNamespace(&c.Labels, kubernetes.ResmgrKeyNamespace)
+	return keysInNamespace(c.Labels, kubernetes.ResmgrKeyNamespace)
 }
 
 func (c *container) GetResmgrLabel(key string) (string, bool) {
@@ -349,7 +349,7 @@ func (c *container) GetAnnotation(key string, objPtr interface{}) (string, bool)
 }
 
 func (c *container) GetResmgrAnnotationKeys() []string {
-	return keysInNamespace(&c.Annotations, kubernetes.ResmgrKeyNamespace)
+	return keysInNamespace(c.Annotations, kubernetes.ResmgrKeyNamespace)
 }
 
 func (c *container) GetResmgrAnnotation(key string, objPtr interface{}) (string, bool) {

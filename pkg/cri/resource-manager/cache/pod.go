@@ -18,8 +18,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"k8s.io/api/core/v1"
-
+	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
@@ -156,7 +155,7 @@ func (p *pod) GetLabel(key string) (string, bool) {
 
 // Get all label keys in the cri-resource-manager namespace.
 func (p *pod) GetResmgrLabelKeys() []string {
-	return keysInNamespace(&p.Labels, kubernetes.ResmgrKeyNamespace)
+	return keysInNamespace(p.Labels, kubernetes.ResmgrKeyNamespace)
 }
 
 // Get the label for the given key in the cri-resource-manager namespace.
@@ -231,7 +230,7 @@ func (p *pod) GetAnnotationObject(key string, objPtr interface{},
 
 // Get the keys of all annotation in the cri-resource-manager namespace.
 func (p *pod) GetResmgrAnnotationKeys() []string {
-	return keysInNamespace(&p.Annotations, kubernetes.ResmgrKeyNamespace)
+	return keysInNamespace(p.Annotations, kubernetes.ResmgrKeyNamespace)
 }
 
 // Get the value of the given annotation in the cri-resource-manager namespace.

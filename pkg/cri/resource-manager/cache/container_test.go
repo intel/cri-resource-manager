@@ -160,7 +160,7 @@ func TestKeysInNamespace(t *testing.T) {
 
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			keys := keysInNamespace(&tc.collectionMap, tc.namespace)
+			keys := keysInNamespace(tc.collectionMap, tc.namespace)
 			sort.Strings(keys)
 			if !cmp.Equal(keys, tc.expectedKeys, cmpopts.EquateEmpty()) {
 				t.Errorf("Expected %v, received %v", tc.expectedKeys, keys)
