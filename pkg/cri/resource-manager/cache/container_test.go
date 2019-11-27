@@ -82,35 +82,31 @@ func TestGetTopologyHints(t *testing.T) {
 			hostPath:      "/something",
 			containerPath: "/something",
 			readOnly:      true,
-			expectedLen:   0,
 		},
 		{
 			name:          "host /etc",
 			hostPath:      "/etc/something",
 			containerPath: "/data/something",
-			readOnly:      false,
-			expectedLen:   0,
 		},
 		{
 			name:          "container /etc",
 			hostPath:      "/var/lib/kubelet/pods/0c9bcfc4-c51b-11e9-ac9a-b8aeed7c7427/etc-hosts",
 			containerPath: "/etc/hosts",
-			readOnly:      false,
-			expectedLen:   0,
 		},
 		{
 			name:          "ConfigMap",
 			containerPath: "/var/lib/kube-proxy",
 			hostPath:      "/var/lib/kubelet/pods/0c9bcfc4-c51b-11e9-ac9a-b8aeed7c7427/volumes/kubernetes.io~configmap/kube-proxy",
-			readOnly:      false,
-			expectedLen:   0,
 		},
 		{
 			name:          "secret",
 			containerPath: "/var/run/secrets/kubernetes.io/serviceaccount",
 			hostPath:      "/var/lib/kubelet/pods/0c9bcfc4-c51b-11e9-ac9a-b8aeed7c7427/volumes/kubernetes.io~secret/kube-proxy-token-d9slz",
-			readOnly:      false,
-			expectedLen:   0,
+		},
+		{
+			name:          "dev null",
+			hostPath:      "/dev/null",
+			containerPath: "/dev/null",
 		},
 	}
 

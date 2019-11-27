@@ -646,11 +646,12 @@ func (c *container) SetCpusetMems(value string) {
 	c.cache.markChanged(c)
 }
 
-func getTopologyHints(hostPath, containerPath string, readOnly bool) (ret sysfs.TopologyHints) {
+func getTopologyHints(hostPath, containerPath string, readOnly bool) sysfs.TopologyHints {
+
 	if readOnly {
 		// if device or path is read-only, assume it as non-important for now
 		// TODO: determine topology hint, but use it with low priority
-		return
+		return sysfs.TopologyHints{}
 	}
 
 	// ignore topology information for small files in /etc, service files in /var/lib/kubelet and host libraries mounts
@@ -658,7 +659,7 @@ func getTopologyHints(hostPath, containerPath string, readOnly bool) (ret sysfs.
 
 	for _, path := range ignoredTopologyPaths {
 		if strings.HasPrefix(hostPath, path) || strings.HasPrefix(containerPath, path) {
-			return
+			return sysfs.TopologyHints{}
 		}
 	}
 
@@ -670,16 +671,18 @@ func getTopologyHints(hostPath, containerPath string, readOnly bool) (ret sysfs.
 	}
 	for _, re := range ignoredTopologyPathRegexps {
 		if re.MatchString(hostPath) || re.MatchString(containerPath) {
-			return
+			return sysfs.TopologyHints{}
 		}
 	}
 
 	if devPath, err := sysfs.FindSysFsDevice(hostPath); err == nil {
+		// errors are ignored
 		if hints, err := sysfs.NewTopologyHints(devPath); err == nil && len(hints) > 0 {
-			ret = sysfs.MergeTopologyHints(ret, hints)
+			return hints
 		}
 	}
-	return
+
+	return sysfs.TopologyHints{}
 }
 
 func getKubeletHint(cpus, mems string) (ret sysfs.TopologyHints) {
