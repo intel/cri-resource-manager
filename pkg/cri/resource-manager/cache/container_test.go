@@ -15,7 +15,11 @@
 package cache
 
 import (
+	"sort"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestGetKubeletHint(t *testing.T) {
@@ -115,6 +119,51 @@ func TestGetTopologyHints(t *testing.T) {
 			output := getTopologyHints(tc.hostPath, tc.containerPath, tc.readOnly)
 			if len(output) != tc.expectedLen {
 				t.Errorf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
+			}
+		})
+	}
+}
+
+func TestKeysInNamespace(t *testing.T) {
+	testMap := map[string]string{
+		"no-namespace":               "",
+		"my.name.space":              "",
+		"my.name.space/key-1":        "",
+		"my.name.space/key-2":        "",
+		"other.name.space/other-key": "",
+	}
+	tcases := []struct {
+		name          string
+		collectionMap map[string]string
+		namespace     string
+		expectedKeys  []string
+	}{
+		{
+			name: "empty map should return nothing for empty namespace",
+		},
+		{
+			name:      "empty map should return nothing",
+			namespace: "my.name.space",
+		},
+		{
+			name:          "keys with no namespace",
+			collectionMap: testMap,
+			expectedKeys:  []string{"my.name.space", "no-namespace"},
+		},
+		{
+			name:          "keys in namespace",
+			collectionMap: testMap,
+			namespace:     "my.name.space",
+			expectedKeys:  []string{"key-1", "key-2"},
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			keys := keysInNamespace(&tc.collectionMap, tc.namespace)
+			sort.Strings(keys)
+			if !cmp.Equal(keys, tc.expectedKeys, cmpopts.EquateEmpty()) {
+				t.Errorf("Expected %v, received %v", tc.expectedKeys, keys)
 			}
 		})
 	}
