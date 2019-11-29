@@ -17,9 +17,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	// LastCPUName is the Prometheuse Gauge name for last CPU with AVX512 instructions.
+	LastCPUName = "last_cpu_avx_task_switches"
+	// AVXSwitchCountName is the Prometheuse Gauge name for AVX switch count per cgroup.
+	AVXSwitchCountName = "avx_switch_count_per_cgroup"
+	// AllSwitchCountName is the Prometheuse Gauge name for all switch count per cgroup.
+	AllSwitchCountName = "all_switch_count_per_cgroup"
+)
+
 var (
 	lastCPUDesc = prometheus.NewDesc(
-		"last_cpu_avx_task_switches",
+		LastCPUName,
 		"Number of task switches on the CPU where AVX512 instructions were used.",
 		[]string{
 			"cpu_id",
@@ -27,7 +36,7 @@ var (
 	)
 
 	avxSwitchCountDesc = prometheus.NewDesc(
-		"avx_switch_count_per_cgroup",
+		AVXSwitchCountName,
 		"Number of task switches where AVX512 instructions were used in a particular cgroup.",
 		[]string{
 			"cgroup",
@@ -36,7 +45,7 @@ var (
 	)
 
 	allSwitchCountDesc = prometheus.NewDesc(
-		"all_switch_count_per_cgroup",
+		AllSwitchCountName,
 		"Total number of task switches in a particular cgroup.",
 		[]string{
 			"cgroup",
