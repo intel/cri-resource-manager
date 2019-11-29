@@ -2,19 +2,23 @@ package metrics
 
 import (
 	"fmt"
+	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
 	builtInCollectors    = make(map[string]InitCollector)
 	registeredCollectors = []prometheus.Collector{}
+	log                  = logger.NewLogger("metrics")
 )
 
 type InitCollector func() (prometheus.Collector, error)
 
 func RegisterCollector(name string, init InitCollector) error {
+	log.Info("registering collector %s...", name)
+
 	if _, found := builtInCollectors[name]; found {
-		return fmt.Errorf("Collector %s already registered", name)
+		return metricsError("Collector %s already registered", name)
 	}
 
 	builtInCollectors[name] = init
@@ -36,4 +40,8 @@ func NewMetricGatherer() (prometheus.Gatherer, error) {
 	reg.MustRegister(registeredCollectors[:]...)
 
 	return reg, nil
+}
+
+func metricsError(format string, args ...interface{}) error {
+	return fmt.Errorf("metrics: "+format, args...)
 }
