@@ -105,7 +105,7 @@ images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 libexec/%.o: elf/%.c
 	$(Q)echo "Building $@"
 	$(Q)mkdir -p libexec
-	$(CLANG) -I$(KERNEL_SRC_DIR)/arch/x86/include -I$(KERNEL_SRC_DIR)/include -O2 -Wall -target bpf -c $< -o $@
+	$(CLANG) -I$(KERNEL_SRC_DIR)/arch/x86/include -I$(KERNEL_SRC_DIR)/arch/x86/include/uapi -I$(KERNEL_SRC_DIR)/include -O2 -Wall -target bpf -c $< -o $@
 
 bin/%:
 	$(Q)bin=$(notdir $@); src=cmd/$$bin; \

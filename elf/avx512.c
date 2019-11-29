@@ -1,6 +1,4 @@
-#include <linux/version.h>
 #include <uapi/linux/bpf.h>
-
 #include <asm/page_types.h>
 
 /* asm/fpu/types.h assumes __packed is defined */
@@ -8,6 +6,10 @@
 #include <asm/fpu/types.h>
 
 #define SEC(NAME) __attribute__((section(NAME), used))
+
+#ifndef KERNEL_VERSION
+    #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
+#endif
 
 #define BUF_SIZE_MAP_NS 256
 
@@ -158,4 +160,13 @@ int tracepoint__x86_fpu_regs_deactivated(struct x86_fpu_args *args)
 
 char _license[] SEC("license") = "GPL";
 
-unsigned int _version SEC("version") = LINUX_VERSION_CODE;
+/*
+Notes about Linux version:
+   * We don't check LINUX_VERSION_CODE build time. It's user's responsibility to provide new enough headers.
+   * Build failures may happen due to too old kernel headers (currently, Linux >= 5.1 headers are needed).
+   * Our dependency to Kernel ABI is x86_fpu tracepoint parameters and struct fpu.
+   * The host kernel needs to run Linux >= 5.2 and the version is checked upon eBPF loading.
+   * We build the minimum supported version in SEC("version") section.
+   * Max supported version is not checked but the check may be added later.
+*/
+unsigned int _version SEC("version") = KERNEL_VERSION(5, 2, 0);

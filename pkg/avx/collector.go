@@ -81,10 +81,6 @@ func checkElfKernelVersion(path string) error {
 		return errors.New("host kernel is too old, consider rebuilding eBPF")
 	}
 
-	if currentCode > kernelVersionCode(elfMajor, elfMinor, 255) {
-		return errors.New("host kernel is too new, consider rebuilding eBPF")
-	}
-
 	return nil
 }
 
