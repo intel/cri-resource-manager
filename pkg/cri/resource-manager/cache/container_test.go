@@ -15,7 +15,11 @@
 package cache
 
 import (
+	"sort"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestGetKubeletHint(t *testing.T) {
@@ -57,7 +61,7 @@ func TestGetKubeletHint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			output := getKubeletHint(tc.cpus, tc.mems)
 			if len(output) != tc.expectedLen {
-				t.Fatalf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
+				t.Errorf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
 			}
 		})
 	}
@@ -78,35 +82,31 @@ func TestGetTopologyHints(t *testing.T) {
 			hostPath:      "/something",
 			containerPath: "/something",
 			readOnly:      true,
-			expectedLen:   0,
 		},
 		{
 			name:          "host /etc",
 			hostPath:      "/etc/something",
 			containerPath: "/data/something",
-			readOnly:      false,
-			expectedLen:   0,
 		},
 		{
 			name:          "container /etc",
 			hostPath:      "/var/lib/kubelet/pods/0c9bcfc4-c51b-11e9-ac9a-b8aeed7c7427/etc-hosts",
 			containerPath: "/etc/hosts",
-			readOnly:      false,
-			expectedLen:   0,
 		},
 		{
 			name:          "ConfigMap",
 			containerPath: "/var/lib/kube-proxy",
 			hostPath:      "/var/lib/kubelet/pods/0c9bcfc4-c51b-11e9-ac9a-b8aeed7c7427/volumes/kubernetes.io~configmap/kube-proxy",
-			readOnly:      false,
-			expectedLen:   0,
 		},
 		{
 			name:          "secret",
 			containerPath: "/var/run/secrets/kubernetes.io/serviceaccount",
 			hostPath:      "/var/lib/kubelet/pods/0c9bcfc4-c51b-11e9-ac9a-b8aeed7c7427/volumes/kubernetes.io~secret/kube-proxy-token-d9slz",
-			readOnly:      false,
-			expectedLen:   0,
+		},
+		{
+			name:          "dev null",
+			hostPath:      "/dev/null",
+			containerPath: "/dev/null",
 		},
 	}
 
@@ -114,7 +114,52 @@ func TestGetTopologyHints(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			output := getTopologyHints(tc.hostPath, tc.containerPath, tc.readOnly)
 			if len(output) != tc.expectedLen {
-				t.Fatalf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
+				t.Errorf("expected len of hints: %d, got: %d, hints: %+v", tc.expectedLen, len(output), output)
+			}
+		})
+	}
+}
+
+func TestKeysInNamespace(t *testing.T) {
+	testMap := map[string]string{
+		"no-namespace":               "",
+		"my.name.space":              "",
+		"my.name.space/key-1":        "",
+		"my.name.space/key-2":        "",
+		"other.name.space/other-key": "",
+	}
+	tcases := []struct {
+		name          string
+		collectionMap map[string]string
+		namespace     string
+		expectedKeys  []string
+	}{
+		{
+			name: "empty map should return nothing for empty namespace",
+		},
+		{
+			name:      "empty map should return nothing",
+			namespace: "my.name.space",
+		},
+		{
+			name:          "keys with no namespace",
+			collectionMap: testMap,
+			expectedKeys:  []string{"my.name.space", "no-namespace"},
+		},
+		{
+			name:          "keys in namespace",
+			collectionMap: testMap,
+			namespace:     "my.name.space",
+			expectedKeys:  []string{"key-1", "key-2"},
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			keys := keysInNamespace(tc.collectionMap, tc.namespace)
+			sort.Strings(keys)
+			if !cmp.Equal(keys, tc.expectedKeys, cmpopts.EquateEmpty()) {
+				t.Errorf("Expected %v, received %v", tc.expectedKeys, keys)
 			}
 		})
 	}
