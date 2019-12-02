@@ -24,7 +24,7 @@ import (
 
 // buildPoolsByTopology builds a hierarchical tree of pools based on HW topology.
 func (p *policy) buildPoolsByTopology() error {
-	var n Node
+	var n *node
 
 	socketCnt := p.sys.SocketCount()
 	nodeCnt := p.sys.NUMANodeCount()
@@ -33,58 +33,52 @@ func (p *policy) buildPoolsByTopology() error {
 	}
 	poolCnt := socketCnt + nodeCnt + map[bool]int{false: 0, true: 1}[socketCnt > 1]
 
-	p.nodes = make(map[string]Node, poolCnt)
-	p.pools = make([]Node, poolCnt)
+	p.nodes = make(map[string]*node, poolCnt)
+	p.pools = make([]*node, poolCnt)
 
 	// create virtual root if necessary
 	if socketCnt > 1 {
-		p.root = p.NewVirtualNode("root", nilnode)
-		p.nodes[p.root.Name()] = p.root
+		p.root = newVirtualNode("root", p, nil)
+		p.nodes[p.root.name] = p.root
 	}
 
 	// create nodes for sockets
-	sockets := make(map[system.ID]Node, socketCnt)
+	sockets := make(map[system.ID]*node, socketCnt)
 	for _, id := range p.sys.PackageIDs() {
 		if socketCnt > 1 {
-			n = p.NewSocketNode(id, p.root)
+			n = newSocketNode(id, p, p.root)
 		} else {
-			n = p.NewSocketNode(id, nilnode)
+			n = newSocketNode(id, p, nil)
 			p.root = n
 		}
-		p.nodes[n.Name()] = n
+		p.nodes[n.name] = n
 		sockets[id] = n
 	}
 
 	// create nodes for NUMA nodes
 	if nodeCnt > 0 {
 		for _, id := range p.sys.NodeIDs() {
-			n = p.NewNumaNode(id, sockets[p.sys.Node(id).PackageID()])
-			p.nodes[n.Name()] = n
+			n = newNumaNode(id, p, sockets[p.sys.Node(id).PackageID()])
+			p.nodes[n.name] = n
 		}
 	}
 
-	// enumerate nodes, calculate tree depth, discover node resource capacity
-	p.root.DepthFirst(func(n Node) error {
+	// enumerate nodes, discover node resource capacity
+	p.root.depthFirst(func(n *node) error {
 		p.pools[p.nodeCnt] = n
-		n.(*node).id = p.nodeCnt
+		n.id = p.nodeCnt
 		p.nodeCnt++
-
-		if p.depth < n.(*node).depth {
-			p.depth = n.(*node).depth
-		}
-
-		n.DiscoverCPU()
-		n.DiscoverMemset()
 
 		return nil
 	})
+	p.root.discoverCPU()
 
 	return nil
 }
 
 // Pick a pool and allocate resource from it to the container.
 func (p *policy) allocatePool(container cache.Container) (CPUGrant, error) {
-	var pool Node
+	var pool *node
 
 	request := newCPURequest(container)
 
@@ -98,17 +92,16 @@ func (p *policy) allocatePool(container cache.Container) (CPUGrant, error) {
 			log.Debug("* node fitting for %s", request)
 			for idx, n := range pools {
 				log.Debug("    - #%d: node %s, score %s, affinity: %d",
-					idx, n.Name(), scores[n.NodeID()], affinity[n.NodeID()])
+					idx, n.name, scores[n.id], affinity[n.id])
 			}
 		}
 
 		pool = pools[0]
 	}
 
-	cpus := pool.FreeCPU()
-	grant, err := cpus.Allocate(request)
+	grant, err := pool.freecpu.Allocate(request)
 	if err != nil {
-		return nil, policyError("failed to allocate %s from %s: %v", request, cpus, err)
+		return nil, policyError("failed to allocate %s from %s: %v", request, pool.freecpu, err)
 	}
 
 	p.allocations.CPU[container.GetCacheID()] = grant
@@ -141,8 +134,8 @@ func (p *policy) applyGrant(grant CPUGrant) error {
 
 	mems := ""
 	node := grant.GetNode()
-	if !node.IsRootNode() && opt.PinMemory {
-		mems = node.GetMemset().String()
+	if node.parent != nil && opt.PinMemory {
+		mems = node.getMemset().String()
 	}
 
 	if opt.PinCPU {
@@ -193,10 +186,8 @@ func (p *policy) releasePool(container cache.Container) (CPUGrant, bool, error) 
 
 	log.Debug("  => releasing grant %s...", grant)
 
-	pool := grant.GetNode()
-	cpus := pool.FreeCPU()
+	grant.GetNode().freecpu.Release(grant)
 
-	cpus.Release(grant)
 	delete(p.allocations.CPU, container.GetCacheID())
 	p.saveAllocations()
 
@@ -214,9 +205,9 @@ func (p *policy) updateSharedAllocations(grant CPUGrant) error {
 		}
 
 		if opt.PinCPU {
-			shared := other.GetNode().FreeCPU().SharableCPUs().String()
+			shared := other.GetNode().freecpu.SharableCPUs().String()
 			log.Debug("  => updating %s with shared CPUs of %s: %s...",
-				other, other.GetNode().Name(), shared)
+				other, other.GetNode().name, shared)
 			other.GetContainer().SetCpusetCpus(shared)
 		}
 	}
@@ -235,7 +226,7 @@ func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int3
 			continue
 		}
 		node := grant.GetNode()
-		result[node.NodeID()] += w
+		result[node.id] += w
 	}
 
 	return result
@@ -260,11 +251,11 @@ func (p *policy) calculateContainerAffinity(container cache.Container) map[strin
 }
 
 // Score pools against the request and sort them by score.
-func (p *policy) sortPoolsByScore(req CPURequest, aff map[int]int32) (map[int]CPUScore, []Node) {
+func (p *policy) sortPoolsByScore(req CPURequest, aff map[int]int32) (map[int]CPUScore, []*node) {
 	scores := make(map[int]CPUScore, p.nodeCnt)
 
-	p.root.DepthFirst(func(n Node) error {
-		scores[n.NodeID()] = n.GetScore(req)
+	p.root.depthFirst(func(n *node) error {
+		scores[n.id] = n.freecpu.GetScore(req)
 		return nil
 	})
 
@@ -279,8 +270,8 @@ func (p *policy) sortPoolsByScore(req CPURequest, aff map[int]int32) (map[int]CP
 func (p *policy) compareScores(request CPURequest, scores map[int]CPUScore,
 	affinity map[int]int32, i int, j int) bool {
 	node1, node2 := p.pools[i], p.pools[j]
-	depth1, depth2 := node1.RootDistance(), node2.RootDistance()
-	id1, id2 := node1.NodeID(), node2.NodeID()
+	depth1, depth2 := node1.rootDistance(), node2.rootDistance()
+	id1, id2 := node1.id, node2.id
 	score1, score2 := scores[id1], scores[id2]
 	isolated1, shared1 := score1.IsolatedCapacity(), score1.SharedCapacity()
 	isolated2, shared2 := score2.IsolatedCapacity(), score2.SharedCapacity()

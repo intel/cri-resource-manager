@@ -15,10 +15,11 @@
 package topologyaware
 
 import (
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"strconv"
 	"strings"
+
+	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 // Calculate the hint score of the given hint and CPUSet.
@@ -78,7 +79,7 @@ func (cs *cpuSupply) hintCpus(h system.TopologyHint) cpuset.CPUSet {
 	case h.NUMAs != "":
 		for _, idstr := range strings.Split(h.NUMAs, ",") {
 			if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-				if node := cs.node.System().Node(system.ID(id)); node != nil {
+				if node := cs.node.policy.sys.Node(system.ID(id)); node != nil {
 					cpus = cpus.Union(node.CPUSet())
 				}
 			}
@@ -87,7 +88,7 @@ func (cs *cpuSupply) hintCpus(h system.TopologyHint) cpuset.CPUSet {
 	case h.Sockets != "":
 		for _, idstr := range strings.Split(h.Sockets, ",") {
 			if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-				if pkg := cs.node.System().Package(system.ID(id)); pkg != nil {
+				if pkg := cs.node.policy.sys.Package(system.ID(id)); pkg != nil {
 					cpus = cpus.Union(pkg.CPUSet())
 				}
 			}

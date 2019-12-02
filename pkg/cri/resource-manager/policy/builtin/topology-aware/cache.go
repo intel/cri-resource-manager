@@ -16,6 +16,7 @@ package topologyaware
 
 import (
 	"encoding/json"
+
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -63,7 +64,7 @@ func newCachedGrant(cg CPUGrant) *cachedGrant {
 	ccg.Exclusive = cg.ExclusiveCPUs().String()
 	ccg.Part = cg.SharedPortion()
 	ccg.Container = cg.GetContainer().GetCacheID()
-	ccg.Pool = cg.GetNode().Name()
+	ccg.Pool = cg.GetNode().name
 
 	return ccg
 }

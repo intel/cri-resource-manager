@@ -32,8 +32,8 @@ func TestToCPUGrant(t *testing.T) {
 			name:   "unknown node",
 			cgrant: &cachedGrant{},
 			policy: &policy{
-				nodes: map[string]Node{
-					"node1": &node{},
+				nodes: map[string]*node{
+					"node1": {},
 				},
 			},
 			expectedError: true,
@@ -44,8 +44,8 @@ func TestToCPUGrant(t *testing.T) {
 				Pool: "node1",
 			},
 			policy: &policy{
-				nodes: map[string]Node{
-					"node1": &node{},
+				nodes: map[string]*node{
+					"node1": {},
 				},
 				cache: &mockCache{},
 			},
@@ -57,8 +57,8 @@ func TestToCPUGrant(t *testing.T) {
 				Pool: "node1",
 			},
 			policy: &policy{
-				nodes: map[string]Node{
-					"node1": &node{},
+				nodes: map[string]*node{
+					"node1": {},
 				},
 				cache: &mockCache{
 					returnValue2ForLookupContainer: true,
@@ -99,14 +99,11 @@ func TestAllocationMarshalling(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			alloc := &allocations{
 				policy: &policy{
-					nodes: map[string]Node{
-						"testnode": &virtualnode{
-							node: node{
-								name:    "testnode",
-								kind:    UnknownNode,
-								nodecpu: newCPUSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0),
-								freecpu: newCPUSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0),
-							},
+					nodes: map[string]*node{
+						"testnode": {
+							name:    "testnode",
+							nodecpu: newCPUSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0),
+							freecpu: newCPUSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0),
 						},
 					},
 					cache: &mockCache{

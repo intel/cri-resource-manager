@@ -323,6 +323,11 @@ func (sys *System) NodeIDs() []ID {
 	return ids
 }
 
+// PackageNodeIDs returns NUMA node ids for a given package.
+func (sys *System) PackageNodeIDs(id ID) []ID {
+	return sys.Package(id).NodeIDs()
+}
+
 // CPUIDs gets the ids of all CPUs present in the system.
 func (sys *System) CPUIDs() []ID {
 	ids := make([]ID, len(sys.cpus))

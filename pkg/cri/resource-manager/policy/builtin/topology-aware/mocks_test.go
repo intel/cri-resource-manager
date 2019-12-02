@@ -15,6 +15,7 @@
 package topologyaware
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -61,6 +62,9 @@ func (fake *mockSystem) PackageIDs() []system.ID {
 func (fake *mockSystem) NodeIDs() []system.ID {
 	return []system.ID{0, 1}
 }
+func (fake *mockSystem) PackageNodeIDs(system.ID) []system.ID {
+	return []system.ID{0}
+}
 
 type mockContainer struct {
 	name                                  string
@@ -73,7 +77,7 @@ func (m *mockContainer) PrettyName() string {
 	return m.name
 }
 func (m *mockContainer) GetPod() (cache.Pod, bool) {
-	return &mockPod{}, false
+	return &mockPod{name: "fakepod"}, false
 }
 func (m *mockContainer) GetID() string {
 	panic("unimplemented")
@@ -209,7 +213,9 @@ func (m *mockContainer) DeleteDevice(string) {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetTopologyHints() sysfs.TopologyHints {
-	return sysfs.TopologyHints{}
+	return sysfs.TopologyHints{
+		"fakehint1": sysfs.TopologyHint{},
+	}
 }
 func (m *mockContainer) GetCPUPeriod() int64 {
 	panic("unimplemented")
@@ -251,8 +257,8 @@ func (m *mockContainer) SetOomScoreAdj(int64) {
 }
 func (m *mockContainer) SetCpusetCpus(string) {
 }
-func (m *mockContainer) SetCpusetMems(string) {
-	panic("unimplemented")
+func (m *mockContainer) SetCpusetMems(mems string) {
+	fmt.Printf("mocked SetCpusetMems(%q) called\n", mems)
 }
 func (m *mockContainer) UpdateCriCreateRequest(*cri.CreateContainerRequest) error {
 	panic("unimplemented")
@@ -457,7 +463,7 @@ func (m *mockCache) GetConfig() *config.RawConfig {
 	panic("unimplemented")
 }
 func (m *mockCache) Save() error {
-	panic("unimplemented")
+	return fmt.Errorf("not implemented")
 }
 func (m *mockCache) Refresh(interface{}) ([]cache.Pod, []cache.Pod, []cache.Container, []cache.Container) {
 	panic("unimplemented")

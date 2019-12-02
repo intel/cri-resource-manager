@@ -25,7 +25,7 @@ import (
 // CPUSupply represents avaialbe CPU capacity of a node.
 type CPUSupply interface {
 	// GetNode returns the node supplying this capacity.
-	GetNode() Node
+	GetNode() *node
 	// Clone creates a copy of this CPUSupply.
 	Clone() CPUSupply
 	// IsolatedCPUs returns the isolated cpuset in this supply.
@@ -72,7 +72,7 @@ type CPUGrant interface {
 	// GetContainer returns the container CPU capacity is granted to.
 	GetContainer() cache.Container
 	// GetNode returns the node that granted CPU capacity to the container.
-	GetNode() Node
+	GetNode() *node
 	// ExclusiveCPUs returns the exclusively granted non-isolated cpuset.
 	ExclusiveCPUs() cpuset.CPUSet
 	// SharedCPUs returns the shared granted cpuset.
@@ -104,7 +104,7 @@ type CPUScore interface {
 
 // cpuSupply implements our CPUSupply interface.
 type cpuSupply struct {
-	node     Node          // node supplying CPUs
+	node     *node         // node supplying CPUs
 	isolated cpuset.CPUSet // isolated CPUs at this node
 	sharable cpuset.CPUSet // sharable CPUs at this node
 	granted  int           // amount of sharable allocated
@@ -131,7 +131,7 @@ var _ CPURequest = &cpuRequest{}
 // cpuGrant implements our CpuGrant interface.
 type cpuGrant struct {
 	container cache.Container // container CPU is granted to
-	node      Node            // node CPU is supplied from
+	node      *node           // node CPU is supplied from
 	exclusive cpuset.CPUSet   // exclusive CPUs
 	portion   int             // milliCPUs granted from shared set
 }
@@ -151,7 +151,7 @@ type cpuScore struct {
 var _ CPUScore = &cpuScore{}
 
 // newCPUSupply creates CPU supply for the given node, cpusets and existing grant.
-func newCPUSupply(n Node, isolated, sharable cpuset.CPUSet, granted int) CPUSupply {
+func newCPUSupply(n *node, isolated, sharable cpuset.CPUSet, granted int) CPUSupply {
 	return &cpuSupply{
 		node:     n,
 		isolated: isolated.Clone(),
@@ -161,7 +161,7 @@ func newCPUSupply(n Node, isolated, sharable cpuset.CPUSet, granted int) CPUSupp
 }
 
 // GetNode returns the node supplying CPU.
-func (cs *cpuSupply) GetNode() Node {
+func (cs *cpuSupply) GetNode() *node {
 	return cs.node
 }
 
@@ -196,7 +196,7 @@ func (cs *cpuSupply) Cumulate(more CPUSupply) {
 
 // AccountAllocate accounts for (removes) allocated exclusive capacity from the supply.
 func (cs *cpuSupply) AccountAllocate(g CPUGrant) {
-	if cs.node.IsSameNode(g.GetNode()) {
+	if cs.node.isSameNode(g.GetNode()) {
 		return
 	}
 	exclusive := g.ExclusiveCPUs()
@@ -206,11 +206,11 @@ func (cs *cpuSupply) AccountAllocate(g CPUGrant) {
 
 // AccountRelease accounts for (reinserts) released exclusive capacity into the supply.
 func (cs *cpuSupply) AccountRelease(g CPUGrant) {
-	if cs.node.IsSameNode(g.GetNode()) {
+	if cs.node.isSameNode(g.GetNode()) {
 		return
 	}
 
-	ncs := cs.node.GetCPU()
+	ncs := cs.node.nodecpu.Clone()
 	nodecpus := ncs.IsolatedCPUs().Union(ncs.SharableCPUs())
 	grantcpus := g.ExclusiveCPUs().Intersection(nodecpus)
 
@@ -234,7 +234,7 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 		if err != nil {
 			return nil, policyError("internal error: "+
 				"can't allocate %d exclusive CPUs from %s of %s",
-				cr.full, cs.isolated, cs.node.Name())
+				cr.full, cs.isolated, cs.node.name)
 		}
 
 	case cr.full > 0 && (1000*cs.sharable.Size()-cs.granted)/1000 > cr.full:
@@ -242,7 +242,7 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 		if err != nil {
 			return nil, policyError("internal error: "+
 				"can't slice %d exclusive CPUs from %s(-%d) of %s",
-				cr.full, cs.sharable, cs.granted, cs.node.Name())
+				cr.full, cs.sharable, cs.granted, cs.node.name)
 		}
 	}
 
@@ -251,15 +251,15 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 		if 1000*cs.sharable.Size()-cs.granted < cr.fraction {
 			return nil, policyError("internal error: "+
 				"not enough sharable CPU for %d in %s(-%d) of %s",
-				cr.fraction, cs.sharable, cs.granted, cs.node.Name())
+				cr.fraction, cs.sharable, cs.granted, cs.node.name)
 		}
 		cs.granted += cr.fraction
 	}
 
 	grant := newCPUGrant(cs.node, cr.GetContainer(), exclusive, cr.fraction)
 
-	cs.node.DepthFirst(func(n Node) error {
-		n.FreeCPU().AccountAllocate(grant)
+	cs.node.depthFirst(func(n *node) error {
+		n.freecpu.AccountAllocate(grant)
 		return nil
 	})
 
@@ -268,15 +268,15 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 
 // Release returns CPU from the given grant to the supply.
 func (cs *cpuSupply) Release(g CPUGrant) {
-	isolated := g.ExclusiveCPUs().Intersection(cs.node.GetCPU().IsolatedCPUs())
+	isolated := g.ExclusiveCPUs().Intersection(cs.node.nodecpu.Clone().IsolatedCPUs())
 	sharable := g.ExclusiveCPUs().Difference(isolated)
 
 	cs.isolated = cs.isolated.Union(isolated)
 	cs.sharable = cs.sharable.Union(sharable)
 	cs.granted -= g.SharedPortion()
 
-	cs.node.DepthFirst(func(n Node) error {
-		n.FreeCPU().AccountRelease(g)
+	cs.node.depthFirst(func(n *node) error {
+		n.freecpu.AccountRelease(g)
 		return nil
 	})
 }
@@ -296,7 +296,7 @@ func (cs *cpuSupply) String() string {
 		none = ""
 	}
 
-	return "<" + cs.node.Name() + " CPU: " + none + isolated + sharable + ">"
+	return "<" + cs.node.name + " CPU: " + none + isolated + sharable + ">"
 }
 
 // newCPURequest creates a new CPU request for the given container.
@@ -373,7 +373,7 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	}
 
 	// calculate free shared capacity
-	score.shared = 1000*cs.sharable.Size() - cs.node.GrantedCPU()
+	score.shared = 1000*cs.sharable.Size() - cs.node.grantedCPU()
 
 	// calculate isolated node capacity CPU
 	if cr.isolate {
@@ -389,8 +389,8 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	score.shared -= part
 
 	// calculate colocation score
-	for _, grant := range cs.node.Policy().allocations.CPU {
-		if grant.GetNode().NodeID() == cs.node.NodeID() {
+	for _, grant := range cs.node.policy.allocations.CPU {
+		if grant.GetNode().isSameNode(cs.node) {
 			score.colocated++
 		}
 	}
@@ -401,7 +401,7 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 
 	for provider, hint := range cr.container.GetTopologyHints() {
 		log.Debug(" - evaluating topology hint %s", hint)
-		score.hints[provider] = cs.node.HintScore(hint)
+		score.hints[provider] = cs.node.hintScore(hint)
 	}
 
 	// calculate any fake hint scores
@@ -410,13 +410,13 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	if fakeHints, ok := opt.FakeHints[key]; ok {
 		for provider, hint := range fakeHints {
 			log.Debug(" - evaluating fake hint %s", hint)
-			score.hints[provider] = cs.node.HintScore(hint)
+			score.hints[provider] = cs.node.hintScore(hint)
 		}
 	}
 	if fakeHints, ok := opt.FakeHints[cr.container.GetName()]; ok {
 		for provider, hint := range fakeHints {
 			log.Debug(" - evaluating fake hint %s", hint)
-			score.hints[provider] = cs.node.HintScore(hint)
+			score.hints[provider] = cs.node.hintScore(hint)
 		}
 	}
 
@@ -454,11 +454,11 @@ func (score *cpuScore) HintScores() map[string]float64 {
 
 func (score *cpuScore) String() string {
 	return fmt.Sprintf("<CPU score: node %s, isolated:%d, shared:%d, colocated:%d, hints: %v>",
-		score.supply.GetNode().Name(), score.isolated, score.shared, score.colocated, score.hints)
+		score.supply.GetNode().name, score.isolated, score.shared, score.colocated, score.hints)
 }
 
 // newCPUGrant creates a CPU grant from the given node for the container.
-func newCPUGrant(n Node, c cache.Container, exclusive cpuset.CPUSet, portion int) CPUGrant {
+func newCPUGrant(n *node, c cache.Container, exclusive cpuset.CPUSet, portion int) CPUGrant {
 	return &cpuGrant{
 		node:      n,
 		container: c,
@@ -473,7 +473,7 @@ func (cg *cpuGrant) GetContainer() cache.Container {
 }
 
 // GetNode returns the Node this grant is allocated to.
-func (cg *cpuGrant) GetNode() Node {
+func (cg *cpuGrant) GetNode() *node {
 	return cg.node
 }
 
@@ -484,7 +484,7 @@ func (cg *cpuGrant) ExclusiveCPUs() cpuset.CPUSet {
 
 // SharedCPUs returns the shared CPUSet in this grant.
 func (cg *cpuGrant) SharedCPUs() cpuset.CPUSet {
-	return cg.node.GetCPU().SharableCPUs()
+	return cg.node.nodecpu.Clone().SharableCPUs()
 }
 
 // SharedPortion returns the milli-CPU allocation for the shared CPUSet in this grant.
@@ -494,7 +494,7 @@ func (cg *cpuGrant) SharedPortion() int {
 
 // ExclusiveCPUs returns the isolated exclusive CPUSet in this grant.
 func (cg *cpuGrant) IsolatedCPUs() cpuset.CPUSet {
-	return cg.node.GetCPU().IsolatedCPUs().Intersection(cg.exclusive)
+	return cg.node.nodecpu.Clone().IsolatedCPUs().Intersection(cg.exclusive)
 }
 
 // String returns a printable representation of the CPU grant.
@@ -512,11 +512,11 @@ func (cg *cpuGrant) String() string {
 	}
 	if cg.portion > 0 {
 		shared = fmt.Sprintf("%sshared: %s (%d milli-CPU)", sep,
-			cg.node.FreeCPU().SharableCPUs(), cg.portion)
+			cg.node.freecpu.SharableCPUs(), cg.portion)
 	}
 
 	return fmt.Sprintf("<CPU grant for %s from %s: %s%s%s>",
-		cg.container.PrettyName(), cg.node.Name(), isolated, exclusive, shared)
+		cg.container.PrettyName(), cg.node.name, isolated, exclusive, shared)
 }
 
 // takeCPUs takes up to cnt CPUs from a given CPU set to another.

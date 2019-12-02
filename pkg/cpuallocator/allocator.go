@@ -364,6 +364,9 @@ func allocateCpus(from *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
 		result, err, *from = from.Clone(), nil, cpuset.NewCPUSet()
 	default:
 		a := NewCPUAllocator(nil)
+		if a == nil {
+			return cpuset.NewCPUSet(), fmt.Errorf("unable to create CPU allocator")
+		}
 		a.from = from.Clone()
 		a.cnt = cnt
 

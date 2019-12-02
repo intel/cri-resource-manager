@@ -51,6 +51,7 @@ type discoveredSystem interface {
 	NUMANodeCount() int
 	PackageIDs() []system.ID
 	NodeIDs() []system.ID
+	PackageNodeIDs(system.ID) []system.ID
 }
 
 // policy is our runtime state for the topology aware policy.
@@ -62,11 +63,10 @@ type policy struct {
 	reserved    cpuset.CPUSet            // system-/kube-reserved CPUs
 	reserveCnt  int                      // number of CPUs to reserve if given as resource.Quantity
 	isolated    cpuset.CPUSet            // (our allowed set of) isolated CPUs
-	nodes       map[string]Node          // pool nodes by name
-	pools       []Node                   // pre-populated node slice for scoring, etc...
-	root        Node                     // root of our pool/partition tree
+	nodes       map[string]*node         // pool nodes by name
+	pools       []*node                  // pre-populated node slice for scoring, etc...
+	root        *node                    // root of our pool/partition tree
 	nodeCnt     int                      // number of pools
-	depth       int                      // tree depth
 	allocations allocations              // container pool assignments
 
 }
@@ -82,7 +82,6 @@ func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend
 		options: *opts,
 	}
 
-	p.nodes = make(map[string]Node)
 	p.allocations = allocations{policy: p, CPU: make(map[string]CPUGrant, 32)}
 
 	if err := p.checkConstraints(); err != nil {
@@ -95,7 +94,7 @@ func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend
 
 	config.GetModule(PolicyPath).AddNotify(p.configNotify)
 
-	p.root.Dump("<pre-start>")
+	p.root.dump("<pre-start>", 0)
 
 	return p
 }
@@ -112,11 +111,12 @@ func (p *policy) Description() string {
 
 // Start prepares this policy for accepting allocation/release requests.
 func (p *policy) Start(add []cache.Container, del []cache.Container) error {
+	// FIXME(rojkov): p.restoreCache() never returns errors. Do we need to check then?
 	if err := p.restoreCache(); err != nil {
 		return policyError("failed to start: %v", err)
 	}
 
-	p.root.Dump("<post-start>")
+	p.root.dump("<post-start>", 0)
 
 	return p.Sync(add, del)
 }
@@ -156,7 +156,7 @@ func (p *policy) AllocateResources(container cache.Container) error {
 			container.PrettyName(), err)
 	}
 
-	p.root.Dump("<post-alloc>")
+	p.root.dump("<post-alloc>", 0)
 
 	return nil
 }
@@ -166,6 +166,7 @@ func (p *policy) ReleaseResources(container cache.Container) error {
 	log.Debug("releasing resources of %s...", container.PrettyName())
 
 	grant, found, err := p.releasePool(container)
+	// FIXME(rojkov): policy.releasePool() never returns error. Is it need?
 	if err != nil {
 		return policyError("failed to release resources of %s: %v",
 			container.PrettyName(), err)
@@ -178,7 +179,7 @@ func (p *policy) ReleaseResources(container cache.Container) error {
 		}
 	}
 
-	p.root.Dump("<post-release>")
+	p.root.dump("<post-release>", 0)
 
 	return nil
 }
@@ -198,7 +199,7 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 
 	data := map[string]string{}
 	shared := grant.SharedCPUs().String()
-	isolated := grant.ExclusiveCPUs().Intersection(grant.GetNode().GetCPU().IsolatedCPUs())
+	isolated := grant.ExclusiveCPUs().Intersection(grant.GetNode().nodecpu.Clone().IsolatedCPUs())
 	exclusive := grant.ExclusiveCPUs().Difference(isolated).String()
 
 	if shared != "" {
@@ -231,6 +232,7 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	return nil
 }
 
+// TODO(rojkov): contrary to what the name suggests checkConstrains() also mutates policy's state.
 // Check the constraints passed to us.
 func (p *policy) checkConstraints() error {
 	if c, ok := p.options.Available[policyapi.DomainCPU]; ok {
