@@ -18,6 +18,7 @@ package rdt
 
 import (
 	"bufio"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -46,6 +47,7 @@ type mbInfo struct {
 	bandwidthGran uint64
 	delayLinear   uint64
 	minBandwidth  uint64
+	mbpsEnabled   bool // true if MBA_MBps is enabled
 }
 
 // l3Info is a helper method for a "unified API" for getting L3 information
@@ -171,6 +173,16 @@ func getMBInfo(basepath string) (mbInfo, uint64, error) {
 	numClosids, err = readFileUint64(filepath.Join(basepath, "num_closids"))
 	if err != nil {
 		return info, numClosids, err
+	}
+
+	// Detect MBps mode directly from mount options as it's not visible in MB
+	// info directory
+	_, mountOpts, err := getResctrlMountInfo()
+	if err != nil {
+		return info, numClosids, fmt.Errorf("failed to get resctrl mount options: %v", err)
+	}
+	if _, ok := mountOpts["mba_MBps"]; ok {
+		info.mbpsEnabled = true
 	}
 
 	return info, numClosids, nil
