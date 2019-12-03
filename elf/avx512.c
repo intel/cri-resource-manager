@@ -74,23 +74,19 @@ struct bpf_map_def SEC("maps/cpu") cpu_hash = {
 	.max_entries = 128,
 };
 
-struct sched_switch_args {
-	u64 pad;
-	char prev_comm[16];
-	int prev_pid;
-	int prev_prio;
-	long long prev_state;
-	char next_comm[16];
-	int next_pid;
-	int next_prio;
-};
-
 SEC("tracepoint/sched/sched_switch")
-int tracepoint__sched_switch(struct sched_switch_args *args)
+int tracepoint__sched_switch(void *args)
 {
 	u64 cgroup_id = bpf_get_current_cgroup_id();
-	u32 *count;
+	u32 *count, *found;
 	u32 new_count = 1;
+
+	found = bpf_map_lookup_elem(&avx_context_switch_count_hash, &cgroup_id);
+
+	/* store sched_switch counts only for cgroups that have AVX activity */
+	if (!found) {
+		return 0;
+	}
 
 	count = bpf_map_lookup_elem(&all_context_switch_count_hash, &cgroup_id);
 	if (count) {
