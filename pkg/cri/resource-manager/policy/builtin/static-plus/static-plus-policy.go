@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -776,26 +776,6 @@ func MilliCPUToShares(milliCPU int) int64 {
 // Automatically register us as a policy implementation.
 //
 
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.BackendOptions) policy.Backend
-
-// Name returns the name of this policy implementation.
-func (n Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (n Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (n Implementation) CreateFn() policy.CreateFn {
-	return policy.CreateFn(n)
-}
-
-var _ policy.Implementation = Implementation(nil)
-
 func init() {
-	policy.Register(Implementation(CreateStaticPlusPolicy))
+	policy.Register(PolicyName, CreateStaticPlusPolicy)
 }

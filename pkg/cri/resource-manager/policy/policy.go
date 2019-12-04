@@ -84,16 +84,6 @@ const (
 	ExportedResources = "resources.sh"
 )
 
-// Implementation attaches metadata (name, etc.) to a backend creation function.
-type Implementation interface {
-	// Name returns the well-known name for this policy.
-	Name() string
-	// Description returns a verbose description for this policy.
-	Description() string
-	// CreateFn creates an instance of this policy.
-	CreateFn() CreateFn
-}
-
 // Backend is the policy (decision making logic) interface exposed by implementations.
 //
 // A backends operates in a set of policy domains. Currently each policy domain
@@ -166,7 +156,7 @@ func NewPolicy(o *Options) (Policy, error) {
 		return nil, nil
 	}
 
-	backend, ok := policies[opt.Policy]
+	backend, ok := policyConstructors[opt.Policy]
 	if !ok {
 		return nil, policyError("unknown policy '%s'", opt.Policy)
 	}
@@ -175,7 +165,7 @@ func NewPolicy(o *Options) (Policy, error) {
 		Logger: logger.NewLogger("policy"),
 	}
 
-	p.Info("creating new policy '%s'...", backend.Name())
+	p.Info("creating new policy '%s'...", opt.Policy)
 	if len(opt.Available) != 0 {
 		p.Info("  with resource availability constraints:")
 		for d := range opt.Available {
@@ -203,7 +193,7 @@ func NewPolicy(o *Options) (Policy, error) {
 		AgentCli:  o.AgentCli,
 		Rdt:       o.Rdt,
 	}
-	p.backend = backend.CreateFn()(backendOpts)
+	p.backend = backend(backendOpts)
 
 	return p, nil
 }
@@ -307,22 +297,21 @@ func (p *policy) SetConfig(conf *config.RawConfig) error {
 	return nil
 }
 
-// Register registers a policy implementation.
-func Register(p Implementation) error {
+// Register registers a policy constructor.
+func Register(name string, policyConstructor func(*BackendOptions) Backend) error {
 	log := logger.Get("policy")
-	name := p.Name()
 
-	if p.CreateFn() == nil {
+	if policyConstructor == nil {
 		return policyError("policy '%s' has a nil instantiation function", name)
 	}
 
 	log.Info("registering policy '%s'...", name)
 
-	if _, ok := policies[name]; ok {
+	if _, ok := policyConstructors[name]; ok {
 		return policyError("policy '%s' already registered", name)
 	}
 
-	policies[name] = p
+	policyConstructors[name] = policyConstructor
 
 	return nil
 }

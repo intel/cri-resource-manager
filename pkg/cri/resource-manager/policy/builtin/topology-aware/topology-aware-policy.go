@@ -303,26 +303,6 @@ func (p *policy) restoreCache() error {
 // Automatically register us as a policy implementation.
 //
 
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policyapi.BackendOptions) policyapi.Backend
-
-// Name returns the name of this policy implementation.
-func (Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (i Implementation) CreateFn() policyapi.CreateFn {
-	return policyapi.CreateFn(i)
-}
-
-var _ policyapi.Implementation = Implementation(nil)
-
 func init() {
-	policyapi.Register(Implementation(CreateTopologyAwarePolicy))
+	policyapi.Register(PolicyName, CreateTopologyAwarePolicy)
 }

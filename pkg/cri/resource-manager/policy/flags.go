@@ -16,11 +16,12 @@ package policy
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
+
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -38,8 +39,8 @@ type options struct {
 	Reserved ConstraintSet `json:"ReservedResources,omitempty"`
 }
 
-// Registered policy implementations.
-var policies = map[string]Implementation{}
+// Registered policy constructors.
+var policyConstructors = map[string]func(*BackendOptions) Backend{}
 
 // Our runtime configuration.
 var opt = defaultOptions().(*options)

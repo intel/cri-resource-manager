@@ -148,26 +148,6 @@ func edaError(format string, args ...interface{}) error {
 // Automatically register us as a policy implementation.
 //
 
-// Implementation is the implementation we register with the policy module.
-type Implementation func(*policy.BackendOptions) policy.Backend
-
-// Name returns the name of this policy implementation.
-func (i Implementation) Name() string {
-	return PolicyName
-}
-
-// Description returns the desccription of this policy implementation.
-func (i Implementation) Description() string {
-	return PolicyDescription
-}
-
-// CreateFn returns the functions used to instantiate this policy.
-func (i Implementation) CreateFn() policy.CreateFn {
-	return policy.CreateFn(i)
-}
-
-var _ policy.Implementation = Implementation(nil)
-
 func init() {
-	policy.Register(Implementation(CreateEdaPolicy))
+	policy.Register(PolicyName, CreateEdaPolicy)
 }
