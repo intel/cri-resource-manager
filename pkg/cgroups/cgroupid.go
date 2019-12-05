@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
@@ -12,6 +13,7 @@ import (
 type CgroupID struct {
 	root  string
 	cache map[uint64]string
+	sync.Mutex
 }
 
 func NewCgroupID(root string) *CgroupID {
@@ -47,6 +49,9 @@ func (cgid *CgroupID) List() error {
 func (cgid *CgroupID) Find(id uint64) (string, error) {
 	found := false
 	var p string
+
+	cgid.Lock()
+	defer cgid.Unlock()
 
 	if path, ok := cgid.cache[id]; ok {
 		return path, nil
