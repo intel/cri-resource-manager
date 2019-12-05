@@ -33,7 +33,6 @@ import (
 	"github.com/ghodss/yaml"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
@@ -46,17 +45,13 @@ const (
 	stampLen = len(stampLayout)
 )
 
-// Mutex used to serialize parallel dumps and file switching.
-var mutex sync.Mutex
-
 // Our logger instances, one for generic logging and another for message dumps.
 var log = logger.NewLogger("dump")
 var message = logger.NewLogger("message")
 
 func checkAndScheduleDumpFileSwitch() {
-	mutex.Lock()
-	defer mutex.Unlock()
-
+	opt.Lock()
+	defer opt.Unlock()
 	if fileName != string(opt.File) {
 		if file != nil {
 			file.Close()
@@ -67,7 +62,7 @@ func checkAndScheduleDumpFileSwitch() {
 }
 
 func checkDumpFile() bool {
-	// this must be closed with mutex.Lock()'ed
+	// this must be called with opt.Lock()'ed
 	switch {
 	case file != nil:
 		return true
@@ -91,6 +86,8 @@ func checkDumpFile() bool {
 // RequestMessage dumps a CRI request.
 func RequestMessage(kind, name string, request interface{}) {
 	method := name[strings.LastIndex(name, "/")+1:]
+	opt.Lock()
+	defer opt.Unlock()
 	switch opt.verbosityOf(method) {
 	case NameOnly:
 		dumpName("request", kind, method, request, 0)
@@ -102,6 +99,8 @@ func RequestMessage(kind, name string, request interface{}) {
 // ReplyMessage dumps a CRI reply.
 func ReplyMessage(kind, name string, reply interface{}, latency time.Duration) {
 	method := name[strings.LastIndex(name, "/")+1:]
+	opt.Lock()
+	defer opt.Unlock()
 	switch opt.verbosityOf(method) {
 	case NameOnly:
 		dumpName("reply", kind, method, reply, latency)
@@ -112,8 +111,6 @@ func ReplyMessage(kind, name string, reply interface{}, latency time.Duration) {
 
 func dumpName(dir, kind, method string, msg interface{}, latency time.Duration) {
 	go func() {
-		mutex.Lock()
-		defer mutex.Unlock()
 		switch dir {
 		case "request":
 			return
@@ -129,8 +126,6 @@ func dumpName(dir, kind, method string, msg interface{}, latency time.Duration) 
 
 func dumpFull(dir, kind, method string, msg interface{}, latency time.Duration) {
 	go func() {
-		mutex.Lock()
-		defer mutex.Unlock()
 		switch dir {
 		case "request":
 			raw, _ := yaml.Marshal(msg)

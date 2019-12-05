@@ -35,6 +35,7 @@ import (
 	"os"
 	re "regexp"
 	"strings"
+	"sync"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 )
@@ -71,6 +72,7 @@ var fileName string
 
 // Dumping options configurable via the command line or pkg/config.
 type options struct {
+	sync.Mutex
 	Config   string               // last value Set()
 	File     dumpFile             // file to also dump to, if set
 	Debug    bool                 // log messages as debug messages
@@ -103,7 +105,7 @@ func (v verbosity) String() string {
 	return fmt.Sprintf("<invalid verbosity %d>", v)
 }
 
-func (o *options) Reset() {
+func (o *options) reset() {
 	o.methods = make(map[string]verbosity)
 	o.rules = []*rule{}
 	o.matches = make(map[string]verbosity)
@@ -112,8 +114,14 @@ func (o *options) Reset() {
 }
 
 func (o *options) Set(value string) error {
+	o.Lock()
+	defer o.Unlock()
+	return o.set(value)
+}
+
+func (o *options) set(value string) error {
 	if o != defaults { // from the command line we cumulate --dump options
-		o.Reset()
+		o.reset()
 	} else {
 		if o.methods == nil {
 			o.methods = make(map[string]verbosity)
@@ -135,7 +143,7 @@ func (o *options) Set(value string) error {
 			o.Debug = true
 			continue
 		case "reset":
-			o.Reset()
+			o.reset()
 			continue
 		}
 
