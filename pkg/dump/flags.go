@@ -90,8 +90,8 @@ type rule struct {
 type dumpFile string
 
 // Our default and runtime configuration.
-var defaults *options
-var opt *options
+var defaults = &options{}
+var opt = &options{}
 
 func (v verbosity) String() string {
 	switch v {
@@ -189,7 +189,7 @@ func (o *options) set(value string) error {
 	}
 
 	// propagate chanegs to defaults by command line options to runtime config as well
-	if o == defaults && opt != nil {
+	if o == defaults {
 		opt.Set(value)
 	}
 
@@ -209,7 +209,7 @@ func (f *dumpFile) Set(value string) error {
 	*f = dumpFile(value)
 
 	// propagate chanegs to defaults by command line options to runtime config as well
-	if defaults != nil && opt != nil && f == &defaults.File {
+	if defaults != nil && f == &defaults.File {
 		opt.File = defaults.File
 	}
 
@@ -305,8 +305,6 @@ func (o *options) configNotify(event config.Event, source config.Source) error {
 
 // Register us for command line parsing and configuration handling.
 func init() {
-	opt = &options{}
-	defaults = &options{}
 	defaults.Set(DefaultConfig)
 
 	flag.Var(defaults, optDump,
