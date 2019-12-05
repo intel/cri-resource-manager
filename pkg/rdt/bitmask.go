@@ -17,6 +17,7 @@ limitations under the License.
 package rdt
 
 import (
+	"fmt"
 	"math/bits"
 	"strconv"
 	"strings"
@@ -30,6 +31,11 @@ import (
 // interface. The "width" i.e. the number of bits available depends on the
 // underlying hardware.
 type CacheBitmask Bitmask
+
+// MarshalJSON is the marshaller function for "encoding/json"
+func (b CacheBitmask) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%#x\"", b)), nil
+}
 
 // UnmarshalJSON is the unmarshaller function for "encoding/json"
 func (b *CacheBitmask) UnmarshalJSON(data []byte) error {

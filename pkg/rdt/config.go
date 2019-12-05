@@ -29,33 +29,29 @@ import (
 // ResctrlGroupConfig represents configuration of one CTRL group in the Linux
 // resctrl interface
 type ResctrlGroupConfig struct {
-	L3Schema     L3Schema `json:"l3Schema,omitempty"`
-	L3CodeSchema L3Schema `json:"l3CodeSchema,omitempty"`
-	L3DataSchema L3Schema `json:"l3DataSchema,omitempty"`
-	MBSchema     MBSchema `json:"mbSchema,omitempty"`
+	L3Schema L3Schema `json:"l3Schema,omitempty"`
+	MBSchema MBSchema `json:"mbSchema,omitempty"`
 }
 
 // SchemaOptions contains the common settings for all resctrl groups
 type SchemaOptions struct {
-	L3     L3Options `json:"l3,omitempty"`
-	L3Code L3Options `json:"l3code,omitempty"`
-	L3Data L3Options `json:"l3data,omitempty"`
-	MB     MBOptions `json:"mb,omitempty"`
+	L3 L3Options `json:"l3"`
+	MB MBOptions `json:"mb"`
 }
 
-// L3 contains the common settings for L3 cache allocation
+// L3Options contains the common settings for L3 cache allocation
 type L3Options struct {
 	Optional bool `json:"optional,omitempty"`
 }
 
-// MB contains the common settings for memory bandwidth allocation
+// MBOptions contains the common settings for memory bandwidth allocation
 type MBOptions struct {
 	Optional bool `json:"optional,omitempty"`
 }
 
 // L3Schema represents an L3 part of the schemata of a resctrl group
 type L3Schema struct {
-	Allocations map[uint64]CacheBitmask
+	Allocations map[uint64]L3Allocation
 }
 
 // MBSchema represents an MB part of the schemata of a resctrl group
@@ -63,12 +59,23 @@ type MBSchema struct {
 	Allocations map[uint64]uint64
 }
 
+// L3Allocation represents the L3 cache allocation configuration for one cache id
+type L3Allocation struct {
+	Unified CacheBitmask `json:"unified"`
+	Code    CacheBitmask `json:"code"`
+	Data    CacheBitmask `json:"data"`
+}
+
+// L3SchemaType represents different L3 cache allocation schemes
 type L3SchemaType string
 
 const (
+	// L3SchemaTypeUnified is the schema type when CDP is not enabled
 	L3SchemaTypeUnified = ""
-	L3SchemaTypeData    = "DATA"
-	L3SchemaTypeCode    = "CODE"
+	// L3SchemaTypeCode is the 'code' part of CDP schema
+	L3SchemaTypeCode = "CODE"
+	// L3SchemaTypeData is the 'data' part of CDP schema
+	L3SchemaTypeData = "DATA"
 )
 
 // IsNil returns true if the schema is empty
@@ -87,7 +94,19 @@ func (s *L3Schema) ToStr(typ L3SchemaType) string {
 	sep := ""
 
 	// We get cache ids but that doesn't matter
-	for id, bitmask := range s.Allocations {
+	for id, masks := range s.Allocations {
+		bitmask := masks.Unified
+		// Use Unified as the default/fallback for Code and Data
+		switch typ {
+		case L3SchemaTypeCode:
+			if masks.Code != 0 {
+				bitmask = masks.Code
+			}
+		case L3SchemaTypeData:
+			if masks.Data != 0 {
+				bitmask = masks.Data
+			}
+		}
 		schema += fmt.Sprintf("%s%d=%x", sep, id, bitmask)
 		sep = ";"
 	}
@@ -111,41 +130,66 @@ func (s *L3Schema) DefaultStr(typ L3SchemaType) string {
 	return schema + "\n"
 }
 
+// UnmarshalJSON implements the Unmarshaler interface of "encoding/json"
 func (s *L3Schema) UnmarshalJSON(b []byte) error {
-	var allocations map[string]CacheBitmask
+	var allocations map[string]L3Allocation
 
 	err := yaml.Unmarshal(b, &allocations)
 	if err != nil {
 		return err
 	}
 
-	s.Allocations = map[uint64]CacheBitmask{}
+	s.Allocations = map[uint64]L3Allocation{}
 
 	// Set default allocations
-	defaultMask, ok := allocations["all"]
-	if !ok {
-		// Set to 100% if "all" is not specified
-		defaultMask = CacheBitmask(rdtInfo.l3FullMask())
+	fullMask := CacheBitmask(rdtInfo.l3FullMask())
+	defaultAllocation := L3Allocation{Unified: fullMask, Code: fullMask, Data: fullMask}
+	if val, ok := allocations["all"]; ok {
+		defaultAllocation = val
+		delete(allocations, "all")
 	}
-	delete(allocations, "all")
 
 	for _, i := range rdtInfo.cacheIds {
-		s.Allocations[i] = defaultMask
+		s.Allocations[i] = defaultAllocation
 	}
 
 	// Parse per-cacheId allocations
-	for key, mask := range allocations {
+	for key, allocation := range allocations {
 		ids, err := listStrToArray(key)
 		if err != nil {
 			return err
 		}
 		for _, id := range ids {
 			if _, ok := s.Allocations[uint64(id)]; ok {
-				s.Allocations[uint64(id)] = mask
+				s.Allocations[uint64(id)] = allocation
 			}
 		}
 	}
 
+	return nil
+}
+
+// UnmarshalJSON implements the Unmarshaler interface of "encoding/json"
+func (a *L3Allocation) UnmarshalJSON(b []byte) error {
+	type l3Intermediate L3Allocation
+	var tmp l3Intermediate
+
+	err := yaml.Unmarshal(b, &tmp)
+	if err != nil {
+		return err
+	}
+
+	if tmp.Unified == 0 {
+		return fmt.Errorf("'unified' not specified in l3Schema %s", b)
+	}
+	if tmp.Code != 0 && tmp.Data == 0 {
+		return fmt.Errorf("'code' specified but missing 'data' from l3Schema %s", b)
+	}
+	if tmp.Code == 0 && tmp.Data != 0 {
+		return fmt.Errorf("'data' specified but missing 'code' from l3Schema %s", b)
+	}
+
+	*a = L3Allocation(tmp)
 	return nil
 }
 
@@ -187,6 +231,7 @@ func (s *MBSchema) DefaultStr() string {
 	return schema + "\n"
 }
 
+// UnmarshalJSON implements the Unmarshaler interface of "encoding/json"
 func (s *MBSchema) UnmarshalJSON(b []byte) error {
 	var allocations map[string]uint64
 
