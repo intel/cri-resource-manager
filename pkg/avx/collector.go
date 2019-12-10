@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
+	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/metrics"
 	bpf "github.com/iovisor/gobpf/elf"
 	"github.com/pkg/errors"
@@ -45,6 +46,9 @@ var (
 	bpfBinaryName  = "avx512.o"
 	bpfInstallpath = "/usr/libexec/bpf"
 	cgroupV2path   = "/sys/fs/cgroup/unified"
+
+	// our logger instance
+	log = logger.NewLogger("avx")
 )
 
 func kernelVersionCode(major, minor, patch uint8) uint32 {
@@ -166,7 +170,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	cg := cgroups.NewCgroupID(c.root)
 	cgroupids, counters, err := c.moveAllElements(c.avxContextSwitchCounters, unsafe.Sizeof(uint64(0)), unsafe.Sizeof(uint32(0)))
 	if err != nil {
-		fmt.Printf("unable to move elements of avx_context_switch_count: %+v\n", err)
+		log.Error("unable to move elements of avx_context_switch_count: %+v", err)
 	}
 
 	for idx, cgroupid := range cgroupids {
@@ -178,7 +182,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 
 			path, err := cg.Find(binary.LittleEndian.Uint64(cgroupid_[0:]))
 			if err != nil {
-				fmt.Println(err)
+				log.Error("failed to find cgroup by id: %v", err)
 				return
 			}
 
@@ -190,7 +194,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 				fmt.Sprintf("%d", binary.LittleEndian.Uint64(cgroupid_[0:])))
 
 			if err := c.bpfModule.LookupElement(c.allContextSwitchCounters, unsafe.Pointer(&cgroupid_[0]), unsafe.Pointer(&allCount)); err != nil {
-				fmt.Printf("unable to find 'all' switch count: %+v\n", err)
+				log.Error("unable to find 'all' switch count: %+v", err)
 				return
 			}
 
@@ -207,7 +211,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 
 	_, _, err = c.moveAllElements(c.allContextSwitchCounters, unsafe.Sizeof(uint64(0)), unsafe.Sizeof(uint32(0)))
 	if err != nil {
-		fmt.Printf("unable to delete elements of all_context_switch_count: %+v\n", err)
+		log.Error("unable to delete elements of all_context_switch_count: %+v", err)
 	}
 }
 
@@ -247,7 +251,7 @@ func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
 	// NB: (* struct fpu)->last_cpu is of type `unsigned int` which translates to Go's uint32, not uint (4 bytes size in IA)
 	lastCPUs, counters, err := c.moveAllElements(c.lastCPUCounters, unsafe.Sizeof(uint32(0)), unsafe.Sizeof(uint32(0)))
 	if err != nil {
-		fmt.Printf("unable to move elements of cpu map: %+v\n", err)
+		log.Error("unable to move elements of cpu map: %+v", err)
 		return
 	}
 
@@ -263,7 +267,7 @@ func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
 func init() {
 	err := metrics.RegisterCollector("avx", NewCollector)
 	if err != nil {
-		fmt.Printf("Failed to register AVX collector: %v", err)
+		log.Error("Failed to register AVX collector: %v", err)
 		return
 	}
 }
