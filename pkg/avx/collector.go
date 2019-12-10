@@ -81,10 +81,6 @@ func checkElfKernelVersion(path string) error {
 		return errors.New("host kernel is too old, consider rebuilding eBPF")
 	}
 
-	if currentCode > kernelVersionCode(elfMajor, elfMinor, 255) {
-		return errors.New("host kernel is too new, consider rebuilding eBPF")
-	}
-
 	return nil
 }
 
@@ -196,13 +192,13 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 		}(idx, cgroupid)
 	}
 
+	// We need to wait so that the response channel doesn't get closed.
+	wg.Wait()
+
 	_, _, err = c.moveAllElements(c.allContextSwitchCounters, unsafe.Sizeof(uint64(0)), unsafe.Sizeof(uint32(0)))
 	if err != nil {
 		fmt.Printf("unable to delete elements of all_context_switch_count: %+v\n", err)
 	}
-
-	// We need to wait so that the response channel doesn't get closed.
-	wg.Wait()
 }
 
 func (c *collector) moveAllElements(table *bpf.Map, keySize, valueSize uintptr) ([][]byte, [][]byte, error) {

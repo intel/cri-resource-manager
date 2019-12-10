@@ -1,6 +1,4 @@
-#include <linux/version.h>
 #include <uapi/linux/bpf.h>
-
 #include <asm/page_types.h>
 
 /* asm/fpu/types.h assumes __packed is defined */
@@ -8,6 +6,10 @@
 #include <asm/fpu/types.h>
 
 #define SEC(NAME) __attribute__((section(NAME), used))
+
+#ifndef KERNEL_VERSION
+    #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
+#endif
 
 #define BUF_SIZE_MAP_NS 256
 
@@ -72,23 +74,19 @@ struct bpf_map_def SEC("maps/cpu") cpu_hash = {
 	.max_entries = 128,
 };
 
-struct sched_switch_args {
-	u64 pad;
-	char prev_comm[16];
-	int prev_pid;
-	int prev_prio;
-	long long prev_state;
-	char next_comm[16];
-	int next_pid;
-	int next_prio;
-};
-
 SEC("tracepoint/sched/sched_switch")
-int tracepoint__sched_switch(struct sched_switch_args *args)
+int tracepoint__sched_switch(void *args)
 {
 	u64 cgroup_id = bpf_get_current_cgroup_id();
-	u32 *count;
+	u32 *count, *found;
 	u32 new_count = 1;
+
+	found = bpf_map_lookup_elem(&avx_context_switch_count_hash, &cgroup_id);
+
+	/* store sched_switch counts only for cgroups that have AVX activity */
+	if (!found) {
+		return 0;
+	}
 
 	count = bpf_map_lookup_elem(&all_context_switch_count_hash, &cgroup_id);
 	if (count) {
@@ -158,4 +156,13 @@ int tracepoint__x86_fpu_regs_deactivated(struct x86_fpu_args *args)
 
 char _license[] SEC("license") = "GPL";
 
-unsigned int _version SEC("version") = LINUX_VERSION_CODE;
+/*
+Notes about Linux version:
+   * We don't check LINUX_VERSION_CODE build time. It's user's responsibility to provide new enough headers.
+   * Build failures may happen due to too old kernel headers (currently, Linux >= 5.1 headers are needed).
+   * Our dependency to Kernel ABI is x86_fpu tracepoint parameters and struct fpu.
+   * The host kernel needs to run Linux >= 5.2 and the version is checked upon eBPF loading.
+   * We build the minimum supported version in SEC("version") section.
+   * Max supported version is not checked but the check may be added later.
+*/
+unsigned int _version SEC("version") = KERNEL_VERSION(5, 2, 0);
