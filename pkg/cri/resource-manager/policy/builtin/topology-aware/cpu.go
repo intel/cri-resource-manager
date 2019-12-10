@@ -16,6 +16,7 @@ package topologyaware
 
 import (
 	"fmt"
+
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -117,7 +118,12 @@ type cpuRequest struct {
 	full      int             // number of full CPUs requested
 	fraction  int             // amount of fractional CPU requested
 	isolate   bool            // prefer isolated exclusive CPUs
-	elevate   int             // displace allocation up in the tree
+
+	// elevate indicates how much to elevate the actual allocation of the
+	// container in the tree of pools. Or in other words how many levels to
+	// go up in the tree starting at the best fitting pool, before assigning
+	// the container to an actual pool. Currently ignored.
+	elevate int
 }
 
 var _ CPURequest = &cpuRequest{}
