@@ -15,8 +15,9 @@
 package topologyaware
 
 import (
-	"github.com/ghodss/yaml"
 	"strconv"
+
+	"github.com/ghodss/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,8 @@ const (
 )
 
 // podIsolationPreference checks if containers explicitly prefers to run on multiple isolated CPUs.
+// The first return value indicates whether the container is isolated or not.
+// The second return value indicates whether that decision was explicit (true) or implicit (false).
 func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, bool) {
 	value, ok := pod.GetResmgrAnnotation(keyIsolationPreference)
 	if !ok {
@@ -59,6 +62,13 @@ func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, boo
 }
 
 // podSharedCPUPreference checks if a container wants to opt-out from exclusive allocation.
+// The first return value indicates if the container prefers to opt-out from
+// exclusive (sliced-off or isolated) CPU allocation even if it was otherwise
+// eligible for it.
+// The second return value, elevate, indicates how much to elevate the actual
+// allocation of the container in the tree of pools. Or in other words how many
+// levels to go up in the tree starting at the best fitting pool, before
+// assigning the container to an actual pool.
 func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int) {
 	value, ok := pod.GetResmgrAnnotation(keySharedCPUPreference)
 	if !ok {
