@@ -15,7 +15,10 @@
 package topologyaware
 
 import (
+	"os"
+
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -25,6 +28,7 @@ type mockContainer struct {
 	name                                  string
 	namespace                             string
 	returnValueForGetResourceRequirements v1.ResourceRequirements
+	returnValueForGetCacheID              string
 }
 
 func (m *mockContainer) PrettyName() string {
@@ -40,7 +44,11 @@ func (m *mockContainer) GetPodID() string {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetCacheID() string {
-	return "0"
+	if len(m.returnValueForGetCacheID) == 0 {
+		return "0"
+	}
+
+	return m.returnValueForGetCacheID
 }
 func (m *mockContainer) GetName() string {
 	return m.name
@@ -283,5 +291,91 @@ func (m *mockPod) GetContainerAffinity(string) []*cache.Affinity {
 	panic("unimplemented")
 }
 func (m *mockPod) ScopeExpression() *cache.Expression {
+	panic("unimplemented")
+}
+
+type mockCache struct {
+	returnValueForGetPolicyEntry   bool
+	returnValue1ForLookupContainer cache.Container
+	returnValue2ForLookupContainer bool
+}
+
+func (m *mockCache) InsertPod(string, interface{}) cache.Pod {
+	panic("unimplemented")
+}
+func (m *mockCache) DeletePod(string) cache.Pod {
+	panic("unimplemented")
+}
+func (m *mockCache) LookupPod(string) (cache.Pod, bool) {
+	panic("unimplemented")
+}
+func (m *mockCache) InsertContainer(interface{}) cache.Container {
+	panic("unimplemented")
+}
+func (m *mockCache) UpdateContainerID(string, interface{}) cache.Container {
+	panic("unimplemented")
+}
+func (m *mockCache) DeleteContainer(string) cache.Container {
+	panic("unimplemented")
+}
+func (m *mockCache) LookupContainer(string) (cache.Container, bool) {
+	return m.returnValue1ForLookupContainer, m.returnValue2ForLookupContainer
+}
+func (m *mockCache) StartTransaction() error {
+	panic("unimplemented")
+}
+func (m *mockCache) CommitTransaction() []cache.Container {
+	panic("unimplemented")
+}
+func (m *mockCache) QueryTransaction() []cache.Container {
+	panic("unimplemented")
+}
+func (m *mockCache) AbortTransaction() {
+	panic("unimplemented")
+}
+func (m *mockCache) GetPods() []cache.Pod {
+	panic("unimplemented")
+}
+func (m *mockCache) GetContainers() []cache.Container {
+	panic("unimplemented")
+}
+func (m *mockCache) GetContainerCacheIds() []string {
+	panic("unimplemented")
+}
+func (m *mockCache) GetContainerIds() []string {
+	panic("unimplemented")
+}
+func (m *mockCache) FilterScope(*cache.Expression) []cache.Container {
+	panic("unimplemented")
+}
+func (m *mockCache) EvaluateAffinity(*cache.Affinity) map[string]int32 {
+	return map[string]int32{
+		"fake key": 1,
+	}
+}
+func (m *mockCache) SetPolicyEntry(string, interface{}) {
+}
+func (m *mockCache) GetPolicyEntry(string, interface{}) bool {
+	return m.returnValueForGetPolicyEntry
+}
+func (m *mockCache) SetConfig(*config.RawConfig) error {
+	panic("unimplemented")
+}
+func (m *mockCache) GetConfig() *config.RawConfig {
+	panic("unimplemented")
+}
+func (m *mockCache) Save() error {
+	panic("unimplemented")
+}
+func (m *mockCache) Refresh(interface{}) ([]cache.Pod, []cache.Pod, []cache.Container, []cache.Container) {
+	panic("unimplemented")
+}
+func (m *mockCache) ContainerDirectory(string) string {
+	panic("unimplemented")
+}
+func (m *mockCache) OpenFile(string, string, os.FileMode) (*os.File, error) {
+	panic("unimplemented")
+}
+func (m *mockCache) WriteFile(string, string, os.FileMode, []byte) error {
 	panic("unimplemented")
 }
