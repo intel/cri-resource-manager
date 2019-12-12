@@ -156,7 +156,7 @@ func (a *allocations) Set(value interface{}) {
 
 func (a *allocations) Dump(logfn func(format string, args ...interface{}), prefix string) {
 	for _, cg := range a.CPU {
-		logfn(prefix+"%s", cg.String())
+		logfn(prefix+"%s", cg)
 	}
 }
 

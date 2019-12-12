@@ -16,6 +16,7 @@ package topologyaware
 
 import (
 	"fmt"
+
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -274,7 +275,7 @@ func (n *node) Dump(prefix string, level ...int) {
 	log.Debug("%s  - memory: %v", idt, n.mem)
 	for _, grant := range n.policy.allocations.CPU {
 		if grant.GetNode().NodeID() == n.id {
-			log.Debug("%s    + %s", idt, grant.String())
+			log.Debug("%s    + %s", idt, grant)
 		}
 	}
 	if !n.Parent().IsNil() {

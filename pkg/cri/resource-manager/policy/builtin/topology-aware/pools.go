@@ -15,10 +15,11 @@
 package topologyaware
 
 import (
+	"sort"
+
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-	"sort"
 )
 
 // buildPoolsByTopology builds a hierarchical tree of pools based on HW topology.
@@ -94,10 +95,10 @@ func (p *policy) allocatePool(container cache.Container) (CPUGrant, error) {
 		scores, pools := p.sortPoolsByScore(request, affinity)
 
 		if log.DebugEnabled() {
-			log.Debug("* node fitting for %s", request.String())
+			log.Debug("* node fitting for %s", request)
 			for idx, n := range pools {
 				log.Debug("    - #%d: node %s, score %s, affinity: %d",
-					idx, n.Name(), scores[n.NodeID()].String(), affinity[n.NodeID()])
+					idx, n.Name(), scores[n.NodeID()], affinity[n.NodeID()])
 			}
 		}
 
@@ -107,8 +108,7 @@ func (p *policy) allocatePool(container cache.Container) (CPUGrant, error) {
 	cpus := pool.FreeCPU()
 	grant, err := cpus.Allocate(request)
 	if err != nil {
-		return nil, policyError("failed to allocate %s from %s: %v",
-			request.String(), cpus.String(), err)
+		return nil, policyError("failed to allocate %s from %s: %v", request, cpus, err)
 	}
 
 	p.allocations.CPU[container.GetCacheID()] = grant
@@ -119,7 +119,7 @@ func (p *policy) allocatePool(container cache.Container) (CPUGrant, error) {
 
 // Apply the result of allocation to the requesting container.
 func (p *policy) applyGrant(grant CPUGrant) error {
-	log.Debug("* applying grant %s", grant.String())
+	log.Debug("* applying grant %s", grant)
 
 	container := grant.GetContainer()
 	exclusive := grant.ExclusiveCPUs()
@@ -191,7 +191,7 @@ func (p *policy) releasePool(container cache.Container) (CPUGrant, bool, error) 
 		return nil, false, nil
 	}
 
-	log.Debug("  => releasing grant %s...", grant.String())
+	log.Debug("  => releasing grant %s...", grant)
 
 	pool := grant.GetNode()
 	cpus := pool.FreeCPU()
@@ -205,18 +205,18 @@ func (p *policy) releasePool(container cache.Container) (CPUGrant, bool, error) 
 
 // Update shared allocations effected by agrant.
 func (p *policy) updateSharedAllocations(grant CPUGrant) error {
-	log.Debug("* updating shared allocations affected by %s", grant.String())
+	log.Debug("* updating shared allocations affected by %s", grant)
 
 	for _, other := range p.allocations.CPU {
 		if other.SharedPortion() == 0 {
-			log.Debug("  => %s not affected (no shared portion)...", other.String())
+			log.Debug("  => %s not affected (no shared portion)...", other)
 			continue
 		}
 
 		if opt.PinCPU {
 			shared := other.GetNode().FreeCPU().SharableCPUs().String()
 			log.Debug("  => updating %s with shared CPUs of %s: %s...",
-				other.String(), other.GetNode().Name(), shared)
+				other, other.GetNode().Name(), shared)
 			other.GetContainer().SetCpusetCpus(shared)
 		}
 	}
