@@ -16,6 +16,7 @@ package topologyaware
 
 import (
 	"fmt"
+
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -80,7 +81,7 @@ type Node interface {
 	// Get the height of this node (inverse of depth: tree depth - node depth).
 	NodeHeight() int
 	// System returns the policy sysfs instance.
-	System() *system.System
+	System() discoveredSystem
 	// Policy returns the policy back pointer.
 	Policy() *policy
 	// DiscoverCPU
@@ -318,7 +319,7 @@ func (n *node) BreadthFirst(fn func(Node) error) error {
 }
 
 // System returns the policy System instance.
-func (n *node) System() *system.System {
+func (n *node) System() discoveredSystem {
 	return n.policy.sys
 }
 

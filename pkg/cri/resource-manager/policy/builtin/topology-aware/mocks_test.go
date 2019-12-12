@@ -17,9 +17,47 @@ package topologyaware
 import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
+
+type mockSystem struct {
+	isolatedCPU int
+}
+
+func (fake *mockSystem) Node(system.ID) *system.Node {
+	return &system.Node{}
+}
+func (fake *mockSystem) Package(system.ID) *system.Package {
+	return &system.Package{}
+}
+func (fake *mockSystem) Offlined() cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+func (fake *mockSystem) Isolated() cpuset.CPUSet {
+	if fake.isolatedCPU > 0 {
+		return cpuset.NewCPUSet(fake.isolatedCPU)
+	}
+
+	return cpuset.NewCPUSet()
+}
+func (fake *mockSystem) CPUSet() cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+func (fake *mockSystem) SocketCount() int {
+	return 2
+}
+func (fake *mockSystem) NUMANodeCount() int {
+	return 2
+}
+func (fake *mockSystem) PackageIDs() []system.ID {
+	return []system.ID{0, 1}
+}
+func (fake *mockSystem) NodeIDs() []system.ID {
+	return []system.ID{0, 1}
+}
 
 type mockContainer struct {
 	name                                  string
