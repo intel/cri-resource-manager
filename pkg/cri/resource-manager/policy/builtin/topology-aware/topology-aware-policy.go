@@ -135,10 +135,8 @@ func (p *policy) AllocateResources(container cache.Container) error {
 
 	if err := p.applyGrant(grant); err != nil {
 		if _, _, err = p.releasePool(container); err != nil {
-			log.Warn("failed to undo/release unapplicable grant %s: %v",
-				grant.String(), err)
-			return policyError("failed to undo/release unapplicable grant %s: %v",
-				grant.String(), err)
+			log.Warn("failed to undo/release unapplicable grant %s: %v", grant, err)
+			return policyError("failed to undo/release unapplicable grant %s: %v", grant, err)
 		}
 	}
 
@@ -266,13 +264,13 @@ func (p *policy) checkConstraints() error {
 		// check that all reserved CPUs are in the allowed set
 		if !p.reserved.Difference(p.allowed).IsEmpty() {
 			return policyError("invalid reserved cpuset %s, some CPUs (%s) are not "+
-				"part of the online allowed cpuset (%s)", p.reserved.String(),
-				p.reserved.Difference(p.allowed).String(), p.allowed.String())
+				"part of the online allowed cpuset (%s)", p.reserved,
+				p.reserved.Difference(p.allowed), p.allowed)
 		}
 		// check that none of the reserved CPUs are isolated
 		if !p.reserved.Intersection(p.isolated).IsEmpty() {
 			return policyError("invalid reserved cpuset %s, some CPUs (%s) are also isolated",
-				p.reserved.Intersection(p.isolated).String())
+				p.reserved.Intersection(p.isolated))
 		}
 
 	case resapi.Quantity:

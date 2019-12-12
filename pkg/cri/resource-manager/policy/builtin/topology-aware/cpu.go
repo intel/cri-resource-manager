@@ -234,7 +234,7 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 		if err != nil {
 			return nil, policyError("internal error: "+
 				"can't allocate %d exclusive CPUs from %s of %s",
-				cr.full, cs.isolated.String(), cs.node.Name())
+				cr.full, cs.isolated, cs.node.Name())
 		}
 
 	case cr.full > 0 && (1000*cs.sharable.Size()-cs.granted)/1000 > cr.full:
@@ -242,7 +242,7 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 		if err != nil {
 			return nil, policyError("internal error: "+
 				"can't slice %d exclusive CPUs from %s(-%d) of %s",
-				cr.full, cs.sharable.String(), cs.granted, cs.node.Name())
+				cr.full, cs.sharable, cs.granted, cs.node.Name())
 		}
 	}
 
@@ -251,7 +251,7 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 		if 1000*cs.sharable.Size()-cs.granted < cr.fraction {
 			return nil, policyError("internal error: "+
 				"not enough sharable CPU for %d in %s(-%d) of %s",
-				cr.fraction, cs.sharable.String(), cs.granted, cs.node.Name())
+				cr.fraction, cs.sharable, cs.granted, cs.node.Name())
 		}
 		cs.granted += cr.fraction
 	}
@@ -286,13 +286,13 @@ func (cs *cpuSupply) String() string {
 	none, isolated, sharable, sep := "-", "", "", ""
 
 	if !cs.isolated.IsEmpty() {
-		isolated = fmt.Sprintf("isolated:%s", cs.isolated.String())
+		isolated = fmt.Sprintf("isolated:%s", cs.isolated)
 		sep = ", "
 		none = ""
 	}
 	if !cs.sharable.IsEmpty() {
 		sharable = fmt.Sprintf("%ssharable:%s (granted:%d, free: %d)", sep,
-			cs.sharable.String(), cs.granted, 1000*cs.sharable.Size()-cs.granted)
+			cs.sharable, cs.granted, 1000*cs.sharable.Size()-cs.granted)
 		none = ""
 	}
 
@@ -400,7 +400,7 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	score.hints = make(map[string]float64, len(hints))
 
 	for provider, hint := range cr.container.GetTopologyHints() {
-		log.Debug(" - evaluating topology hint %s", hint.String())
+		log.Debug(" - evaluating topology hint %s", hint)
 		score.hints[provider] = cs.node.HintScore(hint)
 	}
 
@@ -409,13 +409,13 @@ func (cs *cpuSupply) GetScore(request CPURequest) CPUScore {
 	key := pod.GetName() + ":" + cr.container.GetName()
 	if fakeHints, ok := opt.FakeHints[key]; ok {
 		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint.String())
+			log.Debug(" - evaluating fake hint %s", hint)
 			score.hints[provider] = cs.node.HintScore(hint)
 		}
 	}
 	if fakeHints, ok := opt.FakeHints[cr.container.GetName()]; ok {
 		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint.String())
+			log.Debug(" - evaluating fake hint %s", hint)
 			score.hints[provider] = cs.node.HintScore(hint)
 		}
 	}
@@ -503,16 +503,16 @@ func (cg *cpuGrant) String() string {
 
 	isol := cg.IsolatedCPUs()
 	if !isol.IsEmpty() {
-		isolated = fmt.Sprintf("isolated: %s", isol.String())
+		isolated = fmt.Sprintf("isolated: %s", isol)
 		sep = ", "
 	}
 	if !cg.exclusive.IsEmpty() {
-		exclusive = fmt.Sprintf("%sexclusive: %s", sep, cg.exclusive.String())
+		exclusive = fmt.Sprintf("%sexclusive: %s", sep, cg.exclusive)
 		sep = ", "
 	}
 	if cg.portion > 0 {
 		shared = fmt.Sprintf("%sshared: %s (%d milli-CPU)", sep,
-			cg.node.FreeCPU().SharableCPUs().String(), cg.portion)
+			cg.node.FreeCPU().SharableCPUs(), cg.portion)
 	}
 
 	return fmt.Sprintf("<CPU grant for %s from %s: %s%s%s>",
