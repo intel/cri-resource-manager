@@ -29,13 +29,23 @@ import (
 
 type mockSystem struct {
 	isolatedCPU int
+	packageIDs  []system.ID
+	nodeIDs     []system.ID
+	nodes       map[system.ID]*system.Node
+	pkgs        map[system.ID]*system.Package
 }
 
-func (fake *mockSystem) Node(system.ID) *system.Node {
-	return &system.Node{}
+func (fake *mockSystem) Node(id system.ID) *system.Node {
+	if fake.nodes == nil {
+		return &system.Node{}
+	}
+	return fake.nodes[id]
 }
-func (fake *mockSystem) Package(system.ID) *system.Package {
-	return &system.Package{}
+func (fake *mockSystem) Package(id system.ID) *system.Package {
+	if fake.pkgs == nil {
+		return &system.Package{}
+	}
+	return fake.pkgs[id]
 }
 func (fake *mockSystem) Offlined() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
@@ -51,16 +61,16 @@ func (fake *mockSystem) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 func (fake *mockSystem) SocketCount() int {
-	return 2
+	return len(fake.packageIDs)
 }
 func (fake *mockSystem) NUMANodeCount() int {
-	return 2
+	return len(fake.nodeIDs)
 }
 func (fake *mockSystem) PackageIDs() []system.ID {
-	return []system.ID{0, 1}
+	return fake.packageIDs
 }
 func (fake *mockSystem) NodeIDs() []system.ID {
-	return []system.ID{0, 1}
+	return fake.nodeIDs
 }
 func (fake *mockSystem) PackageNodeIDs(system.ID) []system.ID {
 	return []system.ID{0}

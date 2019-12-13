@@ -70,7 +70,7 @@ type System struct {
 // Package is a physical package (a collection of CPUs).
 type Package struct {
 	id    ID    // package id
-	cpus  IDSet // CPUs in this package
+	Cpus  IDSet // CPUs in this package
 	nodes IDSet // nodes in this package
 }
 
@@ -79,7 +79,7 @@ type Node struct {
 	path     string // sysfs path
 	id       ID     // node id
 	pkg      ID     // package id
-	cpus     IDSet  // cpus in this node
+	Cpus     IDSet  // cpus in this node
 	distance []int  // distance/cost to other NUMA nodes
 }
 
@@ -196,13 +196,13 @@ func (sys *System) Discover(flags DiscoveryFlag) error {
 	if sys.DebugEnabled() {
 		for id, pkg := range sys.packages {
 			sys.Info("package #%d:", id)
-			sys.Debug("   cpus: %s", pkg.cpus)
+			sys.Debug("   cpus: %s", pkg.Cpus)
 			sys.Debug("  nodes: %s", pkg.nodes)
 		}
 
 		for id, node := range sys.nodes {
 			sys.Debug("node #%d:", id)
-			sys.Debug("      cpus: %s", node.cpus)
+			sys.Debug("      cpus: %s", node.Cpus)
 			sys.Debug("  distance: %v", node.distance)
 		}
 
@@ -568,7 +568,7 @@ func (sys *System) discoverNodes() error {
 func (sys *System) discoverNode(path string) error {
 	node := &Node{path: path, id: getEnumeratedID(path)}
 
-	if _, err := readSysfsEntry(path, "cpulist", &node.cpus, ","); err != nil {
+	if _, err := readSysfsEntry(path, "cpulist", &node.Cpus, ","); err != nil {
 		return err
 	}
 	if _, err := readSysfsEntry(path, "distance", &node.distance); err != nil {
@@ -592,7 +592,7 @@ func (n *Node) PackageID() ID {
 
 // CPUSet returns the CPUSet for all cores/threads in this node.
 func (n *Node) CPUSet() cpuset.CPUSet {
-	return n.cpus.CPUSet()
+	return n.Cpus.CPUSet()
 }
 
 // Distance returns the distance vector for this node.
@@ -652,12 +652,12 @@ func (sys *System) discoverPackages() error {
 		if !found {
 			pkg = &Package{
 				id:    cpu.pkg,
-				cpus:  NewIDSet(),
+				Cpus:  NewIDSet(),
 				nodes: NewIDSet(),
 			}
 			sys.packages[cpu.pkg] = pkg
 		}
-		pkg.cpus.Add(cpu.id)
+		pkg.Cpus.Add(cpu.id)
 		pkg.nodes.Add(cpu.node)
 	}
 
@@ -671,7 +671,7 @@ func (p *Package) ID() ID {
 
 // CPUSet returns the CPUSet for all cores/threads in this package.
 func (p *Package) CPUSet() cpuset.CPUSet {
-	return p.cpus.CPUSet()
+	return p.Cpus.CPUSet()
 }
 
 // NodeIDs returns the NUMA node ids for this package.

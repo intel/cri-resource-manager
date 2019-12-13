@@ -23,15 +23,36 @@ import (
 
 func TestBuildPoolsByTopology(t *testing.T) {
 	tcases := []struct {
-		name          string
-		policy        *policy
-		expectedError bool
+		name             string
+		policy           *policy
+		expectedError    bool
+		expectedRootCPUs string
 	}{
 		{
 			name: "empty",
 			policy: &policy{
-				sys: &mockSystem{},
+				sys: &mockSystem{
+					packageIDs: []system.ID{0, 1},
+					nodeIDs:    []system.ID{0, 1},
+					nodes: map[system.ID]*system.Node{
+						0: {
+							Cpus: system.NewIDSet(0),
+						},
+						1: {
+							Cpus: system.NewIDSet(1),
+						},
+					},
+					pkgs: map[system.ID]*system.Package{
+						0: {
+							Cpus: system.NewIDSet(0),
+						},
+						1: {
+							Cpus: system.NewIDSet(1),
+						},
+					},
+				},
 			},
+			expectedRootCPUs: "<root CPU: sharable:0-1 (granted:0, free: 2000)>",
 		},
 	}
 	for _, tc := range tcases {
@@ -42,6 +63,9 @@ func TestBuildPoolsByTopology(t *testing.T) {
 			}
 			if !tc.expectedError && err != nil {
 				t.Errorf("Unxpected error: %+v", err)
+			}
+			if tc.expectedRootCPUs != tc.policy.root.freecpu.String() {
+				t.Errorf("Expected %q granted to root node, but got %q", tc.expectedRootCPUs, tc.policy.root.freecpu)
 			}
 		})
 	}
