@@ -35,14 +35,7 @@ type options struct {
 }
 
 // Relay command line options and runtime configuration with their defaults.
-var opt = options{
-	ImageSocket:   client.DontConnect,
-	RuntimeSocket: sockets.DockerShim,
-	RelaySocket:   sockets.ResourceManagerRelay,
-	RelayDir:      "/var/libb/cri-resmgr",
-	AgentSocket:   sockets.ResourceManagerAgent,
-	ConfigSocket:  sockets.ResourceManagerConfig,
-}
+var opt = options{}
 
 // Register us for command line option processing and configuration handling.
 func init() {
