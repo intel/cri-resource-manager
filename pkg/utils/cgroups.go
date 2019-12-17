@@ -55,9 +55,11 @@ func GetProcessInContainer(cgroupParentDir, containerID string) ([]string, error
 
 	// Find Cpuset sub-cgroup directory of this container
 	containerDir := ""
-	// Probe known per-container directories, in order of decreasing probability
+	// Probe known per-container directories
 	if cgroupParentDir != "" {
 		dirs := []string{
+			filepath.Join(cpusetCgroupDir, cgroupParentDir, "cri-containerd-"+containerID+".scope"),
+			filepath.Join(cpusetCgroupDir, cgroupParentDir, "crio-"+containerID+".scope"),
 			filepath.Join(cpusetCgroupDir, cgroupParentDir, "docker-"+containerID+".scope"),
 			filepath.Join(cpusetCgroupDir, cgroupParentDir, containerID),
 		}
