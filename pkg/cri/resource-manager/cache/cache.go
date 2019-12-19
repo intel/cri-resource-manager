@@ -421,6 +421,8 @@ type Cache interface {
 	DeleteContainer(id string) Container
 	// LookupContainer looks up a container in the cache.
 	LookupContainer(id string) (Container, bool)
+	// LookupContainerByCgroup looks up a container for the given cgroup path.
+	LookupContainerByCgroup(path string) (Container, bool)
 
 	// GetPendingContainers returs all containers with pending changes.
 	GetPendingContainers() []Container
@@ -692,6 +694,35 @@ func (cch *cache) DeleteContainer(id string) Container {
 func (cch *cache) LookupContainer(id string) (Container, bool) {
 	c, ok := cch.Containers[id]
 	return c, ok
+}
+
+// LookupContainerByCgroup looks up the container for the given cgroup path.
+func (cch *cache) LookupContainerByCgroup(path string) (Container, bool) {
+	cch.Debug("resolving %s to a container...", path)
+
+	for id, c := range cch.Containers {
+		if id != c.CacheID {
+			continue
+		}
+
+		parent := ""
+		if pod, ok := c.GetPod(); ok {
+			parent = pod.GetCgroupParentDir()
+		}
+		if parent == "" {
+			continue
+		}
+
+		if !strings.HasPrefix(path, parent) {
+			continue
+		}
+
+		if strings.Index(path, c.GetID()) != -1 {
+			return c, true
+		}
+	}
+
+	return nil, false
 }
 
 // Refresh the cache from an (assumed to be unfiltered) pod or container list response.
