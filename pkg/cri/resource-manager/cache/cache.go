@@ -324,6 +324,13 @@ type Container interface {
 	HasPending(string) bool
 	// ClearPending clears the pending change marker for the given controller.
 	ClearPending(string)
+
+	// GetTag gets the value of the given tag.
+	GetTag(string) (string, bool)
+	// SetTag sets the value of the given tag and returns its previous value..
+	SetTag(string, string) (string, bool)
+	// DeleteTag deletes the given tag, returning its deleted value.
+	DeleteTag(string) (string, bool)
 }
 
 // A cached container.
@@ -345,6 +352,7 @@ type container struct {
 	Mounts        map[string]*Mount   // mounts
 	Devices       map[string]*Device  // devices
 	TopologyHints sysfs.TopologyHints // Set of topology hints for all containers within Pod
+	Tags          map[string]string   // container tags (local dyanmic labels)
 
 	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
