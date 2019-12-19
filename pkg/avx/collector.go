@@ -53,7 +53,6 @@ var (
 
 	bpfBinaryName  = "avx512.o"
 	bpfInstallpath = "/usr/libexec/bpf"
-	cgroupV2path   = "/sys/fs/cgroup/unified"
 
 	// our logger instance
 	log = logger.NewLogger("avx")
@@ -152,7 +151,7 @@ func NewCollector() (prometheus.Collector, error) {
 	}
 
 	return &collector{
-		root:                     cgroupV2path,
+		root:                     cgroups.V2path,
 		bpfModule:                bpfModule,
 		avxContextSwitchCounters: avxSwitchCounters,
 		allContextSwitchCounters: allSwitchCounters,
@@ -273,8 +272,6 @@ func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
 }
 
 func init() {
-	flag.StringVar(&cgroupV2path, "cgroupv2-path", cgroupV2path,
-		"Path to cgroup-v2 mountpoint")
 	flag.StringVar(&bpfInstallpath, "bpf-install-path", bpfInstallpath,
 		"Path to eBPF install directory")
 }
