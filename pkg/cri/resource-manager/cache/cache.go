@@ -40,6 +40,9 @@ const (
 	RDT = "rdt"
 	// BlockIO marks changes that can be applied by the BlockIO controller.
 	BlockIO = "blockio"
+
+	// TagAVX512 tags containers that use AVX512 instructions.
+	TagAVX512 = "AVX512"
 )
 
 // PodState is the pod state in the runtime.
