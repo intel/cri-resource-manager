@@ -104,6 +104,8 @@ type Backend interface {
 	ReleaseResources(cache.Container) error
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
+	// Rebalance tries an optimal allocation of resources for the current container.
+	Rebalance() (bool, error)
 	// ExportResourceData provides resource data to export for the container.
 	ExportResourceData(cache.Container) map[string]string
 }
@@ -120,6 +122,8 @@ type Policy interface {
 	ReleaseResources(cache.Container) error
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
+	// Rebalance tries to find an optimal allocation of resources for the current containers.
+	Rebalance() (bool, error)
 	// ExportResourceData exports/updates resource data for the container.
 	ExportResourceData(cache.Container)
 }
@@ -233,6 +237,11 @@ func (p *policy) ReleaseResources(c cache.Container) error {
 // UpdateResources updates resource allocations of a container.
 func (p *policy) UpdateResources(c cache.Container) error {
 	return p.backend.UpdateResources(c)
+}
+
+// Rebalance tries to find a more optimal allocation of resources for the current containers.
+func (p *policy) Rebalance() (bool, error) {
+	return p.backend.Rebalance()
 }
 
 // ExportResourceData exports/updates resource data for the container.

@@ -81,6 +81,12 @@ func (n *none) UpdateResources(c cache.Container) error {
 	return nil
 }
 
+// Rebalance tries to find an optimal allocation of resources for the current containers.
+func (n *none) Rebalance() (bool, error) {
+	n.Debug("(not) rebalancing containers...")
+	return false, nil
+}
+
 // ExportResourceData provides resource data to export for the container.
 func (n *none) ExportResourceData(c cache.Container) map[string]string {
 	return nil
