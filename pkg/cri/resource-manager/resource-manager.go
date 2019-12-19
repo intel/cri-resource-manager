@@ -26,6 +26,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/prometheus/client_golang/prometheus"
+	model "github.com/prometheus/client_model/go"
 )
 
 // ResourceManager is the interface we expose for controlling the CRI resource manager.
@@ -36,6 +38,8 @@ type ResourceManager interface {
 	Stop()
 	// SetConfig dynamically updates the resource manager  configuration
 	SetConfig(*config.RawConfig) error
+	// SendEvent sends an event to be processed by the resource manager.
+	SendEvent(event interface{}) error
 }
 
 // resmgr is the implementation of ResourceManager.
@@ -49,6 +53,11 @@ type resmgr struct {
 	control      control.Control // policy controllers/enforcement
 	agent        agent.Interface // connection to cri-resmgr agent
 	conf         *config.RawConfig
+	events       chan interface{} // channel to push events into for processing
+	shutdown     chan interface{} // channel to shutdown our various goroutines
+	gatherer     prometheus.Gatherer
+	gathered     []*model.MetricFamily
+	rebalance    bool
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -141,7 +150,11 @@ func (m *resmgr) Start() error {
 		}
 	}
 
-	if err := m.activateRequestProcessing(); err != nil {
+	if err := m.startRequestProcessing(); err != nil {
+		return err
+	}
+
+	if err := m.startEventProcessing(); err != nil {
 		return err
 	}
 
@@ -166,6 +179,7 @@ func (m *resmgr) Start() error {
 func (m *resmgr) Stop() {
 	m.relay.Client().Close()
 	m.relay.Server().Stop()
+	m.stopEventProcessing()
 }
 
 // Set new resource manager configuration.

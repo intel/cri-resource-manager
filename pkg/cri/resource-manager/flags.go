@@ -16,21 +16,24 @@ package resmgr
 
 import (
 	"flag"
+	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 )
 
-// Options captures our command line or runtime configurable parameters.
+// Options captures our command line parameters.
 type options struct {
-	ImageSocket    string `json:",omitempty"`
-	RuntimeSocket  string `json:",omitempty"`
-	RelaySocket    string `json:",omitempty"`
-	RelayDir       string `json:",omitempty"`
-	AgentSocket    string `json:",omitempty"`
-	ConfigSocket   string `json:",omitempty"`
-	ResctrlPath    string `json:",omitempty"`
-	FallbackConfig string `json:",omitempty"`
-	ForceConfig    string `json:",omitempty"`
+	ImageSocket    string
+	RuntimeSocket  string
+	RelaySocket    string
+	RelayDir       string
+	AgentSocket    string
+	ConfigSocket   string
+	ResctrlPath    string
+	FallbackConfig string
+	ForceConfig    string
+	PollMetrics    time.Duration
+	Rebalance      time.Duration
 }
 
 // Relay command line options and runtime configuration with their defaults.
@@ -55,4 +58,9 @@ func init() {
 		"Fallback configuration to use unless/until one is available from the cache or agent.")
 	flag.StringVar(&opt.ForceConfig, "force-config", "",
 		"Configuration used to override the one stored in the cache. Does not override the agent.")
+
+	flag.DurationVar(&opt.PollMetrics, "metrics-interval", 30*time.Second,
+		"Interval for polling/gathering metrics collection.")
+	flag.DurationVar(&opt.Rebalance, "rebalance-interval", 5*time.Minute,
+		"Minimum interval between triggering container rebalancing.")
 }

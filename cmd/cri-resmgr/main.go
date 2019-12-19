@@ -73,5 +73,6 @@ func main() {
 
 	for {
 		time.Sleep(15 * time.Second)
+		m.SendEvent("this is a timeout event from main...")
 	}
 }
