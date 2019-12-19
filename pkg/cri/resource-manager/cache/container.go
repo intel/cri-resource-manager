@@ -661,7 +661,7 @@ func (c *container) GetAffinity() []*Affinity {
 		c.cache.Error("internal error: can't find Pod for container %s", c.PrettyName())
 	}
 
-	affinity := pod.GetContainerAffinity(c.GetName())
+	affinity := append(pod.GetContainerAffinity(c.GetName()), c.implicitAffinities()...)
 	c.cache.Debug("affinity for container %s:", c.PrettyName())
 	for _, a := range affinity {
 		c.cache.Debug("  - %s", a.String())
@@ -809,4 +809,16 @@ func (c *container) DeleteTag(key string) (string, bool) {
 	prev, ok := c.Tags[key]
 	delete(c.Tags, key)
 	return prev, ok
+}
+
+func (c *container) implicitAffinities() []*Affinity {
+	implicit := []*Affinity{}
+
+	if _, ok := c.GetTag(TagAVX512); ok {
+		implicit = append(implicit, globalAffinity("tags/"+TagAVX512, 5))
+	} else {
+		implicit = append(implicit, globalAntiAffinity("tags/"+TagAVX512, 5))
+	}
+
+	return implicit
 }
