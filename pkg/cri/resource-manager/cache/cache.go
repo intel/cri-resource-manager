@@ -68,6 +68,8 @@ type Pod interface {
 	GetInitContainers() []Container
 	// GetContainers returns the (non-init) containers of the pod.
 	GetContainers() []Container
+	// GetContainer returns the named container of the pod.
+	GetContainer(string) (Container, bool)
 	// GetId returns the pod id of the pod.
 	GetID() string
 	// GetUID returns the (kubernetes) unique id of the pod.
@@ -90,8 +92,6 @@ type Pod interface {
 	// GetResmgrLabel returns the value of a pod label from the
 	// cri-resource-manager namespace.
 	GetResmgrLabel(string) (string, bool)
-	// GetAnnotationKeys returns the keys of all annotations of the container.
-
 	// GetAnnotationKeys returns the keys of all pod annotations as a string slice.
 	GetAnnotationKeys() []string
 	// GetAnnotation returns the value of the given annotation and whether it was found.
@@ -133,6 +133,7 @@ type pod struct {
 	Labels       map[string]string // pod labels
 	Annotations  map[string]string // pod annotations
 	CgroupParent string            // cgroup parent directory
+	containers   map[string]string // container name to ID map
 
 	Resources *PodResourceRequirements // annotated resource requirements
 	Affinity  *podContainerAffinity    // annotated container affinity

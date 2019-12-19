@@ -41,6 +41,7 @@ func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
 		return cacheError("pod %s has no request metadata", p.ID)
 	}
 
+	p.containers = make(map[string]string)
 	p.Name = meta.Name
 	p.Namespace = meta.Namespace
 	p.State = PodState(int32(PodStateReady))
@@ -61,6 +62,7 @@ func (p *pod) fromListResponse(pod *cri.PodSandbox) error {
 		return cacheError("pod %s has no reply metadata", p.ID)
 	}
 
+	p.containers = make(map[string]string)
 	p.Name = meta.Name
 	p.Namespace = meta.Namespace
 	p.State = PodState(int32(pod.State))
@@ -107,6 +109,32 @@ func (p *pod) GetContainers() []Container {
 	}
 
 	return containers
+}
+
+// Get container pointer by its name.
+func (p *pod) getContainer(name string) *container {
+	var found *container
+
+	if p.containers == nil {
+		p.containers = make(map[string]string)
+	}
+
+	for _, c := range p.GetContainers() {
+		cptr := c.(*container)
+		p.containers[cptr.Name] = cptr.ID
+		if cptr.Name == name {
+			found = cptr
+		}
+	}
+
+	return found
+}
+
+// Get container by its name.
+func (p *pod) GetContainer(name string) (Container, bool) {
+	c := p.getContainer(name)
+
+	return c, c != nil
 }
 
 // Get the id of a pod.
