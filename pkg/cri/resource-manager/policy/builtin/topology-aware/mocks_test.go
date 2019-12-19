@@ -416,16 +416,7 @@ func (m *mockCache) DeleteContainer(string) cache.Container {
 func (m *mockCache) LookupContainer(string) (cache.Container, bool) {
 	return m.returnValue1ForLookupContainer, m.returnValue2ForLookupContainer
 }
-func (m *mockCache) StartTransaction() error {
-	panic("unimplemented")
-}
-func (m *mockCache) CommitTransaction() []cache.Container {
-	panic("unimplemented")
-}
-func (m *mockCache) QueryTransaction() []cache.Container {
-	panic("unimplemented")
-}
-func (m *mockCache) AbortTransaction() {
+func (m *mockCache) LookupContainerByCgroup(path string) (cache.Container, bool) {
 	panic("unimplemented")
 }
 func (m *mockCache) GetPendingContainers() []cache.Container {
