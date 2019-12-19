@@ -120,6 +120,8 @@ type Policy interface {
 	ReleaseResources(cache.Container) error
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
+	// ReallocateResources reallocates resources for the given containers.
+	ReallocateResources([]cache.Container) error
 	// ExportResourceData exports/updates resource data for the container.
 	ExportResourceData(cache.Container)
 }
@@ -233,6 +235,26 @@ func (p *policy) ReleaseResources(c cache.Container) error {
 // UpdateResources updates resource allocations of a container.
 func (p *policy) UpdateResources(c cache.Container) error {
 	return p.backend.UpdateResources(c)
+}
+
+// ReallocateResources reallocates resources of the given containers.
+func (p *policy) ReallocateResources(containers []cache.Container) error {
+	var errors error
+
+	for _, c := range containers {
+		p.backend.ReleaseResources(c)
+	}
+	for _, c := range containers {
+		if err := p.backend.AllocateResources(c); err != nil {
+			if errors == nil {
+				errors = err
+			} else {
+				errors = policyError("%v, %v", errors, err)
+			}
+		}
+	}
+
+	return errors
 }
 
 // ExportResourceData exports/updates resource data for the container.
