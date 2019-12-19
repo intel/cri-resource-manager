@@ -353,6 +353,8 @@ bin/webhook: $(wildcard cmd/webhook/*.go) \
                 find $$dir -name \*.go; \
             done | sort | uniq)
 
+bin/avx512-load: $(wildcard cmd/avx512-load/*.go)
+
 # phony targets
 .PHONY: all build install clean test images \
 	format vet cyclomatic-check lint golangci-lint \
