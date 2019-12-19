@@ -17,6 +17,7 @@ package e2e
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -33,11 +34,9 @@ const (
 	testDir = "/tmp/cri-rm-test"
 )
 
-func setUp(t *testing.T) {
-	t.Helper()
-
+func init() {
 	if err := os.MkdirAll(testDir, 0700); err != nil {
-		t.Fatalf("unable to create %q: %+v", testDir, err)
+		fmt.Printf("unable to create %q: %+v\n", testDir, err)
 	}
 }
 
@@ -105,7 +104,6 @@ func runTest(t *testing.T, name string, overridenCriHandlers map[string]interfac
 }
 
 func TestListPodSandbox(t *testing.T) {
-	setUp(t)
 	tcases := []struct {
 		name         string
 		pods         []*api.PodSandbox
@@ -142,7 +140,6 @@ func TestListPodSandbox(t *testing.T) {
 }
 
 func TestListContainers(t *testing.T) {
-	setUp(t)
 	tcases := []struct {
 		name               string
 		containers         []*api.Container
