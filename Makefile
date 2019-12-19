@@ -167,7 +167,7 @@ image-%:
 #
 
 format:
-	$(Q)report=`$(GO_FMT) -s -d -w $$(find cmd pkg -name \*.go)`; \
+	$(Q)report=`$(GO_FMT) -s -d -w $$(find cmd pkg test/functional -name \*.go)`; \
 	if [ -n "$$report" ]; then \
 	    echo "$$report"; \
 	    exit 1; \
