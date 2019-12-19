@@ -302,6 +302,15 @@ func (m *mockContainer) HasPending(string) bool {
 func (m *mockContainer) ClearPending(string) {
 	panic("unimplemented")
 }
+func (m *mockContainer) GetTag(string) (string, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) SetTag(string, string) (string, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) DeleteTag(string) (string, bool) {
+	panic("unimplemented")
+}
 
 type mockPod struct {
 	name                               string
