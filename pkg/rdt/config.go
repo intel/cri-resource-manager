@@ -511,18 +511,14 @@ func (raw rawAllocations) parsePercentage() (map[uint64]uint64, error) {
 
 // parse parses a raw L3 cache allocation
 func (raw rawAllocations) parseL3() (l3Schema, error) {
-	rawValues, err := raw.rawParse(map[string]interface{}{"unified": "100%"}, false)
+	rawValues, err := raw.rawParse("100%", false)
 	if err != nil || rawValues == nil {
 		return nil, err
 	}
 
 	allocations := make(l3Schema, len(rawValues))
 	for id, rawVal := range rawValues {
-		strMap, ok := rawVal.(map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("invalid structure of l3Schema %q", rawVal)
-		}
-		allocations[id], err = parseL3Allocation(strMap)
+		allocations[id], err = parseL3Allocation(rawVal)
 		if err != nil {
 			return nil, err
 		}
@@ -605,26 +601,36 @@ func parsePercentage(s string) (uint64, error) {
 }
 
 // parseL3Allocation parses a generic string map into l3Allocation struct
-func parseL3Allocation(raw map[string]interface{}) (l3Allocation, error) {
+func parseL3Allocation(raw interface{}) (l3Allocation, error) {
 	var err error
 	allocation := l3Allocation{}
 
-	for k, v := range raw {
-		s, ok := v.(string)
-		if !ok {
-			return allocation, fmt.Errorf("not a string value %q", v)
-		}
-		switch strings.ToLower(k) {
-		case "unified":
-			allocation.Unified, err = parseCacheAllocation(s)
-		case "code":
-			allocation.Code, err = parseCacheAllocation(s)
-		case "data":
-			allocation.Data, err = parseCacheAllocation(s)
-		}
+	switch value := raw.(type) {
+	case string:
+		allocation.Unified, err = parseCacheAllocation(value)
 		if err != nil {
 			return allocation, err
 		}
+	case map[string]interface{}:
+		for k, v := range value {
+			s, ok := v.(string)
+			if !ok {
+				return allocation, fmt.Errorf("not a string value %q", v)
+			}
+			switch strings.ToLower(k) {
+			case "unified":
+				allocation.Unified, err = parseCacheAllocation(s)
+			case "code":
+				allocation.Code, err = parseCacheAllocation(s)
+			case "data":
+				allocation.Data, err = parseCacheAllocation(s)
+			}
+			if err != nil {
+				return allocation, err
+			}
+		}
+	default:
+		return allocation, fmt.Errorf("invalid structure of l3Schema %q", raw)
 	}
 
 	// Sanity check for the configuration
