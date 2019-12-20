@@ -74,8 +74,9 @@ func (m *resmgr) pollMetrics() {
 			timer.Stop()
 			return
 		case _ = <-timer.C:
-			m.gatherMetrics()
-			m.processMetrics()
+			gathered := m.gatherMetrics()
+			m.processMetrics(gathered)
+			m.gathered = gathered
 		}
 	}
 }

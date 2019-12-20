@@ -175,7 +175,7 @@ func registerPrometheusExporter() error {
 	log := logger.NewLogger("metrics/" + ServiceName)
 	cfg := prometheus.Options{
 		Namespace: prometheusNamespace(ServiceName),
-		Gatherer:  prom.Gatherers{dynamicGatherers, prom.NewRegistry()},
+		Gatherer:  prom.Gatherers{dynamicGatherers},
 		OnError:   func(err error) { log.Error("%v", err) },
 	}
 	pexport, err = prometheus.NewExporter(cfg)

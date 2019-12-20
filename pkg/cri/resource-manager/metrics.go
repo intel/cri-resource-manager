@@ -43,24 +43,31 @@ func (m *resmgr) setupMetricsCollection() error {
 		return err
 	}
 	m.gatherer = g
+
+	instrumentation.RegisterGatherer(m)
+
 	return nil
 }
 
+// Gather is our prometheus.Gatherer interface for proxying gathered metrics to Prometheus.
+func (m *resmgr) Gather() ([]*model.MetricFamily, error) {
+	return m.gathered, nil
+}
+
 // gatherMetrics polls metrics and caches them for proxying to prometheus
-func (m *resmgr) gatherMetrics() {
+func (m *resmgr) gatherMetrics() []*model.MetricFamily {
 	families, err := m.gatherer.Gather()
 	if err != nil {
 		elog.Error("failed to gather metrics: %v", err)
 	}
-	m.gathered = families
+	return families
 }
 
 // processMetrics processes the pending/gathered metrics data
-func (m *resmgr) processMetrics() {
-	for _, f := range m.gathered {
+func (m *resmgr) processMetrics(families []*model.MetricFamily) {
+	for _, f := range families {
 		m.processMetricFamily(f)
 	}
-	m.gathered = nil
 }
 
 // processMetricFamily processes the given metrics event.
