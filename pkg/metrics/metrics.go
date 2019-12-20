@@ -12,8 +12,10 @@ var (
 	log                  = logger.NewLogger("metrics")
 )
 
+// InitCollector is the type for functions that initialize collectors.
 type InitCollector func() (prometheus.Collector, error)
 
+// RegisterCollector registers the named prometheus.Collector for metrics collection.
 func RegisterCollector(name string, init InitCollector) error {
 	log.Info("registering collector %s...", name)
 
@@ -26,6 +28,7 @@ func RegisterCollector(name string, init InitCollector) error {
 	return nil
 }
 
+// NewMetricGatherer creates a new prometheus.Gatherer with all registered collectors.
 func NewMetricGatherer() (prometheus.Gatherer, error) {
 	reg := prometheus.NewPedanticRegistry()
 
