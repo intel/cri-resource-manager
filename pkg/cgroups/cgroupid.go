@@ -35,6 +35,9 @@ func getID(path string) uint64 {
 func (cgid *CgroupID) List() error {
 	return filepath.Walk(cgid.root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			fmt.Printf("WalkFunc called with an error (path %q: %v\n)", path, err)
 			return err
 		}
@@ -59,6 +62,9 @@ func (cgid *CgroupID) Find(id uint64) (string, error) {
 
 	err := filepath.Walk(cgid.root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			fmt.Printf("WalkFunc called with an error (path %q: %v\n)", path, err)
 			return err
 		}
