@@ -20,6 +20,8 @@ import (
 
 	"contrib.go.opencensus.io/exporter/jaeger"
 	"contrib.go.opencensus.io/exporter/prometheus"
+	prom "github.com/prometheus/client_golang/prometheus"
+	model "github.com/prometheus/client_model/go"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
@@ -39,6 +41,9 @@ var log logger.Logger = logger.NewLogger("tracing")
 // Our Jaeger trace and Prometheus metrics exporters.
 var jexport *jaeger.Exporter
 var pexport *prometheus.Exporter
+
+// prometheus Gatherers dynamically registered with us.
+var dynamicGatherers = &gatherers{gatherers: prom.Gatherers{}}
 
 // ConfigureTracing configures Jaeger-tracing.
 func ConfigureTracing(tc TraceConfig) error {
@@ -100,6 +105,11 @@ func InjectGrpcServerTrace(opts ...grpc.ServerOption) []grpc.ServerOption {
 	}
 
 	return opts
+}
+
+// RegisterGatherer registers a new prometheus Gatherer.
+func RegisterGatherer(g prom.Gatherer) {
+	dynamicGatherers.Add(g)
 }
 
 func registerJaegerExporter() error {
@@ -165,6 +175,7 @@ func registerPrometheusExporter() error {
 	log := logger.NewLogger("metrics/" + ServiceName)
 	cfg := prometheus.Options{
 		Namespace: prometheusNamespace(ServiceName),
+		Gatherer:  prom.Gatherers{dynamicGatherers, prom.NewRegistry()},
 		OnError:   func(err error) { log.Error("%v", err) },
 	}
 	pexport, err = prometheus.NewExporter(cfg)
@@ -192,4 +203,19 @@ func unregisterPrometheusExporter() {
 // mutate service name into a valid Prometheus namespace.
 func prometheusNamespace(service string) string {
 	return strings.ReplaceAll(strings.ToLower(service), "-", "_")
+}
+
+// gatherers is a trivial wrapper around prometheus Gatherers.
+type gatherers struct {
+	gatherers prom.Gatherers
+}
+
+// Gather implements the prometheus.Gatherer interface.
+func (g *gatherers) Gather() ([]*model.MetricFamily, error) {
+	return g.gatherers.Gather()
+}
+
+// Add adds a a new gatherer.
+func (g *gatherers) Add(gatherer prom.Gatherer) {
+	g.gatherers = append(g.gatherers, gatherer)
 }
