@@ -201,7 +201,7 @@ golangci-lint:
 
 test:
 ifndef WHAT
-	$(Q)$(GO_CMD) test -race -coverprofile=coverage.txt -covermode=atomic \
+	$(Q)$(GO_CMD) test -v -race -coverprofile=coverage.txt -covermode=atomic \
 	    $(GO_MODULES)
 else
 	$(Q)cd $(WHAT) && \
