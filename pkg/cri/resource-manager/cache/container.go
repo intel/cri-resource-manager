@@ -145,73 +145,6 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 	return nil
 }
 
-// UpdateCriCreateRequest updates a CRI ContainerCreateRequest for the container.
-func (c *container) UpdateCriCreateRequest(req *cri.CreateContainerRequest) error {
-	if c.State != ContainerStateCreating || c.ID != "" {
-		c.cache.Warn("hmm... cache thinks container (%v/%v) being created exists",
-			c.CacheID, c.ID)
-	}
-
-	req.Config.Command = c.Command
-	req.Config.Args = c.Args
-	req.Config.Labels = c.Labels
-	req.Config.Annotations = c.Annotations
-
-	req.Config.Envs = make([]*cri.KeyValue, len(c.Env))
-	idx := 0
-	for k, v := range c.Env {
-		req.Config.Envs[idx] = &cri.KeyValue{
-			Key:   k,
-			Value: v,
-		}
-		idx++
-	}
-
-	req.Config.Mounts = make([]*cri.Mount, len(c.Mounts))
-	idx = 0
-	for _, m := range c.Mounts {
-		req.Config.Mounts[idx] = &cri.Mount{
-			ContainerPath:  m.Container,
-			HostPath:       m.Host,
-			Readonly:       m.Readonly,
-			SelinuxRelabel: m.Relabel,
-			Propagation:    cri.MountPropagation(m.Propagation),
-		}
-		idx++
-	}
-
-	req.Config.Devices = make([]*cri.Device, len(c.Devices))
-	idx = 0
-	for _, d := range c.Devices {
-		req.Config.Devices[idx] = &cri.Device{
-			ContainerPath: d.Container,
-			HostPath:      d.Host,
-			Permissions:   d.Permissions,
-		}
-		idx++
-	}
-
-	req.Config.Linux.Resources = c.LinuxReq
-
-	return nil
-}
-
-// CriUpdateRequest creates a CRI UpdateContainerResourcesRequest for the container.
-func (c *container) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error) {
-	if c.ID == "" {
-		return nil, cacheError("can't udpate container %s, not created yet", c.CacheID)
-	}
-
-	if c.LinuxReq == nil {
-		return nil, nil
-	}
-
-	return &cri.UpdateContainerResourcesRequest{
-		ContainerId: c.ID,
-		Linux:       &(*c.LinuxReq),
-	}, nil
-}
-
 func (c *container) PrettyName() string {
 	pod, ok := c.GetPod()
 	if !ok {
@@ -828,13 +761,13 @@ func (c *container) markPending(controller string) {
 		c.pending = make(map[string]struct{})
 	}
 	c.pending[controller] = struct{}{}
-	c.cache.markChanged(c)
+	c.cache.markPending(c)
 }
 
 func (c *container) ClearPending(controller string) {
 	delete(c.pending, controller)
 	if len(c.pending) == 0 {
-		c.cache.clearChanged(c)
+		c.cache.clearPending(c)
 	}
 }
 
