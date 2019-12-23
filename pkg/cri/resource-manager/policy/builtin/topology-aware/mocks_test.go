@@ -118,6 +118,9 @@ func (m *mockContainer) GetLabelKeys() []string {
 func (m *mockContainer) GetLabel(string) (string, bool) {
 	panic("unimplemented")
 }
+func (m *mockContainer) GetLabels() map[string]string {
+	panic("unimplemented")
+}
 func (m *mockContainer) GetResmgrLabelKeys() []string {
 	panic("unimplemented")
 }
@@ -134,6 +137,9 @@ func (m *mockContainer) GetResmgrAnnotationKeys() []string {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetResmgrAnnotation(string, interface{}) (string, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetAnnotations() map[string]string {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetEnvKeys() []string {
@@ -267,6 +273,24 @@ func (m *mockContainer) SetBlockIOClass(string) {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetBlockIOClass() string {
+	panic("unimplemented")
+}
+func (m *mockContainer) SetCRIRequest(req interface{}) error {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIRequest() (interface{}, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) ClearCRIRequest() (interface{}, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIEnvs() []*cri.KeyValue {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIMounts() []*cri.Mount {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIDevices() []*cri.Device {
 	panic("unimplemented")
 }
 

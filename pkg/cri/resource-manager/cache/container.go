@@ -319,6 +319,17 @@ func (c *container) GetResmgrLabel(key string) (string, bool) {
 	return value, ok
 }
 
+func (c *container) GetLabels() map[string]string {
+	if c.Labels == nil {
+		return nil
+	}
+	labels := make(map[string]string, len(c.Labels))
+	for key, value := range c.Labels {
+		labels[key] = value
+	}
+	return labels
+}
+
 func (c *container) GetAnnotationKeys() []string {
 	keys := make([]string, len(c.Annotations))
 
@@ -354,6 +365,17 @@ func (c *container) GetResmgrAnnotationKeys() []string {
 
 func (c *container) GetResmgrAnnotation(key string, objPtr interface{}) (string, bool) {
 	return c.GetAnnotation(kubernetes.ResmgrKey(key), objPtr)
+}
+
+func (c *container) GetAnnotations() map[string]string {
+	if c.Annotations == nil {
+		return nil
+	}
+	annotations := make(map[string]string, len(c.Annotations))
+	for key, value := range c.Annotations {
+		annotations[key] = value
+	}
+	return annotations
 }
 
 func (c *container) GetEnvKeys() []string {
@@ -727,4 +749,75 @@ func (c *container) SetBlockIOClass(class string) {
 
 func (c *container) GetBlockIOClass() string {
 	return c.BlockIOClass
+}
+
+func (c *container) SetCRIRequest(req interface{}) error {
+	if c.req != nil {
+		return cacheError("can't set pending container request: another pending")
+	}
+	c.req = &req
+	return nil
+}
+
+func (c *container) GetCRIRequest() (interface{}, bool) {
+	if c.req == nil {
+		return nil, false
+	}
+
+	return *c.req, true
+}
+
+func (c *container) ClearCRIRequest() (interface{}, bool) {
+	req, ok := c.GetCRIRequest()
+	c.req = nil
+	return req, ok
+}
+
+func (c *container) GetCRIEnvs() []*cri.KeyValue {
+	envs := make([]*cri.KeyValue, len(c.Env), len(c.Env))
+	idx := 0
+	for k, v := range c.Env {
+		envs[idx] = &cri.KeyValue{
+			Key:   k,
+			Value: v,
+		}
+		idx++
+	}
+	return envs
+}
+
+func (c *container) GetCRIMounts() []*cri.Mount {
+	if c.Mounts == nil {
+		return nil
+	}
+	mounts := make([]*cri.Mount, len(c.Mounts), len(c.Mounts))
+	idx := 0
+	for _, m := range c.Mounts {
+		mounts[idx] = &cri.Mount{
+			ContainerPath:  m.Container,
+			HostPath:       m.Host,
+			Readonly:       m.Readonly,
+			SelinuxRelabel: m.Relabel,
+			Propagation:    cri.MountPropagation(m.Propagation),
+		}
+		idx++
+	}
+	return mounts
+}
+
+func (c *container) GetCRIDevices() []*cri.Device {
+	if c.Devices == nil {
+		return nil
+	}
+	devices := make([]*cri.Device, len(c.Devices), len(c.Devices))
+	idx := 0
+	for _, d := range c.Devices {
+		devices[idx] = &cri.Device{
+			ContainerPath: d.Container,
+			HostPath:      d.Host,
+			Permissions:   d.Permissions,
+		}
+		idx++
+	}
+	return devices
 }
