@@ -7,7 +7,8 @@ GO_LINT   := golint
 GO_CILINT := golangci-lint
 
 # TEST_TAGS is the set of extra build tags passed for tests.
-TEST_TAGS :=
+# We disable AVX collector for tests by default.
+TEST_TAGS := -tags noavx
 GO_TEST   := $(GO_CMD) test $(TEST_TAGS)
 
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
