@@ -85,12 +85,29 @@ func (ctl *rdtctl) PreStartHook(c cache.Container) error {
 
 // PostStartHook is the RDT controller post-start hook.
 func (ctl *rdtctl) PostStartHook(c cache.Container) error {
-	return ctl.assign(c, ctl.RDTClass(c))
+	// Notes:
+	//   Unlike in our PostUpdateHook, we don't bail out here if
+	//   there are no pending RDT changes for the container. We
+	//   might be configured to fall back to assign RDT class
+	//   based on pod/container QoS class in which case there is
+	//   no pending marker on the container.
+	if err := ctl.assign(c, ctl.RDTClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(RDTController)
+	return nil
 }
 
 // PostUpdateHook is the RDT controller post-update hook.
 func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
-	return ctl.assign(c, ctl.RDTClass(c))
+	if !c.HasPending(RDTController) {
+		return nil
+	}
+	if err := ctl.assign(c, ctl.RDTClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(RDTController)
+	return nil
 }
 
 // PostStop is the RDT controller post-stop hook.
@@ -100,6 +117,10 @@ func (ctl *rdtctl) PostStopHook(c cache.Container) error {
 
 // assign assigns the container to the given RDT class.
 func (ctl *rdtctl) assign(c cache.Container, class string) error {
+	if class == "" {
+		return nil
+	}
+
 	pod, ok := c.GetPod()
 	if !ok {
 		return rdtError("failed to get pod of container %s", c.PrettyName())
@@ -132,7 +153,7 @@ func (ctl *rdtctl) RDTClass(c cache.Container) string {
 		}
 	}
 
-	log.Debug("RDT class for %s (%s): %s", c.PrettyName(), cclass, rdtclass)
+	log.Debug("RDT class for %s (%s): %q", c.PrettyName(), cclass, rdtclass)
 
 	return rdtclass
 }

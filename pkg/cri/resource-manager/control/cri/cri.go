@@ -66,6 +66,10 @@ func (ctl *crictl) Stop() {
 func (ctl *crictl) PreCreateHook(c cache.Container) error {
 	log.Debug("running pre-create hook for %s...", c.PrettyName())
 
+	if !c.HasPending(CRIController) {
+		return nil
+	}
+
 	request, ok := c.GetCRIRequest()
 	if !ok {
 		return criError("pre-create hook: no pending CRI request")
@@ -83,6 +87,8 @@ func (ctl *crictl) PreCreateHook(c cache.Container) error {
 	create.Config.Mounts = c.GetCRIMounts()
 	create.Config.Devices = c.GetCRIDevices()
 	create.Config.Linux.Resources = c.GetLinuxResources()
+
+	c.ClearPending(CRIController)
 
 	return nil
 }
@@ -103,6 +109,10 @@ func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 
 	log.Debug("running post-update hook for %s...", c.PrettyName())
 
+	if !c.HasPending(CRIController) {
+		return nil
+	}
+
 	resources := c.GetLinuxResources()
 	if resources == nil {
 		return nil
@@ -118,6 +128,8 @@ func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 		}
 	}
 	update.Linux = resources
+
+	c.ClearPending(CRIController)
 
 	return nil
 }

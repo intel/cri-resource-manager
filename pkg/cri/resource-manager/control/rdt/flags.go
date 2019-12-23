@@ -16,6 +16,7 @@ package rdt
 
 import (
 	"flag"
+
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/rdt"
 )

@@ -392,10 +392,10 @@ func (m *mockCache) DeletePod(string) cache.Pod {
 func (m *mockCache) LookupPod(string) (cache.Pod, bool) {
 	panic("unimplemented")
 }
-func (m *mockCache) InsertContainer(interface{}) cache.Container {
+func (m *mockCache) InsertContainer(interface{}) (cache.Container, error) {
 	panic("unimplemented")
 }
-func (m *mockCache) UpdateContainerID(string, interface{}) cache.Container {
+func (m *mockCache) UpdateContainerID(string, interface{}) (cache.Container, error) {
 	panic("unimplemented")
 }
 func (m *mockCache) DeleteContainer(string) cache.Container {

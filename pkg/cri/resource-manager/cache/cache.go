@@ -419,9 +419,9 @@ type Cache interface {
 	// LookupPod looks up a pod in the cache.
 	LookupPod(id string) (Pod, bool)
 	// InsertContainer inserts a container into the cache, using a runtime request or reply.
-	InsertContainer(msg interface{}) Container
+	InsertContainer(msg interface{}) (Container, error)
 	// UpdateContainerID updates a containers runtime id.
-	UpdateContainerID(cacheID string, msg interface{}) Container
+	UpdateContainerID(cacheID string, msg interface{}) (Container, error)
 	// DeleteContainer deletes a container from the cache.
 	DeleteContainer(id string) Container
 	// LookupContainer looks up a container in the cache.
@@ -633,7 +633,7 @@ func (cch *cache) LookupPod(id string) (Pod, bool) {
 }
 
 // Insert a container into the cache.
-func (cch *cache) InsertContainer(msg interface{}) Container {
+func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
 	var err error
 
 	c := &container{
@@ -650,8 +650,7 @@ func (cch *cache) InsertContainer(msg interface{}) Container {
 	}
 
 	if err != nil {
-		cch.Error("failed to insert container %s: %v", c.CacheID, err)
-		return nil
+		return nil, cacheError("failed to insert container %s: %v", c.CacheID, err)
 	}
 
 	c.CacheID = cch.createCacheID(c)
@@ -665,30 +664,28 @@ func (cch *cache) InsertContainer(msg interface{}) Container {
 
 	cch.Save()
 
-	return c
+	return c, nil
 }
 
 // UpdateContainerID updates a containers runtime id.
-func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) Container {
+func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) (Container, error) {
 	c, ok := cch.Containers[cacheID]
 	if !ok {
-		cch.Error("failed to update container id, container %s not found", cacheID)
-		return nil
+		return nil, cacheError("failed to update container id, container %s not found", cacheID)
 	}
 
 	switch msg.(type) {
 	case *cri.CreateContainerResponse:
 		c.ID = msg.(*cri.CreateContainerResponse).ContainerId
 	default:
-		cch.Error("can't update container id from message %T", msg)
-		return nil
+		return nil, cacheError("can't update container id from message %T", msg)
 	}
 
 	cch.Containers[c.ID] = c
 
 	cch.Save()
 
-	return c
+	return c, nil
 }
 
 // Delete a pod from the cache.
@@ -784,7 +781,13 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 		valid[c.Id] = struct{}{}
 		if _, ok := cch.Containers[c.Id]; !ok {
 			cch.Debug("inserting discovered container %s...", c.Id)
-			add = append(add, cch.InsertContainer(c))
+			inserted, err := cch.InsertContainer(c)
+			if err != nil {
+				cch.Error("failed to insert discovered container %s to cache: %v",
+					c.Id, err)
+			} else {
+				add = append(add, inserted)
+			}
 		}
 	}
 

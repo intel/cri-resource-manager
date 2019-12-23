@@ -72,12 +72,28 @@ func (ctl *blockio) PreStartHook(c cache.Container) error {
 
 // PostStartHook is the block I/O controller post-start hook.
 func (ctl *blockio) PostStartHook(c cache.Container) error {
-	return ctl.assign(c, ctl.BlockIOClass(c))
+	// Notes:
+	//   Unlike in our PostUpdateHook, we don't bail out here if
+	//   there are no pending block I/O changes for the container.
+	//   We might be configured to fall back to assign the class
+	//   based on pod/container QoS class in which case there is
+	//   no pending marker on the container.
+	if err := ctl.assign(c, ctl.BlockIOClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(BlockIOController)
+	return nil
 }
 
 // PostUpdateHook is the block I/O controller post-update hook.
 func (ctl *blockio) PostUpdateHook(c cache.Container) error {
-	// Note: We don't dynamically reassign containers to block I/O groups...
+	if !c.HasPending(BlockIOController) {
+		return nil
+	}
+	if err := ctl.assign(c, ctl.BlockIOClass(c)); err != nil {
+		return err
+	}
+	c.ClearPending(BlockIOController)
 	return nil
 }
 
@@ -88,6 +104,10 @@ func (ctl *blockio) PostStopHook(c cache.Container) error {
 
 // assign assigns the container to the given block I/O class.
 func (ctl *blockio) assign(c cache.Container, class string) error {
+	if class == "" {
+		return nil
+	}
+
 	pod, ok := c.GetPod()
 	if !ok {
 		return blockioError("failed to get Pod for %s", c.PrettyName())
@@ -121,7 +141,7 @@ func (ctl *blockio) BlockIOClass(c cache.Container) string {
 		}
 	}
 
-	log.Debug("block I/O class for %s (%s): %s", c.PrettyName(), cclass, bioclass)
+	log.Debug("block I/O class for %s (%s): %q", c.PrettyName(), cclass, bioclass)
 
 	return bioclass
 }

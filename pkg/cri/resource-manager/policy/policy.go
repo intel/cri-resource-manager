@@ -206,20 +206,7 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 
 	log.Info("starting policy '%s'...", p.backend.Name())
 
-	// Notes:
-	//   Start() also creates an implicit transaction. This allows the backend
-	//   to make decisions, attempting to adjust existing container allocations
-	//   to any potential configuration changes since the previous startup. The
-	//   caller is reponsible for querying and enforcing decisions.
-
-	p.PrepareDecisions()
-
-	if err := p.backend.Start(add, del); err != nil {
-		p.AbortDecisions()
-		return err
-	}
-
-	return nil
+	return p.backend.Start(add, del)
 }
 
 // PrepareDecisions prepares a policy decision making round.
