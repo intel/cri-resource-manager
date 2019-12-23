@@ -29,12 +29,10 @@ import (
 )
 
 func main() {
-	var configFile string
 	var printConfig bool
 
 	log := logger.Default()
 
-	flag.StringVar(&configFile, "config", "", "Read initial configuration from given file.")
 	flag.BoolVar(&printConfig, "print-config", false, "Print configuration and exit.")
 	flag.Parse()
 
@@ -52,12 +50,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if configFile != "" {
-		if err := config.SetConfigFromFile(configFile); err != nil {
-			log.Error("failed to set configuraton from file '%s': %v", configFile, err)
-			os.Exit(1)
-		}
-	}
 	if printConfig {
 		config.Print(nil)
 		os.Exit(0)

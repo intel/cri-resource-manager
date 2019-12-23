@@ -17,15 +17,12 @@ package policy
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
-	control "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/resource-control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -55,8 +52,6 @@ type ConstraintSet map[Domain]Constraint
 type Options struct {
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
-	// Rdt control interface
-	Rdt control.CriRdt
 }
 
 // BackendOptions describes the options for a policy backend instance
@@ -67,12 +62,10 @@ type BackendOptions struct {
 	Reserved ConstraintSet
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
-	// Rdt control interface
-	Rdt control.CriRdt
 }
 
 // CreateFn is the type for functions used to create a policy instance.
-type CreateFn func(*BackendOptions) Backend
+type CreateFn func(cache.Cache, *BackendOptions) Backend
 
 // DataSyntax defines the syntax used to export data to a container.
 type DataSyntax string
@@ -83,16 +76,6 @@ const (
 	// ExportedResources is the name of the file container resources are exported to.
 	ExportedResources = "resources.sh"
 )
-
-// Implementation attaches metadata (name, etc.) to a backend creation function.
-type Implementation interface {
-	// Name returns the well-known name for this policy.
-	Name() string
-	// Description returns a verbose description for this policy.
-	Description() string
-	// CreateFn creates an instance of this policy.
-	CreateFn() CreateFn
-}
 
 // Backend is the policy (decision making logic) interface exposed by implementations.
 //
@@ -105,7 +88,7 @@ type Backend interface {
 	// Description gives a verbose description about the policy implementation.
 	Description() string
 	// Start up and sycnhronizes the policy, using the given cache and resource constraints.
-	Start(cache.Cache, []cache.Container, []cache.Container) error
+	Start([]cache.Container, []cache.Container) error
 	// Sync synchronizes the policy, allocating/releasing the given containers.
 	Sync([]cache.Container, []cache.Container) error
 	// AllocateResources allocates resources to/for a container.
@@ -116,16 +99,12 @@ type Backend interface {
 	UpdateResources(cache.Container) error
 	// ExportResourceData provides resource data to export for the container.
 	ExportResourceData(cache.Container, DataSyntax) []byte
-	// PostStart allocates resources after container is started
-	PostStart(cache.Container) error
-	// SetConfig sets the policy backend configuration
-	SetConfig(string) error
 }
 
 // Policy is the exposed interface for container resource allocations decision making.
 type Policy interface {
 	// Start starts up policy, prepare for serving resource management requests.
-	Start(cache.Cache, []cache.Container, []cache.Container) error
+	Start([]cache.Container, []cache.Container) error
 	// PrepareDecisions prepares policy decisions.
 	PrepareDecisions() error
 	// QueryDecisions queries pending policy decisions.
@@ -142,18 +121,26 @@ type Policy interface {
 	ReleaseResources(cache.Container) error
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
-	// PostStart allocates resources after container is started
-	PostStart(cache.Container) error
-	// SetConfig sets the policy configuration
-	SetConfig(*config.RawConfig) error
 }
 
 // Policy instance/state.
 type policy struct {
-	logger.Logger
 	cache   cache.Cache // system state cache
 	backend Backend     // our active backend
 }
+
+// backend is a registered Backend.
+type backend struct {
+	name        string   // unqiue backend name
+	description string   // verbose backend description
+	create      CreateFn // backend creation function
+}
+
+// Out logger instance.
+var log logger.Logger = logger.NewLogger("policy")
+
+// Registered backends.
+var backends = make(map[string]*backend)
 
 // ActivePolicy returns the name of the policy to be activated.
 func ActivePolicy() string {
@@ -161,65 +148,59 @@ func ActivePolicy() string {
 }
 
 // NewPolicy creates a policy instance using the selected backend.
-func NewPolicy(o *Options) (Policy, error) {
+func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 	if opt.Policy == NullPolicy {
 		return nil, nil
 	}
 
-	backend, ok := policies[opt.Policy]
+	backend, ok := backends[opt.Policy]
 	if !ok {
 		return nil, policyError("unknown policy '%s'", opt.Policy)
 	}
 
 	p := &policy{
-		Logger: logger.NewLogger("policy"),
+		cache: cache,
 	}
 
-	p.Info("creating new policy '%s'...", backend.Name())
+	log.Info("creating new policy '%s'...", backend.name)
 	if len(opt.Available) != 0 {
-		p.Info("  with resource availability constraints:")
+		log.Info("  with resource availability constraints:")
 		for d := range opt.Available {
-			p.Info("    - %s=%s", d, ConstraintToString(opt.Available[d]))
+			log.Info("    - %s=%s", d, ConstraintToString(opt.Available[d]))
 		}
 	}
 
 	if len(opt.Reserved) != 0 {
-		p.Info("  with resource reservation constraints:")
+		log.Info("  with resource reservation constraints:")
 		for d := range opt.Reserved {
-			p.Info("    - %s=%s", d, ConstraintToString(opt.Reserved[d]))
+			log.Info("    - %s=%s", d, ConstraintToString(opt.Reserved[d]))
 		}
 	}
 
-	if p.DebugEnabled() {
-		p.Debug("*** enabling debugging for %s", opt.Policy)
+	if log.DebugEnabled() {
+		log.Debug("*** enabling debugging for %s", opt.Policy)
 		logger.Get(opt.Policy).EnableDebug(true)
 	} else {
-		p.Debug("*** leaving debugging for %s alone", opt.Policy)
+		log.Debug("*** leaving debugging for %s alone", opt.Policy)
 	}
 
 	backendOpts := &BackendOptions{
 		Available: opt.Available,
 		Reserved:  opt.Reserved,
 		AgentCli:  o.AgentCli,
-		Rdt:       o.Rdt,
 	}
-	p.backend = backend.CreateFn()(backendOpts)
+	p.backend = backend.create(p.cache, backendOpts)
 
 	return p, nil
 }
 
 // Start starts up policy, preparing it for resving requests.
-func (p *policy) Start(cch cache.Cache, add []cache.Container, del []cache.Container) error {
+func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	if opt.Policy == NullPolicy {
 		return nil
 	}
 
-	if p.cache != nil {
-		return policyError("policy %s has already been started", p.backend.Name())
-	}
-
-	p.Info("starting policy '%s'...", p.backend.Name())
-	p.cache = cch
+	log.Info("starting policy '%s'...", p.backend.Name())
 
 	// Notes:
 	//   Start() also creates an implicit transaction. This allows the backend
@@ -229,7 +210,7 @@ func (p *policy) Start(cch cache.Cache, add []cache.Container, del []cache.Conta
 
 	p.PrepareDecisions()
 
-	if err := p.backend.Start(p.cache, add, del); err != nil {
+	if err := p.backend.Start(add, del); err != nil {
 		p.AbortDecisions()
 		return err
 	}
@@ -285,44 +266,19 @@ func (p *policy) UpdateResources(c cache.Container) error {
 	return p.backend.UpdateResources(c)
 }
 
-func (p *policy) PostStart(c cache.Container) error {
-	return p.backend.PostStart(c)
-}
-
-// SetConfig updates the configuration of policy backend(s)
-func (p *policy) SetConfig(conf *config.RawConfig) error {
-	p.Info("updating configuration for policy %s...", p.backend.Name())
-
-	c := extractPolicyConfig(p.backend.Name(), conf)
-	err := p.backend.SetConfig(c)
-
-	if err != nil {
-		p.Error("failed to update configuration: %v", err)
-		return policyError("failed to update configuration for policy %s: %v",
-			p.backend.Name(), err)
-	}
-
-	p.Info("configuration update OK")
-
-	return nil
-}
-
-// Register registers a policy implementation.
-func Register(p Implementation) error {
-	log := logger.Get("policy")
-	name := p.Name()
-
-	if p.CreateFn() == nil {
-		return policyError("policy '%s' has a nil instantiation function", name)
-	}
-
+// Register registers a policy backend.
+func Register(name, description string, create CreateFn) error {
 	log.Info("registering policy '%s'...", name)
 
-	if _, ok := policies[name]; ok {
-		return policyError("policy '%s' already registered", name)
+	if o, ok := backends[name]; ok {
+		return policyError("policy %s already registered (%s)", name, o.description)
 	}
 
-	policies[name] = p
+	backends[name] = &backend{
+		name:        name,
+		description: description,
+		create:      create,
+	}
 
 	return nil
 }
@@ -342,34 +298,4 @@ func ConstraintToString(value Constraint) string {
 	default:
 		return fmt.Sprintf("<???(type:%T)>", value)
 	}
-}
-
-// extractPolicyConfig gets the policy/node specific configuration from the
-// full cri-resmgr raw config
-func extractPolicyConfig(policyName string, rawConfig *config.RawConfig) string {
-	config := defaultPolicyConfig(policyName)
-
-	// Go through keys in allconfig (map) and try to find the policy configuration
-	// Scheme for the policy config key is policy.<policy name>[.<node name>]
-	if rawConfig != nil {
-		for k, v := range rawConfig.Data {
-			split := strings.SplitN(k, ".", 3)
-			if split[0] == "policy" && len(split) > 1 && split[1] == policyName {
-				if len(split) == 2 {
-					config = v
-				} else if split[2] == rawConfig.NodeName {
-					config = v
-					break
-				}
-			}
-		}
-	}
-
-	return config
-}
-
-// Return the default configuration for the specified policy.
-func defaultPolicyConfig(policyName string) string {
-	// Just a stub for now, always returning empty.
-	return ""
 }
