@@ -293,6 +293,15 @@ func (m *mockContainer) GetCRIMounts() []*cri.Mount {
 func (m *mockContainer) GetCRIDevices() []*cri.Device {
 	panic("unimplemented")
 }
+func (m *mockContainer) GetPending() []string {
+	panic("unimplemented")
+}
+func (m *mockContainer) HasPending(string) bool {
+	panic("unimplemented")
+}
+func (m *mockContainer) ClearPending(string) {
+	panic("unimplemented")
+}
 
 type mockPod struct {
 	name                               string
@@ -405,6 +414,9 @@ func (m *mockCache) QueryTransaction() []cache.Container {
 	panic("unimplemented")
 }
 func (m *mockCache) AbortTransaction() {
+	panic("unimplemented")
+}
+func (m *mockCache) GetPendingContainers() []cache.Container {
 	panic("unimplemented")
 }
 func (m *mockCache) GetPods() []cache.Pod {

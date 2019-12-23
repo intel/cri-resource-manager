@@ -17,6 +17,7 @@ package cache
 import (
 	"encoding/json"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
@@ -471,12 +472,12 @@ func (c *container) GetLinuxResources() *cri.LinuxContainerResources {
 
 func (c *container) SetCommand(value []string) {
 	c.Command = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetArgs(value []string) {
 	c.Args = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetLabel(key, value string) {
@@ -484,13 +485,13 @@ func (c *container) SetLabel(key, value string) {
 		c.Labels = make(map[string]string)
 	}
 	c.Labels[key] = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteLabel(key string) {
 	if _, ok := c.Labels[key]; ok {
 		delete(c.Labels, key)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -499,13 +500,13 @@ func (c *container) SetAnnotation(key, value string) {
 		c.Annotations = make(map[string]string)
 	}
 	c.Annotations[key] = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteAnnotation(key string) {
 	if _, ok := c.Annotations[key]; ok {
 		delete(c.Annotations, key)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -514,13 +515,13 @@ func (c *container) SetEnv(key, value string) {
 		c.Env = make(map[string]string)
 	}
 	c.Env[key] = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) UnsetEnv(key string) {
 	if _, ok := c.Env[key]; ok {
 		delete(c.Env, key)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -529,13 +530,13 @@ func (c *container) InsertMount(m *Mount) {
 		c.Mounts = make(map[string]*Mount)
 	}
 	c.Mounts[m.Container] = m
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteMount(path string) {
 	if _, ok := c.Mounts[path]; ok {
 		delete(c.Mounts, path)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -544,13 +545,13 @@ func (c *container) InsertDevice(d *Device) {
 		c.Devices = make(map[string]*Device)
 	}
 	c.Devices[d.Container] = d
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteDevice(path string) {
 	if _, ok := c.Devices[path]; ok {
 		delete(c.Devices, path)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -609,7 +610,7 @@ func (c *container) GetCpusetMems() string {
 
 func (c *container) SetLinuxResources(req *cri.LinuxContainerResources) {
 	c.LinuxReq = req
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCPUPeriod(value int64) {
@@ -617,7 +618,7 @@ func (c *container) SetCPUPeriod(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuPeriod = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCPUQuota(value int64) {
@@ -625,7 +626,7 @@ func (c *container) SetCPUQuota(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuQuota = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCPUShares(value int64) {
@@ -633,7 +634,7 @@ func (c *container) SetCPUShares(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuShares = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetMemoryLimit(value int64) {
@@ -641,7 +642,7 @@ func (c *container) SetMemoryLimit(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.MemoryLimitInBytes = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetOomScoreAdj(value int64) {
@@ -649,7 +650,7 @@ func (c *container) SetOomScoreAdj(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.OomScoreAdj = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCpusetCpus(value string) {
@@ -657,7 +658,7 @@ func (c *container) SetCpusetCpus(value string) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetCpus = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCpusetMems(value string) {
@@ -665,7 +666,7 @@ func (c *container) SetCpusetMems(value string) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetMems = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func getTopologyHints(hostPath, containerPath string, readOnly bool) sysfs.TopologyHints {
@@ -735,7 +736,7 @@ func (c *container) GetAffinity() []*Affinity {
 
 func (c *container) SetRDTClass(class string) {
 	c.RDTClass = class
-	c.cache.markChanged(c)
+	c.markPending(RDT)
 }
 
 func (c *container) GetRDTClass() string {
@@ -744,7 +745,7 @@ func (c *container) GetRDTClass() string {
 
 func (c *container) SetBlockIOClass(class string) {
 	c.BlockIOClass = class
-	c.cache.markChanged(c)
+	c.markPending(BlockIO)
 }
 
 func (c *container) GetBlockIOClass() string {
@@ -820,4 +821,39 @@ func (c *container) GetCRIDevices() []*cri.Device {
 		idx++
 	}
 	return devices
+}
+
+func (c *container) markPending(controller string) {
+	if c.pending == nil {
+		c.pending = make(map[string]struct{})
+	}
+	c.pending[controller] = struct{}{}
+	c.cache.markChanged(c)
+}
+
+func (c *container) ClearPending(controller string) {
+	delete(c.pending, controller)
+	if len(c.pending) == 0 {
+		c.cache.clearChanged(c)
+	}
+}
+
+func (c *container) GetPending() []string {
+	if c.pending == nil {
+		return nil
+	}
+	pending := make([]string, 0, len(c.pending))
+	for controller := range c.pending {
+		pending = append(pending, controller)
+	}
+	sort.Strings(pending)
+	return pending
+}
+
+func (c *container) HasPending(controller string) bool {
+	if c.pending == nil {
+		return false
+	}
+	_, pending := c.pending[controller]
+	return pending
 }

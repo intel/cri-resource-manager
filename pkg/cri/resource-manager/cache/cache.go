@@ -33,6 +33,15 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
+const (
+	// CRI marks changes that can be applied by the CRI controller.
+	CRI = "cri"
+	// RDT marks changes that can be applied by the RDT controller.
+	RDT = "rdt"
+	// BlockIO marks changes that can be applied by the BlockIO controller.
+	BlockIO = "blockio"
+)
+
 // PodState is the pod state in the runtime.
 type PodState int32
 
@@ -312,6 +321,13 @@ type Container interface {
 	GetCRIMounts() []*cri.Mount
 	// GetCRIDevices returns container devices.
 	GetCRIDevices() []*cri.Device
+
+	// GetPending gets the names of the controllers with pending changes.
+	GetPending() []string
+	// HasPending checks if the container has pending chanhes for the given controller.
+	HasPending(string) bool
+	// ClearPending clears the pending change marker for the given controller.
+	ClearPending(string)
 }
 
 // A cached container.
@@ -338,8 +354,9 @@ type container struct {
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 	req       *interface{}                 // pending CRI request
 
-	RDTClass     string // RDT class this container is assigned to.
-	BlockIOClass string // Block I/O class this container is assigned to.
+	RDTClass     string              // RDT class this container is assigned to.
+	BlockIOClass string              // Block I/O class this container is assigned to.
+	pending      map[string]struct{} // controllers with pending changes for this container
 }
 
 // MountType is a propagation type.
@@ -419,6 +436,9 @@ type Cache interface {
 	// AbortTransaction discards container changes.
 	AbortTransaction()
 
+	// GetPendingContainers returs all containers with pending changes.
+	GetPendingContainers() []Container
+
 	// GetPods returns all the pods known to the cache.
 	GetPods() []Pod
 	// GetContainers returns all the containers known to the cache.
@@ -487,6 +507,7 @@ type cache struct {
 	updated  []Container         // transaction
 	changed  map[string]struct{} // change marker
 	snapshot []byte              // pre-transaction state snapshot
+	pending  map[string]struct{} // cache IDs of containers with pending changes
 }
 
 // Make sure cache implements Cache.
@@ -841,6 +862,7 @@ func (cch *cache) QueryTransaction() []Container {
 
 // Add a container to the current transaction.
 func (cch *cache) markChanged(c *container) {
+	cch.markPending(c)
 	if cch.updated == nil {
 		return
 	}
@@ -851,6 +873,37 @@ func (cch *cache) markChanged(c *container) {
 
 	cch.updated = append(cch.updated, c)
 	cch.changed[c.CacheID] = struct{}{}
+}
+
+// Mark a container as up-to-date.
+func (cch *cache) clearChanged(c *container) {
+	cch.clearPending(c)
+	delete(cch.changed, c.CacheID)
+}
+
+// Mark a container as having pending changes.
+func (cch *cache) markPending(c *container) {
+	if cch.pending == nil {
+		cch.pending = make(map[string]struct{})
+	}
+	cch.pending[c.CacheID] = struct{}{}
+}
+
+// Get all containers with pending changes.
+func (cch *cache) GetPendingContainers() []Container {
+	pending := make([]Container, 0, len(cch.pending))
+	for id := range cch.pending {
+		c, ok := cch.LookupContainer(id)
+		if ok {
+			pending = append(pending, c)
+		}
+	}
+	return pending
+}
+
+// clear the pending state of the given container.
+func (cch *cache) clearPending(c *container) {
+	delete(cch.pending, c.CacheID)
 }
 
 // Get the cache ids of all cached containers.
