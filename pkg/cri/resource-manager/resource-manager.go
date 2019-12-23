@@ -165,7 +165,17 @@ func (m *resmgr) Start() error {
 		return resmgrError("failed to start relay: %v", err)
 	}
 
+	// Temporary hack to get pkg/rdt properly configured.
+	if err := m.loadInitialConfig(); err != nil {
+		return resmgrError("failed to load initial configuration: %v", err)
+	}
+
+	if m.conf != nil {
+		m.cache.SetConfig(m.conf)
+	}
+
 	m.Info("up and running...")
+
 	return nil
 }
 
