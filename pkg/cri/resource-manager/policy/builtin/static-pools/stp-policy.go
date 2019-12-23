@@ -238,7 +238,7 @@ func (stp *stp) UpdateResources(c cache.Container) error {
 }
 
 // ExportResourceData provides resource data to export for the container.
-func (stp *stp) ExportResourceData(c cache.Container, syntax policy.DataSyntax) []byte {
+func (stp *stp) ExportResourceData(c cache.Container) map[string]string {
 	return nil
 }
 

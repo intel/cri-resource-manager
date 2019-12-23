@@ -166,25 +166,24 @@ func (s *static) UpdateResources(c cache.Container) error {
 }
 
 // ExportResourceData provides resource data to export for the container.
-func (s *static) ExportResourceData(c cache.Container, syntax policy.DataSyntax) []byte {
-	data := ""
+func (s *static) ExportResourceData(c cache.Container) map[string]string {
+	data := map[string]string{}
 
-	cset, ok := s.GetCPUSet(c.GetCacheID())
-	if !ok {
+	if cset, ok := s.GetCPUSet(c.GetCacheID()); !ok {
 		cset = s.GetDefaultCPUSet()
-		data += "SHARED_CPUS=\"" + cset.String() + "\"\n"
+		data[policy.ExportSharedCPUs] = cset.String()
 	} else {
-		isolated := cset.Intersection(s.sys.Isolated())
-		if isolated.String() != "" {
-			data += "ISOLATED_CPUS=\"" + isolated.String() + "\"\n"
+		isolated := cset.Intersection(s.sys.Isolated()).String()
+		if isolated != "" {
+			data[policy.ExportIsolatedCPUs] = isolated
 		}
-		exclusive := cset.Difference(s.sys.Isolated())
-		if exclusive.String() != "" {
-			data += "EXCLUSIVE_CPUS=\"" + exclusive.String() + "\"\n"
+		exclusive := cset.Difference(s.sys.Isolated()).String()
+		if exclusive != "" {
+			data[policy.ExportExclusiveCPUs] = exclusive
 		}
 	}
 
-	return []byte(data)
+	return data
 }
 
 func (s *static) configNotify(event config.Event, source config.Source) error {

@@ -126,7 +126,7 @@ func (eda *eda) UpdateResources(c cache.Container) error {
 }
 
 // ExportResourceData provides resource data to export for the container.
-func (eda *eda) ExportResourceData(c cache.Container, syntax policy.DataSyntax) []byte {
+func (eda *eda) ExportResourceData(c cache.Container) map[string]string {
 	return nil
 }
 
