@@ -257,6 +257,18 @@ func (m *mockContainer) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest
 func (m *mockContainer) GetAffinity() []*cache.Affinity {
 	return nil
 }
+func (m *mockContainer) SetRDTClass(string) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetRDTClass() string {
+	panic("unimplemented")
+}
+func (m *mockContainer) SetBlockIOClass(string) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetBlockIOClass() string {
+	panic("unimplemented")
+}
 
 type mockPod struct {
 	name                               string
