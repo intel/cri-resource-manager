@@ -141,20 +141,6 @@ func (l *logger) passthrough(level Level) bool {
 }
 
 func (l *logger) formatMessage(format string, args ...interface{}) string {
-	if len(l.source) > logging.srcalign {
-		logging.srcalign = len(l.source)
-		l.prefix = ""
-		for _, l := range logging.loggers {
-			l.prefix = ""
-		}
-
-	}
-	if l.prefix == "" {
-		suf := (logging.srcalign - len(l.source)) / 2
-		pre := logging.srcalign - (len(l.source) + suf)
-		l.prefix = "[" + fmt.Sprintf("%-*s", pre, "") + l.source + fmt.Sprintf("%*s", suf, "") + "] "
-	}
-
 	prefix := ""
 	if l.shouldPrefix() {
 		prefix = l.prefix
@@ -352,10 +338,20 @@ func activateBackend(name string) {
 
 // Update loggers when debug flags or sources change.
 func (o *options) updateLoggers() {
+	logging.srcalign = 0
 	for s, l := range logging.loggers {
 		l.enabled = opt.sourceEnabled(s)
 		l.debug = opt.debugEnabled(s)
 		l.level = opt.Level
+		l.prefix = ""
+		if (l.enabled || l.debug) && len(l.source) > logging.srcalign {
+			logging.srcalign = len(l.source)
+		}
+	}
+	for _, l := range logging.loggers {
+		suf := (logging.srcalign - len(l.source)) / 2
+		pre := logging.srcalign - (len(l.source) + suf)
+		l.prefix = "[" + fmt.Sprintf("%-*s", pre, "") + l.source + fmt.Sprintf("%*s", suf, "") + "] "
 	}
 }
 
