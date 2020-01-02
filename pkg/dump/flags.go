@@ -242,7 +242,7 @@ func (o *options) verbosityOf(method string) verbosity {
 	for _, rule := range o.rules {
 		log.Debug("  - checking match rule %s...", rule.source)
 		if rule.regexp.MatchString(method) {
-			log.Debug("    + regexp match (%s): %v", method, rule.source, rule.v)
+			log.Debug("    + regexp match (%s): %v", method, rule.source)
 			v = rule.v
 		}
 	}
