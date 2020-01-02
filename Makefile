@@ -6,6 +6,10 @@ GO_CYCLO  := gocyclo
 GO_LINT   := golint
 GO_CILINT := golangci-lint
 
+# TEST_TAGS is the set of extra build tags passed for tests.
+TEST_TAGS :=
+GO_TEST   := $(GO_CMD) test $(TEST_TAGS)
+
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
 
@@ -201,11 +205,11 @@ golangci-lint:
 
 test:
 ifndef WHAT
-	$(Q)$(GO_CMD) test -race -coverprofile=coverage.txt -covermode=atomic \
+	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
 	    $(GO_MODULES)
 else
 	$(Q)cd $(WHAT) && \
-            $(GO_CMD) test -v -cover -coverprofile cover.out || rc=1; \
+            $(GO_TEST) -v -cover -coverprofile cover.out || rc=1; \
             $(GO_CMD) tool cover -html=cover.out -o coverage.html; \
             rm cover.out; \
             echo "Coverage report: file://$$(realpath coverage.html)"; \
