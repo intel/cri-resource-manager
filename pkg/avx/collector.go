@@ -11,7 +11,6 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	"github.com/intel/cri-resource-manager/pkg/metrics"
 	bpf "github.com/iovisor/gobpf/elf"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -270,14 +269,6 @@ func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
 			prometheus.GaugeValue,
 			float64(binary.LittleEndian.Uint32(counters[idx])),
 			fmt.Sprintf("CPU%d", binary.LittleEndian.Uint32(lastCPU)))
-	}
-}
-
-func init() {
-	err := metrics.RegisterCollector("avx", NewCollector)
-	if err != nil {
-		log.Error("Failed to register AVX collector: %v", err)
-		return
 	}
 }
 
