@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Level is the log message severity level below which we suppress messages.
@@ -78,6 +79,7 @@ type logger struct {
 
 // log is our runtime state.
 type log struct {
+	sync.RWMutex
 	level    Level              // lowest unsuppressed severity
 	active   Backend            // active backend
 	loggers  map[string]*logger // running loggers (log sources)
@@ -137,10 +139,14 @@ func (l *logger) shouldPrefix() bool {
 }
 
 func (l *logger) passthrough(level Level) bool {
+	logging.RLock()
+	defer logging.RUnlock()
 	return (l.enabled && l.level <= level) || (level == LevelDebug && l.debug)
 }
 
 func (l *logger) formatMessage(format string, args ...interface{}) string {
+	logging.RLock()
+	defer logging.RUnlock()
 	prefix := ""
 	if l.shouldPrefix() {
 		prefix = l.prefix
@@ -338,6 +344,9 @@ func activateBackend(name string) {
 
 // Update loggers when debug flags or sources change.
 func (o *options) updateLoggers() {
+	logging.Lock()
+	defer logging.Unlock()
+
 	logging.srcalign = 0
 	for s, l := range logging.loggers {
 		l.enabled = opt.sourceEnabled(s)
