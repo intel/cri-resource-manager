@@ -23,6 +23,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -45,6 +46,7 @@ type resmgr struct {
 	cache        cache.Cache     // cached state
 	policy       policy.Policy   // resource manager policy
 	configServer config.Server   // configuration management server
+	control      control.Control // policy controllers/enforcement
 	agent        agent.Interface // connection to cri-resmgr agent
 	conf         *config.RawConfig
 }
@@ -107,8 +109,12 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, resmgrError("failed to create resource manager: %v", err)
 	}
 
-	if err = m.setupPolicyHooks(); err != nil {
+	if err = m.setupRequestProcessing(); err != nil {
 		return nil, resmgrError("failed to create resource manager: %v", err)
+	}
+
+	if m.control, err = control.NewControl(); err != nil {
+		return nil, resmgrError("failed to create controller: %v", err)
 	}
 
 	if opt.ForceConfig != "" {
@@ -135,15 +141,29 @@ func (m *resmgr) Start() error {
 		}
 	}
 
-	if err := m.startPolicy(); err != nil {
+	if err := m.activateRequestProcessing(); err != nil {
 		return err
+	}
+
+	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+		return resmgrError("failed to start controller: %v", err)
 	}
 
 	if err := m.relay.Start(); err != nil {
 		return resmgrError("failed to start relay: %v", err)
 	}
 
+	// Temporary hack to get pkg/rdt properly configured.
+	if err := m.loadInitialConfig(); err != nil {
+		return resmgrError("failed to load initial configuration: %v", err)
+	}
+
+	if m.conf != nil {
+		m.cache.SetConfig(m.conf)
+	}
+
 	m.Info("up and running...")
+
 	return nil
 }
 
@@ -160,9 +180,16 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	m.Lock()
 	defer m.Unlock()
 
+	// TODO: save current configuration and roll back if some controllers fail to start
+
 	if err := pkgcfg.SetConfig(conf.Data); err != nil {
 		m.Error("failed to update configuration: %v", err)
 		return resmgrError("configuration rejected: %v", err)
+	}
+
+	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+		m.Error("failed to activate configuration: %v", err)
+		return resmgrError("failed to fully activate configuration: %v", err)
 	}
 
 	m.cache.SetConfig(conf)

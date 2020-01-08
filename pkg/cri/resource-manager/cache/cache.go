@@ -33,6 +33,15 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
+const (
+	// CRI marks changes that can be applied by the CRI controller.
+	CRI = "cri"
+	// RDT marks changes that can be applied by the RDT controller.
+	RDT = "rdt"
+	// BlockIO marks changes that can be applied by the BlockIO controller.
+	BlockIO = "blockio"
+)
+
 // PodState is the pod state in the runtime.
 type PodState int32
 
@@ -179,6 +188,8 @@ type Container interface {
 	GetLabelKeys() []string
 	// GetLabel returns the value of a container label.
 	GetLabel(string) (string, bool)
+	// GetLabels returns a copy of all container labels.
+	GetLabels() map[string]string
 	// GetResmgrLabelKeys returns container label keys (without the namespace
 	// part) in cri-resource-manager namespace.
 	GetResmgrLabelKeys() []string
@@ -195,6 +206,8 @@ type Container interface {
 	// GetAnnotation returns the value of a container annotation from the
 	// cri-resource-manager namespace.
 	GetResmgrAnnotation(key string, objPtr interface{}) (string, bool)
+	// GetAnnotations returns a copy of all container annotations.
+	GetAnnotations() map[string]string
 	// GetEnvKeys returns the keys of all container environment variables.
 	GetEnvKeys() []string
 	// GetEnv returns the value of a container environment variable.
@@ -277,13 +290,39 @@ type Container interface {
 	// SetCpusetMems sets the cgroup cpuset.mems of the container.
 	SetCpusetMems(string)
 
-	// UpdateCriCreateRequest updates a CRI ContainerCreateRequest for the container.
-	UpdateCriCreateRequest(*cri.CreateContainerRequest) error
-	// CriUpdateRequest creates a CRI UpdateContainerResourcesRequest for the container.
-	CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error)
-
 	// GetAffinity returns the annotated affinity expressions for this container.
 	GetAffinity() []*Affinity
+
+	// SetRDTClass assigns this container to the given RDT class.
+	SetRDTClass(string)
+	// GetRDTClass returns the RDT class for this container.
+	GetRDTClass() string
+
+	// SetBlockIOClass assigns this container to the given BlockIO class.
+	SetBlockIOClass(string)
+	// GetBlockIOClass returns the BlockIO class for this container.
+	GetBlockIOClass() string
+
+	// SetCRIRequest sets the current pending CRI request of the container.
+	SetCRIRequest(req interface{}) error
+	// GetCRIRequest returns the current pending CRI request of the container.
+	GetCRIRequest() (interface{}, bool)
+	// ClearCRIRequest clears and returns the current pending CRI request of the container.
+	ClearCRIRequest() (interface{}, bool)
+
+	// GetCRIEnvs returns container environment variables.
+	GetCRIEnvs() []*cri.KeyValue
+	// GetCRIMounts returns container mounts.
+	GetCRIMounts() []*cri.Mount
+	// GetCRIDevices returns container devices.
+	GetCRIDevices() []*cri.Device
+
+	// GetPending gets the names of the controllers with pending changes.
+	GetPending() []string
+	// HasPending checks if the container has pending chanhes for the given controller.
+	HasPending(string) bool
+	// ClearPending clears the pending change marker for the given controller.
+	ClearPending(string)
 }
 
 // A cached container.
@@ -308,6 +347,11 @@ type container struct {
 
 	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
+	req       *interface{}                 // pending CRI request
+
+	RDTClass     string              // RDT class this container is assigned to.
+	BlockIOClass string              // Block I/O class this container is assigned to.
+	pending      map[string]struct{} // controllers with pending changes for this container
 }
 
 // MountType is a propagation type.
@@ -370,22 +414,16 @@ type Cache interface {
 	// LookupPod looks up a pod in the cache.
 	LookupPod(id string) (Pod, bool)
 	// InsertContainer inserts a container into the cache, using a runtime request or reply.
-	InsertContainer(msg interface{}) Container
+	InsertContainer(msg interface{}) (Container, error)
 	// UpdateContainerID updates a containers runtime id.
-	UpdateContainerID(cacheID string, msg interface{}) Container
+	UpdateContainerID(cacheID string, msg interface{}) (Container, error)
 	// DeleteContainer deletes a container from the cache.
 	DeleteContainer(id string) Container
 	// LookupContainer looks up a container in the cache.
 	LookupContainer(id string) (Container, bool)
 
-	// StartTransaction start recording container changes.
-	StartTransaction() error
-	// CommitTransaction returns the set of containers that have changed.
-	CommitTransaction() []Container
-	// QueryTransaction queries the set of containers that have changed.
-	QueryTransaction() []Container
-	// AbortTransaction discards container changes.
-	AbortTransaction()
+	// GetPendingContainers returs all containers with pending changes.
+	GetPendingContainers() []Container
 
 	// GetPods returns all the pods known to the cache.
 	GetPods() []Pod
@@ -452,9 +490,7 @@ type cache struct {
 	policyData map[string]interface{} // opaque policy data
 	PolicyJSON map[string]string      // ditto in raw, unmarshaled form
 
-	updated  []Container         // transaction
-	changed  map[string]struct{} // change marker
-	snapshot []byte              // pre-transaction state snapshot
+	pending map[string]struct{} // cache IDs of containers with pending changes
 }
 
 // Make sure cache implements Cache.
@@ -580,7 +616,7 @@ func (cch *cache) LookupPod(id string) (Pod, bool) {
 }
 
 // Insert a container into the cache.
-func (cch *cache) InsertContainer(msg interface{}) Container {
+func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
 	var err error
 
 	c := &container{
@@ -597,8 +633,7 @@ func (cch *cache) InsertContainer(msg interface{}) Container {
 	}
 
 	if err != nil {
-		cch.Error("failed to insert container %s: %v", c.CacheID, err)
-		return nil
+		return nil, cacheError("failed to insert container %s: %v", c.CacheID, err)
 	}
 
 	c.CacheID = cch.createCacheID(c)
@@ -612,30 +647,28 @@ func (cch *cache) InsertContainer(msg interface{}) Container {
 
 	cch.Save()
 
-	return c
+	return c, nil
 }
 
 // UpdateContainerID updates a containers runtime id.
-func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) Container {
+func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) (Container, error) {
 	c, ok := cch.Containers[cacheID]
 	if !ok {
-		cch.Error("failed to update container id, container %s not found", cacheID)
-		return nil
+		return nil, cacheError("failed to update container id, container %s not found", cacheID)
 	}
 
 	switch msg.(type) {
 	case *cri.CreateContainerResponse:
 		c.ID = msg.(*cri.CreateContainerResponse).ContainerId
 	default:
-		cch.Error("can't update container id from message %T", msg)
-		return nil
+		return nil, cacheError("can't update container id from message %T", msg)
 	}
 
 	cch.Containers[c.ID] = c
 
 	cch.Save()
 
-	return c
+	return c, nil
 }
 
 // Delete a pod from the cache.
@@ -731,7 +764,13 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 		valid[c.Id] = struct{}{}
 		if _, ok := cch.Containers[c.Id]; !ok {
 			cch.Debug("inserting discovered container %s...", c.Id)
-			add = append(add, cch.InsertContainer(c))
+			inserted, err := cch.InsertContainer(c)
+			if err != nil {
+				cch.Error("failed to insert discovered container %s to cache: %v",
+					c.Id, err)
+			} else {
+				add = append(add, inserted)
+			}
 		}
 	}
 
@@ -749,76 +788,29 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 	return add, del
 }
 
-// Start a transaction by taking a snapshot of the current cache state.
-func (cch *cache) StartTransaction() error {
-	if cch.snapshot != nil {
-		return nil
+// Mark a container as having pending changes.
+func (cch *cache) markPending(c *container) {
+	if cch.pending == nil {
+		cch.pending = make(map[string]struct{})
 	}
-
-	cch.updated = []Container{}
-	cch.changed = make(map[string]struct{})
-
-	ss, err := cch.Snapshot()
-	if err != nil {
-		return err
-	}
-
-	cch.snapshot = ss
-	return nil
+	cch.pending[c.CacheID] = struct{}{}
 }
 
-// Commit a transaction and return a slice of containers with changes.
-func (cch *cache) CommitTransaction() []Container {
-	if cch.snapshot == nil {
-		return nil
+// Get all containers with pending changes.
+func (cch *cache) GetPendingContainers() []Container {
+	pending := make([]Container, 0, len(cch.pending))
+	for id := range cch.pending {
+		c, ok := cch.LookupContainer(id)
+		if ok {
+			pending = append(pending, c)
+		}
 	}
-
-	updated := cch.updated
-
-	cch.snapshot = nil
-	cch.changed = nil
-	cch.updated = nil
-
-	cch.Save()
-
-	return updated
+	return pending
 }
 
-// Abort a transaction restoring the saved state of the cache.
-func (cch *cache) AbortTransaction() {
-	if cch.snapshot == nil {
-		return
-	}
-
-	cch.Restore(cch.snapshot)
-
-	cch.snapshot = nil
-	cch.updated = nil
-	cch.changed = nil
-
-	cch.Save()
-}
-
-// Query the state of the current transaction.
-func (cch *cache) QueryTransaction() []Container {
-	updated := make([]Container, len(cch.updated))
-	copy(updated, cch.updated)
-
-	return updated
-}
-
-// Add a container to the current transaction.
-func (cch *cache) markChanged(c *container) {
-	if cch.updated == nil {
-		return
-	}
-
-	if _, marked := cch.changed[c.CacheID]; marked {
-		return
-	}
-
-	cch.updated = append(cch.updated, c)
-	cch.changed[c.CacheID] = struct{}{}
+// clear the pending state of the given container.
+func (cch *cache) clearPending(c *container) {
+	delete(cch.pending, c.CacheID)
 }
 
 // Get the cache ids of all cached containers.
@@ -1076,10 +1068,6 @@ type snapshot struct {
 
 // Snapshot takes a restorable snapshot of the current state of the cache.
 func (cch *cache) Snapshot() ([]byte, error) {
-	if len(cch.updated) != 0 {
-		return nil, cacheError("active transaction, refusing to take a snapshot")
-	}
-
 	s := snapshot{
 		Version:    CacheVersion,
 		Pods:       make(map[string]*pod),
@@ -1158,11 +1146,6 @@ func (cch *cache) Restore(data []byte) error {
 
 // Save the state of the cache.
 func (cch *cache) Save() error {
-	if cch.snapshot != nil {
-		cch.Debug("delaying Save() until current transaction is over")
-		return nil
-	}
-
 	cch.Debug("saving cache to file '%s'...", cch.filePath)
 
 	data, err := cch.Snapshot()

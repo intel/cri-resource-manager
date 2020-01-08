@@ -169,30 +169,31 @@ func (p *staticplus) UpdateResources(c cache.Container) error {
 }
 
 // ExportResourceData provides resource data to export for the container.
-func (p *staticplus) ExportResourceData(c cache.Container, syntax policy.DataSyntax) []byte {
-	id := c.GetCacheID()
-	a, ok := p.allocations[id]
+func (p *staticplus) ExportResourceData(c cache.Container) map[string]string {
+	a, ok := p.allocations[c.GetCacheID()]
 	if !ok {
 		// Hmm...
-		p.Warn("can't find allocation for container %s", id)
+		p.Warn("can't find allocation for container %s", c.PrettyName())
+		return nil
 	}
 
-	data := ""
+	data := map[string]string{}
+
 	if a.shared != 0 {
-		data = "SHARED_CPUS=\"" + p.shared.String() + "\"\n"
+		data[policy.ExportSharedCPUs] = p.shared.String()
 	}
 	if a != nil && !a.exclusive.IsEmpty() {
-		isolated := a.exclusive.Intersection(p.sys.Isolated())
-		if isolated.String() != "" {
-			data += "ISOLATED_CPUS=\"" + isolated.String() + "\"\n"
+		isolated := a.exclusive.Intersection(p.sys.Isolated()).String()
+		if isolated != "" {
+			data[policy.ExportIsolatedCPUs] = isolated
 		}
-		exclusive := a.exclusive.Difference(p.sys.Isolated())
-		if exclusive.String() != "" {
-			data += "EXCLUSIVE_CPUS=\"" + exclusive.String() + "\"\n"
+		exclusive := a.exclusive.Difference(p.sys.Isolated()).String()
+		if exclusive != "" {
+			data[policy.ExportExclusiveCPUs] = exclusive
 		}
 	}
 
-	return []byte(data)
+	return data
 }
 
 // policyError creates a formatted policy-specific error.

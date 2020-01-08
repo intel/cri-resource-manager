@@ -193,28 +193,28 @@ func (p *policy) UpdateResources(c cache.Container) error {
 }
 
 // ExportResourceData provides resource data to export for the container.
-func (p *policy) ExportResourceData(c cache.Container, syntax policyapi.DataSyntax) []byte {
+func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	grant, ok := p.allocations.CPU[c.GetCacheID()]
 	if !ok {
-		return []byte{}
+		return nil
 	}
 
+	data := map[string]string{}
 	shared := grant.SharedCPUs().String()
 	isolated := grant.ExclusiveCPUs().Intersection(grant.GetNode().GetCPU().IsolatedCPUs())
 	exclusive := grant.ExclusiveCPUs().Difference(isolated).String()
 
-	data := ""
 	if shared != "" {
-		data += "SHARED_CPUS=\"" + shared + "\"\n"
+		data[policyapi.ExportSharedCPUs] = shared
 	}
 	if isolated.String() != "" {
-		data += "ISOLATED_CPUS=\"" + isolated.String() + "\"\n"
+		data[policyapi.ExportIsolatedCPUs] = isolated.String()
 	}
 	if exclusive != "" {
-		data += "EXCLUSIVE_CPUS=\"" + exclusive + "\"\n"
+		data[policyapi.ExportExclusiveCPUs] = exclusive
 	}
 
-	return []byte(data)
+	return data
 }
 
 func (p *policy) configNotify(event config.Event, source config.Source) error {

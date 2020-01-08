@@ -118,6 +118,9 @@ func (m *mockContainer) GetLabelKeys() []string {
 func (m *mockContainer) GetLabel(string) (string, bool) {
 	panic("unimplemented")
 }
+func (m *mockContainer) GetLabels() map[string]string {
+	panic("unimplemented")
+}
 func (m *mockContainer) GetResmgrLabelKeys() []string {
 	panic("unimplemented")
 }
@@ -134,6 +137,9 @@ func (m *mockContainer) GetResmgrAnnotationKeys() []string {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetResmgrAnnotation(string, interface{}) (string, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetAnnotations() map[string]string {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetEnvKeys() []string {
@@ -257,6 +263,45 @@ func (m *mockContainer) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest
 func (m *mockContainer) GetAffinity() []*cache.Affinity {
 	return nil
 }
+func (m *mockContainer) SetRDTClass(string) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetRDTClass() string {
+	panic("unimplemented")
+}
+func (m *mockContainer) SetBlockIOClass(string) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetBlockIOClass() string {
+	panic("unimplemented")
+}
+func (m *mockContainer) SetCRIRequest(req interface{}) error {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIRequest() (interface{}, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) ClearCRIRequest() (interface{}, bool) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIEnvs() []*cri.KeyValue {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIMounts() []*cri.Mount {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCRIDevices() []*cri.Device {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetPending() []string {
+	panic("unimplemented")
+}
+func (m *mockContainer) HasPending(string) bool {
+	panic("unimplemented")
+}
+func (m *mockContainer) ClearPending(string) {
+	panic("unimplemented")
+}
 
 type mockPod struct {
 	name                               string
@@ -347,10 +392,10 @@ func (m *mockCache) DeletePod(string) cache.Pod {
 func (m *mockCache) LookupPod(string) (cache.Pod, bool) {
 	panic("unimplemented")
 }
-func (m *mockCache) InsertContainer(interface{}) cache.Container {
+func (m *mockCache) InsertContainer(interface{}) (cache.Container, error) {
 	panic("unimplemented")
 }
-func (m *mockCache) UpdateContainerID(string, interface{}) cache.Container {
+func (m *mockCache) UpdateContainerID(string, interface{}) (cache.Container, error) {
 	panic("unimplemented")
 }
 func (m *mockCache) DeleteContainer(string) cache.Container {
@@ -369,6 +414,9 @@ func (m *mockCache) QueryTransaction() []cache.Container {
 	panic("unimplemented")
 }
 func (m *mockCache) AbortTransaction() {
+	panic("unimplemented")
+}
+func (m *mockCache) GetPendingContainers() []cache.Container {
 	panic("unimplemented")
 }
 func (m *mockCache) GetPods() []cache.Pod {

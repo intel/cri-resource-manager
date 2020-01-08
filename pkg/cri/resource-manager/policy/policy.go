@@ -15,6 +15,7 @@
 package policy
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 
@@ -67,14 +68,15 @@ type BackendOptions struct {
 // CreateFn is the type for functions used to create a policy instance.
 type CreateFn func(cache.Cache, *BackendOptions) Backend
 
-// DataSyntax defines the syntax used to export data to a container.
-type DataSyntax string
-
 const (
-	// ExportShell specifies shell (assignment) syntax.
-	ExportShell DataSyntax = "shell"
-	// ExportedResources is the name of the file container resources are exported to.
+	// ExportedResources is the basename of the file container resources are exported to.
 	ExportedResources = "resources.sh"
+	// ExportSharedCPUs is the shell variable used to export shared container CPUs.
+	ExportSharedCPUs = "SHARED_CPUS"
+	// ExportIsolatedCPUs is the shell variable used to export isolated container CPUs.
+	ExportIsolatedCPUs = "ISOLATED_CPUS"
+	// ExportExclusiveCPUs is the shell variable used to export exclusive container CPUs.
+	ExportExclusiveCPUs = "EXCLUSIVE_CPUS"
 )
 
 // Backend is the policy (decision making logic) interface exposed by implementations.
@@ -98,21 +100,13 @@ type Backend interface {
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
 	// ExportResourceData provides resource data to export for the container.
-	ExportResourceData(cache.Container, DataSyntax) []byte
+	ExportResourceData(cache.Container) map[string]string
 }
 
 // Policy is the exposed interface for container resource allocations decision making.
 type Policy interface {
 	// Start starts up policy, prepare for serving resource management requests.
 	Start([]cache.Container, []cache.Container) error
-	// PrepareDecisions prepares policy decisions.
-	PrepareDecisions() error
-	// QueryDecisions queries pending policy decisions.
-	QueryDecisions() []cache.Container
-	// CommitDecisions commits pending policy decisions.
-	CommitDecisions() []cache.Container
-	// AbortDecisions aborts (discard) pending policy decisions.
-	AbortDecisions()
 	// Sync synchronizes the state of the active policy.
 	Sync([]cache.Container, []cache.Container) error
 	// AlocateResources allocates resources to a container.
@@ -121,6 +115,8 @@ type Policy interface {
 	ReleaseResources(cache.Container) error
 	// UpdateResources updates resource allocations of a container.
 	UpdateResources(cache.Container) error
+	// ExportResourceData exports/updates resource data for the container.
+	ExportResourceData(cache.Container)
 }
 
 // Policy instance/state.
@@ -202,48 +198,7 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 
 	log.Info("starting policy '%s'...", p.backend.Name())
 
-	// Notes:
-	//   Start() also creates an implicit transaction. This allows the backend
-	//   to make decisions, attempting to adjust existing container allocations
-	//   to any potential configuration changes since the previous startup. The
-	//   caller is reponsible for querying and enforcing decisions.
-
-	p.PrepareDecisions()
-
-	if err := p.backend.Start(add, del); err != nil {
-		p.AbortDecisions()
-		return err
-	}
-
-	return nil
-}
-
-// PrepareDecisions prepares a policy decision making round.
-func (p *policy) PrepareDecisions() error {
-	return p.cache.StartTransaction()
-}
-
-// QueryDecisions queries pending policy decisions.
-func (p *policy) QueryDecisions() []cache.Container {
-	return p.cache.QueryTransaction()
-}
-
-// CommitDecisions commits pending policy decisions.
-func (p *policy) CommitDecisions() []cache.Container {
-	updated := p.cache.CommitTransaction()
-
-	for _, c := range updated {
-		if data := p.backend.ExportResourceData(c, ExportShell); data != nil {
-			p.cache.WriteFile(c.GetCacheID(), ExportedResources, 0644, data)
-		}
-	}
-
-	return updated
-}
-
-// AbortDecisions reverts changes made in the current policy decision making round.
-func (p *policy) AbortDecisions() {
-	p.cache.AbortTransaction()
+	return p.backend.Start(add, del)
 }
 
 // Sync synchronizes the active policy state.
@@ -264,6 +219,22 @@ func (p *policy) ReleaseResources(c cache.Container) error {
 // UpdateResources updates resource allocations of a container.
 func (p *policy) UpdateResources(c cache.Container) error {
 	return p.backend.UpdateResources(c)
+}
+
+// ExportResourceData exports/updates resource data for the container.
+func (p *policy) ExportResourceData(c cache.Container) {
+	var buf bytes.Buffer
+
+	for key, value := range p.backend.ExportResourceData(c) {
+		if _, err := buf.WriteString(fmt.Sprintf("%s=%q\n", key, value)); err != nil {
+			log.Error("container %s: failed to export resource data (%s=%q)",
+				c.PrettyName(), key, value)
+			buf.Reset()
+			break
+		}
+	}
+
+	p.cache.WriteFile(c.GetCacheID(), ExportedResources, 0644, buf.Bytes())
 }
 
 // Register registers a policy backend.

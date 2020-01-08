@@ -17,6 +17,7 @@ package cache
 import (
 	"encoding/json"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
@@ -144,73 +145,6 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 	return nil
 }
 
-// UpdateCriCreateRequest updates a CRI ContainerCreateRequest for the container.
-func (c *container) UpdateCriCreateRequest(req *cri.CreateContainerRequest) error {
-	if c.State != ContainerStateCreating || c.ID != "" {
-		c.cache.Warn("hmm... cache thinks container (%v/%v) being created exists",
-			c.CacheID, c.ID)
-	}
-
-	req.Config.Command = c.Command
-	req.Config.Args = c.Args
-	req.Config.Labels = c.Labels
-	req.Config.Annotations = c.Annotations
-
-	req.Config.Envs = make([]*cri.KeyValue, len(c.Env))
-	idx := 0
-	for k, v := range c.Env {
-		req.Config.Envs[idx] = &cri.KeyValue{
-			Key:   k,
-			Value: v,
-		}
-		idx++
-	}
-
-	req.Config.Mounts = make([]*cri.Mount, len(c.Mounts))
-	idx = 0
-	for _, m := range c.Mounts {
-		req.Config.Mounts[idx] = &cri.Mount{
-			ContainerPath:  m.Container,
-			HostPath:       m.Host,
-			Readonly:       m.Readonly,
-			SelinuxRelabel: m.Relabel,
-			Propagation:    cri.MountPropagation(m.Propagation),
-		}
-		idx++
-	}
-
-	req.Config.Devices = make([]*cri.Device, len(c.Devices))
-	idx = 0
-	for _, d := range c.Devices {
-		req.Config.Devices[idx] = &cri.Device{
-			ContainerPath: d.Container,
-			HostPath:      d.Host,
-			Permissions:   d.Permissions,
-		}
-		idx++
-	}
-
-	req.Config.Linux.Resources = c.LinuxReq
-
-	return nil
-}
-
-// CriUpdateRequest creates a CRI UpdateContainerResourcesRequest for the container.
-func (c *container) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error) {
-	if c.ID == "" {
-		return nil, cacheError("can't udpate container %s, not created yet", c.CacheID)
-	}
-
-	if c.LinuxReq == nil {
-		return nil, nil
-	}
-
-	return &cri.UpdateContainerResourcesRequest{
-		ContainerId: c.ID,
-		Linux:       &(*c.LinuxReq),
-	}, nil
-}
-
 func (c *container) PrettyName() string {
 	pod, ok := c.GetPod()
 	if !ok {
@@ -319,6 +253,17 @@ func (c *container) GetResmgrLabel(key string) (string, bool) {
 	return value, ok
 }
 
+func (c *container) GetLabels() map[string]string {
+	if c.Labels == nil {
+		return nil
+	}
+	labels := make(map[string]string, len(c.Labels))
+	for key, value := range c.Labels {
+		labels[key] = value
+	}
+	return labels
+}
+
 func (c *container) GetAnnotationKeys() []string {
 	keys := make([]string, len(c.Annotations))
 
@@ -354,6 +299,17 @@ func (c *container) GetResmgrAnnotationKeys() []string {
 
 func (c *container) GetResmgrAnnotation(key string, objPtr interface{}) (string, bool) {
 	return c.GetAnnotation(kubernetes.ResmgrKey(key), objPtr)
+}
+
+func (c *container) GetAnnotations() map[string]string {
+	if c.Annotations == nil {
+		return nil
+	}
+	annotations := make(map[string]string, len(c.Annotations))
+	for key, value := range c.Annotations {
+		annotations[key] = value
+	}
+	return annotations
 }
 
 func (c *container) GetEnvKeys() []string {
@@ -449,12 +405,12 @@ func (c *container) GetLinuxResources() *cri.LinuxContainerResources {
 
 func (c *container) SetCommand(value []string) {
 	c.Command = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetArgs(value []string) {
 	c.Args = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetLabel(key, value string) {
@@ -462,13 +418,13 @@ func (c *container) SetLabel(key, value string) {
 		c.Labels = make(map[string]string)
 	}
 	c.Labels[key] = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteLabel(key string) {
 	if _, ok := c.Labels[key]; ok {
 		delete(c.Labels, key)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -477,13 +433,13 @@ func (c *container) SetAnnotation(key, value string) {
 		c.Annotations = make(map[string]string)
 	}
 	c.Annotations[key] = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteAnnotation(key string) {
 	if _, ok := c.Annotations[key]; ok {
 		delete(c.Annotations, key)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -492,13 +448,13 @@ func (c *container) SetEnv(key, value string) {
 		c.Env = make(map[string]string)
 	}
 	c.Env[key] = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) UnsetEnv(key string) {
 	if _, ok := c.Env[key]; ok {
 		delete(c.Env, key)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -507,13 +463,13 @@ func (c *container) InsertMount(m *Mount) {
 		c.Mounts = make(map[string]*Mount)
 	}
 	c.Mounts[m.Container] = m
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteMount(path string) {
 	if _, ok := c.Mounts[path]; ok {
 		delete(c.Mounts, path)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -522,13 +478,13 @@ func (c *container) InsertDevice(d *Device) {
 		c.Devices = make(map[string]*Device)
 	}
 	c.Devices[d.Container] = d
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) DeleteDevice(path string) {
 	if _, ok := c.Devices[path]; ok {
 		delete(c.Devices, path)
-		c.cache.markChanged(c)
+		c.markPending(CRI)
 	}
 }
 
@@ -587,7 +543,7 @@ func (c *container) GetCpusetMems() string {
 
 func (c *container) SetLinuxResources(req *cri.LinuxContainerResources) {
 	c.LinuxReq = req
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCPUPeriod(value int64) {
@@ -595,7 +551,7 @@ func (c *container) SetCPUPeriod(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuPeriod = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCPUQuota(value int64) {
@@ -603,7 +559,7 @@ func (c *container) SetCPUQuota(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuQuota = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCPUShares(value int64) {
@@ -611,7 +567,7 @@ func (c *container) SetCPUShares(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuShares = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetMemoryLimit(value int64) {
@@ -619,7 +575,7 @@ func (c *container) SetMemoryLimit(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.MemoryLimitInBytes = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetOomScoreAdj(value int64) {
@@ -627,7 +583,7 @@ func (c *container) SetOomScoreAdj(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.OomScoreAdj = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCpusetCpus(value string) {
@@ -635,7 +591,7 @@ func (c *container) SetCpusetCpus(value string) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetCpus = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func (c *container) SetCpusetMems(value string) {
@@ -643,7 +599,7 @@ func (c *container) SetCpusetMems(value string) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetMems = value
-	c.cache.markChanged(c)
+	c.markPending(CRI)
 }
 
 func getTopologyHints(hostPath, containerPath string, readOnly bool) sysfs.TopologyHints {
@@ -709,4 +665,128 @@ func (c *container) GetAffinity() []*Affinity {
 	}
 
 	return affinity
+}
+
+func (c *container) SetRDTClass(class string) {
+	c.RDTClass = class
+	c.markPending(RDT)
+}
+
+func (c *container) GetRDTClass() string {
+	return c.RDTClass
+}
+
+func (c *container) SetBlockIOClass(class string) {
+	c.BlockIOClass = class
+	c.markPending(BlockIO)
+}
+
+func (c *container) GetBlockIOClass() string {
+	return c.BlockIOClass
+}
+
+func (c *container) SetCRIRequest(req interface{}) error {
+	if c.req != nil {
+		return cacheError("can't set pending container request: another pending")
+	}
+	c.req = &req
+	return nil
+}
+
+func (c *container) GetCRIRequest() (interface{}, bool) {
+	if c.req == nil {
+		return nil, false
+	}
+
+	return *c.req, true
+}
+
+func (c *container) ClearCRIRequest() (interface{}, bool) {
+	req, ok := c.GetCRIRequest()
+	c.req = nil
+	return req, ok
+}
+
+func (c *container) GetCRIEnvs() []*cri.KeyValue {
+	envs := make([]*cri.KeyValue, len(c.Env), len(c.Env))
+	idx := 0
+	for k, v := range c.Env {
+		envs[idx] = &cri.KeyValue{
+			Key:   k,
+			Value: v,
+		}
+		idx++
+	}
+	return envs
+}
+
+func (c *container) GetCRIMounts() []*cri.Mount {
+	if c.Mounts == nil {
+		return nil
+	}
+	mounts := make([]*cri.Mount, len(c.Mounts), len(c.Mounts))
+	idx := 0
+	for _, m := range c.Mounts {
+		mounts[idx] = &cri.Mount{
+			ContainerPath:  m.Container,
+			HostPath:       m.Host,
+			Readonly:       m.Readonly,
+			SelinuxRelabel: m.Relabel,
+			Propagation:    cri.MountPropagation(m.Propagation),
+		}
+		idx++
+	}
+	return mounts
+}
+
+func (c *container) GetCRIDevices() []*cri.Device {
+	if c.Devices == nil {
+		return nil
+	}
+	devices := make([]*cri.Device, len(c.Devices), len(c.Devices))
+	idx := 0
+	for _, d := range c.Devices {
+		devices[idx] = &cri.Device{
+			ContainerPath: d.Container,
+			HostPath:      d.Host,
+			Permissions:   d.Permissions,
+		}
+		idx++
+	}
+	return devices
+}
+
+func (c *container) markPending(controller string) {
+	if c.pending == nil {
+		c.pending = make(map[string]struct{})
+	}
+	c.pending[controller] = struct{}{}
+	c.cache.markPending(c)
+}
+
+func (c *container) ClearPending(controller string) {
+	delete(c.pending, controller)
+	if len(c.pending) == 0 {
+		c.cache.clearPending(c)
+	}
+}
+
+func (c *container) GetPending() []string {
+	if c.pending == nil {
+		return nil
+	}
+	pending := make([]string, 0, len(c.pending))
+	for controller := range c.pending {
+		pending = append(pending, controller)
+	}
+	sort.Strings(pending)
+	return pending
+}
+
+func (c *container) HasPending(controller string) bool {
+	if c.pending == nil {
+		return false
+	}
+	_, pending := c.pending[controller]
+	return pending
 }
