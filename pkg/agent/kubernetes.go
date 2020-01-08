@@ -91,7 +91,6 @@ func patchNodeStatus(cli *k8sclient.Clientset, fields map[string]string) error {
 	}
 	patch += "}}"
 
-	//a.Debug("patching status of node with '%s'", patch)
 	_, err := cli.CoreV1().Nodes().PatchStatus(nodeName, []byte(patch))
 
 	return err
