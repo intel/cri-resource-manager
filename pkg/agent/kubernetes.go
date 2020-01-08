@@ -133,6 +133,10 @@ func newWatch(parent *watcher, kind string, ns namespace, open openFn, query que
 
 // newNodeWatch creates a watch for k8s Node
 func newNodeWatch(parent *watcher) *watch {
+	if nodeName == "" {
+		parent.Warn("node name not set, NODE_NAME env variable should be set to match the name of this k8s Node")
+	}
+
 	w := newWatch(parent, "Node", namespace(""),
 		func(ns namespace, name string) (k8swatch.Interface, error) {
 			selector := meta_v1.ListOptions{FieldSelector: "metadata.name=" + name}
