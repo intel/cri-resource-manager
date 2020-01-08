@@ -10,12 +10,14 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// CgroupID implements mapping kernel cgroup IDs to cgroupfs paths with transparent caching.
 type CgroupID struct {
 	root  string
 	cache map[uint64]string
 	sync.Mutex
 }
 
+// NewCgroupID creates a new CgroupID map/cache.
 func NewCgroupID(root string) *CgroupID {
 	return &CgroupID{
 		root:  root,
@@ -32,23 +34,7 @@ func getID(path string) uint64 {
 	return binary.LittleEndian.Uint64(h.Bytes())
 }
 
-func (cgid *CgroupID) List() error {
-	return filepath.Walk(cgid.root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
-			}
-			fmt.Printf("WalkFunc called with an error (path %q: %v\n)", path, err)
-			return err
-		}
-
-		if info.IsDir() {
-			fmt.Printf("%v - %s\n", getID(path), path)
-		}
-		return nil
-	})
-}
-
+// Find finds the path for the given cgroup id.
 func (cgid *CgroupID) Find(id uint64) (string, error) {
 	found := false
 	var p string
