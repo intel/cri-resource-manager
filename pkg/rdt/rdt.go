@@ -71,7 +71,10 @@ func NewControl(resctrlpath string) (Control, error) {
 	// Configure resctrl
 	r.conf = opt.Config
 	if err := r.configureResctrl(r.conf); err != nil {
-		return nil, rdtError("configuration failed: %v", err)
+		// Temporary hack to get rdt properly configured.
+		// Corresponging hack located in pkg/cri/resource-manager/resource-manager.go
+		// TODO: switch back to returning an error after rdt config management is fixed
+		r.Warn("configuration failed: %v", err)
 	}
 
 	pkgcfg.GetModule("rdt").AddNotify(r.configNotify)
