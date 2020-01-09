@@ -111,7 +111,9 @@ func (w *watcher) watch() error {
 	group := ""
 
 	if node, err := nodew.Query(); err != nil {
-		w.Warn("failed to query node %s: %v", nodeName, err)
+		w.Warn("failed to query node %q: %v", nodeName, err)
+	} else if node == nil {
+		w.Warn("failed to query node %q, make sure that NODE_NAME is correctly set", nodeName)
 	} else {
 		group = node.(*core_v1.Node).Labels[opts.labelName]
 		w.Info("configuration group is set to '%s'", group)
