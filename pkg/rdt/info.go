@@ -25,6 +25,7 @@ import (
 	"strings"
 )
 
+// Info contains information about the RDT support in the system
 type Info struct {
 	resctrlPath string
 	numClosids  uint64

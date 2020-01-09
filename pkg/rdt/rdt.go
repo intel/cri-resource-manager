@@ -188,35 +188,12 @@ func (r *control) configureResctrlGroup(name string, config ResctrlGroupConfig, 
 	// Handle L3 cache allocation
 	switch {
 	case rdtInfo.l3.Supported():
-		if !config.L3CodeSchema.IsNil() && !options.L3Code.Optional {
-			return rdtError("separate L3 code path schema for %q requested but CDP not enabled", name)
-		}
-		if !config.L3DataSchema.IsNil() && !options.L3Data.Optional {
-			return rdtError("separate L3 data path schema for %q requested but CDP not enabled", name)
-		}
-		r.Debug("configuring L3 schema for %q", name)
 		schemata += config.L3Schema.ToStr(L3SchemaTypeUnified)
 	case rdtInfo.l3data.Supported() || rdtInfo.l3code.Supported():
-		if !config.L3CodeSchema.IsNil() {
-			r.Debug("using specific L3 code schema for %q", name)
-			schemata += config.L3CodeSchema.ToStr(L3SchemaTypeCode)
-		} else {
-			// No L3 code schema was specified -> use the "unified" L3 schema
-			r.Debug("using unified L3 schema in code path for %q", name)
-			schemata += config.L3Schema.ToStr(L3SchemaTypeCode)
-		}
-		if !config.L3DataSchema.IsNil() {
-			r.Debug("using specific L3 data schema for %q", name)
-			schemata += config.L3DataSchema.ToStr(L3SchemaTypeData)
-		} else {
-			// No L3 data schema was specified -> use the "unified" L3 schema
-			r.Debug("using unified L3 schema in data path for %q", name)
-			schemata += config.L3Schema.ToStr(L3SchemaTypeData)
-		}
+		schemata += config.L3Schema.ToStr(L3SchemaTypeCode)
+		schemata += config.L3Schema.ToStr(L3SchemaTypeData)
 	default:
-		if (!config.L3Schema.IsNil() && !options.L3.Optional) ||
-			(!config.L3CodeSchema.IsNil() && !options.L3Code.Optional) ||
-			(!config.L3DataSchema.IsNil() && !options.L3Data.Optional) {
+		if !config.L3Schema.IsNil() && !options.L3.Optional {
 			return rdtError("L3 cache allocation for %q specified in configuration but not supported by system", name)
 		}
 	}
