@@ -99,7 +99,7 @@ func (p *pod) GetContainers() []Container {
 			continue
 		}
 		if p.Resources != nil {
-			if _, ok := p.Resources.Containers[c.ID]; !ok {
+			if _, ok := p.Resources.InitContainers[c.ID]; ok {
 				continue
 			}
 		}
