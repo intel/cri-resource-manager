@@ -47,11 +47,11 @@ var _ policy.Backend = &eda{}
 // Policy backend implementation
 //
 
-// CreateEdaPolicy creates a new policy instance.
-func CreateEdaPolicy(state cache.Cache, opts *policy.BackendOptions) policy.Backend {
+// CreateEdaPolicy creates a new eda policy instance.
+func CreateEdaPolicy(opts *policy.BackendOptions) policy.Backend {
 	eda := &eda{
 		Logger: logger.NewLogger(PolicyName),
-		state:  state,
+		state:  opts.Cache,
 	}
 	eda.Info("creating policy...")
 	// TODO: policy configuration (if any)

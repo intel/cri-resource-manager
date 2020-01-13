@@ -75,18 +75,15 @@ type policy struct {
 var _ policyapi.Backend = &policy{}
 
 // CreateTopologyAwarePolicy creates a new policy instance.
-func CreateTopologyAwarePolicy(cache cache.Cache, opts *policyapi.BackendOptions) policyapi.Backend {
+func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 	p := &policy{
-		cache:   cache,
+		cache:   opts.Cache,
+		sys:     opts.System,
 		options: *opts,
 	}
 
 	p.nodes = make(map[string]Node)
 	p.allocations = allocations{policy: p, CPU: make(map[string]CPUGrant, 32)}
-
-	if err := p.discoverSystemTopology(); err != nil {
-		log.Fatal("failed to create topology-aware policy: %v", err)
-	}
 
 	if err := p.checkConstraints(); err != nil {
 		log.Fatal("failed to create topology-aware policy: %v", err)
@@ -230,18 +227,6 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	//   be part of the configuration as well.
 
 	p.saveConfig()
-
-	return nil
-}
-
-// Discover system topology.
-func (p *policy) discoverSystemTopology() error {
-	var err error
-
-	log.Info("discovering system topology...")
-	if p.sys, err = system.DiscoverSystem(); err != nil {
-		return policyError("failed to discover system topology: %v", err)
-	}
 
 	return nil
 }

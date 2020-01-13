@@ -67,12 +67,12 @@ var _ policy.Backend = &stp{}
 //
 
 // CreateStpPolicy creates a new policy instance.
-func CreateStpPolicy(state cache.Cache, opts *policy.BackendOptions) policy.Backend {
+func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	var err error
 	stp := &stp{
 		Logger: logger.NewLogger(PolicyName),
 		agent:  opts.AgentCli,
-		state:  state,
+		state:  opts.Cache,
 	}
 
 	stp.Info("creating policy...")

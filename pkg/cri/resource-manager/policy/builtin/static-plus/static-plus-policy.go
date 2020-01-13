@@ -71,17 +71,14 @@ type staticplus struct {
 var _ policy.Backend = &staticplus{}
 
 // CreateStaticPlusPolicy creates a new policy instance.
-func CreateStaticPlusPolicy(cache cache.Cache, opts *policy.BackendOptions) policy.Backend {
+func CreateStaticPlusPolicy(opts *policy.BackendOptions) policy.Backend {
 	p := &staticplus{
 		Logger: logger.NewLogger(PolicyName),
-		cache:  cache,
+		cache:  opts.Cache,
+		sys:    opts.System,
 	}
 
 	p.Info("creating policy...")
-
-	if err := p.discoverSystemTopology(); err != nil {
-		p.Fatal("failed to discover system/topology: %v", err)
-	}
 
 	if err := p.setupPools(opts.Available, opts.Reserved); err != nil {
 		p.Fatal("failed to set up cpu pools: %v", err)
@@ -199,19 +196,6 @@ func (p *staticplus) ExportResourceData(c cache.Container) map[string]string {
 // policyError creates a formatted policy-specific error.
 func policyError(format string, args ...interface{}) error {
 	return fmt.Errorf(PolicyName+": "+format, args...)
-}
-
-// discoverSystemTopology discovers system hardware/topology.
-func (p *staticplus) discoverSystemTopology() error {
-	p.Info("discovering system topology...")
-
-	sys, err := sysfs.DiscoverSystem()
-	if err != nil {
-		return policyError("failed to discover system/topology: %v", err)
-	}
-
-	p.sys = sys
-	return nil
 }
 
 // setupPools sets up the pools we allocate resources from.
