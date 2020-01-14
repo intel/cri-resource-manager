@@ -17,7 +17,6 @@ package resmgr
 import (
 	"flag"
 
-	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 )
 
@@ -39,9 +38,9 @@ var opt = options{}
 
 // Register us for command line option processing and configuration handling.
 func init() {
-	flag.StringVar(&opt.ImageSocket, "image-socket", client.DontConnect,
+	flag.StringVar(&opt.ImageSocket, "image-socket", sockets.Containerd,
 		"Unix domain socket path where CRI image service requests should be relayed to.")
-	flag.StringVar(&opt.RuntimeSocket, "runtime-socket", sockets.DockerShim,
+	flag.StringVar(&opt.RuntimeSocket, "runtime-socket", sockets.Containerd,
 		"Unix domain socket path where CRI runtime service requests should be relayed to.")
 	flag.StringVar(&opt.RelaySocket, "relay-socket", sockets.ResourceManagerRelay,
 		"Unix domain socket path where the resource manager should serve requests on.")
