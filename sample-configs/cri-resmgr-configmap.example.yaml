@@ -84,17 +84,17 @@ data:
         classes:
           Guaranteed:
             l3schema:
-              all: 100%
-          # Specific settings for L3 CDP (Code and Data Prioritization)
-          #      unified: "100%"
-          #      code: "100%"
-          #      data: "80%"
-          # Specify CacheId (typically corresponds to a CPU socket) specific setting
-          #    1: "80%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [100%]
-          #    1-3: [80%, 10000MBps]
+              all: "100%"
+## Specific settings for L3 CDP (Code and Data Prioritization)
+#                unified: "100%"
+#                code: "100%"
+#                data: "80%"
+## Specify CacheId (typically corresponds to a CPU socket) specific setting
+#              1: "80%"
+## MBA (Memory Bandwidth Allocation) for 'Guaranteed'
+#            mbschema:
+#              all: [100%]
+#              1-3: [80%, 10000MBps]
           Burstable:
             l3schema:
               all:
@@ -102,16 +102,21 @@ data:
                 # Separate schema for L3 code and data paths specified
                 code: "100%"
                 data: "50%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [66%, 5000MBps]
+## MBA (Memory Bandwidth Allocation) for 'Burstable'
+#            mbschema:
+#              all: [66%, 5000MBps]
           BestEffort:
             l3schema:
               all:
                 unified: "33%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [33%, 3000MBps]
+## MBA (Memory Bandwidth Allocation) for 'BestEffort'
+#            mbschema:
+#              all: [33%, 3000MBps]
+## Special class 'SYSTEM_DEFAULT'. Reserved name for configuring the "root"
+## resctrl group of the system
+#          SYSTEM_DEFAULT:
+#            l3schema:
+#              all: "50%"
   dump: |+
     Config: full:.*,debug
     File: /tmp/cri-full-debug.dump
@@ -191,17 +196,17 @@ data:
         classes:
           Guaranteed:
             l3schema:
-              all: 100%
-          # Specific settings for L3 CDP (Code and Data Prioritization)
-          #      unified: "100%"
-          #      code: "100%"
-          #      data: "80%"
-          # Specify CacheId (typically corresponds to a CPU socket) specific setting
-          #    1: "80%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [100%]
-          #    1-3: [80%, 10000MBps]
+              all: "100%"
+## Specific settings for L3 CDP (Code and Data Prioritization)
+#                unified: "100%"
+#                code: "100%"
+#                data: "80%"
+## Specify CacheId (typically corresponds to a CPU socket) specific setting
+#              1: "80%"
+## MBA (Memory Bandwidth Allocation) for 'Guaranteed'
+#            mbschema:
+#              all: [100%]
+#              1-3: [80%, 10000MBps]
           Burstable:
             l3schema:
               all:
@@ -209,16 +214,21 @@ data:
                 # Separate schema for L3 code and data paths specified
                 code: "100%"
                 data: "50%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [66%, 5000MBps]
+## MBA (Memory Bandwidth Allocation) for 'Burstable'
+#            mbschema:
+#              all: [66%, 5000MBps]
           BestEffort:
             l3schema:
               all:
                 unified: "33%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [33%, 3000MBps]
+## MBA (Memory Bandwidth Allocation) for 'BestEffort'
+#            mbschema:
+#              all: [33%, 3000MBps]
+## Special class 'SYSTEM_DEFAULT'. Reserved name for configuring the "root"
+## resctrl group of the system
+#          SYSTEM_DEFAULT:
+#            l3schema:
+#              all: "50%"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -293,17 +303,17 @@ data:
         classes:
           Guaranteed:
             l3schema:
-              all: 100%
-          # Specific settings for L3 CDP (Code and Data Prioritization)
-          #      unified: "100%"
-          #      code: "100%"
-          #      data: "80%"
-          # Specify CacheId (typically corresponds to a CPU socket) specific setting
-          #    1: "80%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [100%]
-          #    1-3: [80%, 10000MBps]
+              all: "100%"
+## Specific settings for L3 CDP (Code and Data Prioritization)
+#                unified: "100%"
+#                code: "100%"
+#                data: "80%"
+## Specify CacheId (typically corresponds to a CPU socket) specific setting
+#              1: "80%"
+## MBA (Memory Bandwidth Allocation) for 'Guaranteed'
+#            mbschema:
+#              all: [100%]
+#              1-3: [80%, 10000MBps]
           Burstable:
             l3schema:
               all:
@@ -311,16 +321,21 @@ data:
                 # Separate schema for L3 code and data paths specified
                 code: "100%"
                 data: "50%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [66%, 5000MBps]
+## MBA (Memory Bandwidth Allocation) for 'Burstable'
+#            mbschema:
+#              all: [66%, 5000MBps]
           BestEffort:
             l3schema:
               all:
                 unified: "33%"
-          # MBA (Memory Bandwidth Allocation)
-          #  mbschema:
-          #    all: [33%, 3000MBps]
+## MBA (Memory Bandwidth Allocation) for 'BestEffort'
+#            mbschema:
+#              all: [33%, 3000MBps]
+## Special class 'SYSTEM_DEFAULT'. Reserved name for configuring the "root"
+## resctrl group of the system
+#          SYSTEM_DEFAULT:
+#            l3schema:
+#              all: "50%"
   dump: |+
     Config: full:.*,short:.*Stop.*,off:.*List.*
     File: /tmp/cri-selective-debug.dump
