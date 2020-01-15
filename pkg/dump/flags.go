@@ -224,13 +224,14 @@ func (f *dumpFile) String() string {
 }
 
 func (o *options) verbosityOf(method string) verbosity {
+	if v, ok := o.matches[method]; ok {
+		return v
+	}
+
 	log.Debug("%s: match checking verbosity...", method)
 	if v, ok := o.methods[method]; ok {
 		log.Debug("  => exact match: %v", v)
-		return v
-	}
-	if v, ok := o.matches[method]; ok {
-		log.Debug("  => regexp match: %v", v)
+		o.matches[method] = v
 		return v
 	}
 	if v, ok := o.methods["*"]; ok {
