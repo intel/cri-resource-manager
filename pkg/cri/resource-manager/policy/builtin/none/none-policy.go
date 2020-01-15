@@ -35,7 +35,7 @@ type none struct {
 var _ policy.Backend = &none{}
 
 // CreateNonePolicy creates a new policy instance.
-func CreateNonePolicy(cache cache.Cache, opts *policy.BackendOptions) policy.Backend {
+func CreateNonePolicy(opts *policy.BackendOptions) policy.Backend {
 	n := &none{Logger: logger.NewLogger(PolicyName)}
 	n.Info("creating policy...")
 	return n

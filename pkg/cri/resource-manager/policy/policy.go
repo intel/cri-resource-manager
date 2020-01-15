@@ -25,6 +25,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
 // Domain represents a hardware resource domain that can be policied by a backend.
@@ -57,6 +58,10 @@ type Options struct {
 
 // BackendOptions describes the options for a policy backend instance
 type BackendOptions struct {
+	// System provides system/HW/topology information
+	System *system.System
+	// System state/cache
+	Cache cache.Cache
 	// Resource availibility constraint
 	Available ConstraintSet
 	// Resource reservation constraint
@@ -66,7 +71,7 @@ type BackendOptions struct {
 }
 
 // CreateFn is the type for functions used to create a policy instance.
-type CreateFn func(cache.Cache, *BackendOptions) Backend
+type CreateFn func(*BackendOptions) Backend
 
 const (
 	// ExportedResources is the basename of the file container resources are exported to.
@@ -121,8 +126,9 @@ type Policy interface {
 
 // Policy instance/state.
 type policy struct {
-	cache   cache.Cache // system state cache
-	backend Backend     // our active backend
+	cache   cache.Cache    // system state cache
+	backend Backend        // our active backend
+	system  *system.System // system/HW/topology info
 }
 
 // backend is a registered Backend.
@@ -154,8 +160,14 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 		return nil, policyError("unknown policy '%s'", opt.Policy)
 	}
 
+	sys, err := system.DiscoverSystem()
+	if err != nil {
+		return nil, policyError("failed to discover system topology: %v", err)
+	}
+
 	p := &policy{
-		cache: cache,
+		cache:  cache,
+		system: sys,
 	}
 
 	log.Info("creating new policy '%s'...", backend.name)
@@ -181,11 +193,13 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 	}
 
 	backendOpts := &BackendOptions{
+		Cache:     p.cache,
+		System:    p.system,
 		Available: opt.Available,
 		Reserved:  opt.Reserved,
 		AgentCli:  o.AgentCli,
 	}
-	p.backend = backend.create(p.cache, backendOpts)
+	p.backend = backend.create(backendOpts)
 
 	return p, nil
 }

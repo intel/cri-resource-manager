@@ -63,23 +63,18 @@ const (
 )
 
 // NewStaticPolicy creates a new policy instance.
-func NewStaticPolicy(state cache.Cache, opts *policy.BackendOptions) policy.Backend {
+func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 	s := &static{
 		Logger:    logger.NewLogger(PolicyName),
-		state:     state,
+		state:     opts.Cache,
+		sys:       opts.System,
 		available: opts.Available,
 		reserved:  opts.Reserved,
 	}
 
 	s.Info("creating policy...")
 
-	sys, err := sysfs.DiscoverSystem()
-	if err != nil {
-		s.Fatal("failed to discover system topology: %v", err)
-	}
-
-	s.sys = sys
-	s.numHT = sys.CPU(sysfs.ID(0)).ThreadCPUSet().Size()
+	s.numHT = s.sys.CPU(sysfs.ID(0)).ThreadCPUSet().Size()
 
 	if err := s.checkConstraints(); err != nil {
 		s.Fatal("cannot start with given constraints: %v", err)
