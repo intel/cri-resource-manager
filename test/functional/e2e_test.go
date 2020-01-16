@@ -52,6 +52,9 @@ func runTest(t *testing.T, name string, overridenCriHandlers map[string]interfac
 		if err := flag.Set("runtime-socket", filepath.Join(tmpDir, "fakecri.sock")); err != nil {
 			t.Fatalf("unable to set runtime-socket")
 		}
+		if err := flag.Set("image-socket", filepath.Join(tmpDir, "fakecri.sock")); err != nil {
+			t.Fatalf("unable to set image-socket")
+		}
 		if err := flag.Set("relay-socket", filepath.Join(tmpDir, "relay.sock")); err != nil {
 			t.Fatalf("unable to set relay-socket")
 		}

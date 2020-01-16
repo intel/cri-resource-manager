@@ -15,8 +15,8 @@
 package sockets
 
 const (
-	// DockerShim is the CRI socket dockershim listens on.
-	DockerShim = "/var/run/dockershim.sock"
+	// Containerd is the CRI socket containerd listens on.
+	Containerd = "/var/run/containerd/containerd.sock"
 	// ResourceManagerRelay is the CRI socket the resource manager listens on.
 	ResourceManagerRelay = "/var/run/cri-resmgr/cri-resmgr.sock"
 	// ResourceManagerAgent is the socket the resource manager node agent listens on.
