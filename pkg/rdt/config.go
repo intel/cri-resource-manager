@@ -489,7 +489,7 @@ func (raw options) resolveClasses() (map[string]classConfig, error) {
 
 // parsePercentage parses a percentage value
 func (raw rawAllocations) parsePercentage() (map[uint64]uint64, error) {
-	rawValues, err := raw.rawParse("100%")
+	rawValues, err := raw.rawParse("100%", true)
 	if err != nil || rawValues == nil {
 		return nil, err
 	}
@@ -511,7 +511,7 @@ func (raw rawAllocations) parsePercentage() (map[uint64]uint64, error) {
 
 // parse parses a raw L3 cache allocation
 func (raw rawAllocations) parseL3() (l3Schema, error) {
-	rawValues, err := raw.rawParse(map[string]interface{}{"unified": "100%"})
+	rawValues, err := raw.rawParse(map[string]interface{}{"unified": "100%"}, false)
 	if err != nil || rawValues == nil {
 		return nil, err
 	}
@@ -533,7 +533,7 @@ func (raw rawAllocations) parseL3() (l3Schema, error) {
 
 // parseMB parses a raw MB allocation
 func (raw rawAllocations) parseMB() (map[uint64]uint64, error) {
-	rawValues, err := raw.rawParse("100")
+	rawValues, err := raw.rawParse("100", false)
 	if err != nil || rawValues == nil {
 		return nil, err
 	}
@@ -555,8 +555,8 @@ func (raw rawAllocations) parseMB() (map[uint64]uint64, error) {
 
 // rawParse "pre-parses" the rawAllocations per each cache id. I.e. it assigns
 // a raw (string) allocation for each cache id
-func (raw rawAllocations) rawParse(defaultVal interface{}) (map[uint64]interface{}, error) {
-	if raw == nil {
+func (raw rawAllocations) rawParse(defaultVal interface{}, initEmpty bool) (map[uint64]interface{}, error) {
+	if raw == nil && !initEmpty {
 		return nil, nil
 	}
 
