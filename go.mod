@@ -4,20 +4,20 @@ go 1.13
 
 require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
-	contrib.go.opencensus.io/exporter/prometheus v0.1.0
+	contrib.go.opencensus.io/exporter/prometheus v0.1.1-0.20191218042359-6151c48ac7fa
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang/protobuf v1.3.1
-	github.com/google/go-cmp v0.3.0
+	github.com/golang/protobuf v1.3.2
+	github.com/google/go-cmp v0.3.1
+	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/iovisor/gobpf v0.0.0-20191024162143-7c8f8e040b4b
-	github.com/json-iterator/go v1.1.6 // indirect
-	github.com/pkg/errors v0.8.0
-	github.com/prometheus/client_golang v0.9.3-0.20190127221311-3c4408c8b829
-	github.com/prometheus/client_model v0.0.0-20190115171406-56726106282f
-	github.com/prometheus/common v0.2.0
-	github.com/stretchr/testify v1.3.0 // indirect
-	go.opencensus.io v0.22.0
+	github.com/minio/sha256-simd v0.1.1
+	github.com/pkg/errors v0.8.1
+	github.com/prometheus/client_golang v1.2.1
+	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
+	github.com/prometheus/common v0.7.0
+	go.opencensus.io v0.22.2
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
-	golang.org/x/sys v0.0.0-20190502145724-3ef323f4f1fd
+	golang.org/x/sys v0.0.0-20191113165036-4c7a9d0fe056
 	google.golang.org/grpc v1.20.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

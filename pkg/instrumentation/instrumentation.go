@@ -15,12 +15,13 @@
 package instrumentation
 
 import (
-	"net/http"
 	"strings"
 	"time"
 
 	"contrib.go.opencensus.io/exporter/jaeger"
 	"contrib.go.opencensus.io/exporter/prometheus"
+	prom "github.com/prometheus/client_golang/prometheus"
+	model "github.com/prometheus/client_model/go"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
@@ -30,92 +31,58 @@ import (
 )
 
 const (
-	Service = "CRI-RM"
+	// ServiceName is our Jaeger and Prometheus service names.
+	ServiceName = "CRI-RM"
 )
 
 // Our logger instance.
 var log logger.Logger = logger.NewLogger("tracing")
 
-// shutdownFn is the type of function we run during shutdown.
-type shutdownFn func()
+// Our Jaeger trace and Prometheus metrics exporters.
+var jexport *jaeger.Exporter
+var pexport *prometheus.Exporter
 
-// Our shutdown function.
-var shutdown shutdownFn
+// prometheus Gatherers dynamically registered with us.
+var dynamicGatherers = &gatherers{gatherers: prom.Gatherers{}}
 
-// IsEnabled returns true if tracing is enabled.
-func IsEnabled() bool {
-	return opt.Trace != Disabled
+// ConfigureTracing configures Jaeger-tracing.
+func ConfigureTracing(tc TraceConfig) error {
+	log.Debug("applying trace configuration %v", tc)
+	trace.ApplyConfig(trace.Config{DefaultSampler: tc.Sampler()})
+	return nil
 }
 
-// Setup sets up instrumentation (tracing, metrics collection, etc.).
-func Setup() error {
-	var cfg *trace.Config
+// TracingEnabled returns true if the tracing sampler is not disabled.
+func TracingEnabled() bool {
+	return float64(opt.Trace) > 0.0
+}
 
-	if !IsEnabled() {
-		return nil
-	}
+// Start sets up instrumentation (tracing, metrics collection, etc.).
+func Start() error {
+	log.Info("Starting instrumenation...")
+	ConfigureTracing(opt.Trace)
 
-	cfg = &trace.Config{DefaultSampler: opt.Trace.Sampler()}
-	trace.ApplyConfig(*cfg)
+	registerJaegerExporter()
+	registerGrpcTraceViews()
+	registerPrometheusExporter()
 
-	if shutdown != nil {
-		return nil
-	}
-
-	jopt := jaeger.Options{
-		ServiceName:       Service,
-		CollectorEndpoint: opt.Collector,
-		AgentEndpoint:     opt.Agent,
-		Process:           jaeger.Process{ServiceName: Service},
-		OnError:           func(err error) { log.Error("jaeger: %v", err) },
-	}
-	je, err := jaeger.NewExporter(jopt)
-	if err != nil {
-		return traceError("failed to create Jaeger exporter: %v", err)
-	}
-	trace.RegisterExporter(je)
-
-	if err = view.Register(ocgrpc.DefaultClientViews...); err != nil {
-		return traceError("failed to register default gRPC client views: %v", err)
-	}
-	if err = view.Register(ocgrpc.DefaultServerViews...); err != nil {
-		return traceError("failed to register default gRPC server views: %v", err)
-	}
-
-	popt := prometheus.Options{
-		Namespace: prometheusNamespace(Service),
-		OnError:   func(err error) { log.Error("prometheus: %v", err) },
-	}
-	pe, err := prometheus.NewExporter(popt)
-	if err != nil {
-		return traceError("failed to create Prometheus exporter: %v", err)
-	}
-	view.RegisterExporter(pe)
-
-	view.SetReportingPeriod(5 * time.Second)
-
-	go serveMetrics(pe)
-
-	shutdown = func() {
-		je.Flush()
+	if err := HTTPStart(); err != nil {
+		return traceError("failed to start tracing/metrics HTTP server: %v", err)
 	}
 
 	return nil
 }
 
-// Finish shuts down instrumentation.
-func Finish() {
-	if shutdown != nil {
-		shutdown()
-	}
+// Stop shuts down instrumentation.
+func Stop() {
+	unregisterJaegerExporter()
+	unregisterGrpcTraceViews()
+	unregisterPrometheusExporter()
+	HTTPShutdown()
 }
 
 // InjectGrpcClientTrace injects gRPC dial options for instrumentation if necessary.
 func InjectGrpcClientTrace(opts ...grpc.DialOption) []grpc.DialOption {
-	if !IsEnabled() {
-		return opts
-	}
-
 	extra := grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
 
 	if len(opts) > 0 {
@@ -129,10 +96,6 @@ func InjectGrpcClientTrace(opts ...grpc.DialOption) []grpc.DialOption {
 
 // InjectGrpcServerTrace injects gRPC server options for instrumentation if necessary.
 func InjectGrpcServerTrace(opts ...grpc.ServerOption) []grpc.ServerOption {
-	if !IsEnabled() {
-		return opts
-	}
-
 	extra := grpc.StatsHandler(&ocgrpc.ServerHandler{})
 
 	if len(opts) > 0 {
@@ -144,16 +107,115 @@ func InjectGrpcServerTrace(opts ...grpc.ServerOption) []grpc.ServerOption {
 	return opts
 }
 
-// prometheusNamespace mutates a service name into a valid Prometheus namespace.
+// RegisterGatherer registers a new prometheus Gatherer.
+func RegisterGatherer(g prom.Gatherer) {
+	dynamicGatherers.Add(g)
+}
+
+func registerJaegerExporter() error {
+	var err error
+
+	if !TracingEnabled() || jexport != nil {
+		return nil
+	}
+
+	log.Debug("registering Jaeger exporter...")
+
+	log := logger.NewLogger("jaeger/" + ServiceName)
+	cfg := jaeger.Options{
+		ServiceName:       ServiceName,
+		CollectorEndpoint: opt.Collector,
+		AgentEndpoint:     opt.Agent,
+		Process:           jaeger.Process{ServiceName: ServiceName},
+		OnError:           func(err error) { log.Error("%v", err) },
+	}
+	jexport, err = jaeger.NewExporter(cfg)
+	if err != nil {
+		return traceError("failed to create Jaeger exporter: %v", err)
+	}
+	trace.RegisterExporter(jexport)
+
+	return nil
+}
+
+func unregisterJaegerExporter() {
+	if jexport == nil {
+		return
+	}
+
+	trace.UnregisterExporter(jexport)
+	jexport = nil
+}
+
+func registerGrpcTraceViews() error {
+	log.Debug("registering gRPC trace views...")
+	if err := view.Register(ocgrpc.DefaultClientViews...); err != nil {
+		return traceError("failed to register default gRPC client views: %v", err)
+	}
+	if err := view.Register(ocgrpc.DefaultServerViews...); err != nil {
+		return traceError("failed to register default gRPC server views: %v", err)
+	}
+	return nil
+}
+
+func unregisterGrpcTraceViews() {
+	view.Unregister(ocgrpc.DefaultClientViews...)
+	view.Unregister(ocgrpc.DefaultServerViews...)
+}
+
+func registerPrometheusExporter() error {
+	var err error
+
+	if !TracingEnabled() || pexport != nil {
+		return nil
+	}
+
+	log.Debug("registering Prometheus exporter...")
+
+	log := logger.NewLogger("metrics/" + ServiceName)
+	cfg := prometheus.Options{
+		Namespace: prometheusNamespace(ServiceName),
+		Gatherer:  prom.Gatherers{dynamicGatherers, prom.NewRegistry()},
+		OnError:   func(err error) { log.Error("%v", err) },
+	}
+	pexport, err = prometheus.NewExporter(cfg)
+	if err != nil {
+		return traceError("failed to create Prometheus exporter: %v", err)
+	}
+
+	view.RegisterExporter(pexport)
+	view.SetReportingPeriod(5 * time.Second)
+
+	GetHTTPMux().Handle("/metrics", pexport)
+
+	return nil
+}
+
+func unregisterPrometheusExporter() {
+	if pexport == nil {
+		return
+	}
+
+	view.UnregisterExporter(pexport)
+	pexport = nil
+}
+
+// mutate service name into a valid Prometheus namespace.
 func prometheusNamespace(service string) string {
 	return strings.ReplaceAll(strings.ToLower(service), "-", "_")
 }
 
-// serveMetrics runs the Prometheus /metrics endpoint.
-func serveMetrics(pe *prometheus.Exporter) {
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", pe)
-	if err := http.ListenAndServe(opt.Metrics, mux); err != nil {
-		log.Fatal("failed to run Prometheus /metrics endpoint: %v", err)
-	}
+// gatherers is a trivial wrapper around prometheus Gatherers.
+type gatherers struct {
+	gatherers prom.Gatherers
+}
+
+// Gather implements the prometheus.Gatherer interface.
+func (g *gatherers) Gather() ([]*model.MetricFamily, error) {
+	return g.gatherers.Gather()
+}
+
+// Add adds a a new gatherer.
+func (g *gatherers) Add(gatherer prom.Gatherer) {
+	g.gatherers = append(g.gatherers, gatherer)
 }

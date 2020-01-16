@@ -57,10 +57,10 @@ func main() {
 
 	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
 
-	if err := instrumentation.Setup(); err != nil {
+	if err := instrumentation.Start(); err != nil {
 		log.Fatal("failed to set up instrumentation: %v", err)
 	}
-	defer instrumentation.Finish()
+	defer instrumentation.Stop()
 
 	m, err := resmgr.NewResourceManager()
 	if err != nil {
