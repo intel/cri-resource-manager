@@ -28,6 +28,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
@@ -197,6 +198,11 @@ func (p *staticplus) ExportResourceData(c cache.Container) map[string]string {
 	}
 
 	return data
+}
+
+// Introspect provides data for external introspection.
+func (p *staticplus) Introspect(*introspect.State) {
+	return
 }
 
 // policyError creates a formatted policy-specific error.

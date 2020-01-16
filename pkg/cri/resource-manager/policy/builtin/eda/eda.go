@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -134,6 +135,11 @@ func (eda *eda) Rebalance() (bool, error) {
 // ExportResourceData provides resource data to export for the container.
 func (eda *eda) ExportResourceData(c cache.Container) map[string]string {
 	return nil
+}
+
+// Introspect provides data for external introspection.
+func (eda *eda) Introspect(*introspect.State) {
+	return
 }
 
 //

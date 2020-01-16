@@ -25,6 +25,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
@@ -246,6 +247,11 @@ func (stp *stp) Rebalance() (bool, error) {
 // ExportResourceData provides resource data to export for the container.
 func (stp *stp) ExportResourceData(c cache.Container) map[string]string {
 	return nil
+}
+
+// Introspect provides data for external introspection.
+func (stp *stp) Introspect(*introspect.State) {
+	return
 }
 
 func (stp *stp) configNotify(event config.Event, source config.Source) error {

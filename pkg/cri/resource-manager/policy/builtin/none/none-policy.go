@@ -16,6 +16,7 @@ package none
 
 import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -90,6 +91,11 @@ func (n *none) Rebalance() (bool, error) {
 // ExportResourceData provides resource data to export for the container.
 func (n *none) ExportResourceData(c cache.Container) map[string]string {
 	return nil
+}
+
+// Introspect provides data for external introspection.
+func (n *none) Introspect(*introspect.State) {
+	return
 }
 
 // Register us as a policy implementation.
