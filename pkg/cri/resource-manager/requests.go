@@ -133,6 +133,7 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 
 	podID := reply.(*criapi.RunPodSandboxResponse).PodSandboxId
 	pod := m.cache.InsertPod(podID, request)
+	m.updateIntrospection()
 
 	m.Info("created pod %s (%s)", pod.GetName(), podID)
 
@@ -186,6 +187,7 @@ func (m *resmgr) RemovePod(ctx context.Context, method string, request interface
 	}
 
 	m.cache.DeletePod(podID)
+	m.updateIntrospection()
 
 	return reply, rqerr
 }
@@ -243,6 +245,7 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 
 	m.cache.UpdateContainerID(container.GetCacheID(), reply)
 	container.UpdateState(cache.ContainerStateCreated)
+	m.updateIntrospection()
 
 	return reply, nil
 }
@@ -285,6 +288,8 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 		m.Error("%s: failed to run post-start hooks for %s: %v",
 			method, container.PrettyName(), err)
 	}
+
+	m.updateIntrospection()
 
 	return reply, rqerr
 }
@@ -331,6 +336,7 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 	}
 
 	container.UpdateState(cache.ContainerStateExited)
+	m.updateIntrospection()
 
 	return reply, rqerr
 }
@@ -373,6 +379,7 @@ func (m *resmgr) RemoveContainer(ctx context.Context, method string, request int
 	}
 
 	m.cache.DeleteContainer(container.GetCacheID())
+	m.updateIntrospection()
 
 	return reply, rqerr
 }
@@ -396,6 +403,8 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 		m.Warn("%s: XXX TODO: we probably should reallocate the container instead...",
 			method)
 	}
+
+	m.updateIntrospection()
 
 	return &criapi.UpdateContainerResourcesResponse{}, nil
 }
