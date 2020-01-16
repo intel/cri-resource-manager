@@ -23,91 +23,13 @@ import (
 	"strings"
 )
 
-//
-// RDT cache specific bitmask
-//
-
-// CacheBitmask represents a cache bitmask in the system's resctrl kernel
-// interface. The "width" i.e. the number of bits available depends on the
-// underlying hardware.
-type CacheBitmask Bitmask
-
-// MarshalJSON is the marshaller function for "encoding/json"
-func (b CacheBitmask) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"%#x\"", b)), nil
-}
-
-// UnmarshalJSON is the unmarshaller function for "encoding/json"
-func (b *CacheBitmask) UnmarshalJSON(data []byte) error {
-	// Number of bits available in CacheBitmask
-	cacheBitmaskNumBits := uint64(rdtInfo.l3FullMask().lsbZero())
-
-	// Drop string quotes
-	str := strings.TrimSpace(string(data[1 : len(data)-1]))
-
-	if strings.HasPrefix(str, "0x") {
-		// Hex value
-		value, err := strconv.ParseUint(str[2:], 16, int(cacheBitmaskNumBits))
-		if err != nil {
-			return err
-		}
-		*b = CacheBitmask(value)
-
-		return nil
-	} else if str[len(str)-1] == '%' {
-		// Percentages of the max number of bits
-		split := strings.SplitN(str[0:len(str)-1], "-", 2)
-		var low, high uint64
-		var err error
-
-		if len(split) == 1 {
-			high, err = strconv.ParseUint(split[0], 10, 7)
-			if err != nil {
-				return err
-			}
-		} else {
-			low, err = strconv.ParseUint(split[0], 10, 7)
-			if err != nil {
-				return err
-			}
-			high, err = strconv.ParseUint(split[1], 10, 7)
-			if err != nil {
-				return err
-			}
-		}
-		if low == 0 {
-			low = 1
-		}
-		if low > high || low > 100 || high > 100 {
-			return rdtError("invalid percentage range %q", str)
-		}
-
-		// Convert percentage limits to bit numbers
-		// Our effective range is 1%-100%, use substraction (-1) because of
-		// arithmetics, so that we don't overflow on 100%
-		lsb := (low - 1) * cacheBitmaskNumBits / 100
-		msb := (high - 1) * cacheBitmaskNumBits / 100
-
-		*b = ((1 << (msb - lsb + 1)) - 1) << lsb
-
-		return nil
-	}
-
-	// Last, try "list" format (i.e. smthg like 0,2,5-9,...)
-	value, err := ListStrToBitmask(str)
-	if err != nil {
-		return err
-	}
-	*b = CacheBitmask(value)
-	return nil
-}
-
-//
-// Generic bitbmask
-//
-
 // Bitmask represents a generic 64 bit wide bitmask
 type Bitmask uint64
+
+// MarshalJSON implements the Marshaler interface of "encoding/json"
+func (b Bitmask) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%#x\"", b)), nil
+}
 
 // ListStr prints the bitmask in human-readable format, similar to e.g. the
 // cpuset format of the Linux kernel
@@ -184,6 +106,11 @@ func (b Bitmask) lsbOne() int {
 		return -1
 	}
 	return bits.TrailingZeros64(uint64(b))
+}
+
+func (b Bitmask) msbOne() int {
+	// Returns -1 for b == 0
+	return 63 - bits.LeadingZeros64(uint64(b))
 }
 
 func (b Bitmask) lsbZero() int {
