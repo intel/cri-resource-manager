@@ -84,14 +84,13 @@ data:
         classes:
           Guaranteed:
             l3schema:
-              all:
-                unified: "100%"
+              all: 100%
           # Specific settings for L3 CDP (Code and Data Prioritization)
+          #      unified: "100%"
           #      code: "100%"
           #      data: "80%"
           # Specify CacheId (typically corresponds to a CPU socket) specific setting
-          #    1:
-          #      unified: "80%"
+          #    1: "80%"
           # MBA (Memory Bandwidth Allocation)
           #  mbschema:
           #    all: 100
@@ -192,14 +191,13 @@ data:
         classes:
           Guaranteed:
             l3schema:
-              all:
-                unified: "100%"
+              all: 100%
           # Specific settings for L3 CDP (Code and Data Prioritization)
+          #      unified: "100%"
           #      code: "100%"
           #      data: "80%"
           # Specify CacheId (typically corresponds to a CPU socket) specific setting
-          #    1:
-          #      unified: "80%"
+          #    1: "80%"
           # MBA (Memory Bandwidth Allocation)
           #  mbschema:
           #    all: 100
@@ -295,14 +293,13 @@ data:
         classes:
           Guaranteed:
             l3schema:
-              all:
-                unified: "100%"
+              all: 100%
           # Specific settings for L3 CDP (Code and Data Prioritization)
+          #      unified: "100%"
           #      code: "100%"
           #      data: "80%"
           # Specify CacheId (typically corresponds to a CPU socket) specific setting
-          #    1:
-          #      unified: "80%"
+          #    1: "80%"
           # MBA (Memory Bandwidth Allocation)
           #  mbschema:
           #    all: 100
