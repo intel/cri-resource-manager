@@ -189,7 +189,7 @@ func (c *client) connect(kind, socket string, options ConnectOptions) (*grpc.Cli
 		}))
 
 	if options.Wait {
-		c.Debug("waiting for %s on socket %s...", kind, socket)
+		c.Info("waiting for %s on socket %s...", kind, socket)
 		if err = utils.WaitForServer(socket, -1, dialOpts, &cc); err != nil {
 			return nil, clientError("failed to connect to %s: %v", kind, err)
 		}
