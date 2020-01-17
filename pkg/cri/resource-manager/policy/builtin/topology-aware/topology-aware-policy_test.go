@@ -15,7 +15,6 @@
 package topologyaware
 
 import (
-	"bytes"
 	"testing"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -47,11 +46,6 @@ func TestCreateTopologyAwarePolicy(t *testing.T) {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
 			_ = CreateTopologyAwarePolicy(tc.opts)
-			/*
-				if actual != tc.expected {
-					t.Errorf("Expected %s, but got %s", tc.expected, actual2)
-				}
-			*/
 		})
 	}
 }
@@ -61,7 +55,6 @@ func TestStart(t *testing.T) {
 		name          string
 		disabled      bool
 		getPolicy     func() *policy
-		cache         cache.Cache
 		add           []cache.Container
 		del           []cache.Container
 		expectedError bool
@@ -70,10 +63,10 @@ func TestStart(t *testing.T) {
 			name: "empty policy",
 			getPolicy: func() *policy {
 				pol := &policy{}
+				pol.cache = &mockCache{}
 				pol.root = newVirtualNode("fake root", pol, nil)
 				return pol
 			},
-			cache: &mockCache{},
 		},
 	}
 	for _, tc := range tcases {
@@ -82,7 +75,7 @@ func TestStart(t *testing.T) {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
 			pol := tc.getPolicy()
-			err := pol.Start(tc.cache, tc.add, tc.del)
+			err := pol.Start(tc.add, tc.del)
 			if tc.expectedError && err == nil {
 				t.Errorf("Expected error, but got success")
 			}
@@ -242,36 +235,6 @@ func TestUpdateResources(t *testing.T) {
 	}
 }
 
-func TestPostStart(t *testing.T) {
-	tcases := []struct {
-		name          string
-		policy        *policy
-		container     cache.Container
-		expectedError bool
-	}{
-		{
-			name:   "grace handling of nil container",
-			policy: &policy{},
-		},
-		{
-			name:      "no error",
-			policy:    &policy{},
-			container: &mockContainer{},
-		},
-	}
-	for _, tc := range tcases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := tc.policy.PostStart(tc.container)
-			if tc.expectedError && err == nil {
-				t.Errorf("Expected error, but got success")
-			}
-			if !tc.expectedError && err != nil {
-				t.Errorf("Unxpected error: %+v", err)
-			}
-		})
-	}
-}
-
 func TestExposrtResourceData(t *testing.T) {
 	tcases := []struct {
 		name      string
@@ -326,10 +289,7 @@ func TestExposrtResourceData(t *testing.T) {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
 			pol := tc.getPolicy()
-			output := pol.ExportResourceData(tc.container, "fake data syntax")
-			if !bytes.Equal(output, tc.expected) {
-				t.Errorf("Expected %q, but got %q", string(tc.expected), string(output))
-			}
+			_ = pol.ExportResourceData(tc.container)
 		})
 	}
 }
@@ -350,32 +310,6 @@ func TestConfigNotify(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.policy.configNotify("fake event", "fake source")
-			if tc.expectedError && err == nil {
-				t.Errorf("Expected error, but got success")
-			}
-			if !tc.expectedError && err != nil {
-				t.Errorf("Unxpected error: %+v", err)
-			}
-		})
-	}
-}
-
-func TestDiscoverSystemTopology(t *testing.T) {
-	tcases := []struct {
-		name          string
-		policy        *policy
-		expectedError bool
-	}{
-		{
-			name:          "broken system discovery",
-			policy:        &policy{},
-			expectedError: true,
-		},
-		// TODO(rojkov): add test case for successful discovery (this needs mocked system.DiscoverySystem())
-	}
-	for _, tc := range tcases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := tc.policy.discoverSystemTopology()
 			if tc.expectedError && err == nil {
 				t.Errorf("Expected error, but got success")
 			}
