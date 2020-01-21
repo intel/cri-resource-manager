@@ -68,6 +68,12 @@ const (
 	AlwaysTrue = "AlwaysTrue"
 )
 
+// ImplicitAffinity is an affinity that gets implicitly added to all eligible containers.
+type ImplicitAffinity struct {
+	Eligible func(Container) bool // function to determine if Affinity is added to a Container
+	Affinity *Affinity            // the actual implicitly added Affinity
+}
+
 // Validate checks the affinity for (obvious) invalidity.
 func (a *Affinity) Validate() error {
 	if err := a.Scope.Validate(); err != nil {
@@ -339,4 +345,25 @@ func GlobalAffinity(key string, weight int32) *Affinity {
 // GlobalAntiAffinity creates an anti-affinity with all containers in scope.
 func GlobalAntiAffinity(key string, weight int32) *Affinity {
 	return GlobalAffinity(key, -weight)
+}
+
+// AddImplicitAffinities registers a set of implicit affinities.
+func (cch *cache) AddImplicitAffinities(implicit map[string]*ImplicitAffinity) error {
+	for name := range implicit {
+		if existing, ok := cch.implicit[name]; ok {
+			return cacheError("implicit affinity %s already defined (%s)",
+				name, existing.Affinity.String())
+		}
+	}
+	for name, a := range implicit {
+		cch.implicit[name] = a
+	}
+	return nil
+}
+
+// DeleteImplicitAffinities removes a previously registered set of implicit affinities.
+func (cch *cache) DeleteImplicitAffinities(names []string) {
+	for _, name := range names {
+		delete(cch.implicit, name)
+	}
 }
