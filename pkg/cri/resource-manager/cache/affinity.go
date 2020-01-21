@@ -64,6 +64,8 @@ const (
 	Exists Operator = "Exists"
 	// NotExist evalutes to true if the named key does not exist.
 	NotExist Operator = "NotExist"
+	// AlwaysTrue always evaluates to true.
+	AlwaysTrue = "AlwaysTrue"
 )
 
 // Validate checks the affinity for (obvious) invalidity.
@@ -158,6 +160,8 @@ func (e *Expression) Evaluate(container Container) bool {
 		result = ok
 	case NotExist:
 		result = !ok
+	case AlwaysTrue:
+		result = true
 	}
 
 	return result
