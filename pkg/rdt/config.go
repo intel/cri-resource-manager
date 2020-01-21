@@ -183,6 +183,11 @@ func (a l3AbsoluteAllocation) Overlay(baseMask Bitmask) (Bitmask, error) {
 	return bitmask, nil
 }
 
+// MarshalJSON implements the Marshaler interface of "encoding/json"
+func (a l3AbsoluteAllocation) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%#x\"", a)), nil
+}
+
 // Overlay function of the cacheAllocation interface
 func (a l3RelativeAllocation) Overlay(baseMask Bitmask) (Bitmask, error) {
 	baseMaskMsb := uint64(baseMask.msbOne())
