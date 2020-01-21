@@ -167,12 +167,20 @@ func (s l3Schema) ToStr(typ l3SchemaType, baseSchema map[uint64]Bitmask) (string
 
 // Overlay function of the cacheAllocation interface
 func (a l3AbsoluteAllocation) Overlay(baseMask Bitmask) (Bitmask, error) {
-	// Just bounds checking that we're "inside" the base mask
-	if Bitmask(a)|baseMask != baseMask {
-		return 0, rdtError("bitmask %#x does not fit basemask %#x", a, baseMask)
+	shiftWidth := baseMask.lsbOne()
+	if shiftWidth < 0 {
+		return 0, rdtError("empty basemask not allowed")
 	}
 
-	return Bitmask(a), nil
+	// Treat our bitmask relative to the basemask
+	bitmask := Bitmask(a) << shiftWidth
+
+	// Do bounds checking that we're "inside" the base mask
+	if bitmask|baseMask != baseMask {
+		return 0, rdtError("bitmask %#x (%#x << %d) does not fit basemask %#x", bitmask, a, shiftWidth, baseMask)
+	}
+
+	return bitmask, nil
 }
 
 // Overlay function of the cacheAllocation interface
