@@ -18,6 +18,7 @@ package rdt
 
 import (
 	"bufio"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -46,6 +47,7 @@ type mbInfo struct {
 	bandwidthGran uint64
 	delayLinear   uint64
 	minBandwidth  uint64
+	mbpsEnabled   bool // true if MBA_MBps is enabled
 }
 
 // l3Info is a helper method for a "unified API" for getting L3 information
@@ -173,6 +175,16 @@ func getMBInfo(basepath string) (mbInfo, uint64, error) {
 		return info, numClosids, err
 	}
 
+	// Detect MBps mode directly from mount options as it's not visible in MB
+	// info directory
+	_, mountOpts, err := getResctrlMountInfo()
+	if err != nil {
+		return info, numClosids, fmt.Errorf("failed to get resctrl mount options: %v", err)
+	}
+	if _, ok := mountOpts["mba_MBps"]; ok {
+		info.mbpsEnabled = true
+	}
+
 	return info, numClosids, nil
 }
 
@@ -217,26 +229,36 @@ func getCacheIds(basepath string) ([]uint64, error) {
 	return ids, rdtError("no resources in root schemata")
 }
 
-// ResctrlMountPath returns path of the mount point to the resctrl filesystem
-func ResctrlMountPath() (string, error) {
+func getResctrlMountInfo() (string, map[string]struct{}, error) {
+	mountOptions := map[string]struct{}{}
+
 	f, err := os.Open("/proc/mounts")
 	if err != nil {
-		return "", err
+		return "", mountOptions, err
 	}
 	defer f.Close()
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		split := strings.Split(s.Text(), " ")
-		if len(split) > 1 && split[2] == "resctrl" {
-			return split[1], nil
+		if len(split) > 3 && split[2] == "resctrl" {
+			opts := strings.Split(split[3], ",")
+			for _, opt := range opts {
+				mountOptions[opt] = struct{}{}
+			}
+			return split[1], mountOptions, nil
 		}
 	}
-	if err := s.Err(); err != nil {
+	return "", mountOptions, rdtError("resctrl not found in /proc/mounts")
+}
+
+// ResctrlMountPath returns path of the mount point to the resctrl filesystem
+func ResctrlMountPath() (string, error) {
+	path, _, err := getResctrlMountInfo()
+	if err != nil {
 		return "", err
 	}
-
-	return "", rdtError("resctrl not found in /proc/mounts")
+	return path, nil
 }
 
 func readFileUint64(path string) (uint64, error) {

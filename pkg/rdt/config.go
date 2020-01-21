@@ -18,6 +18,7 @@ package rdt
 
 import (
 	"fmt"
+	"math"
 	"math/bits"
 	"sort"
 	"strconv"
@@ -121,6 +122,11 @@ const (
 	l3SchemaTypeCode = "CODE"
 	// l3SchemaTypeData is the 'data' part of CDP schema
 	l3SchemaTypeData = "DATA"
+)
+
+const (
+	mbSuffixPct  = "%"
+	mbSuffixMbps = "MBps"
 )
 
 // ToStr returns the L3 schema in a format accepted by the Linux kernel
@@ -238,17 +244,29 @@ func (s mbSchema) ToStr(base map[uint64]uint64) string {
 	sep := ""
 
 	for id, baseAllocation := range base {
-		allocation := uint64(100)
-		if s != nil {
-			allocation = s[id]
-		}
-		percentage := allocation * baseAllocation / 100
-		// Guarantee minimum bw so that writing out the schemata does not fail
-		if percentage < rdtInfo.mb.minBandwidth {
-			percentage = rdtInfo.mb.minBandwidth
+		value := uint64(0)
+		if rdtInfo.mb.mbpsEnabled {
+			value = math.MaxUint32
+			if s != nil {
+				value = s[id]
+			}
+			// Limit to given base value
+			if value > baseAllocation {
+				value = baseAllocation
+			}
+		} else {
+			allocation := uint64(100)
+			if s != nil {
+				allocation = s[id]
+			}
+			value = allocation * baseAllocation / 100
+			// Guarantee minimum bw so that writing out the schemata does not fail
+			if value < rdtInfo.mb.minBandwidth {
+				value = rdtInfo.mb.minBandwidth
+			}
 		}
 
-		schema += fmt.Sprintf("%s%d=%d", sep, id, percentage)
+		schema += fmt.Sprintf("%s%d=%d", sep, id, value)
 		sep = ";"
 	}
 
@@ -441,15 +459,14 @@ func (raw options) resolveL3Partitions(conf map[string]partitionConfig) error {
 func (raw options) resolveMBPartitions(conf map[string]partitionConfig) error {
 	// We use percentage values directly from the raw conf
 	for name, partition := range raw.Partitions {
-		allocations, err := partition.MBAllocation.parsePercentage()
+		allocations, err := partition.MBAllocation.parseMB()
 		if err != nil {
 			return fmt.Errorf("failed to resolve MB allocation for partition %q: %v", name, err)
 		}
 		for id, allocation := range allocations {
+			conf[name].MB[id] = allocation
 			// Check that we don't go under the minimum allowed bandwidth setting
-			if allocation > rdtInfo.mb.minBandwidth {
-				conf[name].MB[id] = allocation
-			} else {
+			if !rdtInfo.mb.mbpsEnabled && allocation < rdtInfo.mb.minBandwidth {
 				conf[name].MB[id] = rdtInfo.mb.minBandwidth
 			}
 		}
@@ -528,19 +545,19 @@ func (raw rawAllocations) parseL3() (l3Schema, error) {
 }
 
 // parseMB parses a raw MB allocation
-func (raw rawAllocations) parseMB() (map[uint64]uint64, error) {
-	rawValues, err := raw.rawParse("100", false)
+func (raw rawAllocations) parseMB() (mbSchema, error) {
+	rawValues, err := raw.rawParse(map[string]interface{}{}, false)
 	if err != nil || rawValues == nil {
 		return nil, err
 	}
 
-	allocations := make(map[uint64]uint64, len(rawValues))
+	allocations := make(mbSchema, len(rawValues))
 	for id, rawVal := range rawValues {
-		s, ok := rawVal.(string)
+		strList, ok := rawVal.([]interface{})
 		if !ok {
 			return nil, fmt.Errorf("not a string value %q", rawVal)
 		}
-		allocations[id], err = strconv.ParseUint(s, 10, 7)
+		allocations[id], err = parseMBAllocation(strList)
 		if err != nil {
 			return nil, err
 		}
@@ -708,6 +725,41 @@ func parseCacheAllocation(data string) (cacheAllocation, error) {
 	}
 
 	return l3AbsoluteAllocation(value), nil
+}
+
+// parseMBAllocation parses a generic string map into MB allocation value
+func parseMBAllocation(raw []interface{}) (uint64, error) {
+	for _, v := range raw {
+		strVal, ok := v.(string)
+		if !ok {
+			return 0, fmt.Errorf("not a string value %q", v)
+		}
+		if strings.HasSuffix(strVal, mbSuffixPct) {
+			if !rdtInfo.mb.mbpsEnabled {
+				value, err := strconv.ParseUint(strings.TrimSuffix(strVal, mbSuffixPct), 10, 7)
+				if err != nil {
+					return 0, err
+				}
+				return value, nil
+			}
+		} else if strings.HasSuffix(strVal, mbSuffixMbps) {
+			if rdtInfo.mb.mbpsEnabled {
+				value, err := strconv.ParseUint(strings.TrimSuffix(strVal, mbSuffixMbps), 10, 32)
+				if err != nil {
+					return 0, err
+				}
+				return value, nil
+			}
+		} else {
+			log.Warn("unrecognized MBA allocation format in %q", strVal)
+		}
+	}
+
+	// No value for the active mode was specified
+	if rdtInfo.mb.mbpsEnabled {
+		return 0, fmt.Errorf("missing 'MBps' value from mbSchema; required because 'mba_MBps' is enabled in the system")
+	}
+	return 0, fmt.Errorf("missing '%%' value from mbSchema; required because percentage-based MBA allocation is enabled in the system")
 }
 
 // Currently active set of "raw" options
