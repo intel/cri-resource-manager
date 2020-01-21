@@ -321,3 +321,22 @@ func (pca *podContainerAffinity) parseFull(pod *pod, value string, weight int32)
 
 	return nil
 }
+
+// GlobalAffinity creates an affinity with all containers in scope.
+func GlobalAffinity(key string, weight int32) *Affinity {
+	return &Affinity{
+		Scope: &Expression{
+			Op: AlwaysTrue, // evaluate against all containers
+		},
+		Match: &Expression{
+			Key: key,
+			Op:  Exists,
+		},
+		Weight: weight,
+	}
+}
+
+// GlobalAntiAffinity creates an anti-affinity with all containers in scope.
+func GlobalAntiAffinity(key string, weight int32) *Affinity {
+	return GlobalAffinity(key, -weight)
+}
