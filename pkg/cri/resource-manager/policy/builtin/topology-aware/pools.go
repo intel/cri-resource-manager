@@ -224,6 +224,26 @@ func (p *policy) updateSharedAllocations(grant CPUGrant) error {
 	return nil
 }
 
+// addImplicitAffinities adds our set of policy-specific implicit affinities.
+func (p *policy) addImplicitAffinities() error {
+	return p.cache.AddImplicitAffinities(map[string]*cache.ImplicitAffinity{
+		PolicyName + ":AVX512-pull": {
+			Eligible: func(c cache.Container) bool {
+				_, ok := c.GetTag(cache.TagAVX512)
+				return ok
+			},
+			Affinity: cache.GlobalAffinity("tags/"+cache.TagAVX512, 5),
+		},
+		PolicyName + ":AVX512-push": {
+			Eligible: func(c cache.Container) bool {
+				_, ok := c.GetTag(cache.TagAVX512)
+				return !ok
+			},
+			Affinity: cache.GlobalAntiAffinity("tags/"+cache.TagAVX512, 5),
+		},
+	})
+}
+
 // Calculate pool affinities for the given container.
 func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int32 {
 	log.Debug("=> calculating pool affinities...")
