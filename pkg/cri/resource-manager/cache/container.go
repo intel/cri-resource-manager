@@ -146,11 +146,15 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 }
 
 func (c *container) PrettyName() string {
-	pod, ok := c.GetPod()
-	if !ok {
-		return c.PodID + ":" + c.Name
+	if c.prettyName != "" {
+		return c.prettyName
 	}
-	return pod.GetName() + ":" + c.Name
+	if pod, ok := c.GetPod(); !ok {
+		c.prettyName = c.PodID + ":" + c.Name
+	} else {
+		c.prettyName = pod.GetName() + ":" + c.Name
+	}
+	return c.prettyName
 }
 
 func (c *container) GetPod() (Pod, bool) {
