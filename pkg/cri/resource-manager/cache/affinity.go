@@ -300,6 +300,10 @@ func (pca *podContainerAffinity) parseFull(pod *pod, value string, weight int32)
 			}
 			if a.Weight == 0 {
 				a.Weight = weight
+			} else {
+				if weight < 0 {
+					a.Weight *= -1
+				}
 			}
 			if err := a.Validate(); err != nil {
 				return err
