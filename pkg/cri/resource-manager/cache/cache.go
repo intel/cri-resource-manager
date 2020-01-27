@@ -713,7 +713,7 @@ func (cch *cache) LookupContainerByCgroup(path string) (Container, bool) {
 			continue
 		}
 
-		if !strings.HasPrefix(path, parent) {
+		if !strings.HasPrefix(path, parent+"/") {
 			continue
 		}
 
