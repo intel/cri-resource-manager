@@ -325,6 +325,9 @@ func (m *mockPod) GetInitContainers() []cache.Container {
 func (m *mockPod) GetContainers() []cache.Container {
 	panic("unimplemented")
 }
+func (m *mockPod) GetContainer(string) (cache.Container, bool) {
+	panic("unimplemented")
+}
 func (m *mockPod) GetID() string {
 	panic("unimplemented")
 }

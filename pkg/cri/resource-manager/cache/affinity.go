@@ -22,9 +22,6 @@ import (
 )
 
 const (
-	// SelfReference indicates a container self-referencing value.
-	//SelfReference = "@self:"
-
 	// annotation key for specifying container affinity rules
 	keyAffinity = "affinity"
 	// annotation key for specifying container anti-affinity rules
@@ -46,21 +43,10 @@ type Affinity struct {
 
 // Expression is used to describe a criteria to select objects within a domain.
 type Expression struct {
-	//  Domain  Domain   `json:"domain"`          // domain of operation, ATM implicitly labels
-	Key    string   `json:"key"`              // domain key
+	Key    string   `json:"key"`              // key to check values of/against
 	Op     Operator `json:"operator"`         // operator to apply to value of Key and Values
 	Values []string `json:"values,omitempty"` // value(s) for domain key
 }
-
-/*
-// Domain specifies possible domains to evaluate Expressions in.
-type Domain string
-
-const (
-	// ScopeLabels specifies the operation to be performed
-	LabelsDomain Domain = "labels"
-)
-*/
 
 // Operator defines the possible operators for an Expression.
 type Operator string
@@ -178,9 +164,81 @@ func (e *Expression) Evaluate(container Container) bool {
 }
 
 // KeyValue extracts the value of the expresssion key from a container.
-func (e *Expression) KeyValue(container Container) (string, bool) {
-	value, ok := container.GetLabel(e.Key)
+func (e *Expression) KeyValue(c Container) (string, bool) {
+	value, ok, _ := c.(*container).resolveRef(e.Key)
 	return value, ok
+}
+
+// resolveRef walks an object trying to resolve a reference to a value.
+func (c *container) resolveRef(path string) (string, bool, error) {
+	var obj interface{}
+
+	c.cache.Debug("resolving %s/%s...", c.PrettyName(), path)
+
+	obj = c
+	ref := strings.Split(path, "/")
+	if len(ref) == 1 {
+		ref = []string{"labels", path}
+	}
+	for len(ref) > 0 {
+		key := ref[0]
+		c.cache.Debug("* resolve: walking %s, @%s, obj %T...", path, key, obj)
+		switch v := obj.(type) {
+		case *container:
+			switch strings.ToLower(key) {
+			case "pod":
+				pod, ok := v.GetPod()
+				if !ok {
+					return "", false, cacheError("failed to find pod (%s) for container %s",
+						v.PodID, v.Name)
+				}
+				obj = pod
+			case "labels":
+				obj = v.Labels
+			case "tags":
+				obj = v.Tags
+			case "name":
+				obj = v.Name
+			case "namespace":
+				obj = v.Namespace
+			case "qosclass":
+				obj = string(v.QOSClass)
+			}
+		case *pod:
+			switch strings.ToLower(key) {
+			case "labels":
+				obj = v.Labels
+			case "name":
+				obj = v.Name
+			case "namespace":
+				obj = v.Namespace
+			case "qosclass":
+				obj = string(v.QOSClass)
+			}
+		case map[string]string:
+			value, ok := v[key]
+			if !ok {
+				return "", false, nil
+			}
+			obj = value
+
+		default:
+			return "", false, cacheError("can't handle object of type %T in reference %s",
+				obj, path)
+
+		}
+
+		ref = ref[1:]
+	}
+
+	str, ok := obj.(string)
+	if !ok {
+		return "", false, cacheError("reference %s resolved to non-string: %T", path, obj)
+	}
+
+	c.cache.Debug("%s/%s => %s", c.PrettyName(), path, str)
+
+	return str, true, nil
 }
 
 // String returns the affinity as a string.
@@ -199,7 +257,7 @@ func (e *Expression) String() string {
 }
 
 // Try to parse affinities in simplified notation from the given annotation value.
-func (pca *podContainerAffinity) parseSimple(pod Pod, value string, weight int32) bool {
+func (pca *podContainerAffinity) parseSimple(pod *pod, value string, weight int32) bool {
 	parsed := simpleAffinity{}
 	if err := yaml.Unmarshal([]byte(value), &parsed); err != nil {
 		return false
@@ -223,7 +281,7 @@ func (pca *podContainerAffinity) parseSimple(pod Pod, value string, weight int32
 }
 
 // Try to parse affinities in full notation from the given annotation value.
-func (pca *podContainerAffinity) parseFull(pod Pod, value string, weight int32) error {
+func (pca *podContainerAffinity) parseFull(pod *pod, value string, weight int32) error {
 	parsed := podContainerAffinity{}
 	if err := yaml.Unmarshal([]byte(value), &parsed); err != nil {
 		return cacheError("failed to parse affinity annotation '%s': %v", value, err)
@@ -235,20 +293,25 @@ func (pca *podContainerAffinity) parseFull(pod Pod, value string, weight int32) 
 		if !ok {
 			ca = make([]*Affinity, 0, len(pa))
 		}
+
 		for _, a := range pa {
 			if a.Scope == nil {
 				a.Scope = podScope
 			}
 			if a.Weight == 0 {
 				a.Weight = weight
+			} else {
+				if weight < 0 {
+					a.Weight *= -1
+				}
 			}
-
 			if err := a.Validate(); err != nil {
 				return err
 			}
 
 			ca = append(ca, a)
 		}
+
 		(*pca)[name] = ca
 	}
 
