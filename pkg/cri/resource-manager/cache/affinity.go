@@ -64,7 +64,15 @@ const (
 	Exists Operator = "Exists"
 	// NotExist evalutes to true if the named key does not exist.
 	NotExist Operator = "NotExist"
+	// AlwaysTrue always evaluates to true.
+	AlwaysTrue = "AlwaysTrue"
 )
+
+// ImplicitAffinity is an affinity that gets implicitly added to all eligible containers.
+type ImplicitAffinity struct {
+	Eligible func(Container) bool // function to determine if Affinity is added to a Container
+	Affinity *Affinity            // the actual implicitly added Affinity
+}
 
 // Validate checks the affinity for (obvious) invalidity.
 func (a *Affinity) Validate() error {
@@ -158,6 +166,8 @@ func (e *Expression) Evaluate(container Container) bool {
 		result = ok
 	case NotExist:
 		result = !ok
+	case AlwaysTrue:
+		result = true
 	}
 
 	return result
@@ -316,4 +326,44 @@ func (pca *podContainerAffinity) parseFull(pod *pod, value string, weight int32)
 	}
 
 	return nil
+}
+
+// GlobalAffinity creates an affinity with all containers in scope.
+func GlobalAffinity(key string, weight int32) *Affinity {
+	return &Affinity{
+		Scope: &Expression{
+			Op: AlwaysTrue, // evaluate against all containers
+		},
+		Match: &Expression{
+			Key: key,
+			Op:  Exists,
+		},
+		Weight: weight,
+	}
+}
+
+// GlobalAntiAffinity creates an anti-affinity with all containers in scope.
+func GlobalAntiAffinity(key string, weight int32) *Affinity {
+	return GlobalAffinity(key, -weight)
+}
+
+// AddImplicitAffinities registers a set of implicit affinities.
+func (cch *cache) AddImplicitAffinities(implicit map[string]*ImplicitAffinity) error {
+	for name := range implicit {
+		if existing, ok := cch.implicit[name]; ok {
+			return cacheError("implicit affinity %s already defined (%s)",
+				name, existing.Affinity.String())
+		}
+	}
+	for name, a := range implicit {
+		cch.implicit[name] = a
+	}
+	return nil
+}
+
+// DeleteImplicitAffinities removes a previously registered set of implicit affinities.
+func (cch *cache) DeleteImplicitAffinities(names []string) {
+	for _, name := range names {
+		delete(cch.implicit, name)
+	}
 }

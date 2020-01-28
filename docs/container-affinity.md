@@ -129,7 +129,7 @@ a boolean true/false result. Currently the following operations are supported:
   - `NotIn`: negated membership, true if the *value of key* is not equal to any among *values*
   - `Exists`: true if the given *key* exists with any value
   - `NotExists`: true if the given *key* does not exist
-
+  - `AlwaysTrue`: always evaluates to true, can be used to denote node-global scope (all containers)
 
 The effective affinity between containers C_1 and C_2, A(C_1, C_2) is the sum of the
 weights of all pairwise in-scope matching affinities W(C_1, C_2). To put it another way,

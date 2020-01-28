@@ -450,6 +450,8 @@ type Cache interface {
 	FilterScope(*Expression) []Container
 	// EvaluateAffinity evaluates the given affinity against all known in-scope containers
 	EvaluateAffinity(*Affinity) map[string]int32
+	// AddImplicitAffinities adds a set of implicit affinities (added to all containers).
+	AddImplicitAffinities(map[string]*ImplicitAffinity) error
 
 	// GetActivePolicy returns the name of the active policy stored in the cache.
 	GetActivePolicy() string
@@ -502,6 +504,8 @@ type cache struct {
 	PolicyJSON map[string]string      // ditto in raw, unmarshaled form
 
 	pending map[string]struct{} // cache IDs of containers with pending changes
+
+	implicit map[string]*ImplicitAffinity // implicit affinities
 }
 
 // Make sure cache implements Cache.
@@ -524,6 +528,7 @@ func NewCache(options Options) (Cache, error) {
 		NextID:     1,
 		policyData: make(map[string]interface{}),
 		PolicyJSON: make(map[string]string),
+		implicit:   make(map[string]*ImplicitAffinity),
 	}
 
 	if err := cch.Load(); err != nil {
