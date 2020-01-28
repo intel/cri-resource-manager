@@ -94,6 +94,8 @@ func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend
 		log.Fatal("failed to create topology-aware policy: %v", err)
 	}
 
+	p.addImplicitAffinities()
+
 	config.GetModule(PolicyPath).AddNotify(p.configNotify)
 
 	p.root.Dump("<pre-start>")
