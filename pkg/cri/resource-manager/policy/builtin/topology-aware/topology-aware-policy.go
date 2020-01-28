@@ -15,6 +15,7 @@
 package topologyaware
 
 import (
+	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -187,6 +188,33 @@ func (p *policy) ReleaseResources(container cache.Container) error {
 func (p *policy) UpdateResources(c cache.Container) error {
 	log.Debug("(not) updating container %s...", c.PrettyName())
 	return nil
+}
+
+// Rebalance tries to find an optimal allocation of resources for the current containers.
+func (p *policy) Rebalance() (bool, error) {
+	var errors error
+
+	containers := p.cache.GetContainers()
+	movable := []cache.Container{}
+
+	for _, c := range containers {
+		if c.GetQOSClass() != v1.PodQOSGuaranteed {
+			p.ReleaseResources(c)
+			movable = append(movable, c)
+		}
+	}
+
+	for _, c := range movable {
+		if err := p.AllocateResources(c); err != nil {
+			if errors == nil {
+				errors = err
+			} else {
+				errors = policyError("%v, %v", errors, err)
+			}
+		}
+	}
+
+	return true, errors
 }
 
 // ExportResourceData provides resource data to export for the container.

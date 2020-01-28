@@ -125,6 +125,12 @@ func (eda *eda) UpdateResources(c cache.Container) error {
 	return nil
 }
 
+// Rebalance tries to find an optimal allocation of resources for the current containers.
+func (eda *eda) Rebalance() (bool, error) {
+	eda.Debug("(not) rebalancing containers...")
+	return false, nil
+}
+
 // ExportResourceData provides resource data to export for the container.
 func (eda *eda) ExportResourceData(c cache.Container) map[string]string {
 	return nil
