@@ -88,6 +88,8 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 		}
 	}
 
+	c.Tags = make(map[string]string)
+
 	// if we get more than one hint, check that there are no duplicates
 	// if len(c.TopologyHints) > 1 {
 	// 	c.TopologyHints = sysfs.DeDuplicateTopologyHints(c.TopologyHints)
@@ -133,6 +135,7 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 	c.Image = lrc.GetImage().GetImage()
 	c.Labels = lrc.Labels
 	c.Annotations = lrc.Annotations
+	c.Tags = make(map[string]string)
 
 	if p.Resources != nil {
 		if r, ok := p.Resources.InitContainers[c.Name]; ok {
@@ -789,4 +792,21 @@ func (c *container) HasPending(controller string) bool {
 	}
 	_, pending := c.pending[controller]
 	return pending
+}
+
+func (c *container) GetTag(key string) (string, bool) {
+	value, ok := c.Tags[key]
+	return value, ok
+}
+
+func (c *container) SetTag(key string, value string) (string, bool) {
+	prev, ok := c.Tags[key]
+	c.Tags[key] = value
+	return prev, ok
+}
+
+func (c *container) DeleteTag(key string) (string, bool) {
+	value, ok := c.Tags[key]
+	delete(c.Tags, key)
+	return value, ok
 }
