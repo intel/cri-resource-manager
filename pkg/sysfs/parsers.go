@@ -15,7 +15,10 @@
 package sysfs
 
 import (
+	"errors"
 	"io/ioutil"
+	"math"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -39,6 +42,22 @@ var units = map[string]int64{
 // PickEntryFn picks a given input line apart into an entry of key and value.
 type PickEntryFn func(string) (string, string, error)
 
+// SplitFieldsFn picks a given input line apart into a set of key-value pair fields.
+type SplitFieldsFn func(string) ([]*Field, error)
+
+// PickFieldFn returns a pointer corresponding to the value of the field.
+type PickFieldFn func(int, *Field) (interface{}, error)
+
+// Field is a single field split out by a SplitFieldsFn or to be picked by a PickFieldFn.
+type Field struct {
+	Index int
+	Key   string
+	Value string
+}
+
+// ErrSkip is used as a error return value for skipping an entry instead of picking/splitting it.
+var ErrSkip = errors.New("skip parsing this entry")
+
 // splitNumericAndUnit splits a string into a numeric and a unit part.
 func splitNumericAndUnit(path string, value string) (string, int64, error) {
 	fields := strings.Fields(value)
@@ -59,7 +78,7 @@ func splitNumericAndUnit(path string, value string) (string, int64, error) {
 	return "", -1, sysfsError(path, "invalid numeric value %s", value)
 }
 
-// PparseNumberic parses a numeric string into integer of the right size.
+// parseNumeric parses a numeric string into integer of the right size.
 func parseNumeric(path, value string, ptr interface{}) error {
 	var numstr string
 	var num, unit int64
@@ -115,6 +134,145 @@ func parseNumeric(path, value string, ptr interface{}) error {
 	return err
 }
 
+// parseIntWithUnit parses an integer multiplied by a unit.
+func parseIntWithUnit(path, val string, unit int64) (int64, error) {
+	num, err := strconv.ParseInt(val, 0, 64)
+	if err != nil {
+		return 0, sysfsError(path, "can't parse numeric value '%s': %v", val, err)
+	}
+	return num * unit, nil
+}
+
+// parseUintWithUnit parses an unsigned integer multiplied by a unit.
+func parseUintWithUnit(path, val string, unit int64) (uint64, error) {
+	num, err := strconv.ParseUint(val, 0, 64)
+	if err != nil {
+		return 0, sysfsError(path, "can't parse numeric unsigned value '%s': %v", val, err)
+	}
+	return num * uint64(unit), nil
+}
+
+// parseFloatWithUnit parses an integer multiplied by a unit.
+func parseFloatWithUnit(path, val string, unit int64) (float64, error) {
+	num, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0.0, sysfsError(path, "can't parse numeric value '%s': %v", val, err)
+	}
+	return num * float64(unit), nil
+}
+
+// parseNumericMap parses a numeric string into integer of the right size.
+func parseNumericMap(path, key, value string, vmap interface{}) error {
+	var numstr string
+	var num, unit int64
+	var unum uint64
+	var f float64
+	var err error
+
+	if numstr, unit, err = splitNumericAndUnit(path, value); err != nil {
+		return err
+	}
+
+	switch vm := vmap.(type) {
+	case map[string]int8:
+		typeName, min, max := "int8", int64(math.MinInt8), int64(math.MaxInt8)
+		if num, err = parseIntWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if num < min || num > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = int8(num)
+	case map[string]uint8:
+		typeName, max := "uint8", uint64(math.MaxUint8)
+		if unum, err = parseUintWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if unum > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = uint8(unum)
+	case map[string]int16:
+		typeName, min, max := "int16", int64(math.MinInt16), int64(math.MaxInt16)
+		if num, err = parseIntWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if num < min || num > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = int16(num)
+	case map[string]uint16:
+		typeName, max := "uint16", uint64(math.MaxUint16)
+		if unum, err = parseUintWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if unum > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = uint16(unum)
+	case map[string]int32:
+		typeName, min, max := "int32", int64(math.MinInt32), int64(math.MaxInt32)
+		if num, err = parseIntWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if num < min || num > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = int32(num)
+	case map[string]uint32:
+		typeName, max := "uint32", uint64(math.MaxUint32)
+		if unum, err = parseUintWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if unum > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = uint32(unum)
+	case map[string]int64:
+		typeName, min, max := "int64", int64(math.MinInt64), int64(math.MaxInt64)
+		if num, err = parseIntWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if num < min || num > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = num
+	case map[string]uint64:
+		typeName, max := "uint64", uint64(math.MaxUint64)
+		if unum, err = parseUintWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if unum > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = unum
+
+	case map[string]float32:
+		typeName, min, max := "float32", math.SmallestNonzeroFloat32, math.MaxFloat32
+		if f, err = parseFloatWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if f < min || f > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = float32(f)
+	case map[string]float64:
+		typeName, min, max := "float64", math.SmallestNonzeroFloat64, math.MaxFloat64
+		if f, err = parseFloatWithUnit(path, numstr, unit); err != nil {
+			return err
+		}
+		if f < min || f > max {
+			return sysfsError(path, "numeric value %s overflows %s", value, typeName)
+		}
+		vm[key] = f
+
+	default:
+		err = sysfsError(path, "can't parse '%s' as numeric map value for map %T", value, vmap)
+	}
+
+	return err
+}
+
 // ParseFileEntries parses a sysfs files for the given entries.
 func ParseFileEntries(path string, values map[string]interface{}, pickFn PickEntryFn) error {
 	var err error
@@ -127,7 +285,10 @@ func ParseFileEntries(path string, values map[string]interface{}, pickFn PickEnt
 	left := len(values)
 	for _, line := range strings.Split(string(data), "\n") {
 		key, value, err := pickFn(line)
-		if err != nil {
+		switch {
+		case err == ErrSkip:
+			continue
+		case err != nil:
 			return err
 		}
 
@@ -161,6 +322,79 @@ func ParseFileEntries(path string, values map[string]interface{}, pickFn PickEnt
 		left--
 		if left == 0 {
 			break
+		}
+	}
+
+	return nil
+}
+
+// ParseFileByLines parses a sysfs files for the given entries.
+func ParseFileByLines(path string, splitFn SplitFieldsFn, pickFn PickFieldFn) error {
+	var err error
+
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		sysfsError(path, "failed to read file: %v", err)
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		fields, err := splitFn(line)
+		switch {
+		case err == ErrSkip:
+			continue
+		case err != nil:
+			return nil
+		}
+		// Sort according to caller-provided Index which indicates in which order the caller
+		// wants to consume (usually because the caller statefully combines the fields).
+		sort.Slice(fields, func(i, j int) bool { return fields[i].Index <= fields[j].Index })
+
+		for idx, f := range fields {
+			ptr, err := pickFn(idx, f)
+			switch {
+			case err == ErrSkip:
+				continue
+			case err != nil:
+				return err
+			}
+
+			switch ptr.(type) {
+			case *int, *int8, *int32, *int16, *int64, *uint, *uint8, *uint16, *uint32, *uint64:
+				if err = parseNumeric(path, f.Value, ptr); err != nil {
+					return err
+				}
+			case *float32, *float64:
+				if err = parseNumeric(path, f.Value, ptr); err != nil {
+					return err
+				}
+			case *string:
+				*ptr.(*string) = f.Value
+			case *bool:
+				*ptr.(*bool), err = strconv.ParseBool(f.Value)
+				if err != nil {
+					return sysfsError(path, "failed to parse field %s, value %s as boolean",
+						f.Key, f.Value)
+				}
+
+			case map[string]string:
+				ptr.(map[string]string)[f.Key] = f.Value
+
+			case map[string]bool:
+				var b bool
+				ptr.(map[string]string)[f.Key] = f.Value
+				b, err = strconv.ParseBool(f.Value)
+				if err != nil {
+					return sysfsError(path, "failed to parse field %s, value %s as boolean",
+						f.Key, f.Value)
+				}
+				ptr.(map[string]bool)[f.Key] = b
+
+			default:
+				if err = parseNumericMap(path, f.Key, f.Value, ptr); err != nil {
+					return sysfsError(path, "failed to parse field %s = %s: %v",
+						f.Key, f.Value, err)
+				}
+			}
 		}
 	}
 
