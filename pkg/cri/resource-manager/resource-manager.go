@@ -53,76 +53,42 @@ type resmgr struct {
 
 // NewResourceManager creates a new ResourceManager instance.
 func NewResourceManager() (ResourceManager, error) {
-	var err error
+	m := &resmgr{Logger: logger.NewLogger("resource-manager")}
 
-	if opt.ForceConfig != "" && opt.FallbackConfig != "" {
-		return nil, resmgrError("both fallback (%s) and forced (%s) configuration given",
-			opt.FallbackConfig, opt.ForceConfig)
-	}
-
-	m := &resmgr{
-		Logger: logger.NewLogger("resource-manager"),
+	if err := m.setupCache(); err != nil {
+		return nil, err
 	}
 
-	// Set-up connection to cri-resmgr agent
-	m.agent, err = agent.NewAgentInterface(opt.AgentSocket)
-	if err != nil {
-		m.Warn("failed to connect to cri-resmgr agent: %v", err)
+	if err := m.checkConfig(); err != nil {
+		return nil, err
 	}
 
-	ropts := relay.Options{
-		RelaySocket:   opt.RelaySocket,
-		ImageSocket:   opt.ImageSocket,
-		RuntimeSocket: opt.RuntimeSocket,
-	}
-	if m.relay, err = relay.NewRelay(ropts); err != nil {
-		return nil, resmgrError("failed to create resource manager: %v", err)
+	if err := m.setupConfigAgent(); err != nil {
+		return nil, err
 	}
 
-	copts := cache.Options{
-		CacheDir: opt.RelayDir,
-	}
-	if m.cache, err = cache.NewCache(copts); err != nil {
-		return nil, resmgrError("failed to create resource manager: %v", err)
+	if err := m.loadConfig(); err != nil {
+		return nil, err
 	}
 
-	if err = m.loadInitialConfig(); err != nil {
-		return nil, resmgrError("failed to load initial configuration: %v", err)
+	if err := m.setupConfigServer(); err != nil {
+		return nil, err
 	}
 
-	if policy.ActivePolicy() != m.cache.GetActivePolicy() {
-		if m.cache.GetActivePolicy() != "" {
-			return nil, resmgrError("trying to load cache with policy %s for active policy %s",
-				m.cache.GetActivePolicy(), policy.ActivePolicy())
-		}
-		m.cache.SetActivePolicy(policy.ActivePolicy())
+	if err := m.setupPolicy(); err != nil {
+		return nil, err
 	}
 
-	policyOpts := &policy.Options{
-		AgentCli: m.agent,
-	}
-	if m.policy, err = policy.NewPolicy(m.cache, policyOpts); err != nil {
-		return nil, resmgrError("failed to create resource manager: %v", err)
+	if err := m.setupRelay(); err != nil {
+		return nil, err
 	}
 
-	if err = m.relay.Setup(); err != nil {
-		return nil, resmgrError("failed to create resource manager: %v", err)
+	if err := m.setupRequestProcessing(); err != nil {
+		return nil, err
 	}
 
-	if err = m.setupRequestProcessing(); err != nil {
-		return nil, resmgrError("failed to create resource manager: %v", err)
-	}
-
-	if m.control, err = control.NewControl(); err != nil {
-		return nil, resmgrError("failed to create controller: %v", err)
-	}
-
-	if opt.ForceConfig != "" {
-		m.Warn("using forced configuration %s, not starting config server...", opt.ForceConfig)
-	} else {
-		if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
-			return nil, resmgrError("failed to create resource manager: %v", err)
-		}
+	if err := m.setupControllers(); err != nil {
+		return nil, err
 	}
 
 	return m, nil
@@ -130,47 +96,56 @@ func NewResourceManager() (ResourceManager, error) {
 
 // Start starts the resource manager.
 func (m *resmgr) Start() error {
-	m.Info("starting resource manager...")
+	m.Info("starting...")
 
 	m.Lock()
 	defer m.Unlock()
 
-	if opt.ForceConfig == "" {
-		if err := m.configServer.Start(opt.ConfigSocket); err != nil {
-			return resmgrError("failed to start config-server: %v", err)
-		}
-	}
-
-	if err := m.activateRequestProcessing(); err != nil {
+	if err := m.startControllers(); err != nil {
 		return err
 	}
 
-	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
-		return resmgrError("failed to start controller: %v", err)
+	if err := m.startRequestProcessing(); err != nil {
+		return err
 	}
 
 	if err := m.relay.Start(); err != nil {
-		return resmgrError("failed to start relay: %v", err)
+		return resmgrError("failed to start CRI relay: %v", err)
 	}
 
-	if m.conf != nil {
-		m.cache.SetConfig(m.conf)
+	if opt.ForceConfig == "" {
+		if err := m.configServer.Start(opt.ConfigSocket); err != nil {
+			return resmgrError("failed to start configuration server: %v", err)
+		}
+
+		if m.conf != nil {
+			m.cache.SetConfig(m.conf)
+			m.conf = nil
+		}
 	}
 
-	m.Info("up and running...")
+	m.Info("up and running")
 
 	return nil
 }
 
 // Stop stops the resource manager.
 func (m *resmgr) Stop() {
-	m.relay.Client().Close()
-	m.relay.Server().Stop()
+	m.Info("shutting down...")
+
+	m.Lock()
+	defer m.Unlock()
+
+	if opt.ForceConfig == "" {
+		m.configServer.Stop()
+	}
+
+	m.relay.Stop()
 }
 
-// Set new resource manager configuration.
+// SetConfig pushes new configuration to the resource manager.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
-	m.Info("received new configuration")
+	m.Info("applying new configuration...")
 
 	m.Lock()
 	defer m.Unlock()
@@ -178,63 +153,190 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	// TODO: save current configuration and roll back if some controllers fail to start
 
 	if err := pkgcfg.SetConfig(conf.Data); err != nil {
-		m.Error("failed to update configuration: %v", err)
+		m.Error("new configuration was rejected: %v", err)
 		return resmgrError("configuration rejected: %v", err)
 	}
 
 	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
-		m.Error("failed to activate configuration: %v", err)
+		m.Error("failed to activate new configuration: %v", err)
 		return resmgrError("failed to fully activate configuration: %v", err)
 	}
 
 	m.cache.SetConfig(conf)
-	m.Info("configuration successfully updated")
+	m.Info("successfully switched to new configuration")
 
 	return nil
 }
 
-// loadInitialConfig tries to load initial configuration using the agent, a file, or the cache.
-func (m *resmgr) loadInitialConfig() error {
+// setupCache creates a cache and reloads its last saved state if found.
+func (m *resmgr) setupCache() error {
+	var err error
+
+	options := cache.Options{CacheDir: opt.RelayDir}
+	if m.cache, err = cache.NewCache(options); err != nil {
+		return resmgrError("failed to create cache: %v", err)
+	}
+
+	return nil
+
+}
+
+// setupConfigAgent sets up the connection to the configuration agent.
+func (m *resmgr) setupConfigAgent() error {
+	var err error
+
+	if m.agent, err = agent.NewAgentInterface(opt.AgentSocket); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// setupConfigServer sets up our configuration server for agent notifications.
+func (m *resmgr) setupConfigServer() error {
+	var err error
+
+	if opt.ForceConfig != "" {
+		m.Warn("using forced configuration %s, not starting configuration server",
+			opt.ForceConfig)
+	} else {
+		if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
+			return resmgrError("failed to create configuration notification server: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// checkConfig checks the (command line) configuration for obvious errors.
+func (m *resmgr) checkConfig() error {
+	if opt.ForceConfig != "" && opt.FallbackConfig != "" {
+		return resmgrError("both fallback (%s) and forced (%s) configurations given",
+			opt.FallbackConfig, opt.ForceConfig)
+	}
+
+	return nil
+}
+
+// loadConfig tries to pick and load (initial) configuration from a number of sources.
+func (m *resmgr) loadConfig() error {
+	//
+	// We try to load initial configuration from a number of sources:
+	//
+	//    1. use forced configuration file if we were given one
+	//    2. use configuration from agent, if we can fetch it and it applies
+	//    3. use last configuration stored in cache, if we have one and it applies
+	//    4. use fallback configuration file if we were given one
+	//    5. use empty/builtin default configuration, whatever that is...
 	//
 	// Notes/TODO:
+	//   If the agent is already running at this point, the initial configuration is
+	//   obtained by polling the agent via GetConfig(). Unlike for the latter updates
+	//   which are pushed by the agent, there is currently no way to report problems
+	//   about polled configuration back to the agent. If/once the agent will have a
+	//   mechanism to propagate configuration errors back to the origin, this might
+	//   become a problem that we'll need to solve.
 	//
-	//   If the agent is already up and running when cri-resmgr is being started the
-	//   first configuration update will be polled using GetConfig(), unlike latter
-	//   updates which are pushed by the agent. Since there is no way to report about
-	//   problems with a polled configuration the agent will not know about problems
-	//   with the initial one...
-	//
-
-	m.Info("loading initial configuration...")
 
 	if opt.ForceConfig != "" {
 		m.Info("using forced configuration %s...", opt.ForceConfig)
-		return pkgcfg.SetConfigFromFile(opt.ForceConfig)
+		if err := pkgcfg.SetConfigFromFile(opt.ForceConfig); err != nil {
+			return resmgrError("failed to load forced configuration %s: %v",
+				opt.ForceConfig, err)
+		}
+		return nil
 	}
 
 	m.Info("trying configuration from agent...")
 	if conf, err := m.agent.GetConfig(1 * time.Second); err == nil {
 		if err = pkgcfg.SetConfig(conf.Data); err == nil {
-			m.conf = conf // save to be stored if we manage to start up
+			m.conf = conf // schedule storing in cache if we ever manage to start up
 			return nil
 		}
 		m.Error("configuration from agent failed to apply: %v", err)
 	}
 
-	m.Info("trying saved configuration from cache...")
+	m.Info("trying last cached configuration...")
 	if conf := m.cache.GetConfig(); conf != nil {
 		err := pkgcfg.SetConfig(conf.Data)
 		if err == nil {
 			return nil
 		}
-		m.Error("configuration from cache failed to apply: %v", err)
+		m.Error("failed to activate cached configuration: %v", err)
 	}
 
 	if opt.FallbackConfig != "" {
-		m.Info("trying fallback configuration %s...", opt.FallbackConfig)
-		return pkgcfg.SetConfigFromFile(opt.FallbackConfig)
+		m.Info("using fallback configuration %s...", opt.FallbackConfig)
+		if err := pkgcfg.SetConfigFromFile(opt.FallbackConfig); err != nil {
+			return resmgrError("failed to load fallback configuration %s: %v",
+				opt.FallbackConfig, err)
+		}
+		return nil
 	}
 
 	m.Warn("no initial configuration found")
+	return nil
+}
+
+// setupPolicy sets up policy with the configured/active backend
+func (m *resmgr) setupPolicy() error {
+	var err error
+
+	active := policy.ActivePolicy()
+	cached := m.cache.GetActivePolicy()
+
+	if active != cached {
+		if cached != "" {
+			return resmgrError("cannot load cache with policy %s for active policy %s",
+				cached, active)
+		}
+		m.cache.SetActivePolicy(active)
+	}
+
+	options := &policy.Options{AgentCli: m.agent}
+	if m.policy, err = policy.NewPolicy(m.cache, options); err != nil {
+		return resmgrError("failed to create policy %s: %v", active, err)
+	}
+
+	return nil
+}
+
+// setupRelay sets up the CRI request relay.
+func (m *resmgr) setupRelay() error {
+	var err error
+
+	options := relay.Options{
+		RelaySocket:   opt.RelaySocket,
+		ImageSocket:   opt.ImageSocket,
+		RuntimeSocket: opt.RuntimeSocket,
+	}
+	if m.relay, err = relay.NewRelay(options); err != nil {
+		return resmgrError("failed to create CRI relay: %v", err)
+	}
+
+	if err = m.relay.Setup(); err != nil {
+		return resmgrError("failed to create CRI relay: %v", err)
+	}
+
+	return nil
+}
+
+// setupControllers sets up the resource controllers.
+func (m *resmgr) setupControllers() error {
+	var err error
+
+	if m.control, err = control.NewControl(); err != nil {
+		return resmgrError("failed to create resource controller: %v", err)
+	}
+
+	return nil
+}
+
+// startControllers start the resource controllers.
+func (m *resmgr) startControllers() error {
+	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+		return resmgrError("failed to start resource controllers: %v", err)
+	}
+
 	return nil
 }

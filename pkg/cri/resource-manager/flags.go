@@ -20,23 +20,23 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 )
 
-// Options captures our command line or runtime configurable parameters.
+// Options captures our command line parameters.
 type options struct {
-	ImageSocket    string `json:",omitempty"`
-	RuntimeSocket  string `json:",omitempty"`
-	RelaySocket    string `json:",omitempty"`
-	RelayDir       string `json:",omitempty"`
-	AgentSocket    string `json:",omitempty"`
-	ConfigSocket   string `json:",omitempty"`
-	ResctrlPath    string `json:",omitempty"`
-	FallbackConfig string `json:",omitempty"`
-	ForceConfig    string `json:",omitempty"`
+	ImageSocket    string
+	RuntimeSocket  string
+	RelaySocket    string
+	RelayDir       string
+	AgentSocket    string
+	ConfigSocket   string
+	ResctrlPath    string
+	FallbackConfig string
+	ForceConfig    string
 }
 
-// Relay command line options and runtime configuration with their defaults.
+// Relay command line options.
 var opt = options{}
 
-// Register us for command line option processing and configuration handling.
+// Register us for command line option processing.
 func init() {
 	flag.StringVar(&opt.ImageSocket, "image-socket", sockets.Containerd,
 		"Unix domain socket path where CRI image service requests should be relayed to.")
