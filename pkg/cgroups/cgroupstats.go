@@ -17,11 +17,11 @@ package cgroups
 import (
 	"fmt"
 	"io/ioutil"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
@@ -86,6 +86,9 @@ type GlobalNumaStats struct {
 	LocalNode     int64
 	OtherNode     int64
 }
+
+// our logger instance
+var log = logger.NewLogger("cgroup-metrics")
 
 func readCgroupFileLines(filePath string) ([]string, error) {
 
@@ -157,73 +160,81 @@ func GetBlkioThrottleBytes(cgroupPath string) (BlkioThrottleBytes, error) {
 	// 8:0 Total 7608309248
 	// Total 15039162880
 
-	entry := path.Join(cgroupPath, cgroupEntry)
-	lines, err := readCgroupFileLines(entry)
-	if err != nil {
-		return BlkioThrottleBytes{}, err
-	}
-
-	if len(lines) == 1 && lines[0] == "Total 0" {
-		return BlkioThrottleBytes{}, nil
-	}
+	var devops *BlkioDeviceBytes
+	var device string
 
 	result := BlkioThrottleBytes{DeviceBytes: make([]*BlkioDeviceBytes, 0)}
-	devidx := map[string]int{}
-
-	for _, line := range lines {
-		split := strings.Split(line, " ")
-		key := split[0]
-		if key == "Total" {
-			if len(split) != 2 {
-				continue
-			}
-			totalBytes, err := strconv.ParseInt(split[1], 10, 64)
-			if err != nil {
-				return BlkioThrottleBytes{}, err
-			}
-			result.TotalBytes = totalBytes
-		} else {
-			var dev *BlkioDeviceBytes
-
-			majmin := strings.Split(key, ":")
-			if len(majmin) != 2 {
-				return BlkioThrottleBytes{}, fmt.Errorf("error parsing file %s", entry)
-			}
-			maj64, err := strconv.ParseInt(string(majmin[0]), 10, 32)
-			if err != nil {
-				return BlkioThrottleBytes{}, err
-			}
-			min64, err := strconv.ParseInt(string(majmin[1]), 10, 32)
-			if err != nil {
-				return BlkioThrottleBytes{}, err
-			}
-			major := int(maj64)
-			minor := int(min64)
-
-			idx, ok := devidx[split[0]]
-			if ok {
-				dev = result.DeviceBytes[idx]
-			} else {
-				dev = &BlkioDeviceBytes{
-					Major:      major,
-					Minor:      minor,
-					Operations: make(map[string]int64),
+	path := filepath.Join(cgroupPath, cgroupEntry)
+	err := sysfs.ParseFileByLines(path,
+		// split line to fields
+		func(line string) ([]*sysfs.Field, error) {
+			split := strings.Split(line, " ")
+			switch len(split) {
+			case 2:
+				if split[0] != "Total" {
+					return nil, fmt.Errorf("unknown entry (%s)", split[0])
 				}
-				idx = len(result.DeviceBytes)
-				devidx[key] = idx
-				result.DeviceBytes = append(result.DeviceBytes, dev)
+				return []*sysfs.Field{{Index: 0, Key: "Total", Value: split[1]}}, nil
+			case 3:
+				return []*sysfs.Field{
+					{Index: 1, Key: "Device", Value: split[0]},
+					{Index: 2, Key: split[1], Value: split[2]},
+				}, nil
+			default:
+				return nil, fmt.Errorf("unknown entry")
 			}
+		},
+		// initialize/pick result.DeviceBytes.BlkioDeviceBytes
+		func(_ int, f *sysfs.Field) (interface{}, error) {
+			switch {
+			case f.Key == "Total":
+				return &result.TotalBytes, nil
+			case f.Key == "Device":
+				if device != f.Value {
+					maj, min, err := parseDeviceNumber(f.Value)
+					if err != nil {
+						return nil, fmt.Errorf("invalid device number %s: %v", f.Value, err)
+					}
+					device = f.Value
+					devops = &BlkioDeviceBytes{
+						Major:      maj,
+						Minor:      min,
+						Operations: make(map[string]int64),
+					}
+					result.DeviceBytes = append(result.DeviceBytes, devops)
+				}
+				return nil, sysfs.ErrSkip
+			default:
+				if devops == nil {
+					return nil, fmt.Errorf("invalid entry %s, 'Device' expected", f.Key)
+				}
+				return devops.Operations, nil
+			}
+		},
+	)
 
-			op, count := split[1], split[2]
-			bytes, err := strconv.ParseInt(count, 10, 64)
-			if err != nil {
-				return BlkioThrottleBytes{}, err
-			}
-			dev.Operations[op] = bytes
-		}
+	if err != nil {
+		return BlkioThrottleBytes{}, fmt.Errorf("error parsing file %s: %v", path, err)
 	}
 
 	return result, nil
+}
+
+// parseDeviceNumber parses a device 'major:minor' string into numerical major, minor.
+func parseDeviceNumber(dev string) (int, int, error) {
+	majmin := strings.Split(dev, ":")
+	if len(majmin) != 2 {
+		return 0, 0, fmt.Errorf("invalid device %s, major:minor expected", dev)
+	}
+	maj, err := strconv.ParseInt(majmin[0], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid device major %s: %v", majmin[0], err)
+	}
+	min, err := strconv.ParseInt(majmin[1], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid device minor %s: %v", majmin[1], err)
+	}
+	return int(maj), int(min), nil
 }
 
 // GetCPUAcctStats retrieves CPU account statistics for a given cgroup.
@@ -235,7 +246,7 @@ func GetCPUAcctStats(cgroupPath string) ([]CPUAcctUsage, error) {
 	// 0 3723082232186 2456599218
 	// 1 3748398003001 1149546796
 
-	lines, err := readCgroupFileLines(path.Join(cgroupPath, "cpuacct.usage_all"))
+	lines, err := readCgroupFileLines(filepath.Join(cgroupPath, "cpuacct.usage_all"))
 
 	if err != nil {
 		return nil, err
@@ -272,7 +283,7 @@ func GetCPUSetMemoryMigrate(cgroupPath string) (bool, error) {
 	//
 	// 0
 
-	number, err := readCgroupSingleNumber(path.Join(cgroupPath, "cpuset.memory_migrate"))
+	number, err := readCgroupSingleNumber(filepath.Join(cgroupPath, "cpuset.memory_migrate"))
 
 	if err != nil {
 		return false, err
@@ -299,7 +310,7 @@ func GetHugetlbUsage(cgroupPath string) ([]HugetlbUsage, error) {
 	//
 	// 124
 
-	usageFiles, err := filepath.Glob(path.Join(cgroupPath, prefix+"*"+usageSuffix))
+	usageFiles, err := filepath.Glob(filepath.Join(cgroupPath, prefix+"*"+usageSuffix))
 	if err != nil {
 		return nil, err
 	}
@@ -333,12 +344,12 @@ func GetMemoryUsage(cgroupPath string) (MemoryUsage, error) {
 	//
 	// 142
 
-	usage, err := readCgroupSingleNumber(path.Join(cgroupPath, "memory.usage_in_bytes"))
+	usage, err := readCgroupSingleNumber(filepath.Join(cgroupPath, "memory.usage_in_bytes"))
 	if err != nil {
 		return MemoryUsage{}, err
 	}
 
-	maxUsage, err := readCgroupSingleNumber(path.Join(cgroupPath, "memory.max_usage_in_bytes"))
+	maxUsage, err := readCgroupSingleNumber(filepath.Join(cgroupPath, "memory.max_usage_in_bytes"))
 	if err != nil {
 		return MemoryUsage{}, err
 	}
@@ -368,72 +379,73 @@ func GetNumaStats(cgroupPath string) (NumaStat, error) {
 	// hierarchical_anon=46096 N0=12597 N1=18890 N2=283 N3=14326
 	// hierarchical_unevictable=20 N0=0 N1=0 N2=0 N3=20
 
-	entry := path.Join(cgroupPath, cgroupEntry)
-	lines, err := readCgroupFileLines(entry)
-	if err != nil {
-		return NumaStat{}, err
-	}
+	var nline *NumaLine
 
 	result := NumaStat{}
-	for _, line := range lines {
-		split := strings.Split(line, " ")
-		if len(line) < 2 {
-			return NumaStat{}, fmt.Errorf("error parsing file %s", entry)
-		}
-
-		keytotal := strings.Split(split[0], "=")
-		if len(keytotal) != 2 {
-			return NumaStat{}, fmt.Errorf("error parsing file %s", entry)
-		}
-		key, tot := keytotal[0], keytotal[1]
-
-		total, err := strconv.ParseInt(tot, 10, 64)
-		if err != nil {
-			return NumaStat{}, fmt.Errorf("error parsing file %s: %v", entry, err)
-		}
-
-		nodes := make(map[string]int64)
-		for _, nodeEntry := range split[1:] {
-			nodeamount := strings.Split(nodeEntry, "=")
-			if len(nodeamount) != 2 {
-				return NumaStat{}, fmt.Errorf("error parsing file %s", entry)
+	path := filepath.Join(cgroupPath, cgroupEntry)
+	err := sysfs.ParseFileByLines(path,
+		// split line to fields by spaces
+		func(line string) ([]*sysfs.Field, error) {
+			split := strings.Split(line, " ")
+			fields := make([]*sysfs.Field, len(split))
+			for idx, entry := range split {
+				keyval := strings.Split(entry, "=")
+				if len(keyval) != 2 {
+					return nil, fmt.Errorf("failed to parse entry '%s' of line '%s'", entry, line)
+				}
+				fields[idx] = &sysfs.Field{
+					Index: idx,
+					Key:   keyval[0],
+					Value: keyval[1],
+				}
 			}
-			node, amount := nodeamount[0], nodeamount[1]
-			number, err := strconv.ParseInt(amount, 10, 64)
-			if err != nil {
-				return NumaStat{}, fmt.Errorf("error parsing file %s: %v", entry, err)
+			return fields, nil
+		},
+		// pick NumaLine.Total or pick NumaLine.Nodes, based on this/last non-node field key
+		func(_ int, f *sysfs.Field) (interface{}, error) {
+			switch f.Key {
+			case "total":
+				nline = &result.Total
+			case "file":
+				nline = &result.File
+			case "anon":
+				nline = &result.Anon
+			case "unevictable":
+				nline = &result.Unevictable
+			case "hierarchical_total":
+				nline = &result.HierarchicalTotal
+			case "hierarchical_file":
+				nline = &result.HierarchicalFile
+			case "hierarchical_anon":
+				nline = &result.HierarchicalAnon
+			case "hierarchical_unevictable":
+				nline = &result.HierarchicalUnevictable
+			default:
+				if f.Key[0] != 'N' {
+					return nil, fmt.Errorf("unknown field key %s", f.Key)
+				}
 			}
-			nodes[node] = number
-		}
 
-		switch key {
-		case "total":
-			result.Total.Total = total
-			result.Total.Nodes = nodes
-		case "file":
-			result.File.Total = total
-			result.File.Nodes = nodes
-		case "anon":
-			result.Anon.Total = total
-			result.Anon.Nodes = nodes
-		case "unevictable":
-			result.Unevictable.Total = total
-			result.Unevictable.Nodes = nodes
-		case "hierarchical_total":
-			result.HierarchicalTotal.Total = total
-			result.HierarchicalTotal.Nodes = nodes
-		case "hierarchical_file":
-			result.HierarchicalFile.Total = total
-			result.HierarchicalFile.Nodes = nodes
-		case "hierarchical_anon":
-			result.HierarchicalAnon.Total = total
-			result.HierarchicalAnon.Nodes = nodes
-		case "hierarchical_unevictable":
-			result.HierarchicalUnevictable.Total = total
-			result.HierarchicalUnevictable.Nodes = nodes
-		default:
-			return NumaStat{}, fmt.Errorf("error parsing file, unknown key %s", key)
-		}
+			switch {
+			case nline == nil:
+				return nil, fmt.Errorf("node data for unknown NumaStat entry")
+			case f.Key[0] != 'N':
+				log.Debug("NumaStat(%s): %s = %s",
+					logger.Delay(func() string { return filepath.Base(cgroupPath) }), f.Key, f.Value)
+				return &nline.Total, nil
+			default: // f.Key[0] == 'N'
+				log.Debug("NumaStat(%s): %s = %s",
+					logger.Delay(func() string { return filepath.Base(cgroupPath) }), f.Key, f.Value)
+				if nline.Nodes == nil {
+					nline.Nodes = make(map[string]int64)
+				}
+				return nline.Nodes, nil
+			}
+		},
+	)
+
+	if err != nil {
+		return NumaStat{}, fmt.Errorf("error parsing file %s: %v", path, err)
 	}
 
 	return result, nil
@@ -461,6 +473,9 @@ func GetGlobalNumaStats() (map[int]GlobalNumaStats, error) {
 		return map[int]GlobalNumaStats{}, err
 	}
 
+	log.Debug("GlobalNumaStat: nodedirs: %s",
+		logger.Delay(func() string { return strings.Join(nodeDirs, ", ") }))
+
 	for _, dir := range nodeDirs {
 		id := strings.TrimPrefix(dir, prefix)
 		node, err := strconv.ParseInt(id, 10, 64)
@@ -470,7 +485,7 @@ func GetGlobalNumaStats() (map[int]GlobalNumaStats, error) {
 
 		nodeStat := GlobalNumaStats{}
 
-		numastat := path.Join(dir, "numastat")
+		numastat := filepath.Join(dir, "numastat")
 		err = sysfs.ParseFileEntries(numastat,
 			map[string]interface{}{
 				"numa_hit":       &nodeStat.NumaHit,
@@ -485,6 +500,8 @@ func GetGlobalNumaStats() (map[int]GlobalNumaStats, error) {
 				if len(fields) != 2 {
 					return "", "", fmt.Errorf("failed to parse line '%s'", line)
 				}
+				log.Debug("GlobalNumaStat(%s) %s = %s",
+					logger.Delay(func() string { return filepath.Base(dir) }), fields[0], fields[1])
 				return fields[0], fields[1], nil
 			},
 		)
