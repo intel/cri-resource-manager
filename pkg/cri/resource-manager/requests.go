@@ -50,8 +50,8 @@ func (m *resmgr) setupRequestProcessing() error {
 	return nil
 }
 
-// activateRequestProcessing starts activates request processing by starting the active policy.
-func (m *resmgr) activateRequestProcessing() error {
+// startRequestProcessing starts request processing by starting the active policy.
+func (m *resmgr) startRequestProcessing() error {
 	ctx := context.Background()
 	add, del, err := m.syncWithCRI(ctx)
 

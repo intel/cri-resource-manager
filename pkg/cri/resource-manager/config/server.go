@@ -86,7 +86,10 @@ func (s *server) Start(socket string) error {
 
 // Stop Server instance
 func (s *server) Stop() {
-	s.server.Stop()
+	if s.server != nil {
+		s.server.Stop()
+		s.server = nil
+	}
 }
 
 // GetNode gets K8s node object.
