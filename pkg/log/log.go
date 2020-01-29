@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -53,6 +54,62 @@ type Logger interface {
 	ErrorBlock(prefix string, format string, args ...interface{})
 
 	Stop()
+}
+
+// Delayed implement delayed evaluation, useful for lowering the overhead suppressed log.Debug.
+type Delayed interface {
+	String() string
+}
+
+// delay implements Delayed.
+type delay struct {
+	o interface{}
+	Delayed
+}
+
+// Delay wraps its argument for delayed .String() evaluation.
+func Delay(o interface{}) Delayed {
+	return &delay{o: o}
+}
+
+// String implements stringification of its delayed argument.
+func (d *delay) String() string {
+	o := d.o
+	switch o.(type) {
+	case func() string:
+		return o.(func() string)()
+	case func() interface{}:
+		o = o.(func() interface{})()
+	}
+
+	switch o.(type) {
+	case string:
+		return o.(string)
+	case int8:
+		return strconv.FormatInt(int64(o.(int8)), 10)
+	case int16:
+		return strconv.FormatInt(int64(o.(int16)), 10)
+	case int32:
+		return strconv.FormatInt(int64(o.(int32)), 10)
+	case int64:
+		return strconv.FormatInt(o.(int64), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(o.(uint8)), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(o.(uint16)), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(o.(uint32)), 10)
+	case uint64:
+		return strconv.FormatUint(o.(uint64), 10)
+	case float32:
+		return strconv.FormatFloat(float64(o.(float32)), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(o.(float64), 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(o.(bool))
+	default:
+		return fmt.Sprintf("%v", o)
+	}
 }
 
 // Backend is an entity that can emit log messages.
