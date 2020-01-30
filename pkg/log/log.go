@@ -52,6 +52,7 @@ type Logger interface {
 	WarnBlock(prefix string, format string, args ...interface{})
 	ErrorBlock(prefix string, format string, args ...interface{})
 
+	Flush()
 	Stop()
 }
 
@@ -86,7 +87,7 @@ type log struct {
 }
 
 var logging = &log{
-	active: &fmtBackend{},
+	active: fmtbe,
 }
 
 // Get an existing logger or create a new one.
@@ -189,12 +190,14 @@ func (l *logger) Error(format string, args ...interface{}) {
 
 // Emit a fatal error message and exit.
 func (l *logger) Fatal(format string, args ...interface{}) {
+	l.Flush()
 	logging.active.Error(l.formatMessage(format, args...))
 	os.Exit(1)
 }
 
 // Emit a fatal error message and panic.
 func (l *logger) Panic(format string, args ...interface{}) {
+	l.Flush()
 	message := l.formatMessage(format, args...)
 	logging.active.Error(message)
 	panic(message)
@@ -324,6 +327,18 @@ func (l *logger) ErrorBlock(prefix string, format string, args ...interface{}) {
 	l.Block(l.Error, prefix, format, args...)
 }
 
+// Buffering is implemented by logger backends that might buffer output.
+type Buffering interface {
+	Flush()
+}
+
+// Flush flushes the backend buffer, if is a Buffering one.
+func (l *logger) Flush() {
+	if b, ok := logging.active.(Buffering); ok {
+		b.Flush()
+	}
+}
+
 // RegisterBackend registers a logger backend.
 func RegisterBackend(b Backend) {
 	name := b.Name()
@@ -344,7 +359,7 @@ func activateBackend(name string) {
 	if b, ok := logging.backends[string(opt.Logger)]; ok {
 		logging.active = b
 	} else {
-		logging.active = &fmtBackend{}
+		logging.active = fmtbe
 	}
 
 	logging.active.Info(fmt.Sprintf("activated logger backend '%s'", logging.active.Name()))
@@ -367,9 +382,20 @@ const (
 	fmtBackendName = "fmt"
 )
 
-type fmtBackend struct{}
+var fmtbe = newFmtBackend()
+
+type fmtBackend struct {
+	q   []string
+	log func(string)
+}
 
 var _ Backend = &fmtBackend{}
+
+func newFmtBackend() Backend {
+	be := &fmtBackend{q: make([]string, 0, 64)}
+	be.log = be.enq
+	return be
+}
 
 func (f *fmtBackend) Name() string {
 	return "fmt"
@@ -380,27 +406,50 @@ func (f *fmtBackend) PrefixPreference() bool {
 }
 
 func (f *fmtBackend) Info(message string) {
-	fmt.Println("I: " + message)
+	f.log(fmt.Sprintf("I: " + message + "\n"))
 }
 
 func (f *fmtBackend) Warn(message string) {
-	fmt.Println("W: " + message)
+	f.log(fmt.Sprintf("W: " + message + "\n"))
 }
 
 func (f *fmtBackend) Error(message string) {
-	fmt.Println("E: " + message)
+	f.log(fmt.Sprintf("E: " + message + "\n"))
 }
 
 func (f *fmtBackend) Debug(message string) {
-	fmt.Println("D: " + message)
+	f.log(fmt.Sprintf("D: " + message + "\n"))
 }
 
 func (f *fmtBackend) Enabled(l Level) bool {
 	return l >= opt.Level
 }
 
+func (f *fmtBackend) Flush() {
+	if f.q != nil {
+		f.log = f.write
+		for _, msg := range f.q {
+			f.write(msg)
+		}
+		f.q = nil
+	}
+}
+
+func (f *fmtBackend) enq(msg string) {
+	if len(f.q) < cap(f.q) {
+		f.q = append(f.q, msg)
+	} else {
+		f.Flush()
+		f.write(msg)
+	}
+}
+
+func (f *fmtBackend) write(msg string) {
+	os.Stdout.Write([]byte(msg))
+}
+
 func init() {
-	RegisterBackend(&fmtBackend{})
+	RegisterBackend(fmtbe)
 
 	binary := filepath.Clean(os.Args[0])
 	source := filepath.Base(binary)

@@ -55,6 +55,7 @@ func main() {
 		os.Exit(0)
 	}
 
+	log.Flush()
 	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
 
 	if err := instrumentation.Start(); err != nil {
