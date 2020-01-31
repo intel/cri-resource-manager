@@ -9,7 +9,7 @@ import (
 var (
 	builtInCollectors    = make(map[string]InitCollector)
 	registeredCollectors = []prometheus.Collector{}
-	log                  = logger.NewLogger("metrics")
+	log                  = logger.NewLogger("collectors")
 )
 
 // InitCollector is the type for functions that initialize collectors.
