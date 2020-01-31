@@ -364,6 +364,8 @@ type container struct {
 	RDTClass     string              // RDT class this container is assigned to.
 	BlockIOClass string              // Block I/O class this container is assigned to.
 	pending      map[string]struct{} // controllers with pending changes for this container
+
+	prettyName string // cached PrettyName()
 }
 
 // MountType is a propagation type.
