@@ -407,6 +407,31 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 	return &criapi.UpdateContainerResourcesResponse{}, nil
 }
 
+// RebalanceContainers tries to find a more optimal container resource allocation if necessary.
+func (m *resmgr) RebalanceContainers() error {
+	m.Lock()
+	defer m.Unlock()
+
+	m.Info("rebalancing (reallocating) containers...")
+
+	method := "Rebalance"
+	changes, err := m.policy.Rebalance()
+
+	if err != nil {
+		m.Error("%s: rebalancing of containers failed: %v", method, err)
+	}
+
+	if changes {
+		if err := m.runPostUpdateHooks(context.Background(), method); err != nil {
+			m.Error("%s: failed to run post-update hooks: %v", method, err)
+			return resmgrError("%s: failed to run post-update hooks: %v", method, err)
+		}
+	}
+
+	m.cache.Save()
+	return nil
+}
+
 // runPostAllocateHooks runs the necessary hooks after allocating resources for some containers.
 func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error {
 	for _, c := range m.cache.GetPendingContainers() {
@@ -467,6 +492,31 @@ func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string) error {
 		default:
 			m.Warn("%s: skipping pending container %s (in state %v)",
 				method, c.PrettyName(), c.GetState())
+		}
+	}
+	return nil
+}
+
+// runPostUpdateHooks runs the necessary hooks after reconcilation.
+func (m *resmgr) runPostUpdateHooks(ctx context.Context, method string) error {
+	for _, c := range m.cache.GetPendingContainers() {
+		switch c.GetState() {
+		case cache.ContainerStateRunning, cache.ContainerStateCreated:
+			if err := m.control.RunPostUpdateHooks(c); err != nil {
+				return err
+			}
+			if req, ok := c.GetCRIRequest(); ok {
+				if _, err := m.sendCRIRequest(ctx, req); err != nil {
+					m.Warn("%s update of container %s failed: %v",
+						method, c.PrettyName(), err)
+				} else {
+					c.ClearCRIRequest()
+				}
+			}
+			m.policy.ExportResourceData(c)
+		default:
+			m.Warn("%s: skipping container %s (in state %v)", method,
+				c.PrettyName(), c.GetState())
 		}
 	}
 	return nil
