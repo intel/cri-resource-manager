@@ -150,6 +150,63 @@ func TestReadFilesInDirectory(t *testing.T) {
 	}
 }
 
+func TestGetDevicesFromVirtual(t *testing.T) {
+	teardown := setupTestEnv(t)
+	defer teardown()
+
+	cases := []struct {
+		name        string
+		input       string
+		output      []string
+		expectedErr bool
+	}{
+		{
+			name:        "vfio",
+			input:       "/sys/devices/virtual/vfio/42",
+			output:      []string{mockRoot + "/sys/devices/pci0000:00/0000:00:02.0"},
+			expectedErr: false,
+		},
+		{
+			name:        "misc",
+			input:       "/sys/devices/virtual/misc/vfio",
+			output:      nil,
+			expectedErr: false,
+		},
+		{
+			name:        "missing-iommu-group",
+			input:       "/sys/devices/virtual/vfio/84",
+			output:      nil,
+			expectedErr: true,
+		},
+		{
+			name:        "non-virtual",
+			input:       "/sys/devices/pci0000:00/0000:00:02.0",
+			output:      nil,
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		test := tc
+		t.Run(test.name, func(t *testing.T) {
+			output, err := getDevicesFromVirtual(test.input)
+			switch {
+			case err != nil && !test.expectedErr:
+				t.Fatalf("unexpected error returned: %+v", err)
+			case err == nil && test.expectedErr:
+				t.Fatalf("unexpected success: %+v", output)
+			case len(output) != len(test.output):
+				t.Fatalf("expected: %q got: %q", len(test.output), len(output))
+			}
+			for i, p := range test.output {
+				if test.output[i] != p {
+					t.Fatalf("expected: %q got: %q", test.output[i], p)
+				}
+			}
+		})
+	}
+}
+
 func TestMergeTopologyHints(t *testing.T) {
 	cases := []struct {
 		name           string
