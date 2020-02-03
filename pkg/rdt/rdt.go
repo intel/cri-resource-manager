@@ -30,7 +30,12 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
-const resctrlGroupPrefix = "cri-resmgr."
+const (
+	resctrlGroupPrefix = "cri-resmgr."
+	// rootClassName is the name we use in our config for the special class
+	// that configures the "root" resctrl group of the system
+	rootClassName = "SYSTEM_DEFAULT"
+)
 
 // Control is the interface managing Intel RDT resources
 type Control interface {
@@ -233,6 +238,10 @@ func (r *control) configureResctrlGroup(name string, class classConfig,
 }
 
 func (r *control) resctrlGroupDirName(name string) string {
+	if name == rootClassName {
+		return ""
+	}
+
 	return resctrlGroupPrefix + name
 }
 
