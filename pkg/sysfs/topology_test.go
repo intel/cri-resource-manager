@@ -15,28 +15,16 @@
 package sysfs
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 )
-
-func setupTestEnv(t *testing.T) func() {
-	pwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal("unable to get current directory")
-	}
-	if path, err := filepath.EvalSymlinks(pwd); err == nil {
-		pwd = path
-	}
-	mockRoot = pwd + "/testdata"
-	teardown := func() {
-		mockRoot = ""
-	}
-	return teardown
-}
 
 func TestMapKeys(t *testing.T) {
 	cases := []struct {
@@ -77,8 +65,6 @@ func TestFindSysFsDevice(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	teardown := setupTestEnv(t)
-	defer teardown()
 	cases := []struct {
 		name        string
 		input       string
@@ -204,12 +190,59 @@ func TestMergeTopologyHints(t *testing.T) {
 	}
 }
 
+// createDirectoryTree creates files and directories with the provided content
+// it creates empty directory if file content is set to nil
+func createDirectoryTree(root string, files map[string][]byte) error {
+	for filePath, content := range files {
+		fullPath := path.Join(root, filePath)
+		// create directory
+		dirPath := path.Dir(fullPath)
+		err := os.MkdirAll(dirPath, 0755)
+		if err != nil {
+			return err
+		}
+		// create file if content is provided
+		if content != nil {
+			err := ioutil.WriteFile(fullPath, content, 0644)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func TestNewTopologyHints(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	teardown := setupTestEnv(t)
-	defer teardown()
+
+	// prepare test data
+	mockRoot = fmt.Sprintf("/tmp/cri-rm-test-%d", time.Now().Unix())
+	sysFSTree := map[string][]byte{
+		"sys/devices/pci0000:00/0000:00:02.0/local_cpulist":      []byte("0-7"),
+		"sys/devices/pci0000:00/0000:00:02.0/device":             []byte("0x5912"),
+		"sys/devices/pci0000:00/0000:00:02.0/local_cpus":         []byte("ff"),
+		"sys/devices/pci0000:00/0000:00:02.0/numa_node":          []byte("-1"),
+		"sys/devices/pci0000:00/0000:00:02.0/drm/renderD129/dev": []byte("226:129"),
+		"sys/devices/pci0000:00/0000:00:02.0/drm/card1/dev":      []byte("226:1"),
+		"sys/devices/pci0000:00/0000:00:02.0/vendor":             []byte("0x8086"),
+		"sys/devices/pci0000:00/0000:00:02.0/class":              []byte("0x030000"),
+	}
+	err := createDirectoryTree(mockRoot, sysFSTree)
+	if err != nil {
+		t.Fatalf("Failed to create tmp mockRoot sysfs tree %s: %+v", mockRoot, err)
+	}
+
+	// defer test data cleanup
+	defer func() {
+		err := os.RemoveAll(mockRoot)
+		if err != nil {
+			t.Fatalf("Failed to remove tmp mockRoot sysfs tree %s: %+v", mockRoot, err)
+		}
+		mockRoot = ""
+	}()
+
 	cases := []struct {
 		name        string
 		input       string
