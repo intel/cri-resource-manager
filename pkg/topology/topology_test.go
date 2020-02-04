@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sysfs
+package topology
 
 import (
 	"io/ioutil"

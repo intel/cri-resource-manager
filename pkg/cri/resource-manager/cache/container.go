@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
-	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/topology"
 
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -72,7 +72,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Propagation: MountType(m.Propagation),
 		}
 		if hints := getTopologyHints(m.HostPath, m.ContainerPath, m.Readonly); len(hints) > 0 {
-			c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, hints)
+			c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
 		}
 	}
 
@@ -84,7 +84,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Permissions: d.Permissions,
 		}
 		if hints := getTopologyHints(d.HostPath, d.ContainerPath, strings.IndexAny(d.Permissions, "wm") == -1); len(hints) > 0 {
-			c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, hints)
+			c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
 		}
 	}
 
@@ -92,7 +92,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 
 	// if we get more than one hint, check that there are no duplicates
 	// if len(c.TopologyHints) > 1 {
-	// 	c.TopologyHints = sysfs.DeDuplicateTopologyHints(c.TopologyHints)
+	// 	c.TopologyHints = topology.DeDuplicateTopologyHints(c.TopologyHints)
 	// }
 
 	c.LinuxReq = cfg.GetLinux().GetResources()
@@ -109,7 +109,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 		c.Resources = estimateComputeResources(c.LinuxReq)
 	}
 
-	c.TopologyHints = sysfs.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
+	c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
 
 	return nil
 }
@@ -495,7 +495,7 @@ func (c *container) DeleteDevice(path string) {
 	}
 }
 
-func (c *container) GetTopologyHints() sysfs.TopologyHints {
+func (c *container) GetTopologyHints() topology.TopologyHints {
 	return c.TopologyHints
 }
 
@@ -609,12 +609,12 @@ func (c *container) SetCpusetMems(value string) {
 	c.markPending(CRI)
 }
 
-func getTopologyHints(hostPath, containerPath string, readOnly bool) sysfs.TopologyHints {
+func getTopologyHints(hostPath, containerPath string, readOnly bool) topology.TopologyHints {
 
 	if readOnly {
 		// if device or path is read-only, assume it as non-important for now
 		// TODO: determine topology hint, but use it with low priority
-		return sysfs.TopologyHints{}
+		return topology.TopologyHints{}
 	}
 
 	// ignore topology information for small files in /etc, service files in /var/lib/kubelet and host libraries mounts
@@ -622,7 +622,7 @@ func getTopologyHints(hostPath, containerPath string, readOnly bool) sysfs.Topol
 
 	for _, path := range ignoredTopologyPaths {
 		if strings.HasPrefix(hostPath, path) || strings.HasPrefix(containerPath, path) {
-			return sysfs.TopologyHints{}
+			return topology.TopologyHints{}
 		}
 	}
 
@@ -634,25 +634,25 @@ func getTopologyHints(hostPath, containerPath string, readOnly bool) sysfs.Topol
 	}
 	for _, re := range ignoredTopologyPathRegexps {
 		if re.MatchString(hostPath) || re.MatchString(containerPath) {
-			return sysfs.TopologyHints{}
+			return topology.TopologyHints{}
 		}
 	}
 
-	if devPath, err := sysfs.FindSysFsDevice(hostPath); err == nil {
+	if devPath, err := topology.FindSysFsDevice(hostPath); err == nil {
 		// errors are ignored
-		if hints, err := sysfs.NewTopologyHints(devPath); err == nil && len(hints) > 0 {
+		if hints, err := topology.NewTopologyHints(devPath); err == nil && len(hints) > 0 {
 			return hints
 		}
 	}
 
-	return sysfs.TopologyHints{}
+	return topology.TopologyHints{}
 }
 
-func getKubeletHint(cpus, mems string) (ret sysfs.TopologyHints) {
+func getKubeletHint(cpus, mems string) (ret topology.TopologyHints) {
 	if cpus != "" || mems != "" {
-		ret = sysfs.TopologyHints{
-			sysfs.ProviderKubelet: sysfs.TopologyHint{
-				Provider: sysfs.ProviderKubelet,
+		ret = topology.TopologyHints{
+			topology.ProviderKubelet: topology.TopologyHint{
+				Provider: topology.ProviderKubelet,
 				CPUs:     cpus,
 				NUMAs:    mems}}
 	}

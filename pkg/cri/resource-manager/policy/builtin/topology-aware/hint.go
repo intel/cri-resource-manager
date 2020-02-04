@@ -16,13 +16,14 @@ package topologyaware
 
 import (
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"strconv"
 	"strings"
 )
 
 // Calculate the hint score of the given hint and CPUSet.
-func cpuHintScore(hint system.TopologyHint, CPUs cpuset.CPUSet) float64 {
+func cpuHintScore(hint topology.TopologyHint, CPUs cpuset.CPUSet) float64 {
 	hCPUs, err := cpuset.Parse(hint.CPUs)
 	if err != nil {
 		log.Warn("invalid hint CPUs '%s' from %s", hint.CPUs, hint.Provider)
@@ -33,7 +34,7 @@ func cpuHintScore(hint system.TopologyHint, CPUs cpuset.CPUSet) float64 {
 }
 
 // Calculate the NUMA node score of the given hint and NUMA node.
-func numaHintScore(hint system.TopologyHint, sysIDs ...system.ID) float64 {
+func numaHintScore(hint topology.TopologyHint, sysIDs ...system.ID) float64 {
 	for _, idstr := range strings.Split(hint.NUMAs, ",") {
 		hID, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
@@ -52,7 +53,7 @@ func numaHintScore(hint system.TopologyHint, sysIDs ...system.ID) float64 {
 }
 
 // Calculate the socket node score of the given hint and NUMA node.
-func socketHintScore(hint system.TopologyHint, sysID system.ID) float64 {
+func socketHintScore(hint topology.TopologyHint, sysID system.ID) float64 {
 	for _, idstr := range strings.Split(hint.Sockets, ",") {
 		id, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
@@ -68,7 +69,7 @@ func socketHintScore(hint system.TopologyHint, sysID system.ID) float64 {
 }
 
 // return the cpuset for the CPU, NUMA or socket hints, preferred in this particular order.
-func (cs *cpuSupply) hintCpus(h system.TopologyHint) cpuset.CPUSet {
+func (cs *cpuSupply) hintCpus(h topology.TopologyHint) cpuset.CPUSet {
 	var cpus cpuset.CPUSet
 
 	switch {

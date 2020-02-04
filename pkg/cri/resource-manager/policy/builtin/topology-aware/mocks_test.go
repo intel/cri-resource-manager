@@ -19,8 +19,8 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
-	"github.com/intel/cri-resource-manager/pkg/sysfs"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/topology"
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -208,8 +208,8 @@ func (m *mockContainer) InsertDevice(*cache.Device) {
 func (m *mockContainer) DeleteDevice(string) {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetTopologyHints() sysfs.TopologyHints {
-	return sysfs.TopologyHints{}
+func (m *mockContainer) GetTopologyHints() topology.TopologyHints {
+	return topology.TopologyHints{}
 }
 func (m *mockContainer) GetCPUPeriod() int64 {
 	panic("unimplemented")
