@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"sync"
+	"syscall"
 	"unsafe"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
@@ -23,6 +24,8 @@ const (
 	AVXSwitchCountName = "avx_switch_count_per_cgroup"
 	// AllSwitchCountName is the Prometheuse Gauge name for all switch count per cgroup.
 	AllSwitchCountName = "all_switch_count_per_cgroup"
+	// LastUpdateNs is the Prometheuse Gauge name for per cgroup AVX512 activity timestamp.
+	LastUpdateNs = "last_update_ns"
 )
 
 var (
@@ -46,6 +49,13 @@ var (
 	allSwitchCountDesc = prometheus.NewDesc(
 		AllSwitchCountName,
 		"Total number of task switches in a particular cgroup.",
+		[]string{
+			"cgroup",
+		}, nil,
+	)
+	lastUpdateNsDesc = prometheus.NewDesc(
+		"last_update_ns",
+		"Time since last AVX512 activity in a particular cgroup.",
 		[]string{
 			"cgroup",
 		}, nil,
@@ -109,6 +119,7 @@ type collector struct {
 	bpfModule                *bpf.Module
 	avxContextSwitchCounters *bpf.Map
 	allContextSwitchCounters *bpf.Map
+	lastUpdateNs             *bpf.Map
 	lastCPUCounters          *bpf.Map
 }
 
@@ -138,6 +149,11 @@ func NewCollector() (prometheus.Collector, error) {
 		return nil, errors.New("map avx_context_switch_count not found")
 	}
 
+	lastUpdateNs := bpfModule.Map("last_update_ns")
+	if lastUpdateNs == nil {
+		return nil, errors.New("map last_update_ns not found")
+	}
+
 	lastCPUCounters := bpfModule.Map("cpu")
 	if lastCPUCounters == nil {
 		return nil, errors.New("map cpu not found")
@@ -156,6 +172,7 @@ func NewCollector() (prometheus.Collector, error) {
 		bpfModule:                bpfModule,
 		avxContextSwitchCounters: avxSwitchCounters,
 		allContextSwitchCounters: allSwitchCounters,
+		lastUpdateNs:             lastUpdateNs,
 		lastCPUCounters:          lastCPUCounters,
 	}, nil
 }
@@ -163,6 +180,15 @@ func NewCollector() (prometheus.Collector, error) {
 // Describe implements prometheus.Collector interface
 func (c *collector) Describe(ch chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(c, ch)
+}
+
+// TODO use bpf.NowNanoseconds() after https://github.com/iovisor/gobpf/pull/222
+// nowNanoseconds returns a time that can be compared to bpf_ktime_get_ns()
+func nowNanoseconds() uint64 {
+	var ts syscall.Timespec
+	syscall.Syscall(syscall.SYS_CLOCK_GETTIME, 1 /* CLOCK_MONOTONIC */, uintptr(unsafe.Pointer(&ts)), 0)
+	sec, nsec := ts.Unix()
+	return 1000*1000*1000*uint64(sec) + uint64(nsec)
 }
 
 // Collect implements prometheus.Collector interface
@@ -185,6 +211,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 		wg.Add(1)
 		go func(idx_ int, cgroupid_ []byte) {
 			var allCount uint32
+			var lastUpdate uint64
 
 			defer wg.Done()
 
@@ -206,11 +233,23 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 				return
 			}
 
+			if err := c.bpfModule.LookupElement(c.lastUpdateNs, unsafe.Pointer(&cgroupid_[0]), unsafe.Pointer(&lastUpdate)); err != nil {
+				log.Error("unable to find last update timestamp: %+v", err)
+				return
+			}
+
 			ch <- prometheus.MustNewConstMetric(
 				allSwitchCountDesc,
 				prometheus.GaugeValue,
 				float64(allCount),
 				path)
+
+			ch <- prometheus.MustNewConstMetric(
+				lastUpdateNsDesc,
+				prometheus.GaugeValue,
+				float64(nowNanoseconds()-lastUpdate),
+				path)
+
 		}(idx, cgroupid)
 	}
 

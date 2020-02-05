@@ -29,6 +29,9 @@ static int (*bpf_probe_read)(void *dst, u64 size, const void *unsafe_ptr) =
 static u64 (*bpf_get_current_cgroup_id)(void) = (void *)
 	BPF_FUNC_get_current_cgroup_id;
 
+static u64 (*bpf_ktime_get_ns)(void) = (void *)
+	BPF_FUNC_ktime_get_ns;
+
 static int (*bpf_map_update_elem)(void *map, void *key, void *value,
 				  u64 flags) = (void *)BPF_FUNC_map_update_elem;
 
@@ -64,6 +67,14 @@ struct bpf_map_def
 		.type = BPF_MAP_TYPE_HASH,
 		.key_size = sizeof(u64),
 		.value_size = sizeof(u32),
+		.max_entries = 1024,
+	};
+
+struct bpf_map_def
+	SEC("maps/last_update_ns") last_update_ns_hash = {
+		.type = BPF_MAP_TYPE_HASH,
+		.key_size = sizeof(u64),
+		.value_size = sizeof(u64),
 		.max_entries = 1024,
 	};
 
@@ -149,6 +160,9 @@ int tracepoint__x86_fpu_regs_deactivated(struct x86_fpu_args *args)
 		bpf_map_update_elem(&avx_context_switch_count_hash, &cgroup_id,
 				    &count, BPF_ANY);
 	}
+
+	u64 last = bpf_ktime_get_ns();
+	bpf_map_update_elem(&last_update_ns_hash, &cgroup_id, &last, BPF_ANY);
 
 	bpf_printk("AVX512 detected in cgroup %llu\n", cgroup_id);
 	return 0;
