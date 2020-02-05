@@ -29,6 +29,7 @@ import (
 
 	agent_v1 "github.com/intel/cri-resource-manager/pkg/agent/api/v1"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
+	"github.com/intel/cri-resource-manager/pkg/log"
 )
 
 // Interface describe interfaces of cri-resource-manager agent
@@ -51,17 +52,30 @@ type Interface interface {
 	RemoveTaints([]core_v1.Taint, time.Duration) error
 
 	FindTaintIndex([]core_v1.Taint, *core_v1.Taint) (int, bool)
+
+	Disabled() bool
 }
+
+const (
+	// DontConnect indicates that the agent connection is disabled.
+	DontConnect = ""
+)
 
 // agentInterface implements Interface
 type agentInterface struct {
-	cli agent_v1.AgentClient
+	cli    agent_v1.AgentClient
+	socket string
 }
 
 // NewAgentInterface connects to cri-resource-manager-agent gRPC server
 // and return a new Interface
 func NewAgentInterface(socket string) (Interface, error) {
-	a := &agentInterface{}
+	a := &agentInterface{socket: socket}
+
+	if socket == DontConnect {
+		log.Warn("agent: empty socket path, connection to agent is disabled")
+		return a, nil
+	}
 
 	dialOpts := []grpc.DialOption{
 		//		grpc.WithBlock(),
@@ -81,7 +95,22 @@ func NewAgentInterface(socket string) (Interface, error) {
 	return a, nil
 }
 
+func (a *agentInterface) Disabled() bool {
+	return a.socket == DontConnect
+}
+
+func (a *agentInterface) check() error {
+	if a.Disabled() {
+		return agentError("connection to agent is disabled")
+	}
+	return nil
+}
+
 func (a *agentInterface) GetNode(timeout time.Duration) (core_v1.Node, error) {
+	if err := a.check(); err != nil {
+		return core_v1.Node{}, err
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -101,6 +130,10 @@ func (a *agentInterface) GetNode(timeout time.Duration) (core_v1.Node, error) {
 }
 
 func (a *agentInterface) PatchNode(patches []*agent_v1.JsonPatch, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -116,6 +149,10 @@ func (a *agentInterface) PatchNode(patches []*agent_v1.JsonPatch, timeout time.D
 }
 
 func (a *agentInterface) UpdateNodeCapacity(caps map[string]string, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -130,6 +167,10 @@ func (a *agentInterface) UpdateNodeCapacity(caps map[string]string, timeout time
 }
 
 func (a *agentInterface) GetConfig(timeout time.Duration) (*config.RawConfig, error) {
+	if err := a.check(); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -167,6 +208,10 @@ func taintPatchPath(idx int) string {
 }
 
 func (a *agentInterface) GetLabels(timeout time.Duration) (map[string]string, error) {
+	if err := a.check(); err != nil {
+		return nil, err
+	}
+
 	node, err := a.GetNode(timeout)
 	if err != nil {
 		return nil, err
@@ -176,6 +221,10 @@ func (a *agentInterface) GetLabels(timeout time.Duration) (map[string]string, er
 }
 
 func (a *agentInterface) SetLabels(labels map[string]string, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	if len(labels) == 0 {
 		return nil
 	}
@@ -203,6 +252,10 @@ func (a *agentInterface) SetLabels(labels map[string]string, timeout time.Durati
 }
 
 func (a *agentInterface) RemoveLabels(keys []string, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	if len(keys) == 0 {
 		return nil
 	}
@@ -231,6 +284,10 @@ func (a *agentInterface) RemoveLabels(keys []string, timeout time.Duration) erro
 }
 
 func (a *agentInterface) GetAnnotations(timeout time.Duration) (map[string]string, error) {
+	if err := a.check(); err != nil {
+		return nil, err
+	}
+
 	node, err := a.GetNode(timeout)
 	if err != nil {
 		return nil, err
@@ -239,6 +296,10 @@ func (a *agentInterface) GetAnnotations(timeout time.Duration) (map[string]strin
 }
 
 func (a *agentInterface) SetAnnotations(annotations map[string]string, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	if len(annotations) == 0 {
 		return nil
 	}
@@ -266,6 +327,10 @@ func (a *agentInterface) SetAnnotations(annotations map[string]string, timeout t
 }
 
 func (a *agentInterface) RemoveAnnotations(keys []string, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	if len(keys) == 0 {
 		return nil
 	}
@@ -295,6 +360,10 @@ func (a *agentInterface) RemoveAnnotations(keys []string, timeout time.Duration)
 }
 
 func (a *agentInterface) GetTaints(timeout time.Duration) ([]core_v1.Taint, error) {
+	if err := a.check(); err != nil {
+		return nil, err
+	}
+
 	node, err := a.GetNode(timeout)
 	if err != nil {
 		return nil, err
@@ -303,6 +372,10 @@ func (a *agentInterface) GetTaints(timeout time.Duration) ([]core_v1.Taint, erro
 }
 
 func (a *agentInterface) SetTaints(taints []core_v1.Taint, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	if len(taints) == 0 {
 		return nil
 	}
@@ -341,6 +414,10 @@ func (a *agentInterface) SetTaints(taints []core_v1.Taint, timeout time.Duration
 }
 
 func (a *agentInterface) RemoveTaints(taints []core_v1.Taint, timeout time.Duration) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+
 	if len(taints) == 0 {
 		return nil
 	}
