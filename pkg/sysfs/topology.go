@@ -48,6 +48,34 @@ type TopologyHint struct {
 // TopologyHints represents set of hints collected from multiple providers
 type TopologyHints map[string]TopologyHint
 
+func getDevicesFromVirtual(realDevPath string) (devs []string, err error) {
+	if !filepath.HasPrefix(realDevPath, "/sys/devices/virtual") {
+		return nil, fmt.Errorf("%s is not a virtual device", realDevPath)
+	}
+
+	relPath, _ := filepath.Rel("/sys/devices/virtual", realDevPath)
+
+	dir, file := filepath.Split(relPath)
+	switch dir {
+	case "vfio/":
+		iommuGroup := filepath.Join(mockRoot, "/sys/kernel/iommu_groups", file, "devices")
+		files, err := ioutil.ReadDir(iommuGroup)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read IOMMU group %s", iommuGroup)
+		}
+		for _, file := range files {
+			realDev, err := filepath.EvalSymlinks(filepath.Join(iommuGroup, file.Name()))
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to get real path for %s", file.Name())
+			}
+			devs = append(devs, realDev)
+		}
+		return devs, nil
+	default:
+		return nil, nil
+	}
+}
+
 // NewTopologyHints return array of hints for the device and its slaves (e.g. RAID).
 func NewTopologyHints(devPath string) (hints TopologyHints, err error) {
 	hints = make(TopologyHints)
@@ -102,13 +130,14 @@ func NewTopologyHints(devPath string) (hints TopologyHints, err error) {
 			break
 		}
 	}
+	fromVirtual, _ := getDevicesFromVirtual(realDevPath)
 	slaves, _ := filepath.Glob(filepath.Join(realDevPath, "slaves/*"))
-	for _, slave := range slaves {
-		slaveHints, er := NewTopologyHints(slave)
+	for _, device := range append(slaves, fromVirtual...) {
+		deviceHints, er := NewTopologyHints(device)
 		if er != nil {
 			return nil, er
 		}
-		hints = MergeTopologyHints(hints, slaveHints)
+		hints = MergeTopologyHints(hints, deviceHints)
 	}
 	return
 }
