@@ -24,6 +24,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -36,19 +37,24 @@ type ResourceManager interface {
 	Stop()
 	// SetConfig dynamically updates the resource manager  configuration
 	SetConfig(*config.RawConfig) error
+	// SendEvent sends an event to be processed by the resource manager.
+	SendEvent(event interface{}) error
 }
 
 // resmgr is the implementation of ResourceManager.
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay     // our CRI relay
-	cache        cache.Cache     // cached state
-	policy       policy.Policy   // resource manager policy
-	configServer config.Server   // configuration management server
-	control      control.Control // policy controllers/enforcement
-	agent        agent.Interface // connection to cri-resmgr agent
-	conf         *config.RawConfig
+	relay        relay.Relay       // our CRI relay
+	cache        cache.Cache       // cached state
+	policy       policy.Policy     // resource manager policy
+	configServer config.Server     // configuration management server
+	control      control.Control   // policy controllers/enforcement
+	agent        agent.Interface   // connection to cri-resmgr agent
+	conf         *config.RawConfig // pending for saving in cache
+	metrics      *metrics.Metrics  // metrics collector/pre-processor
+	events       chan interface{}  // channel for delivering events
+	stop         chan interface{}  // channel for signalling shutdown to goroutines
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -87,6 +93,10 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, err
 	}
 
+	if err := m.setupEventProcessing(); err != nil {
+		return nil, err
+	}
+
 	if err := m.setupControllers(); err != nil {
 		return nil, err
 	}
@@ -106,6 +116,10 @@ func (m *resmgr) Start() error {
 	}
 
 	if err := m.startRequestProcessing(); err != nil {
+		return err
+	}
+
+	if err := m.startEventProcessing(); err != nil {
 		return err
 	}
 
@@ -142,6 +156,7 @@ func (m *resmgr) Stop() {
 
 	m.configServer.Stop()
 	m.relay.Stop()
+	m.stopEventProcessing()
 }
 
 // SetConfig pushes new configuration to the resource manager.

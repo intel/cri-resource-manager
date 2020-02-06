@@ -16,6 +16,7 @@ package resmgr
 
 import (
 	"flag"
+	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 )
@@ -31,6 +32,8 @@ type options struct {
 	ResctrlPath    string
 	FallbackConfig string
 	ForceConfig    string
+	MetricsTimer   time.Duration
+	RebalanceTimer time.Duration
 }
 
 // Relay command line options.
@@ -55,4 +58,9 @@ func init() {
 		"Fallback configuration to use unless/until one is available from the cache or agent.")
 	flag.StringVar(&opt.ForceConfig, "force-config", "",
 		"Configuration used to override the one stored in the cache. Does not override the agent.")
+
+	flag.DurationVar(&opt.MetricsTimer, "metrics-interval", 30*time.Second,
+		"Interval for polling/gathering runtime metrics data. Use 'disable' for disabling.")
+	flag.DurationVar(&opt.RebalanceTimer, "rebalance-interval", 5*time.Minute,
+		"Minimum interval between two container rebalancing attempts. Use 'disable' for disabling.")
 }
