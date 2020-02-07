@@ -346,7 +346,6 @@ func init() {
 		Error:        cfglog.Error,
 		Fatal:        cfglog.Fatal,
 		Panic:        cfglog.Panic,
-		Block:        cfglog.Block,
 	})
 
 	flag.Var(&defaults.Level, optionLevel,

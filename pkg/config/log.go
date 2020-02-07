@@ -17,7 +17,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 )
 
 //
@@ -37,7 +36,6 @@ type Logger struct {
 	Error        func(string, ...interface{})
 	Fatal        func(string, ...interface{})
 	Panic        func(string, ...interface{})
-	Block        func(func(string, ...interface{}), string, string, ...interface{})
 }
 
 // log is our Logger.
@@ -66,9 +64,6 @@ func SetLogger(logger Logger) {
 	if logger.Fatal != nil {
 		log.Fatal = logger.Fatal
 	}
-	if logger.Block != nil {
-		log.Block = logger.Block
-	}
 }
 
 func defaultLogger() Logger {
@@ -80,7 +75,6 @@ func defaultLogger() Logger {
 		Error:        errormsg,
 		Fatal:        fatalmsg,
 		Panic:        panicmsg,
-		Block:        blockmsg,
 	}
 }
 
@@ -112,10 +106,4 @@ func fatalmsg(format string, args ...interface{}) {
 func panicmsg(format string, args ...interface{}) {
 	errormsg(format, args...)
 	panic(fmt.Sprintf("fatal error: "+format+"\n", args...))
-}
-
-func blockmsg(fn func(string, ...interface{}), prefix string, format string, args ...interface{}) {
-	for _, line := range strings.Split(fmt.Sprintf(format, args...), "\n") {
-		fn("%s%s", prefix, line)
-	}
 }
