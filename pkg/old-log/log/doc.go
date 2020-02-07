@@ -25,21 +25,21 @@ sources are producing debug messages.
 The available message severity levels are error, warning, and info. By default
 all log sources produce messages of all severity and none of the log sources
 produce any debug messages. For instance to enable only warnings and errors,
-and turn on debugging for the resource-manager, policy, cache, and message
-sources you can use the config fragment below:
+and debugging for the resource-manager, policy, cache, and message sources you
+can use the config fragment below:
 
   logger:
-    Enable: warning,error
-    Debug: resource-manager,policy,cache,messages
+    enable: warning,error
+    debug: resource-manager,policy,cache,messages
 
-You can prefix a source or a list of source names with 'off' or 'on' to toggle
-them on or off. For instance, to turn on debugging for all except the cache and
-resource-manager sources you can use the following fragment:
+The reserved keywords 'all' and 'none' can be used to refer to all or none of
+the log sources. For instance, the following fragment enables full logging and
+debugging:
 
   logger:
-    Debug: on:*,off:cache,resource-manager
+    enable: all
+    debug: all
 
-The same logger settings can be also controlled using the --logger-source and
-and --logger-debug command line options. As an alternative for '*' you can also
-use 'all'.
+The very same logger settings can be also controlled using the --logger-source
+and --logger-debug command line options.
 `
