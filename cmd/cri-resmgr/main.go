@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
@@ -63,6 +64,8 @@ func main() {
 		}
 	}
 
+	logger.Flush()
+	logger.SetupDebugToggleSignal(syscall.SIGUSR1)
 	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
 
 	if err := instrumentation.Start(); err != nil {
