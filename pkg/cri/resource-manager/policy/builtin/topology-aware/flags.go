@@ -16,7 +16,7 @@ package topologyaware
 
 import (
 	config "github.com/intel/cri-resource-manager/pkg/config"
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/topology"
 )
 
 // Options captures our configurable policy parameters.
@@ -36,8 +36,8 @@ type options struct {
 // Our runtime configuration.
 var opt = defaultOptions().(*options)
 
-// fakeHints is our flag.Value for per-pod or per-container faked system.TopologyHints.
-type fakehints map[string]system.TopologyHints
+// fakeHints is our flag.Value for per-pod or per-container faked topology.TopologyHints.
+type fakehints map[string]topology.TopologyHints
 
 // newFakeHints creates a new set of fake hints.
 func newFakeHints() fakehints {

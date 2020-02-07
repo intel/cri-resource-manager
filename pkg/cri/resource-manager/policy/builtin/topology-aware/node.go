@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -106,7 +107,7 @@ type Node interface {
 	dump(string, ...int)
 
 	GetScore(CPURequest) CPUScore
-	HintScore(system.TopologyHint) float64
+	HintScore(topology.TopologyHint) float64
 }
 
 // node represents data common to all node types.
@@ -369,7 +370,7 @@ func (n *node) GetScore(req CPURequest) CPUScore {
 }
 
 // HintScore calculates the (CPU) score of the node for the given topology hint.
-func (n *node) HintScore(hint system.TopologyHint) float64 {
+func (n *node) HintScore(hint topology.TopologyHint) float64 {
 	return n.self.node.HintScore(hint)
 }
 
@@ -419,7 +420,7 @@ func (n *numanode) DiscoverMemset() system.IDSet {
 }
 
 // HintScore calculates the (CPU) score of the node for the given topology hint.
-func (n *numanode) HintScore(hint system.TopologyHint) float64 {
+func (n *numanode) HintScore(hint topology.TopologyHint) float64 {
 	switch {
 	case hint.CPUs != "":
 		return cpuHintScore(hint, n.sysnode.CPUSet())
@@ -497,7 +498,7 @@ func (n *socketnode) DiscoverMemset() system.IDSet {
 }
 
 // HintScore calculates the (CPU) score of the node for the given topology hint.
-func (n *socketnode) HintScore(hint system.TopologyHint) float64 {
+func (n *socketnode) HintScore(hint topology.TopologyHint) float64 {
 	switch {
 	case hint.CPUs != "":
 		return cpuHintScore(hint, n.syspkg.CPUSet())
@@ -559,7 +560,7 @@ func (n *virtualnode) DiscoverMemset() system.IDSet {
 }
 
 // HintScore calculates the (CPU) score of the node for the given topology hint.
-func (n *virtualnode) HintScore(hint system.TopologyHint) float64 {
+func (n *virtualnode) HintScore(hint topology.TopologyHint) float64 {
 	// don't bother calculating any scores, the root should always score 1.0
 	switch {
 	case hint.CPUs != "":

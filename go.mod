@@ -9,6 +9,7 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
+	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
 	github.com/iovisor/gobpf v0.0.0-20191024162143-7c8f8e040b4b
 	github.com/minio/sha256-simd v0.1.1
 	github.com/pkg/errors v0.8.1
@@ -28,6 +29,7 @@ require (
 
 // versions are based on k8s.io/kubernetes
 replace (
+	github.com/intel/cri-resource-manager/pkg/topology v0.0.0 => ./pkg/topology
 	k8s.io/api v0.0.0 => k8s.io/api v0.0.0-20190819141258-3544db3b9e44
 	k8s.io/apiextensions-apiserver v0.0.0 => k8s.io/apiextensions-apiserver v0.0.0-20190819143637-0dbe462fe92d
 	k8s.io/apimachinery v0.0.0 => k8s.io/apimachinery v0.0.0-20190817020851-f2f3a405f61d
