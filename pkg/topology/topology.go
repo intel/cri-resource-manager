@@ -37,16 +37,16 @@ const (
 	ProviderKubelet = "kubelet"
 )
 
-// TopologyHint represents various hints that can be detected from sysfs for the device
-type TopologyHint struct {
+// Hint represents various hints that can be detected from sysfs for the device
+type Hint struct {
 	Provider string
 	CPUs     string
 	NUMAs    string
 	Sockets  string
 }
 
-// TopologyHints represents set of hints collected from multiple providers
-type TopologyHints map[string]TopologyHint
+// Hints represents set of hints collected from multiple providers
+type Hints map[string]Hint
 
 func getDevicesFromVirtual(realDevPath string) (devs []string, err error) {
 	if !filepath.HasPrefix(realDevPath, "/sys/devices/virtual") {
@@ -77,14 +77,14 @@ func getDevicesFromVirtual(realDevPath string) (devs []string, err error) {
 }
 
 // NewTopologyHints return array of hints for the device and its slaves (e.g. RAID).
-func NewTopologyHints(devPath string) (hints TopologyHints, err error) {
-	hints = make(TopologyHints)
+func NewTopologyHints(devPath string) (hints Hints, err error) {
+	hints = make(Hints)
 	realDevPath, err := filepath.EvalSymlinks(devPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed get realpath for %s", devPath)
 	}
 	for p := realDevPath; strings.HasPrefix(p, mockRoot+"/sys/devices/"); p = filepath.Dir(p) {
-		hint := TopologyHint{Provider: p}
+		hint := Hint{Provider: p}
 		fileMap := map[string]*string{
 			"local_cpulist": &hint.CPUs,
 			"numa_node":     &hint.NUMAs,
@@ -143,11 +143,11 @@ func NewTopologyHints(devPath string) (hints TopologyHints, err error) {
 }
 
 // MergeTopologyHints combines org and hints.
-func MergeTopologyHints(org, hints TopologyHints) (res TopologyHints) {
+func MergeTopologyHints(org, hints Hints) (res Hints) {
 	if org != nil {
 		res = org
 	} else {
-		res = make(TopologyHints)
+		res = make(Hints)
 	}
 	for k, v := range hints {
 		if _, ok := res[k]; ok {
@@ -159,7 +159,7 @@ func MergeTopologyHints(org, hints TopologyHints) (res TopologyHints) {
 }
 
 // String returns the hints as a string.
-func (h *TopologyHint) String() string {
+func (h *Hint) String() string {
 	cpus, nodes, sockets, sep := "", "", "", ""
 
 	if h.CPUs != "" {

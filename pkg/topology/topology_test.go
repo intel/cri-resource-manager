@@ -210,42 +210,42 @@ func TestGetDevicesFromVirtual(t *testing.T) {
 func TestMergeTopologyHints(t *testing.T) {
 	cases := []struct {
 		name           string
-		inputA         TopologyHints
-		inputB         TopologyHints
-		expectedOutput TopologyHints
+		inputA         Hints
+		inputB         Hints
+		expectedOutput Hints
 		expectedErr    bool
 	}{
 		{
 			name:           "empty",
 			inputA:         nil,
 			inputB:         nil,
-			expectedOutput: TopologyHints{},
+			expectedOutput: Hints{},
 		},
 		{
 			name:           "one,nil",
-			inputA:         TopologyHints{"test": TopologyHint{Provider: "test", CPUs: "0"}},
+			inputA:         Hints{"test": Hint{Provider: "test", CPUs: "0"}},
 			inputB:         nil,
-			expectedOutput: TopologyHints{"test": TopologyHint{Provider: "test", CPUs: "0"}},
+			expectedOutput: Hints{"test": Hint{Provider: "test", CPUs: "0"}},
 		},
 		{
 			name:           "nil, one",
 			inputA:         nil,
-			inputB:         TopologyHints{"test": TopologyHint{Provider: "test", CPUs: "0"}},
-			expectedOutput: TopologyHints{"test": TopologyHint{Provider: "test", CPUs: "0"}},
+			inputB:         Hints{"test": Hint{Provider: "test", CPUs: "0"}},
+			expectedOutput: Hints{"test": Hint{Provider: "test", CPUs: "0"}},
 		},
 		{
 			name:           "duplicate",
-			inputA:         TopologyHints{"test": TopologyHint{Provider: "test", CPUs: "0"}},
-			inputB:         TopologyHints{"test": TopologyHint{Provider: "test", CPUs: "0"}},
-			expectedOutput: TopologyHints{"test": TopologyHint{Provider: "test", CPUs: "0"}},
+			inputA:         Hints{"test": Hint{Provider: "test", CPUs: "0"}},
+			inputB:         Hints{"test": Hint{Provider: "test", CPUs: "0"}},
+			expectedOutput: Hints{"test": Hint{Provider: "test", CPUs: "0"}},
 		},
 		{
 			name:   "two",
-			inputA: TopologyHints{"test1": TopologyHint{Provider: "test1", CPUs: "0"}},
-			inputB: TopologyHints{"test2": TopologyHint{Provider: "test2", CPUs: "1"}},
-			expectedOutput: TopologyHints{
-				"test1": TopologyHint{Provider: "test1", CPUs: "0"},
-				"test2": TopologyHint{Provider: "test2", CPUs: "1"},
+			inputA: Hints{"test1": Hint{Provider: "test1", CPUs: "0"}},
+			inputB: Hints{"test2": Hint{Provider: "test2", CPUs: "1"}},
+			expectedOutput: Hints{
+				"test1": Hint{Provider: "test1", CPUs: "0"},
+				"test2": Hint{Provider: "test2", CPUs: "1"},
 			},
 		},
 	}
@@ -270,7 +270,7 @@ func TestNewTopologyHints(t *testing.T) {
 	cases := []struct {
 		name        string
 		input       string
-		output      TopologyHints
+		output      Hints
 		expectedErr bool
 	}{
 		{
@@ -282,8 +282,8 @@ func TestNewTopologyHints(t *testing.T) {
 		{
 			name:  "pci card1",
 			input: mockRoot + "/sys/devices/pci0000:00/0000:00:02.0/drm/card1",
-			output: TopologyHints{
-				mockRoot + "/sys/devices/pci0000:00/0000:00:02.0": TopologyHint{
+			output: Hints{
+				mockRoot + "/sys/devices/pci0000:00/0000:00:02.0": Hint{
 					Provider: mockRoot + "/sys/devices/pci0000:00/0000:00:02.0",
 					CPUs:     "0-7",
 					NUMAs:    "",

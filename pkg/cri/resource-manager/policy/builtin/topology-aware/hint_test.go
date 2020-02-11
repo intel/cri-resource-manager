@@ -26,7 +26,7 @@ func TestCpuHintScore(t *testing.T) {
 	tcases := []struct {
 		name     string
 		expected float64
-		hint     topology.TopologyHint
+		hint     topology.Hint
 		cpus     cpuset.CPUSet
 		disabled bool // TODO(rojkov): remove this field when the code is fixed.
 	}{
@@ -36,19 +36,19 @@ func TestCpuHintScore(t *testing.T) {
 		},
 		{
 			name: "handle unparsable cpu size gracefully",
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				CPUs: "unparsable",
 			},
 		},
 		{
 			name: "non-zero cpu size hint and empty CPUs",
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				CPUs: "1",
 			},
 		},
 		{
 			name: "hint corresponding to given CPU",
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				CPUs: "1,2",
 			},
 			cpus:     cpuset.NewCPUSet(1),
@@ -72,25 +72,25 @@ func TestNumaHintScore(t *testing.T) {
 	tcases := []struct {
 		name     string
 		expected float64
-		hint     topology.TopologyHint
+		hint     topology.Hint
 		ids      []system.ID
 	}{
 		{
 			name: "handle unparsable NUMAs gracefully",
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				NUMAs: "unparsable",
 			},
 		},
 		{
 			name: "non-zero NUMA hint and empty NUMAs",
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				NUMAs: "1",
 			},
 		},
 		{
 			name: "hint corresponding to a given ID",
 			ids:  []system.ID{1},
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				NUMAs: "1,2",
 			},
 			expected: 1.0,
@@ -110,25 +110,25 @@ func TestSocketHintScore(t *testing.T) {
 	tcases := []struct {
 		name     string
 		expected float64
-		hint     topology.TopologyHint
+		hint     topology.Hint
 		id       system.ID
 	}{
 		{
 			name: "handle unparsable Sockets gracefully",
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				Sockets: "unparsable",
 			},
 		},
 		{
 			name: "non-zero Sockets hint and empty Sockets",
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				Sockets: "1",
 			},
 		},
 		{
 			name: "hint corresponding to a given ID",
 			id:   1,
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				Sockets: "1,2",
 			},
 			expected: 1.0,
@@ -148,13 +148,13 @@ func TestHintCpus(t *testing.T) {
 	tcases := []struct {
 		name     string
 		supply   *cpuSupply
-		hint     topology.TopologyHint
+		hint     topology.Hint
 		expected cpuset.CPUSet
 	}{
 		{
 			name:   "handle unparsable Sockets gracefully",
 			supply: &cpuSupply{},
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				Sockets: "unparsable",
 			},
 		},
@@ -167,14 +167,14 @@ func TestHintCpus(t *testing.T) {
 					},
 				},
 			},
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				Sockets: "1",
 			},
 		},
 		{
 			name:   "handle unparsable NUMAs gracefully",
 			supply: &cpuSupply{},
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				NUMAs: "unparsable",
 			},
 		},
@@ -187,7 +187,7 @@ func TestHintCpus(t *testing.T) {
 					},
 				},
 			},
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				NUMAs: "1",
 			},
 		},
@@ -195,7 +195,7 @@ func TestHintCpus(t *testing.T) {
 		{
 			name:   "non-zero CPUs hint",
 			supply: &cpuSupply{},
-			hint: topology.TopologyHint{
+			hint: topology.Hint{
 				CPUs: "1",
 			},
 			expected: cpuset.NewCPUSet(1),
@@ -228,25 +228,25 @@ func TestString(t *testing.T) {
 		{
 			name: "non-empty CPUs",
 			fh: fakehints{
-				"key1": topology.TopologyHints{
-					"testkey3": topology.TopologyHint{ // TODO(rojkov): this is bug - this value gets ignored
+				"key1": topology.Hints{
+					"testkey3": topology.Hint{ // TODO(rojkov): this is bug - this value gets ignored
 						CPUs:    "2",
 						NUMAs:   "2",
 						Sockets: "2",
 					},
-					"testkey2": topology.TopologyHint{
+					"testkey2": topology.Hint{
 						CPUs:    "2",
 						NUMAs:   "2",
 						Sockets: "2",
 					},
 				},
-				"key2": topology.TopologyHints{
-					"testkey3": topology.TopologyHint{ // TODO(rojkov): this is bug - this value gets ignored
+				"key2": topology.Hints{
+					"testkey3": topology.Hint{ // TODO(rojkov): this is bug - this value gets ignored
 						CPUs:    "2",
 						NUMAs:   "2",
 						Sockets: "2",
 					},
-					"testkey2": topology.TopologyHint{
+					"testkey2": topology.Hint{
 						CPUs:    "2",
 						NUMAs:   "2",
 						Sockets: "2",

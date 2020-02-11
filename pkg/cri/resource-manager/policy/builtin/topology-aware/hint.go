@@ -23,7 +23,7 @@ import (
 )
 
 // Calculate the hint score of the given hint and CPUSet.
-func cpuHintScore(hint topology.TopologyHint, CPUs cpuset.CPUSet) float64 {
+func cpuHintScore(hint topology.Hint, CPUs cpuset.CPUSet) float64 {
 	hCPUs, err := cpuset.Parse(hint.CPUs)
 	if err != nil {
 		log.Warn("invalid hint CPUs '%s' from %s", hint.CPUs, hint.Provider)
@@ -34,7 +34,7 @@ func cpuHintScore(hint topology.TopologyHint, CPUs cpuset.CPUSet) float64 {
 }
 
 // Calculate the NUMA node score of the given hint and NUMA node.
-func numaHintScore(hint topology.TopologyHint, sysIDs ...system.ID) float64 {
+func numaHintScore(hint topology.Hint, sysIDs ...system.ID) float64 {
 	for _, idstr := range strings.Split(hint.NUMAs, ",") {
 		hID, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
@@ -53,7 +53,7 @@ func numaHintScore(hint topology.TopologyHint, sysIDs ...system.ID) float64 {
 }
 
 // Calculate the socket node score of the given hint and NUMA node.
-func socketHintScore(hint topology.TopologyHint, sysID system.ID) float64 {
+func socketHintScore(hint topology.Hint, sysID system.ID) float64 {
 	for _, idstr := range strings.Split(hint.Sockets, ",") {
 		id, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
@@ -69,7 +69,7 @@ func socketHintScore(hint topology.TopologyHint, sysID system.ID) float64 {
 }
 
 // return the cpuset for the CPU, NUMA or socket hints, preferred in this particular order.
-func (cs *cpuSupply) hintCpus(h topology.TopologyHint) cpuset.CPUSet {
+func (cs *cpuSupply) hintCpus(h topology.Hint) cpuset.CPUSet {
 	var cpus cpuset.CPUSet
 
 	switch {
