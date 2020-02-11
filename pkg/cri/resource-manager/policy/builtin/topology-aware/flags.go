@@ -36,8 +36,8 @@ type options struct {
 // Our runtime configuration.
 var opt = defaultOptions().(*options)
 
-// fakeHints is our flag.Value for per-pod or per-container faked topology.TopologyHints.
-type fakehints map[string]topology.TopologyHints
+// fakeHints is our flag.Value for per-pod or per-container faked topology.Hints.
+type fakehints map[string]topology.Hints
 
 // newFakeHints creates a new set of fake hints.
 func newFakeHints() fakehints {

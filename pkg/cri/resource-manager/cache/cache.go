@@ -260,7 +260,7 @@ type Container interface {
 	DeleteDevice(string)
 
 	// Get any attached topology hints.
-	GetTopologyHints() topology.TopologyHints
+	GetTopologyHints() topology.Hints
 
 	// GetCPUPeriod gets the CFS CPU period of the container.
 	GetCPUPeriod() int64
@@ -338,24 +338,24 @@ type Container interface {
 
 // A cached container.
 type container struct {
-	cache         *cache                 // our cache of objects
-	ID            string                 // container runtime id
-	PodID         string                 // associate pods runtime id
-	CacheID       string                 // our cache id
-	Name          string                 // container name
-	Namespace     string                 // container namespace
-	State         ContainerState         // created/running/exited/unknown
-	QOSClass      v1.PodQOSClass         // QoS class, if the container had one
-	Image         string                 // containers image
-	Command       []string               // command to run in container
-	Args          []string               // arguments for command
-	Labels        map[string]string      // container labels
-	Annotations   map[string]string      // container annotations
-	Env           map[string]string      // environment variables
-	Mounts        map[string]*Mount      // mounts
-	Devices       map[string]*Device     // devices
-	TopologyHints topology.TopologyHints // Set of topology hints for all containers within Pod
-	Tags          map[string]string      // container tags (local dynamic labels)
+	cache         *cache             // our cache of objects
+	ID            string             // container runtime id
+	PodID         string             // associate pods runtime id
+	CacheID       string             // our cache id
+	Name          string             // container name
+	Namespace     string             // container namespace
+	State         ContainerState     // created/running/exited/unknown
+	QOSClass      v1.PodQOSClass     // QoS class, if the container had one
+	Image         string             // containers image
+	Command       []string           // command to run in container
+	Args          []string           // arguments for command
+	Labels        map[string]string  // container labels
+	Annotations   map[string]string  // container annotations
+	Env           map[string]string  // environment variables
+	Mounts        map[string]*Mount  // mounts
+	Devices       map[string]*Device // devices
+	TopologyHints topology.Hints     // Set of topology hints for all containers within Pod
+	Tags          map[string]string  // container tags (local dynamic labels)
 
 	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations

@@ -208,8 +208,8 @@ func (m *mockContainer) InsertDevice(*cache.Device) {
 func (m *mockContainer) DeleteDevice(string) {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetTopologyHints() topology.TopologyHints {
-	return topology.TopologyHints{}
+func (m *mockContainer) GetTopologyHints() topology.Hints {
+	return topology.Hints{}
 }
 func (m *mockContainer) GetCPUPeriod() int64 {
 	panic("unimplemented")

@@ -495,7 +495,7 @@ func (c *container) DeleteDevice(path string) {
 	}
 }
 
-func (c *container) GetTopologyHints() topology.TopologyHints {
+func (c *container) GetTopologyHints() topology.Hints {
 	return c.TopologyHints
 }
 
@@ -609,12 +609,12 @@ func (c *container) SetCpusetMems(value string) {
 	c.markPending(CRI)
 }
 
-func getTopologyHints(hostPath, containerPath string, readOnly bool) topology.TopologyHints {
+func getTopologyHints(hostPath, containerPath string, readOnly bool) topology.Hints {
 
 	if readOnly {
 		// if device or path is read-only, assume it as non-important for now
 		// TODO: determine topology hint, but use it with low priority
-		return topology.TopologyHints{}
+		return topology.Hints{}
 	}
 
 	// ignore topology information for small files in /etc, service files in /var/lib/kubelet and host libraries mounts
@@ -622,7 +622,7 @@ func getTopologyHints(hostPath, containerPath string, readOnly bool) topology.To
 
 	for _, path := range ignoredTopologyPaths {
 		if strings.HasPrefix(hostPath, path) || strings.HasPrefix(containerPath, path) {
-			return topology.TopologyHints{}
+			return topology.Hints{}
 		}
 	}
 
@@ -634,7 +634,7 @@ func getTopologyHints(hostPath, containerPath string, readOnly bool) topology.To
 	}
 	for _, re := range ignoredTopologyPathRegexps {
 		if re.MatchString(hostPath) || re.MatchString(containerPath) {
-			return topology.TopologyHints{}
+			return topology.Hints{}
 		}
 	}
 
@@ -645,13 +645,13 @@ func getTopologyHints(hostPath, containerPath string, readOnly bool) topology.To
 		}
 	}
 
-	return topology.TopologyHints{}
+	return topology.Hints{}
 }
 
-func getKubeletHint(cpus, mems string) (ret topology.TopologyHints) {
+func getKubeletHint(cpus, mems string) (ret topology.Hints) {
 	if cpus != "" || mems != "" {
-		ret = topology.TopologyHints{
-			topology.ProviderKubelet: topology.TopologyHint{
+		ret = topology.Hints{
+			topology.ProviderKubelet: topology.Hint{
 				Provider: topology.ProviderKubelet,
 				CPUs:     cpus,
 				NUMAs:    mems}}
