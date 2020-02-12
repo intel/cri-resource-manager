@@ -50,6 +50,14 @@ LDFLAGS  = -ldflags "-X=github.com/intel/cri-resource-manager/pkg/version.Versio
                      -X=github.com/intel/cri-resource-manager/pkg/version.Build=$$gitbuildid \
                      -B 0x$(BUILD_ID)"
 
+# Build non-optimized version for debugging on make DEBUG=1.
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+    GCFLAGS=-gcflags "all=-N -l"
+else
+    GCFLAGS=
+endif
+
 # Tarball timestamp, tar-related commands.
 TAR          := tar
 TIME_STAMP   := $(shell date +%Y%m%d)
@@ -118,7 +126,7 @@ bin/%:
 	echo "Building $@ (version $$gitversion, build $$gitbuildid)..."; \
 	mkdir -p bin && \
 	cd $$src && \
-	    $(GO_BUILD) $(LDFLAGS) -o ../../bin/$$bin
+	    $(GO_BUILD) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
 
 install-bin-%: bin/%
 	$(Q)bin=$(patsubst install-bin-%,%,$@); dir=cmd/$$bin; \
