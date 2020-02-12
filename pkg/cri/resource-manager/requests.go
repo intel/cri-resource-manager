@@ -415,7 +415,14 @@ func (m *resmgr) RebalanceContainers() error {
 	m.Info("rebalancing (reallocating) containers...")
 
 	method := "Rebalance"
-	changes, err := m.policy.Rebalance()
+	changes := false
+	var err error
+
+	if m.policy == nil {
+		err = resmgrError("policy is nil")
+	} else {
+		changes, err = m.policy.Rebalance()
+	}
 
 	if err != nil {
 		m.Error("%s: rebalancing of containers failed: %v", method, err)
