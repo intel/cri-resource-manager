@@ -21,7 +21,8 @@ PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
 CLANG := clang
 KERNEL_VERSION ?= $(shell uname -r)
-KERNEL_SRC_DIR ?= /usr/src/kernels/$(KERNEL_VERSION)
+KERNEL_SRC_DIR ?= /lib/modules/$(KERNEL_VERSION)/source
+KERNEL_BUILD_DIR ?= /lib/modules/$(KERNEL_VERSION)/build
 
 # Binaries and directories for installation.
 PREFIX     ?= /usr
@@ -115,10 +116,20 @@ images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 # Rules for building and installing binaries, or building docker images, and cleaning up.
 #
 
+KERNEL_INCLUDE_DIRS = /include \
+                      /include/uapi \
+                      /include/generated/uapi \
+                      /arch/x86/include \
+                      /arch/x86/include/uapi \
+                      /arch/x86/include/generated/uapi
+
+KERNEL_INCLUDES := $(strip $(foreach kernel_dir,$(KERNEL_SRC_DIR) $(KERNEL_BUILD_DIR),$(addprefix -I,$(wildcard $(addprefix $(kernel_dir),$(KERNEL_INCLUDE_DIRS))))))
+
 libexec/%.o: elf/%.c
+	$(Q)if [ -z "$(KERNEL_INCLUDES)" ]; then echo "Cannot build $@: invalid KERNEL_SRC_DIR=$(KERNEL_SRC_DIR)"; exit 1; fi
 	$(Q)echo "Building $@"
 	$(Q)mkdir -p libexec
-	$(CLANG) -I$(KERNEL_SRC_DIR)/arch/x86/include -I$(KERNEL_SRC_DIR)/arch/x86/include/uapi -I$(KERNEL_SRC_DIR)/include -O2 -Wall -target bpf -c $< -o $@
+	$(Q)$(CLANG) -nostdinc -D __KERNEL__ $(KERNEL_INCLUDES) -O2 -Wall -target bpf -c $< -o $@
 
 bin/%:
 	$(Q)bin=$(notdir $@); src=cmd/$$bin; \
