@@ -76,6 +76,51 @@ func getDevicesFromVirtual(realDevPath string) (devs []string, err error) {
 	}
 }
 
+func getTopologyHint(sysFSPath string) (*Hint, error) {
+	hint := Hint{Provider: sysFSPath}
+	fileMap := map[string]*string{
+		"local_cpulist": &hint.CPUs,
+		"numa_node":     &hint.NUMAs,
+	}
+	if err := readFilesInDirectory(fileMap, sysFSPath); err != nil {
+		return nil, err
+	}
+	// Workarounds for broken information provided by kernel
+	if hint.NUMAs == "-1" {
+		// non-NUMA aware device or system, ignore it
+		hint.NUMAs = ""
+	}
+	if hint.NUMAs != "" && hint.CPUs == "" {
+		// broken topology hint. BIOS reports socket id as NUMA node
+		// First, try to get hints from parent device or bus.
+		parentHints, er := NewTopologyHints(filepath.Dir(sysFSPath))
+		if er == nil {
+			cpulist := map[string]bool{}
+			numalist := map[string]bool{}
+			for _, h := range parentHints {
+				if h.CPUs != "" {
+					cpulist[h.CPUs] = true
+				}
+				if h.NUMAs != "" {
+					numalist[h.NUMAs] = true
+				}
+			}
+			if cpus := strings.Join(mapKeys(cpulist), ","); cpus != "" {
+				hint.CPUs = cpus
+			}
+			if numas := strings.Join(mapKeys(numalist), ","); numas != "" {
+				hint.NUMAs = numas
+			}
+		}
+		// if after parent hints we still don't have CPUs hints, use numa hint as sockets.
+		if hint.CPUs == "" && hint.NUMAs != "" {
+			hint.Sockets = hint.NUMAs
+			hint.NUMAs = ""
+		}
+	}
+	return &hint, nil
+}
+
 // NewTopologyHints return array of hints for the device and its slaves (e.g. RAID).
 func NewTopologyHints(devPath string) (hints Hints, err error) {
 	hints = make(Hints)
@@ -84,49 +129,12 @@ func NewTopologyHints(devPath string) (hints Hints, err error) {
 		return nil, errors.Wrapf(err, "failed get realpath for %s", devPath)
 	}
 	for p := realDevPath; strings.HasPrefix(p, mockRoot+"/sys/devices/"); p = filepath.Dir(p) {
-		hint := Hint{Provider: p}
-		fileMap := map[string]*string{
-			"local_cpulist": &hint.CPUs,
-			"numa_node":     &hint.NUMAs,
-		}
-		if err = readFilesInDirectory(fileMap, p); err != nil {
+		hint, err := getTopologyHint(p)
+		if err != nil {
 			return nil, err
 		}
-		// Workarounds for broken information provided by kernel
-		if hint.NUMAs == "-1" {
-			// non-NUMA aware device or system, ignore it
-			hint.NUMAs = ""
-		}
-		if hint.NUMAs != "" && hint.CPUs == "" {
-			// broken topology hint. BIOS reports socket id as NUMA node
-			// First, try to get hints from parent device or bus.
-			parentHints, er := NewTopologyHints(filepath.Dir(p))
-			if er == nil {
-				cpulist := map[string]bool{}
-				numalist := map[string]bool{}
-				for _, h := range parentHints {
-					if h.CPUs != "" {
-						cpulist[h.CPUs] = true
-					}
-					if h.NUMAs != "" {
-						numalist[h.NUMAs] = true
-					}
-				}
-				if cpus := strings.Join(mapKeys(cpulist), ","); cpus != "" {
-					hint.CPUs = cpus
-				}
-				if numas := strings.Join(mapKeys(numalist), ","); numas != "" {
-					hint.NUMAs = numas
-				}
-			}
-			// if after parent hints we still don't have CPUs hints, use numa hint as sockets.
-			if hint.CPUs == "" && hint.NUMAs != "" {
-				hint.Sockets = hint.NUMAs
-				hint.NUMAs = ""
-			}
-		}
 		if hint.CPUs != "" || hint.NUMAs != "" || hint.Sockets != "" {
-			hints[hint.Provider] = hint
+			hints[hint.Provider] = *hint
 			break
 		}
 	}
