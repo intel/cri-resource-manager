@@ -1,8 +1,5 @@
 #include <uapi/linux/bpf.h>
 #include <asm/page_types.h>
-
-/* asm/fpu/types.h assumes __packed is defined */
-#define __packed __attribute__((packed))
 #include <asm/fpu/types.h>
 
 #define SEC(NAME) __attribute__((section(NAME), used))
