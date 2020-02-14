@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation. All Rights Reserved.
+// Copyright 2019-2020 Intel Corporation. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,56 +15,38 @@
 package instrumentation
 
 import (
-	"context"
 	"net/http"
 )
 
-// Notes: currently there is no proper locking here for the singletons.
-
-// Our singleton HTTP server.
-var srv *http.Server
-
-// Our singleton HTTP request multiplexer.
-var mux *http.ServeMux
-
-// GetHTTPMux get our singleton HTTP request multiplexer for instrumentation.
-func GetHTTPMux() *http.ServeMux {
-	if mux == nil {
-		mux = http.NewServeMux()
-	}
-	return mux
+// createHTTP creates our HTTP server and request multiplexer.
+func (s *Service) createHTTP() {
+	s.reqmux = http.NewServeMux()
+	s.server = &http.Server{Handler: s}
 }
 
-// GetHTTPServer returns our singleton HTTP server.
-func GetHTTPServer() *http.Server {
-	if srv == nil {
-		srv = &http.Server{Handler: GetHTTPMux()}
-	}
-	return srv
+// startHTTP starts our HTTP server.
+func (s *Service) startHTTP() {
+	s.server.Addr = opt.Metrics
+	go s.server.ListenAndServe()
 }
 
-// HTTPStart starts our HTTP server.
-func HTTPStart() error {
-	log.Debug("starting HTTP server...")
+// closeHTTP Close()s HTTP server.
+func (s *Service) closeHTTP() error {
+	err := s.server.Close()
+	s.server = nil
+	s.reqmux = nil
 
-	srv := GetHTTPServer()
-	srv.Addr = opt.Metrics
-	go srv.ListenAndServe()
-	return nil
-}
-
-// HTTPClose Close()'s our HTTP server.
-func HTTPClose() error {
-	srv = GetHTTPServer()
-	err := srv.Close()
-	srv = nil
 	return err
 }
 
-// HTTPShutdown does a graceful Shutdown() of our HTTP server.
-func HTTPShutdown() error {
-	srv = GetHTTPServer()
-	err := srv.Shutdown(context.Background())
-	srv = nil
-	return err
+// ServeHTTP is our implementation of the http.Handler interface.
+func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.RLock()
+	defer s.RUnlock()
+
+	h, pattern := s.reqmux.Handler(r)
+	if pattern == "" {
+		h, _ = s.ServeMux.Handler(r)
+	}
+	h.ServeHTTP(w, r)
 }
