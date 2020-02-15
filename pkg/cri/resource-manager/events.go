@@ -133,7 +133,5 @@ func (m *resmgr) processAvx(e *metrics.AvxEvent) bool {
 
 // resolveCgroupPath resolves a cgroup path to a container.
 func (m *resmgr) resolveCgroupPath(path string) (cache.Container, bool) {
-	m.Lock()
-	defer m.Unlock()
 	return m.cache.LookupContainerByCgroup(path)
 }
