@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	builtInCollectors    = make(map[string]InitCollector)
-	registeredCollectors = []prometheus.Collector{}
-	log                  = logger.NewLogger("collectors")
+	builtInCollectors     = make(map[string]InitCollector)
+	registeredCollectors  = []prometheus.Collector{}
+	initializedCollectors = make(map[string]struct{})
+	log                   = logger.NewLogger("collectors")
 )
 
 // InitCollector is the type for functions that initialize collectors.
@@ -32,12 +33,17 @@ func RegisterCollector(name string, init InitCollector) error {
 func NewMetricGatherer() (prometheus.Gatherer, error) {
 	reg := prometheus.NewPedanticRegistry()
 
-	for _, cb := range builtInCollectors {
+	for name, cb := range builtInCollectors {
+		if _, ok := initializedCollectors[name]; ok {
+			continue
+		}
+
 		c, err := cb()
 		if err != nil {
 			return nil, err
 		}
 		registeredCollectors = append(registeredCollectors, c)
+		initializedCollectors[name] = struct{}{}
 	}
 
 	reg.MustRegister(registeredCollectors[:]...)
