@@ -40,7 +40,8 @@ func NewMetricGatherer() (prometheus.Gatherer, error) {
 
 		c, err := cb()
 		if err != nil {
-			return nil, err
+			log.Error("Failed to initialize collector '%s': %v. Skipping it.", name, err)
+			continue
 		}
 		registeredCollectors = append(registeredCollectors, c)
 		initializedCollectors[name] = struct{}{}
