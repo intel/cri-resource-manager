@@ -8,17 +8,15 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1
-	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
 	github.com/iovisor/gobpf v0.0.0-20191024162143-7c8f8e040b4b
-	github.com/minio/sha256-simd v0.1.1
-	github.com/pkg/errors v0.8.1
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.2.1
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
 	github.com/prometheus/common v0.7.0
 	go.opencensus.io v0.22.2
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
-	golang.org/x/sys v0.0.0-20191113165036-4c7a9d0fe056
+	golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5
 	google.golang.org/grpc v1.20.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
