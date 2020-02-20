@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation. All Rights Reserved.
+// Copyright 2019-2020 Intel Corporation. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,8 +33,6 @@ const (
 	Production TraceConfig = 0.1
 	// Testing is a trace configuration for testing.
 	Testing TraceConfig = 1.0
-	// Full is the trace configuration for full probabilistic sampling.
-	Full TraceConfig = 1.0
 	// defaultCollector is the default Jaeger collector endpoint.
 	defaultCollector = "http://localhost:14268/api/traces"
 	// defaultAgent is the default Jeager agent endpoint.
@@ -57,7 +55,6 @@ type options struct {
 
 // Our instrumentation options.
 var opt = defaultOptions().(*options)
-var cfg = opt
 
 // MarshalJSON is the JSON marshaller for TraceConfig values.
 func (tc TraceConfig) MarshalJSON() ([]byte, error) {
@@ -66,8 +63,6 @@ func (tc TraceConfig) MarshalJSON() ([]byte, error) {
 		return json.Marshal("disabled")
 	case tc <= 0.1:
 		return json.Marshal("production")
-	case tc == 1.0:
-		return json.Marshal("full")
 	case tc >= 0.95:
 		return json.Marshal("testing")
 	}
@@ -78,7 +73,7 @@ func (tc TraceConfig) MarshalJSON() ([]byte, error) {
 func (tc *TraceConfig) UnmarshalJSON(raw []byte) error {
 	var obj interface{}
 	if err := json.Unmarshal(raw, &obj); err != nil {
-		return traceError("failed to unmarshal TraceConfig value:%v", err)
+		return instrumentationError("failed to unmarshal TraceConfig value:%v", err)
 	}
 	switch obj.(type) {
 	case string:
@@ -89,15 +84,13 @@ func (tc *TraceConfig) UnmarshalJSON(raw []byte) error {
 			*tc = Testing
 		case "production":
 			*tc = Production
-		case "full":
-			*tc = Full
 		default:
-			return traceError("invalid TraceConfig value '%s'", obj.(string))
+			return instrumentationError("invalid TraceConfig value '%s'", obj.(string))
 		}
 	case float64:
 		*tc = obj.(TraceConfig)
 	default:
-		return traceError("invalid TraceConfig value of type %T: %v", obj, obj)
+		return instrumentationError("invalid TraceConfig value of type %T: %v", obj, obj)
 	}
 	return nil
 }
@@ -109,8 +102,6 @@ func (tc TraceConfig) String() string {
 		return "disabled"
 	case tc <= 0.1:
 		return "production"
-	case tc == 1.0:
-		return "full"
 	case tc >= 0.95:
 		return "testing"
 	}
@@ -155,17 +146,12 @@ func defaultOptions() interface{} {
 
 // configNotify is our configuration udpate notification handler.
 func configNotify(event config.Event, source config.Source) error {
-	log.Info("instrumentation configuration is now %v", opt.Trace)
+	log.Info("instrumentation configuration is now %v", opt)
 
-	// If some endpoint changed restart ourself, otherwise just update tracing configuration.
-	if opt.Collector != cfg.Collector || opt.Agent != cfg.Agent || opt.Metrics != cfg.Metrics {
-		log.Info("some endpoint have changed, restarting instrumentation...")
-		Stop()
-		Start()
-	} else {
-		ConfigureTracing(opt.Trace)
+	log.Info("restarting...")
+	if err := Restart(); err != nil {
+		log.Error("failed to restart instrumentation: %v", err)
 	}
-	*cfg = *opt
 
 	return nil
 }
