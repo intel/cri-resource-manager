@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -25,6 +26,8 @@ import (
 	"github.com/prometheus/common/expfmt"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+
+	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	"github.com/intel/cri-resource-manager/pkg/metrics"
 	// pull in all metrics collectors
 	_ "github.com/intel/cri-resource-manager/pkg/metrics/register"
@@ -52,10 +55,12 @@ type Options struct {
 
 // Metrics implements collecting, caching and processing of raw metrics.
 type Metrics struct {
+	sync.RWMutex
 	opts Options               // metrics collecting options
 	g    prometheus.Gatherer   // prometheus/raw metrics gatherer
 	stop chan interface{}      // channel to stop polling goroutine
 	raw  []*model.MetricFamily // latest set of raw metrics
+	pend []*model.MetricFamily // pending metrics for forwarding
 }
 
 // Our logger instance.
@@ -75,11 +80,16 @@ func NewMetrics(opts Options) (*Metrics, error) {
 		return nil, metricsError("failed to create raw metrics gatherer: %v", err)
 	}
 
-	return &Metrics{
+	m := &Metrics{
 		opts: opts,
 		raw:  make([]*model.MetricFamily, 0),
 		g:    g,
-	}, nil
+	}
+
+	m.poll()
+	instrumentation.RegisterGatherer(m)
+
+	return m, nil
 }
 
 // Start starts metrics collection and processing.
@@ -121,11 +131,15 @@ func (m *Metrics) Stop() {
 
 // poll does a single round of raw metrics collection.
 func (m *Metrics) poll() error {
+	m.Lock()
+	defer m.Unlock()
+
 	f, err := m.g.Gather()
 	if err != nil {
 		return metricsError("failed to poll raw metrics: %v", err)
 	}
 	m.raw = f
+	m.pend = f
 	return nil
 }
 
@@ -150,7 +164,7 @@ func (m *Metrics) sendEvent(e *Event) error {
 	case m.opts.Events <- e:
 		return nil
 	default:
-		return metricsError("failed to deliver event (channel full?)")
+		return metricsError("failed to deliver event %v (channel full?)", *e)
 	}
 }
 

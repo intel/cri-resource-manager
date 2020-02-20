@@ -28,39 +28,48 @@ const (
 	LastUpdateNs = "last_update_ns"
 )
 
-var (
-	lastCPUDesc = prometheus.NewDesc(
+// Prometheus Metric descriptor indices and descriptor table
+const (
+	lastCPUDesc = iota
+	avxSwitchCountDesc
+	allSwitchCountDesc
+	lastUpdateNsDesc
+	numDescriptors
+)
+
+var descriptors = [numDescriptors]*prometheus.Desc{
+	lastCPUDesc: prometheus.NewDesc(
 		LastCPUName,
 		"Number of task switches on the CPU where AVX512 instructions were used.",
 		[]string{
 			"cpu_id",
 		}, nil,
-	)
-
-	avxSwitchCountDesc = prometheus.NewDesc(
+	),
+	avxSwitchCountDesc: prometheus.NewDesc(
 		AVXSwitchCountName,
 		"Number of task switches where AVX512 instructions were used in a particular cgroup.",
 		[]string{
 			"cgroup",
 			"cgroup_id",
 		}, nil,
-	)
-
-	allSwitchCountDesc = prometheus.NewDesc(
+	),
+	allSwitchCountDesc: prometheus.NewDesc(
 		AllSwitchCountName,
 		"Total number of task switches in a particular cgroup.",
 		[]string{
 			"cgroup",
 		}, nil,
-	)
-	lastUpdateNsDesc = prometheus.NewDesc(
+	),
+	lastUpdateNsDesc: prometheus.NewDesc(
 		"last_update_ns",
 		"Time since last AVX512 activity in a particular cgroup.",
 		[]string{
 			"cgroup",
 		}, nil,
-	)
+	),
+}
 
+var (
 	bpfBinaryName  = "avx512.o"
 	bpfInstallpath = "/usr/libexec/bpf"
 
@@ -178,7 +187,9 @@ func NewCollector() (prometheus.Collector, error) {
 
 // Describe implements prometheus.Collector interface
 func (c *collector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(c, ch)
+	for _, d := range descriptors {
+		ch <- d
+	}
 }
 
 // TODO use bpf.NowNanoseconds() after https://github.com/iovisor/gobpf/pull/222
@@ -221,7 +232,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			ch <- prometheus.MustNewConstMetric(
-				avxSwitchCountDesc,
+				descriptors[avxSwitchCountDesc],
 				prometheus.GaugeValue,
 				float64(binary.LittleEndian.Uint32(counters[idx_][0:])),
 				path,
@@ -238,13 +249,13 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			ch <- prometheus.MustNewConstMetric(
-				allSwitchCountDesc,
+				descriptors[allSwitchCountDesc],
 				prometheus.GaugeValue,
 				float64(allCount),
 				path)
 
 			ch <- prometheus.MustNewConstMetric(
-				lastUpdateNsDesc,
+				descriptors[lastUpdateNsDesc],
 				prometheus.GaugeValue,
 				float64(nowNanoseconds()-lastUpdate),
 				path)
@@ -303,7 +314,7 @@ func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
 
 	for idx, lastCPU := range lastCPUs {
 		ch <- prometheus.MustNewConstMetric(
-			lastCPUDesc,
+			descriptors[lastCPUDesc],
 			prometheus.GaugeValue,
 			float64(binary.LittleEndian.Uint32(counters[idx])),
 			fmt.Sprintf("CPU%d", binary.LittleEndian.Uint32(lastCPU)))

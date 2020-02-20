@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation. All Rights Reserved.
+// Copyright 2020 Intel Corporation. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package instrumentation
+package metrics
 
 import (
-	"fmt"
+	model "github.com/prometheus/client_model/go"
 )
 
-// traceError creates a formatted error related to instrumentation.
-func traceError(format string, args ...interface{}) error {
-	return fmt.Errorf("instrumentation: "+format, args...)
+// Gather is our prometheus.Gatherer interface for proxying metrics.
+func (m *Metrics) Gather() ([]*model.MetricFamily, error) {
+	m.Lock()
+	pend := m.pend
+	m.Unlock()
+
+	if pend == nil {
+		log.Info("no data to proxy to prometheus...")
+	} else {
+		log.Info("proxying data to prometheus...")
+	}
+
+	return pend, nil
 }
