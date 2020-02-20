@@ -32,10 +32,11 @@ func RegisterCollector(name string, init InitCollector) error {
 func NewMetricGatherer() (prometheus.Gatherer, error) {
 	reg := prometheus.NewPedanticRegistry()
 
-	for _, cb := range builtInCollectors {
+	for n, cb := range builtInCollectors {
 		c, err := cb()
 		if err != nil {
-			return nil, err
+			log.Error("Failed to initialize collector '%s': %v. Skipping it.", n, err)
+			continue
 		}
 		registeredCollectors = append(registeredCollectors, c)
 	}
