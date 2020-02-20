@@ -28,8 +28,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	numaStatsDesc = prometheus.NewDesc(
+// Prometheus Metric descriptor indices and descriptor table
+const (
+	numaStatsDesc = iota
+	memoryUsageDesc
+	memoryMigrateDesc
+	cpuAcctUsageDesc
+	hugeTlbUsageDesc
+	blkioDeviceUsageDesc
+	numDescriptors
+)
+
+var descriptors = [numDescriptors]*prometheus.Desc{
+	numaStatsDesc: prometheus.NewDesc(
 		"cgroup_numa_stats",
 		"NUMA statistics for a given container and pod.",
 		[]string{
@@ -40,26 +51,23 @@ var (
 			// NUMA memory type
 			"type",
 		}, nil,
-	)
-
-	memoryUsageDesc = prometheus.NewDesc(
+	),
+	memoryUsageDesc: prometheus.NewDesc(
 		"cgroup_memory_usage",
 		"Memory usage statistics for a given container and pod.",
 		[]string{
 			"cgroup_path",
 			"type",
 		}, nil,
-	)
-
-	memoryMigrateDesc = prometheus.NewDesc(
+	),
+	memoryMigrateDesc: prometheus.NewDesc(
 		"cgroup_memory_migrate",
 		"Memory migrate status for a given container and pod.",
 		[]string{
 			"cgroup_path",
 		}, nil,
-	)
-
-	cpuAcctUsageDesc = prometheus.NewDesc(
+	),
+	cpuAcctUsageDesc: prometheus.NewDesc(
 		"cgroup_cpu_acct",
 		"CPU accounting for a given container and pod.",
 		[]string{
@@ -68,9 +76,8 @@ var (
 			"cpu",
 			"type",
 		}, nil,
-	)
-
-	hugeTlbUsageDesc = prometheus.NewDesc(
+	),
+	hugeTlbUsageDesc: prometheus.NewDesc(
 		"cgroup_hugetlb_usage",
 		"Hugepages usage for a given container and pod.",
 		[]string{
@@ -78,9 +85,8 @@ var (
 			"size",
 			"type",
 		}, nil,
-	)
-
-	blkioDeviceUsageDesc = prometheus.NewDesc(
+	),
+	blkioDeviceUsageDesc: prometheus.NewDesc(
 		"cgroup_blkio_device_usage",
 		"Blkio Device bytes usage for a given container and pod.",
 		[]string{
@@ -89,8 +95,8 @@ var (
 			"minor",
 			"operation",
 		}, nil,
-	)
-)
+	),
+}
 
 var (
 	// cgroupRoot is the mount point for the cgroup (v1) filesystem
@@ -113,25 +119,27 @@ func NewCollector() (prometheus.Collector, error) {
 
 // Describe implements prometheus.Collector interface
 func (c *collector) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(c, ch)
+	for _, d := range descriptors {
+		ch <- d
+	}
 }
 
 func updateCPUAcctUsageMetric(ch chan<- prometheus.Metric, path string, metric []cgroups.CPUAcctUsage) {
 	for i, acct := range metric {
 		ch <- prometheus.MustNewConstMetric(
-			cpuAcctUsageDesc,
+			descriptors[cpuAcctUsageDesc],
 			prometheus.CounterValue,
 			float64(acct.CPU),
 			path, strconv.FormatInt(int64(i), 10), "CPU",
 		)
 		ch <- prometheus.MustNewConstMetric(
-			cpuAcctUsageDesc,
+			descriptors[cpuAcctUsageDesc],
 			prometheus.CounterValue,
 			float64(acct.User),
 			path, strconv.FormatInt(int64(i), 10), "User",
 		)
 		ch <- prometheus.MustNewConstMetric(
-			cpuAcctUsageDesc,
+			descriptors[cpuAcctUsageDesc],
 			prometheus.CounterValue,
 			float64(acct.System),
 			path, strconv.FormatInt(int64(i), 10), "System",
@@ -145,7 +153,7 @@ func updateMemoryMigrateMetric(ch chan<- prometheus.Metric, path string, migrate
 		migrateValue = 1
 	}
 	ch <- prometheus.MustNewConstMetric(
-		memoryMigrateDesc,
+		descriptors[memoryMigrateDesc],
 		prometheus.GaugeValue,
 		float64(migrateValue),
 		path,
@@ -154,13 +162,13 @@ func updateMemoryMigrateMetric(ch chan<- prometheus.Metric, path string, migrate
 
 func updateMemoryUsageMetric(ch chan<- prometheus.Metric, path string, metric cgroups.MemoryUsage) {
 	ch <- prometheus.MustNewConstMetric(
-		memoryUsageDesc,
+		descriptors[memoryUsageDesc],
 		prometheus.GaugeValue,
 		float64(metric.Bytes),
 		path, "Bytes",
 	)
 	ch <- prometheus.MustNewConstMetric(
-		memoryUsageDesc,
+		descriptors[memoryUsageDesc],
 		prometheus.GaugeValue,
 		float64(metric.MaxBytes),
 		path, "MaxBytes",
@@ -172,7 +180,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 
 	for key, value := range metric.Total.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "Total",
@@ -180,7 +188,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 	}
 	for key, value := range metric.File.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "File",
@@ -188,7 +196,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 	}
 	for key, value := range metric.Anon.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "Anon",
@@ -196,7 +204,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 	}
 	for key, value := range metric.Unevictable.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "Unevictable",
@@ -204,7 +212,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 	}
 	for key, value := range metric.HierarchicalTotal.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "HierarchicalTotal",
@@ -212,7 +220,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 	}
 	for key, value := range metric.HierarchicalFile.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "HierarchicalFile",
@@ -220,7 +228,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 	}
 	for key, value := range metric.HierarchicalAnon.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "HierarchicalAnon",
@@ -228,7 +236,7 @@ func updateNumaStatMetric(ch chan<- prometheus.Metric, path string, metric cgrou
 	}
 	for key, value := range metric.HierarchicalUnevictable.Nodes {
 		ch <- prometheus.MustNewConstMetric(
-			numaStatsDesc,
+			descriptors[numaStatsDesc],
 			prometheus.GaugeValue,
 			float64(value),
 			path, key, "HierarchicalUnevictable",
@@ -240,13 +248,13 @@ func updateHugeTlbUsageMetric(ch chan<- prometheus.Metric, path string, metric [
 	// One HugeTlbUsage for each size.
 	for _, hugeTlbUsage := range metric {
 		ch <- prometheus.MustNewConstMetric(
-			hugeTlbUsageDesc,
+			descriptors[hugeTlbUsageDesc],
 			prometheus.GaugeValue,
 			float64(hugeTlbUsage.Bytes),
 			path, hugeTlbUsage.Size, "Bytes",
 		)
 		ch <- prometheus.MustNewConstMetric(
-			hugeTlbUsageDesc,
+			descriptors[hugeTlbUsageDesc],
 			prometheus.GaugeValue,
 			float64(hugeTlbUsage.MaxBytes),
 			path, hugeTlbUsage.Size, "MaxBytes",
@@ -258,7 +266,7 @@ func updateBlkioDeviceUsageMetric(ch chan<- prometheus.Metric, path string, metr
 	for _, deviceBytes := range metric.DeviceBytes {
 		for operation, val := range deviceBytes.Operations {
 			ch <- prometheus.MustNewConstMetric(
-				blkioDeviceUsageDesc,
+				descriptors[blkioDeviceUsageDesc],
 				prometheus.CounterValue,
 				float64(val),
 				path, strconv.FormatInt(int64(deviceBytes.Major), 10),
