@@ -25,9 +25,9 @@ func (m *Metrics) Gather() ([]*model.MetricFamily, error) {
 	m.Unlock()
 
 	if pend == nil {
-		log.Info("no data to proxy to prometheus...")
+		log.Debug("no data to proxy to prometheus...")
 	} else {
-		log.Info("proxying data to prometheus...")
+		log.Debug("proxying data to prometheus...")
 	}
 
 	return pend, nil
