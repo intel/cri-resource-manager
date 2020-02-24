@@ -16,11 +16,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
@@ -28,31 +30,37 @@ import (
 	version "github.com/intel/cri-resource-manager/pkg/version"
 )
 
+var log = logger.Default()
+
 func main() {
-	var printConfig bool
-
-	log := logger.Default()
-
-	flag.BoolVar(&printConfig, "print-config", false, "Print configuration and exit.")
+	printConfig := flag.Bool("print-config", false, "Print configuration and exit.")
+	listPolicies := flag.Bool("list-policies", false, "List available policies.")
 	flag.Parse()
 
-	if len(flag.Args()) != 0 {
-		args := flag.Args()
-
-		switch args[0] {
-		case "config-help", "help":
-			config.Describe(args[1:]...)
-			os.Exit(0)
-		default:
-			log.Error("unknown command line arguments: %s", strings.Join(flag.Args(), ","))
-			flag.Usage()
-		}
-		os.Exit(1)
-	}
-
-	if printConfig {
+	switch {
+	case *printConfig:
 		config.Print(nil)
 		os.Exit(0)
+
+	case *listPolicies:
+		fmt.Printf("Available policies:\n")
+		for _, available := range policy.AvailablePolicies() {
+			fmt.Printf("  * %s: %s\n", available.Name, available.Description)
+		}
+		os.Exit(0)
+
+	default:
+		if args := flag.Args(); len(args) > 0 {
+			switch args[0] {
+			case "config-help", "help":
+				config.Describe(args[1:]...)
+				os.Exit(0)
+			default:
+				log.Error("unknown command line arguments: %s", strings.Join(flag.Args(), ","))
+				flag.Usage()
+				os.Exit(1)
+			}
+		}
 	}
 
 	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
