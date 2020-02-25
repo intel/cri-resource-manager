@@ -96,7 +96,7 @@ func WaitForServer(socket string, timeout time.Duration, opts ...interface{}) er
 
 // ServerActiveAt checks if a gRPC server is accepting connections at the socket.
 func ServerActiveAt(socket string) bool {
-	return WaitForServer(socket, 1*time.Microsecond) == nil
+	return WaitForServer(socket, time.Second) == nil
 }
 
 // Check if a socket connection error looks fatal.
@@ -153,7 +153,7 @@ func isFatalDialError(err error) bool {
 			case os.IsNotExist(ne):
 				return false
 			case ne.Err == syscall.ECONNREFUSED:
-				return false
+				return true
 			default:
 				err = ne
 				continue
