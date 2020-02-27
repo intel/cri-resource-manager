@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -57,6 +58,12 @@ func NewConfigServer(cb SetConfigCb) (Server, error) {
 
 // Start runs server instance.
 func (s *server) Start(socket string) error {
+	// Make sure we have a directory for the socket
+	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
+		return serverError("failed to create directory for socket %s: %v",
+			socket, err)
+	}
+
 	// Remove socket file if it exists
 	if err := os.Remove(socket); err != nil && !os.IsNotExist(err) {
 		return serverError("failed to unlink socket file: %s", err)
