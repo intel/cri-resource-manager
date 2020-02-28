@@ -16,16 +16,21 @@ package policy
 
 import (
 	"encoding/json"
-	"github.com/intel/cri-resource-manager/pkg/config"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"sort"
 	"strconv"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+
+	"github.com/intel/cri-resource-manager/pkg/config"
 )
 
 const (
 	// NullPolicy is the reserved name for disabling policy altogether.
 	NullPolicy = "null"
+	// NullPolicyDescription is the description for the null policy.
+	NullPolicyDescription = "A policy to bypass even the agnostic policy layer."
 )
 
 // Options captures our configurable parameters.
@@ -135,6 +140,32 @@ func (d Domain) isEqual(domain interface{}) bool {
 	default:
 		return false
 	}
+}
+
+// AvailablePolicy describes an available policy.
+type AvailablePolicy struct {
+	// Name is the name of the policy.
+	Name string
+	// Description is a short description of the policy.
+	Description string
+}
+
+// AvailablePolicies returns the available policies and their descriptions.
+func AvailablePolicies() []*AvailablePolicy {
+	policies := make([]*AvailablePolicy, 0, len(backends)+1)
+	for name, be := range backends {
+		policies = append(policies, &AvailablePolicy{
+			Name:        name,
+			Description: be.description,
+		})
+	}
+	policies = append(policies, &AvailablePolicy{
+		Name:        NullPolicy,
+		Description: NullPolicyDescription,
+	})
+	sort.Slice(policies, func(i, j int) bool { return policies[i].Name < policies[j].Name })
+
+	return policies
 }
 
 // defaultOptions returns a new options instance, all initialized to defaults.
