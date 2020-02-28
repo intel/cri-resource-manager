@@ -521,7 +521,7 @@ func (cg *cpuGrant) String() string {
 
 // takeCPUs takes up to cnt CPUs from a given CPU set to another.
 func takeCPUs(from, to *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
-	cset, err := cpuallocator.AllocateCpus(from, cnt)
+	cset, err := cpuallocator.AllocateCpus(from, cnt, true)
 	if err != nil {
 		return cset, err
 	}

@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"sort"
-	"sync"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -49,9 +48,9 @@ type CPUAllocator struct {
 	sys           sysfs.System  // sysfs CPU and topology information
 	flags         AllocFlag     // allocation preferences
 	from          cpuset.CPUSet // set of CPUs to allocate from
+	preferred     cpuset.CPUSet // set of preferred CPUs
 	cnt           int           // number of CPUs to allocate
 	result        cpuset.CPUSet // set of CPUs allocated
-	offline       cpuset.CPUSet // set of CPUs currently offline
 
 	pkgs []sysfs.CPUPackage // physical CPU packages, sorted by preference
 	cpus []sysfs.CPU        // CPU cores, sorted by preference
@@ -59,14 +58,14 @@ type CPUAllocator struct {
 
 // A singleton wrapper around sysfs.System.
 type sysfsSingleton struct {
-	sync.Once              // we do discovery only once
-	sys       sysfs.System // wrapped sysfs.System instance
-	err       error        // error during recovery
-	cpusets   struct {     // cached cpusets per
+	sys     sysfs.System // wrapped sysfs.System instance
+	err     error        // error during recovery
+	cpusets struct {     // cached cpusets per
 		pkg  map[sysfs.ID]cpuset.CPUSet // package,
 		node map[sysfs.ID]cpuset.CPUSet // node, and
 		core map[sysfs.ID]cpuset.CPUSet // CPU core
 	}
+	priorityCpus cpuset.CPUSet // set of CPUs having higher priority
 }
 
 var system sysfsSingleton
@@ -74,6 +73,10 @@ var debug bool
 
 func init() {
 	flag.BoolVar(&debug, debugFlag, false, "enable CPU allocator debug log")
+
+	if err := system.init(); err != nil {
+		log.Warn("sysfs system discovery failed: %v", err)
+	}
 }
 
 // IDFilter helps filtering Ids.
@@ -85,16 +88,20 @@ type IDSorter func(int, int) bool
 // our logger instance
 var log = logger.NewLogger(logSource)
 
-// Get/discover sysfs.System.
-func (s *sysfsSingleton) get() (sysfs.System, error) {
-	s.Do(func() {
-		s.sys, s.err = sysfs.DiscoverSystem(sysfs.DiscoverCPUTopology)
-		s.cpusets.pkg = make(map[sysfs.ID]cpuset.CPUSet)
-		s.cpusets.node = make(map[sysfs.ID]cpuset.CPUSet)
-		s.cpusets.core = make(map[sysfs.ID]cpuset.CPUSet)
-	})
+// init does system discovery
+func (s *sysfsSingleton) init() error {
+	sys, err := sysfs.DiscoverSystem(sysfs.DiscoverCPUTopology)
+	if err != nil {
+		return err
+	}
+	s.sys = sys
+	s.cpusets.pkg = make(map[sysfs.ID]cpuset.CPUSet)
+	s.cpusets.node = make(map[sysfs.ID]cpuset.CPUSet)
+	s.cpusets.core = make(map[sysfs.ID]cpuset.CPUSet)
 
-	return s.sys, s.err
+	s.discoverPriorityCpus()
+
+	return err
 }
 
 // PackageCPUSet gets the CPUSet for the given package.
@@ -150,10 +157,47 @@ func (s *sysfsSingleton) pick(idSlice []sysfs.ID, f IDFilter) []sysfs.ID {
 	return ids[0:idx]
 }
 
+func (s *sysfsSingleton) discoverPriorityCpus() {
+	s.priorityCpus = cpuset.NewCPUSet()
+	if s.sys == nil {
+		return
+	}
+
+	// Group cpus by base frequency
+	freqs := map[uint64][]sysfs.ID{}
+	for _, id := range s.sys.CPUIDs() {
+		bf := s.sys.CPU(id).BaseFrequency()
+		freqs[bf] = append(freqs[bf], id)
+	}
+
+	// Construct a sorted list of detected frequencies
+	freqList := []uint64{}
+	for freq := range freqs {
+		if freq > 0 {
+			freqList = append(freqList, freq)
+		}
+	}
+	sort.Slice(freqList, func(i, j int) bool {
+		return freqList[i] < freqList[j]
+	})
+
+	// All cpus NOT in the lowest base frequency bin are considered high prio
+	if len(freqList) > 0 {
+		priorityCpus := []sysfs.ID{}
+		for _, freq := range freqList[1:] {
+			priorityCpus = append(priorityCpus, freqs[freq]...)
+		}
+		s.priorityCpus = sysfs.NewIDSet(priorityCpus...).CPUSet()
+	}
+	if s.priorityCpus.Size() > 0 {
+		log.Debug("discovered high priority cpus: %v", s.priorityCpus)
+	}
+}
+
 // NewCPUAllocator creates a new CPU allocator.
 func NewCPUAllocator(sys sysfs.System) *CPUAllocator {
 	if sys == nil {
-		sys, _ = system.get()
+		sys = system.sys
 	}
 	if sys == nil {
 		return nil
@@ -189,9 +233,14 @@ func (a *CPUAllocator) takeIdlePackages() {
 			return cset.Intersection(a.from).Equals(cset)
 		})
 
-	// sorted by id
+	// sorted by number of preferred cpus and then by cpu id
 	sort.Slice(pkgs,
 		func(i, j int) bool {
+			iPref := system.PackageCPUSet(pkgs[i]).Intersection(a.preferred).Size()
+			jPref := system.PackageCPUSet(pkgs[j]).Intersection(a.preferred).Size()
+			if iPref != jPref {
+				return iPref > jPref
+			}
 			return pkgs[i] < pkgs[j]
 		})
 
@@ -230,6 +279,11 @@ func (a *CPUAllocator) takeIdleCores() {
 	// sorted by id
 	sort.Slice(cores,
 		func(i, j int) bool {
+			iPref := system.CoreCPUSet(cores[i]).Intersection(a.preferred).Size()
+			jPref := system.CoreCPUSet(cores[j]).Intersection(a.preferred).Size()
+			if iPref != jPref {
+				return iPref > jPref
+			}
 			return cores[i] < cores[j]
 		})
 
@@ -267,6 +321,7 @@ func (a *CPUAllocator) takeIdleThreads() {
 	// sorted for preference by id, mimicking cpus_assignment.go for now:
 	//   IOW, prefer CPUs
 	//     - from packages with higher number of CPUs/cores already in a.result
+	//     - from the list of preferred cpus
 	//     - from packages with fewer remaining free CPUs/cores in a.from
 	//     - from cores with fewer remaining free CPUs/cores in a.from
 	//     - from packages with lower id
@@ -292,15 +347,14 @@ func (a *CPUAllocator) takeIdleThreads() {
 			iCoreFree := iCoreSet.Intersection(a.from).Size()
 			jCoreFree := jCoreSet.Intersection(a.from).Size()
 
-			// prefer CPUs from packages with
-			//   - higher number of CPUs/cores already in a.result, and
-			//   - fewer remaining free CPUs/cores in a.from
-			//   - from cores with fewer remaining CPUs/cores in a.from
-			//   - lower id
+			iPreferred := a.preferred.Contains(int(cores[i]))
+			jPreferred := a.preferred.Contains(int(cores[j]))
 
 			switch {
 			case iPkgColo != jPkgColo:
 				return iPkgColo > jPkgColo
+			case iPreferred != jPreferred:
+				return iPreferred
 			case iPkgFree != jPkgFree:
 				return iPkgFree < jPkgFree
 			case iCoreFree != jCoreFree:
@@ -353,7 +407,7 @@ func (a *CPUAllocator) allocate() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func allocateCpus(from *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
+func allocateCpus(from *cpuset.CPUSet, cnt int, preferred cpuset.CPUSet) (cpuset.CPUSet, error) {
 	var result cpuset.CPUSet
 	var err error
 
@@ -366,30 +420,43 @@ func allocateCpus(from *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
 		a := NewCPUAllocator(nil)
 		a.from = from.Clone()
 		a.cnt = cnt
+		a.preferred = preferred
 
 		result, err, *from = a.allocate(), nil, a.from.Clone()
 
-		a.Debug("allocateCpus(#%s, %d) => #%s", from.Union(result).String(), cnt, result)
+		a.Debug("%d cpus from #%v (preferring #%v) => #%v", cnt, from.Union(result), preferred, result)
 	}
 
 	return result, err
 }
 
 // AllocateCpus allocates a number of CPUs from the given set.
-func AllocateCpus(from *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
-	result, err := allocateCpus(from, cnt)
+func AllocateCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
+	preferred := system.priorityCpus
+	if !preferHighPrio {
+		// Try to avoid high priority cpus
+		preferred = from.Difference(system.priorityCpus)
+	}
+
+	result, err := allocateCpus(from, cnt, preferred)
 	return result, err
 }
 
 // ReleaseCpus releases a number of CPUs from the given set.
-func ReleaseCpus(from *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
+func ReleaseCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
 	var oset cpuset.CPUSet
 
 	if debug {
 		oset = from.Clone()
 	}
 
-	result, err := allocateCpus(from, from.Size()-cnt)
+	preferred := system.priorityCpus
+	if !preferHighPrio {
+		// Try to avoid high priority cpus
+		preferred = from.Difference(system.priorityCpus)
+	}
+
+	result, err := allocateCpus(from, from.Size()-cnt, preferred)
 
 	if debug {
 		log.Info("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset.String(), cnt,
