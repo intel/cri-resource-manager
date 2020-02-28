@@ -54,28 +54,65 @@ const (
 )
 
 // System devices
-type System struct {
-	logger.Logger                 // our logger instance
-	flags         DiscoveryFlag   // system discovery flags
-	path          string          // sysfs mount point
-	packages      map[ID]*Package // physical packages
-	nodes         map[ID]*Node    // NUMA nodes
-	cpus          map[ID]*CPU     // CPUs
-	cache         map[ID]*Cache   // Cache
-	offline       IDSet           // offlined CPUs
-	isolated      IDSet           // isolated CPUs
-	threads       int             // hyperthreads per core
+type System interface {
+	Discover(flags DiscoveryFlag) error
+	SetCpusOnline(online bool, cpus IDSet) (IDSet, error)
+	SetCPUFrequencyLimits(min, max uint64, cpus IDSet) error
+	PackageIDs() []ID
+	NodeIDs() []ID
+	CPUIDs() []ID
+	PackageCount() int
+	SocketCount() int
+	CPUCount() int
+	NUMANodeCount() int
+	ThreadCount() int
+	CPUSet() cpuset.CPUSet
+	Package(id ID) CPUPackage
+	Node(id ID) Node
+	CPU(id ID) CPU
+	Offlined() cpuset.CPUSet
+	Isolated() cpuset.CPUSet
 }
 
-// Package is a physical package (a collection of CPUs).
-type Package struct {
+// System devices
+type system struct {
+	logger.Logger                    // our logger instance
+	flags         DiscoveryFlag      // system discovery flags
+	path          string             // sysfs mount point
+	packages      map[ID]*cpuPackage // physical packages
+	nodes         map[ID]*node       // NUMA nodes
+	cpus          map[ID]*cpu        // CPUs
+	cache         map[ID]*Cache      // Cache
+	offline       IDSet              // offlined CPUs
+	isolated      IDSet              // isolated CPUs
+	threads       int                // hyperthreads per core
+}
+
+// CPUPackage is a physical package (a collection of CPUs).
+type CPUPackage interface {
+	ID() ID
+	CPUSet() cpuset.CPUSet
+	NodeIDs() []ID
+}
+
+type cpuPackage struct {
 	id    ID    // package id
 	cpus  IDSet // CPUs in this package
 	nodes IDSet // nodes in this package
 }
 
+// Node represents a NUMA node.
+type Node interface {
+	ID() ID
+	PackageID() ID
+	CPUSet() cpuset.CPUSet
+	Distance() []int
+	DistanceFrom(id ID) int
+	MemoryInfo() (*MemInfo, error)
+}
+
 // Node is a NUMA node.
-type Node struct {
+type node struct {
 	path     string // sysfs path
 	id       ID     // node id
 	pkg      ID     // package id
@@ -84,7 +121,19 @@ type Node struct {
 }
 
 // CPU is a CPU core.
-type CPU struct {
+type CPU interface {
+	ID() ID
+	PackageID() ID
+	NodeID() ID
+	CoreID() ID
+	ThreadCPUSet() cpuset.CPUSet
+	FrequencyRange() CPUFreq
+	Online() bool
+	Isolated() bool
+	SetFrequencyLimits(min, max uint64) error
+}
+
+type cpu struct {
 	path     string  // sysfs path
 	id       ID      // CPU id
 	pkg      ID      // package id
@@ -136,7 +185,12 @@ type Cache struct {
 }
 
 // DiscoverSystem performs discovery of the running systems details.
-func DiscoverSystem(args ...DiscoveryFlag) (*System, error) {
+func DiscoverSystem(args ...DiscoveryFlag) (System, error) {
+	return DiscoverSystemAt(SysfsRootPath, args...)
+}
+
+// DiscoverSystemAt performs discovery of the running systems details from sysfs mounted at path.
+func DiscoverSystemAt(path string, args ...DiscoveryFlag) (System, error) {
 	var flags DiscoveryFlag
 
 	if len(args) < 1 {
@@ -148,9 +202,9 @@ func DiscoverSystem(args ...DiscoveryFlag) (*System, error) {
 		}
 	}
 
-	sys := &System{
+	sys := &system{
 		Logger:  logger.NewLogger("sysfs"),
-		path:    SysfsRootPath,
+		path:    path,
 		offline: NewIDSet(),
 	}
 
@@ -162,7 +216,7 @@ func DiscoverSystem(args ...DiscoveryFlag) (*System, error) {
 }
 
 // Discover performs system/hardware discovery.
-func (sys *System) Discover(flags DiscoveryFlag) error {
+func (sys *system) Discover(flags DiscoveryFlag) error {
 	sys.flags |= (flags &^ DiscoverCache)
 
 	if (sys.flags & (DiscoverCPUTopology | DiscoverCache)) != 0 {
@@ -230,7 +284,7 @@ func (sys *System) Discover(flags DiscoveryFlag) error {
 }
 
 // SetCpusOnline puts a set of CPUs online. Return the toggled set. Nil set implies all CPUs.
-func (sys *System) SetCpusOnline(online bool, cpus IDSet) (IDSet, error) {
+func (sys *system) SetCpusOnline(online bool, cpus IDSet) (IDSet, error) {
 	var entries []string
 
 	if cpus == nil {
@@ -275,7 +329,7 @@ func (sys *System) SetCpusOnline(online bool, cpus IDSet) (IDSet, error) {
 }
 
 // SetCPUFrequencyLimits sets the CPU frequency scaling limits. Nil set implies all CPUs.
-func (sys *System) SetCPUFrequencyLimits(min, max uint64, cpus IDSet) error {
+func (sys *system) SetCPUFrequencyLimits(min, max uint64, cpus IDSet) error {
 	if cpus == nil {
 		cpus = NewIDSet(sys.CPUIDs()...)
 	}
@@ -292,7 +346,7 @@ func (sys *System) SetCPUFrequencyLimits(min, max uint64, cpus IDSet) error {
 }
 
 // PackageIDs gets the ids of all packages present in the system.
-func (sys *System) PackageIDs() []ID {
+func (sys *system) PackageIDs() []ID {
 	ids := make([]ID, len(sys.packages))
 	idx := 0
 	for id := range sys.packages {
@@ -308,7 +362,7 @@ func (sys *System) PackageIDs() []ID {
 }
 
 // NodeIDs gets the ids of all NUMA nodes present in the system.
-func (sys *System) NodeIDs() []ID {
+func (sys *system) NodeIDs() []ID {
 	ids := make([]ID, len(sys.nodes))
 	idx := 0
 	for id := range sys.nodes {
@@ -324,7 +378,7 @@ func (sys *System) NodeIDs() []ID {
 }
 
 // CPUIDs gets the ids of all CPUs present in the system.
-func (sys *System) CPUIDs() []ID {
+func (sys *system) CPUIDs() []ID {
 	ids := make([]ID, len(sys.cpus))
 	idx := 0
 	for id := range sys.cpus {
@@ -340,22 +394,22 @@ func (sys *System) CPUIDs() []ID {
 }
 
 // PackageCount returns the number of discovered CPU packages (sockets).
-func (sys *System) PackageCount() int {
+func (sys *system) PackageCount() int {
 	return len(sys.packages)
 }
 
 // SocketCount returns the number of discovered CPU packages (sockets).
-func (sys *System) SocketCount() int {
+func (sys *system) SocketCount() int {
 	return len(sys.packages)
 }
 
 // CPUCount resturns the number of discovered CPUs/cores.
-func (sys *System) CPUCount() int {
+func (sys *system) CPUCount() int {
 	return len(sys.cpus)
 }
 
 // NUMANodeCount returns the number of discovered NUMA nodes.
-func (sys *System) NUMANodeCount() int {
+func (sys *system) NUMANodeCount() int {
 	cnt := len(sys.nodes)
 	if cnt < 1 {
 		cnt = 1
@@ -364,47 +418,47 @@ func (sys *System) NUMANodeCount() int {
 }
 
 // ThreadCount returns the number of threads per core discovered.
-func (sys *System) ThreadCount() int {
+func (sys *system) ThreadCount() int {
 	return sys.threads
 }
 
 // CPUSet gets the ids of all CPUs present in the system as a CPUSet.
-func (sys *System) CPUSet() cpuset.CPUSet {
+func (sys *system) CPUSet() cpuset.CPUSet {
 	return NewIDSet(sys.CPUIDs()...).CPUSet()
 }
 
 // Package gets the package with a given package id.
-func (sys *System) Package(id ID) *Package {
+func (sys *system) Package(id ID) CPUPackage {
 	return sys.packages[id]
 }
 
 // Node gets the node with a given node id.
-func (sys *System) Node(id ID) *Node {
+func (sys *system) Node(id ID) Node {
 	return sys.nodes[id]
 }
 
 // CPU gets the CPU with a given CPU id.
-func (sys *System) CPU(id ID) *CPU {
+func (sys *system) CPU(id ID) CPU {
 	return sys.cpus[id]
 }
 
 // Offlined gets the set of offlined CPUs.
-func (sys *System) Offlined() cpuset.CPUSet {
+func (sys *system) Offlined() cpuset.CPUSet {
 	return sys.offline.CPUSet()
 }
 
 // Isolated gets the set of isolated CPUs."
-func (sys *System) Isolated() cpuset.CPUSet {
+func (sys *system) Isolated() cpuset.CPUSet {
 	return sys.isolated.CPUSet()
 }
 
 // Discover Cpus present in the system.
-func (sys *System) discoverCPUs() error {
+func (sys *system) discoverCPUs() error {
 	if sys.cpus != nil {
 		return nil
 	}
 
-	sys.cpus = make(map[ID]*CPU)
+	sys.cpus = make(map[ID]*cpu)
 
 	offline, err := sys.SetCpusOnline(true, nil)
 	if err != nil {
@@ -428,8 +482,8 @@ func (sys *System) discoverCPUs() error {
 }
 
 // Discover details of the given CPU.
-func (sys *System) discoverCPU(path string) error {
-	cpu := &CPU{path: path, id: getEnumeratedID(path), online: true}
+func (sys *system) discoverCPU(path string) error {
+	cpu := &cpu{path: path, id: getEnumeratedID(path), online: true}
 
 	cpu.isolated = sys.isolated.Has(cpu.id)
 
@@ -471,47 +525,47 @@ func (sys *System) discoverCPU(path string) error {
 }
 
 // ID returns the id of this CPU.
-func (c *CPU) ID() ID {
+func (c *cpu) ID() ID {
 	return c.id
 }
 
 // PackageID returns package id of this CPU.
-func (c *CPU) PackageID() ID {
+func (c *cpu) PackageID() ID {
 	return c.pkg
 }
 
 // NodeID returns the node id of this CPU.
-func (c *CPU) NodeID() ID {
+func (c *cpu) NodeID() ID {
 	return c.node
 }
 
 // CoreID returns the core id of this CPU (lowest CPU id of all thread siblings).
-func (c *CPU) CoreID() ID {
+func (c *cpu) CoreID() ID {
 	return c.threads.SortedMembers()[0]
 }
 
 // ThreadCPUSet returns the CPUSet for all threads in this core.
-func (c *CPU) ThreadCPUSet() cpuset.CPUSet {
+func (c *cpu) ThreadCPUSet() cpuset.CPUSet {
 	return c.threads.CPUSet()
 }
 
 // FrequencyRange returns the frequency range for this CPU.
-func (c *CPU) FrequencyRange() CPUFreq {
+func (c *cpu) FrequencyRange() CPUFreq {
 	return c.freq
 }
 
 // Online returns if this CPU is online.
-func (c *CPU) Online() bool {
+func (c *cpu) Online() bool {
 	return c.online
 }
 
 // Isolated returns if this CPU is isolated.
-func (c *CPU) Isolated() bool {
+func (c *cpu) Isolated() bool {
 	return c.isolated
 }
 
 // SetFrequencyLimits sets the frequency scaling limits for this CPU.
-func (c *CPU) SetFrequencyLimits(min, max uint64) error {
+func (c *cpu) SetFrequencyLimits(min, max uint64) error {
 	if c.freq.min == 0 {
 		return nil
 	}
@@ -542,12 +596,12 @@ func (c *CPU) SetFrequencyLimits(min, max uint64) error {
 }
 
 // Discover NUMA nodes present in the system.
-func (sys *System) discoverNodes() error {
+func (sys *system) discoverNodes() error {
 	if sys.nodes != nil {
 		return nil
 	}
 
-	sys.nodes = make(map[ID]*Node)
+	sys.nodes = make(map[ID]*node)
 
 	entries, _ := filepath.Glob(filepath.Join(sys.path, sysfsNumaNodePath, "node[0-9]*"))
 	for _, entry := range entries {
@@ -560,8 +614,8 @@ func (sys *System) discoverNodes() error {
 }
 
 // Discover details of the given NUMA node.
-func (sys *System) discoverNode(path string) error {
-	node := &Node{path: path, id: getEnumeratedID(path)}
+func (sys *system) discoverNode(path string) error {
+	node := &node{path: path, id: getEnumeratedID(path)}
 
 	if _, err := readSysfsEntry(path, "cpulist", &node.cpus, ","); err != nil {
 		return err
@@ -576,27 +630,27 @@ func (sys *System) discoverNode(path string) error {
 }
 
 // ID returns id of this node.
-func (n *Node) ID() ID {
+func (n *node) ID() ID {
 	return n.id
 }
 
 // PackageID returns the id of this node.
-func (n *Node) PackageID() ID {
+func (n *node) PackageID() ID {
 	return n.pkg
 }
 
 // CPUSet returns the CPUSet for all cores/threads in this node.
-func (n *Node) CPUSet() cpuset.CPUSet {
+func (n *node) CPUSet() cpuset.CPUSet {
 	return n.cpus.CPUSet()
 }
 
 // Distance returns the distance vector for this node.
-func (n *Node) Distance() []int {
+func (n *node) Distance() []int {
 	return n.distance
 }
 
 // DistanceFrom returns the distance of this and a given node.
-func (n *Node) DistanceFrom(id ID) int {
+func (n *node) DistanceFrom(id ID) int {
 	if int(id) < len(n.distance) {
 		return n.distance[int(id)]
 	}
@@ -605,7 +659,7 @@ func (n *Node) DistanceFrom(id ID) int {
 }
 
 // MemoryInfo memory info for the node (partial content from the meminfo sysfs entry).
-func (n *Node) MemoryInfo() (*MemInfo, error) {
+func (n *node) MemoryInfo() (*MemInfo, error) {
 	meminfo := filepath.Join(n.path, "meminfo")
 	buf := &MemInfo{}
 	err := ParseFileEntries(meminfo,
@@ -635,17 +689,17 @@ func (n *Node) MemoryInfo() (*MemInfo, error) {
 }
 
 // Discover physical packages (CPU sockets) present in the system.
-func (sys *System) discoverPackages() error {
+func (sys *system) discoverPackages() error {
 	if sys.packages != nil {
 		return nil
 	}
 
-	sys.packages = make(map[ID]*Package)
+	sys.packages = make(map[ID]*cpuPackage)
 
 	for _, cpu := range sys.cpus {
 		pkg, found := sys.packages[cpu.pkg]
 		if !found {
-			pkg = &Package{
+			pkg = &cpuPackage{
 				id:    cpu.pkg,
 				cpus:  NewIDSet(),
 				nodes: NewIDSet(),
@@ -660,17 +714,17 @@ func (sys *System) discoverPackages() error {
 }
 
 // ID returns the id of this package.
-func (p *Package) ID() ID {
+func (p *cpuPackage) ID() ID {
 	return p.id
 }
 
 // CPUSet returns the CPUSet for all cores/threads in this package.
-func (p *Package) CPUSet() cpuset.CPUSet {
+func (p *cpuPackage) CPUSet() cpuset.CPUSet {
 	return p.cpus.CPUSet()
 }
 
 // NodeIDs returns the NUMA node ids for this package.
-func (p *Package) NodeIDs() []ID {
+func (p *cpuPackage) NodeIDs() []ID {
 	return p.nodes.SortedMembers()
 }
 
@@ -678,7 +732,7 @@ func (p *Package) NodeIDs() []ID {
 // Notes:
 //     I'm not sure how to interpret the cache information under sysfs. This code is now effectively
 //     disabled by forcing the associated discovery bit off in the discovery flags.
-func (sys *System) discoverCache(path string) error {
+func (sys *system) discoverCache(path string) error {
 	var id ID
 
 	if _, err := readSysfsEntry(path, "id", &id); err != nil {

@@ -132,16 +132,16 @@ type nodeself struct {
 
 // socketnode represents a physical CPU package/socket in the system.
 type socketnode struct {
-	node                   // common node data
-	id     system.ID       // NUMA node socket id
-	syspkg *system.Package // corresponding system.Package
+	node                     // common node data
+	id     system.ID         // NUMA node socket id
+	syspkg system.CPUPackage // corresponding system.Package
 }
 
 // numanode represents a NUMA node in the system.
 type numanode struct {
-	node                 // common node data
-	id      system.ID    // NUMA node system id
-	sysnode *system.Node // corresponding system.Node
+	node                // common node data
+	id      system.ID   // NUMA node system id
+	sysnode system.Node // corresponding system.Node
 }
 
 // virtualnode represents a virtual node (ATM only the root in a multi-socket system).

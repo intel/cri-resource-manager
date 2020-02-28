@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -49,7 +49,7 @@ type static struct {
 	reservedCpus  cpuset.CPUSet        // CPUs reserved for system- and kube-tasks
 	availableCpus cpuset.CPUSet        // CPUs free usable by this policy
 	isolatedCpus  cpuset.CPUSet        // available CPUs isolated from normal scheduling
-	sys           *sysfs.System        // system/topology information
+	sys           sysfs.System         // system/topology information
 	numHT         int                  // number of hyperthreads per core
 	state         cache.Cache          // policy/state cache
 }
@@ -389,10 +389,10 @@ func (s *static) guaranteedCPUs(pod cache.Pod, container cache.Container) int {
 
 	s.Debug("* QoS class for pod %s (%s) is %s", pod.GetID(), pod.GetName(), qos)
 
-	if qos != v1.PodQOSGuaranteed {
+	if qos != corev1.PodQOSGuaranteed {
 		return 0
 	}
-	cpuQuantity := container.GetResourceRequirements().Requests[v1.ResourceCPU]
+	cpuQuantity := container.GetResourceRequirements().Requests[corev1.ResourceCPU]
 	if cpuQuantity.Value()*1000 != cpuQuantity.MilliValue() {
 		return 0
 	}

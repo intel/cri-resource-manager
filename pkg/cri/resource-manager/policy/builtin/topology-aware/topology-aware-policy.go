@@ -15,7 +15,7 @@
 package topologyaware
 
 import (
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -43,8 +43,8 @@ type allocations struct {
 
 // TODO(rojkov): this is the interface of system.System we consume in this Go package. Should be moved to the package which is supposed to provide the interface.
 type discoveredSystem interface {
-	Node(system.ID) *system.Node
-	Package(system.ID) *system.Package
+	Node(system.ID) system.Node
+	Package(system.ID) system.CPUPackage
 	Offlined() cpuset.CPUSet
 	Isolated() cpuset.CPUSet
 	CPUSet() cpuset.CPUSet
@@ -200,7 +200,7 @@ func (p *policy) Rebalance() (bool, error) {
 	movable := []cache.Container{}
 
 	for _, c := range containers {
-		if c.GetQOSClass() != v1.PodQOSGuaranteed {
+		if c.GetQOSClass() != corev1.PodQOSGuaranteed {
 			p.ReleaseResources(c)
 			movable = append(movable, c)
 		}

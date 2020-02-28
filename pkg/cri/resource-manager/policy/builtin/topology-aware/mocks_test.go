@@ -26,15 +26,54 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
+type mockSystemNode struct {
+	id        system.ID // node id
+	packageID system.ID // node id
+	distance  int
+}
+
+func (fake *mockSystemNode) MemoryInfo() (*system.MemInfo, error) {
+	return nil, nil
+}
+func (fake *mockSystemNode) PackageID() system.ID {
+	return fake.packageID
+}
+func (fake *mockSystemNode) ID() system.ID {
+	return fake.id
+}
+func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+func (fake *mockSystemNode) Distance() []int {
+	return []int{}
+}
+func (fake *mockSystemNode) DistanceFrom(id system.ID) int {
+	return 0
+}
+
+type mockSystemCPUPackage struct {
+	id system.ID // package id
+}
+
+func (fake *mockSystemCPUPackage) ID() system.ID {
+	return fake.id
+}
+func (fake *mockSystemCPUPackage) CPUSet() cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+func (fake *mockSystemCPUPackage) NodeIDs() []system.ID {
+	return []system.ID{}
+}
+
 type mockSystem struct {
 	isolatedCPU int
 }
 
-func (fake *mockSystem) Node(system.ID) *system.Node {
-	return &system.Node{}
+func (fake *mockSystem) Node(id system.ID) system.Node {
+	return &mockSystemNode{id: id}
 }
-func (fake *mockSystem) Package(system.ID) *system.Package {
-	return &system.Package{}
+func (fake *mockSystem) Package(id system.ID) system.CPUPackage {
+	return &mockSystemCPUPackage{id: id}
 }
 func (fake *mockSystem) Offlined() cpuset.CPUSet {
 	return cpuset.NewCPUSet()

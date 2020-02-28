@@ -60,7 +60,7 @@ type Options struct {
 // BackendOptions describes the options for a policy backend instance
 type BackendOptions struct {
 	// System provides system/HW/topology information
-	System *system.System
+	System system.System
 	// System state/cache
 	Cache cache.Cache
 	// Resource availibility constraint
@@ -131,9 +131,9 @@ type Policy interface {
 
 // Policy instance/state.
 type policy struct {
-	cache   cache.Cache    // system state cache
-	backend Backend        // our active backend
-	system  *system.System // system/HW/topology info
+	cache   cache.Cache   // system state cache
+	backend Backend       // our active backend
+	system  system.System // system/HW/topology info
 }
 
 // backend is a registered Backend.
