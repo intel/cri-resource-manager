@@ -127,6 +127,7 @@ type CPU interface {
 	NodeID() ID
 	CoreID() ID
 	ThreadCPUSet() cpuset.CPUSet
+	BaseFrequency() uint64
 	FrequencyRange() CPUFreq
 	Online() bool
 	Isolated() bool
@@ -140,6 +141,7 @@ type cpu struct {
 	node     ID      // node id
 	core     ID      // core id
 	threads  IDSet   // sibling/hyper-threads
+	baseFreq uint64  // CPU base frequency
 	freq     CPUFreq // CPU frequencies
 	online   bool    // whether this CPU is online
 	isolated bool    // whether this CPU is isolated
@@ -263,11 +265,12 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 
 		for id, cpu := range sys.cpus {
 			sys.Debug("CPU #%d:", id)
-			sys.Debug("      pkg: %d", cpu.pkg)
-			sys.Debug("     node: %d", cpu.node)
-			sys.Debug("     core: %d", cpu.core)
-			sys.Debug("  threads: %s", cpu.threads)
-			sys.Debug("     freq: %d - %d", cpu.freq.min, cpu.freq.max)
+			sys.Debug("        pkg: %d", cpu.pkg)
+			sys.Debug("       node: %d", cpu.node)
+			sys.Debug("       core: %d", cpu.core)
+			sys.Debug("    threads: %s", cpu.threads)
+			sys.Debug("  base freq: %d", cpu.baseFreq)
+			sys.Debug("       freq: %d - %d", cpu.freq.min, cpu.freq.max)
 		}
 
 		sys.Debug("offline CPUs: %s", sys.offline)
@@ -498,6 +501,9 @@ func (sys *system) discoverCPU(path string) error {
 	if _, err := readSysfsEntry(path, "topology/thread_siblings_list", &cpu.threads, ","); err != nil {
 		return err
 	}
+	if _, err := readSysfsEntry(path, "cpufreq/base_frequency", &cpu.baseFreq); err != nil {
+		cpu.baseFreq = 0
+	}
 	if _, err := readSysfsEntry(path, "cpufreq/cpuinfo_min_freq", &cpu.freq.min); err != nil {
 		cpu.freq.min = 0
 	}
@@ -552,6 +558,11 @@ func (c *cpu) CoreID() ID {
 // ThreadCPUSet returns the CPUSet for all threads in this core.
 func (c *cpu) ThreadCPUSet() cpuset.CPUSet {
 	return c.threads.CPUSet()
+}
+
+// BaseFrequency returns the base frequency setting for this CPU.
+func (c *cpu) BaseFrequency() uint64 {
+	return c.baseFreq
 }
 
 // FrequencyRange returns the frequency range for this CPU.
