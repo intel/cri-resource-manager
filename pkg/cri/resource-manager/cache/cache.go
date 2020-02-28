@@ -536,6 +536,11 @@ func NewCache(options Options) (Cache, error) {
 		implicit:   make(map[string]*ImplicitAffinity),
 	}
 
+	if err := os.MkdirAll(options.CacheDir, 0700); err != nil {
+		return nil, cacheError("failed to create cache directory %s: %v",
+			options.CacheDir, err)
+	}
+
 	if err := cch.Load(); err != nil {
 		return nil, err
 	}
