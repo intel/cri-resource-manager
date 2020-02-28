@@ -175,6 +175,7 @@ func (s *server) createGrpcServer() error {
 			return serverError("failed to create server: socket %s already in use",
 				s.options.Socket)
 		}
+		s.Warn("removing abandoned socket '%s' in use...", s.options.Socket)
 		os.Remove(s.options.Socket)
 		l, err = net.Listen("unix", s.options.Socket)
 		if err != nil {
