@@ -17,6 +17,7 @@ package policy
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -248,7 +249,15 @@ func (p *policy) Rebalance() (bool, error) {
 func (p *policy) ExportResourceData(c cache.Container) {
 	var buf bytes.Buffer
 
-	for key, value := range p.backend.ExportResourceData(c) {
+	data := p.backend.ExportResourceData(c)
+	keys := []string{}
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := data[key]
 		if _, err := buf.WriteString(fmt.Sprintf("%s=%q\n", key, value)); err != nil {
 			log.Error("container %s: failed to export resource data (%s=%q)",
 				c.PrettyName(), key, value)
