@@ -46,23 +46,23 @@ const (
 // CPUAllocator encapsulates state for allocating CPUs.
 type CPUAllocator struct {
 	logger.Logger               // allocator logger instance
-	sys           *sysfs.System // sysfs CPU and topology information
+	sys           sysfs.System  // sysfs CPU and topology information
 	flags         AllocFlag     // allocation preferences
 	from          cpuset.CPUSet // set of CPUs to allocate from
 	cnt           int           // number of CPUs to allocate
 	result        cpuset.CPUSet // set of CPUs allocated
 	offline       cpuset.CPUSet // set of CPUs currently offline
 
-	pkgs []sysfs.Package // physical CPU packages, sorted by preference
-	cpus []sysfs.CPU     // CPU cores, sorted by preference
+	pkgs []sysfs.CPUPackage // physical CPU packages, sorted by preference
+	cpus []sysfs.CPU        // CPU cores, sorted by preference
 }
 
 // A singleton wrapper around sysfs.System.
 type sysfsSingleton struct {
-	sync.Once               // we do discovery only once
-	sys       *sysfs.System // wrapped sysfs.System instance
-	err       error         // error during recovery
-	cpusets   struct {      // cached cpusets per
+	sync.Once              // we do discovery only once
+	sys       sysfs.System // wrapped sysfs.System instance
+	err       error        // error during recovery
+	cpusets   struct {     // cached cpusets per
 		pkg  map[sysfs.ID]cpuset.CPUSet // package,
 		node map[sysfs.ID]cpuset.CPUSet // node, and
 		core map[sysfs.ID]cpuset.CPUSet // CPU core
@@ -86,7 +86,7 @@ type IDSorter func(int, int) bool
 var log = logger.NewLogger(logSource)
 
 // Get/discover sysfs.System.
-func (s *sysfsSingleton) get() (*sysfs.System, error) {
+func (s *sysfsSingleton) get() (sysfs.System, error) {
 	s.Do(func() {
 		s.sys, s.err = sysfs.DiscoverSystem(sysfs.DiscoverCPUTopology)
 		s.cpusets.pkg = make(map[sysfs.ID]cpuset.CPUSet)
@@ -151,7 +151,7 @@ func (s *sysfsSingleton) pick(idSlice []sysfs.ID, f IDFilter) []sysfs.ID {
 }
 
 // NewCPUAllocator creates a new CPU allocator.
-func NewCPUAllocator(sys *sysfs.System) *CPUAllocator {
+func NewCPUAllocator(sys sysfs.System) *CPUAllocator {
 	if sys == nil {
 		sys, _ = system.get()
 	}

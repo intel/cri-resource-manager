@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -62,7 +62,7 @@ type staticplus struct {
 	reserved    cpuset.CPUSet // pool (primarily) for system-/kube-tasks
 	isolated    cpuset.CPUSet // primary pool for exclusive allocations
 	allocations Allocations   // container cpu allocations
-	sys         *sysfs.System // system/topologu information
+	sys         sysfs.System  // system/topologu information
 	cache       cache.Cache   // system state/cache
 	shared      cpuset.CPUSet // pool for fractional and shared allocations
 }
@@ -304,7 +304,7 @@ func (p *staticplus) restoreCache() error {
 
 // requestedCpus calculates the exclusive and shared cpu allocations for a container.
 func (p *staticplus) requestedCpus(c cache.Container) (int, int) {
-	cpuReq, ok := c.GetResourceRequirements().Requests[v1.ResourceCPU]
+	cpuReq, ok := c.GetResourceRequirements().Requests[corev1.ResourceCPU]
 	if !ok {
 		return 0, 0
 	}
