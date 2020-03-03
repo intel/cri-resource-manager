@@ -138,6 +138,7 @@ type cpu struct {
 	id       ID      // CPU id
 	pkg      ID      // package id
 	node     ID      // node id
+	core     ID      // core id
 	threads  IDSet   // sibling/hyper-threads
 	freq     CPUFreq // CPU frequencies
 	online   bool    // whether this CPU is online
@@ -264,6 +265,7 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 			sys.Debug("CPU #%d:", id)
 			sys.Debug("      pkg: %d", cpu.pkg)
 			sys.Debug("     node: %d", cpu.node)
+			sys.Debug("     core: %d", cpu.core)
 			sys.Debug("  threads: %s", cpu.threads)
 			sys.Debug("     freq: %d - %d", cpu.freq.min, cpu.freq.max)
 		}
@@ -490,6 +492,9 @@ func (sys *system) discoverCPU(path string) error {
 	if _, err := readSysfsEntry(path, "topology/physical_package_id", &cpu.pkg); err != nil {
 		return err
 	}
+	if _, err := readSysfsEntry(path, "topology/core_id", &cpu.core); err != nil {
+		return err
+	}
 	if _, err := readSysfsEntry(path, "topology/thread_siblings_list", &cpu.threads, ","); err != nil {
 		return err
 	}
@@ -541,7 +546,7 @@ func (c *cpu) NodeID() ID {
 
 // CoreID returns the core id of this CPU (lowest CPU id of all thread siblings).
 func (c *cpu) CoreID() ID {
-	return c.threads.SortedMembers()[0]
+	return c.core
 }
 
 // ThreadCPUSet returns the CPUSet for all threads in this core.
