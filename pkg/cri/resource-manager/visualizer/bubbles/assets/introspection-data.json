@@ -1,0 +1,540 @@
+{
+  "Pools": {
+    "numa node #0": {
+      "Name": "numa node #0",
+      "CPUs": "0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108",
+      "Memory": "0,4",
+      "Parent": "socket #0",
+      "Children": null
+    },
+    "numa node #1": {
+      "Name": "numa node #1",
+      "CPUs": "1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77,81,85,89,93,97,101,105,109",
+      "Memory": "1",
+      "Parent": "socket #1",
+      "Children": null
+    },
+    "numa node #2": {
+      "Name": "numa node #2",
+      "CPUs": "2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78,82,86,90,94,98,102,106,110",
+      "Memory": "2,5",
+      "Parent": "socket #0",
+      "Children": null
+    },
+    "numa node #3": {
+      "Name": "numa node #3",
+      "CPUs": "3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79,83,87,91,95,99,103,107,111",
+      "Memory": "3",
+      "Parent": "socket #1",
+      "Children": null
+    },
+    "root": {
+      "Name": "root",
+      "CPUs": "0-111",
+      "Memory": "0,1,2,3,4,5",
+      "Parent": "",
+      "Children": [
+        "socket #0",
+        "socket #1"
+      ]
+    },
+    "socket #0": {
+      "Name": "socket #0",
+      "CPUs": "0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,94,96,98,100,102,104,106,108,110",
+      "Memory": "0,2,4,5",
+      "Parent": "root",
+      "Children": [
+        "numa node #0",
+        "numa node #2"
+      ]
+    },
+    "socket #1": {
+      "Name": "socket #1",
+      "CPUs": "1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95,97,99,101,103,105,107,109,111",
+      "Memory": "1,3",
+      "Parent": "root",
+      "Children": [
+        "numa node #1",
+        "numa node #3"
+      ]
+    }
+  },
+  "Pods": {
+    "09e2f41edb0300d4fd45f247c2f603654f17d6b332f8374069305a3db2f3998b": {
+      "ID": "09e2f41edb0300d4fd45f247c2f603654f17d6b332f8374069305a3db2f3998b",
+      "UID": "17e8c110-a945-49fb-9cd4-11c7f86b227a",
+      "Name": "coredns-5644d7b6d9-6kh6d",
+      "Containers": {
+        "723dfea9f14df6021d9204694490e41ac133ae245547b8ef24f02f058d78acc5": {
+          "ID": "723dfea9f14df6021d9204694490e41ac133ae245547b8ef24f02f058d78acc5",
+          "Name": "coredns",
+          "Command": [],
+          "Args": [
+            "-conf",
+            "/etc/coredns/Corefile"
+          ],
+          "CPURequest": 100,
+          "CPULimit": 0,
+          "MemoryRequest": 800960607166,
+          "MemoryLimit": 178257920,
+          "Hints": {}
+        }
+      }
+    },
+    "1526f80489bec054b2d1e642448c1703f91e9b0683df43c82672ef71fa001f99": {
+      "ID": "1526f80489bec054b2d1e642448c1703f91e9b0683df43c82672ef71fa001f99",
+      "UID": "7f04cffe-4cd9-4bfc-ab82-a0f91e1dbd8e",
+      "Name": "coredns-5644d7b6d9-kckvs",
+      "Containers": {
+        "0981be5a090bb74a4098d63986c40890354c0e3644147edd624ba5c54ffa6639": {
+          "ID": "0981be5a090bb74a4098d63986c40890354c0e3644147edd624ba5c54ffa6639",
+          "Name": "coredns",
+          "Command": [],
+          "Args": [
+            "-conf",
+            "/etc/coredns/Corefile"
+          ],
+          "CPURequest": 100,
+          "CPULimit": 0,
+          "MemoryRequest": 800960607166,
+          "MemoryLimit": 178257920,
+          "Hints": {}
+        }
+      }
+    },
+    "2a24265de4f799c33e912337be71d83e87dc70a059706739f800cfa9ae809010": {
+      "ID": "2a24265de4f799c33e912337be71d83e87dc70a059706739f800cfa9ae809010",
+      "UID": "9f5a1355-1351-4348-95ac-5dc0d60b7dcf",
+      "Name": "kube-proxy-tz76s",
+      "Containers": {
+        "72256c3bc02763448ca56eacbd3e8a33a437528aab14e71a538315a74ced1e8b": {
+          "ID": "72256c3bc02763448ca56eacbd3e8a33a437528aab14e71a538315a74ced1e8b",
+          "Name": "kube-proxy",
+          "Command": [
+            "/usr/local/bin/kube-proxy",
+            "--config=/var/lib/kube-proxy/config.conf",
+            "--hostname-override=r640-1"
+          ],
+          "Args": [],
+          "CPURequest": 0,
+          "CPULimit": 0,
+          "MemoryRequest": 800960607166,
+          "MemoryLimit": 0,
+          "Hints": {}
+        }
+      }
+    },
+    "3f5927d0e67104199f5b4ebe82056cb02f560d964acc1b37b72d0074e6523c7c": {
+      "ID": "3f5927d0e67104199f5b4ebe82056cb02f560d964acc1b37b72d0074e6523c7c",
+      "UID": "c2395f9a-2de0-4821-ac0f-f8cd295c3ce1",
+      "Name": "demo",
+      "Containers": {
+        "0e415b5be6ae64dd630cb59a1ea7ba3e1d1f133ec41cf2cbb1619d46a303cde8": {
+          "ID": "0e415b5be6ae64dd630cb59a1ea7ba3e1d1f133ec41cf2cbb1619d46a303cde8",
+          "Name": "container1",
+          "Command": [
+            "/bin/sample-app",
+            "container1",
+            "8080"
+          ],
+          "Args": [],
+          "CPURequest": 1500,
+          "CPULimit": 0,
+          "MemoryRequest": 0,
+          "MemoryLimit": 0,
+          "Hints": {}
+        },
+        "1608f81b76522e0fc9bf70fe046c1a2efd7d1fe6de1e59cefb2850fb4282d3a3": {
+          "ID": "1608f81b76522e0fc9bf70fe046c1a2efd7d1fe6de1e59cefb2850fb4282d3a3",
+          "Name": "container2",
+          "Command": [
+            "/bin/sample-app",
+            "container2",
+            "8081"
+          ],
+          "Args": [],
+          "CPURequest": 1500,
+          "CPULimit": 0,
+          "MemoryRequest": 0,
+          "MemoryLimit": 0,
+          "Hints": {}
+        },
+        "e5c4977133d4bcef8c261476c4e4380df85a319cb1ea5cb3b412b9d4698a8a1d": {
+          "ID": "e5c4977133d4bcef8c261476c4e4380df85a319cb1ea5cb3b412b9d4698a8a1d",
+          "Name": "container3",
+          "Command": [
+            "/bin/sample-app",
+            "container3",
+            "8082"
+          ],
+          "Args": [],
+          "CPURequest": 1500,
+          "CPULimit": 0,
+          "MemoryRequest": 0,
+          "MemoryLimit": 0,
+          "Hints": {}
+        }
+      }
+    },
+    "4e582643ad47fa670c51e6a4e95f868498a8924c1f7654ce573557ec0b412a7c": {
+      "ID": "4e582643ad47fa670c51e6a4e95f868498a8924c1f7654ce573557ec0b412a7c",
+      "UID": "9545b9fe0aadc96db1b34f9fdb983495",
+      "Name": "kube-scheduler-r640-1",
+      "Containers": {
+        "54a1ecfb42d574982032dcd0796d89ac0fd4a6ccf7265597209ee81d41bcf2cb": {
+          "ID": "54a1ecfb42d574982032dcd0796d89ac0fd4a6ccf7265597209ee81d41bcf2cb",
+          "Name": "kube-scheduler",
+          "Command": [
+            "kube-scheduler",
+            "--authentication-kubeconfig=/etc/kubernetes/scheduler.conf",
+            "--authorization-kubeconfig=/etc/kubernetes/scheduler.conf",
+            "--bind-address=127.0.0.1",
+            "--kubeconfig=/etc/kubernetes/scheduler.conf",
+            "--leader-elect=true"
+          ],
+          "Args": [],
+          "CPURequest": 100,
+          "CPULimit": 0,
+          "MemoryRequest": 800960607166,
+          "MemoryLimit": 0,
+          "Hints": {}
+        }
+      }
+    },
+    "56f5a33dd961eaf3b0ad774d4af0dac14817176ca9d0e788908ef1a62a34d76c": {
+      "ID": "56f5a33dd961eaf3b0ad774d4af0dac14817176ca9d0e788908ef1a62a34d76c",
+      "UID": "d3f67064-5a4a-45b1-b468-3b2ff25ce99e",
+      "Name": "weave-net-zml4m",
+      "Containers": {
+        "81da976530a4f2118fa3834ea0e63a70c7712768aacf86d1ea983043cacff6e3": {
+          "ID": "81da976530a4f2118fa3834ea0e63a70c7712768aacf86d1ea983043cacff6e3",
+          "Name": "weave-npc",
+          "Command": [],
+          "Args": [],
+          "CPURequest": 10,
+          "CPULimit": 0,
+          "MemoryRequest": 0,
+          "MemoryLimit": 0,
+          "Hints": {}
+        },
+        "b5b8955e42da669bb00a7e3be6b9e7deabe23446d39e1145d622ff2184fc0a39": {
+          "ID": "b5b8955e42da669bb00a7e3be6b9e7deabe23446d39e1145d622ff2184fc0a39",
+          "Name": "weave",
+          "Command": [
+            "/home/weave/launch.sh"
+          ],
+          "Args": [],
+          "CPURequest": 10,
+          "CPULimit": 0,
+          "MemoryRequest": 0,
+          "MemoryLimit": 0,
+          "Hints": {
+            "/sys/devices/pci0000:17/0000:17:00.0/0000:18:00.0": {
+              "Provider": "/sys/devices/pci0000:17/0000:17:00.0/0000:18:00.0",
+              "CPUs": "0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108",
+              "NUMAs": "0",
+              "Sockets": ""
+            }
+          }
+        }
+      }
+    },
+    "91255045682307ef06d15fe43ef88d3d960f2c93ef3ebb2921dfecb0b4e98a8c": {
+      "ID": "91255045682307ef06d15fe43ef88d3d960f2c93ef3ebb2921dfecb0b4e98a8c",
+      "UID": "50b5e30d3643ac33e747dfe296aeaae0",
+      "Name": "kube-apiserver-r640-1",
+      "Containers": {
+        "d12cbfdb6baae8810180dd2af6b5b07074d43ee4a98d4331c85b8fe6f80b8fb4": {
+          "ID": "d12cbfdb6baae8810180dd2af6b5b07074d43ee4a98d4331c85b8fe6f80b8fb4",
+          "Name": "kube-apiserver",
+          "Command": [
+            "kube-apiserver",
+            "--advertise-address=10.237.71.115",
+            "--allow-privileged=true",
+            "--authorization-mode=Node,RBAC",
+            "--client-ca-file=/etc/kubernetes/pki/ca.crt",
+            "--enable-admission-plugins=NodeRestriction",
+            "--enable-bootstrap-token-auth=true",
+            "--etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt",
+            "--etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt",
+            "--etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key",
+            "--etcd-servers=https://127.0.0.1:2379",
+            "--insecure-port=0",
+            "--kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt",
+            "--kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key",
+            "--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+            "--proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt",
+            "--proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key",
+            "--requestheader-allowed-names=front-proxy-client",
+            "--requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt",
+            "--requestheader-extra-headers-prefix=X-Remote-Extra-",
+            "--requestheader-group-headers=X-Remote-Group",
+            "--requestheader-username-headers=X-Remote-User",
+            "--secure-port=6443",
+            "--service-account-key-file=/etc/kubernetes/pki/sa.pub",
+            "--service-cluster-ip-range=10.96.0.0/12",
+            "--tls-cert-file=/etc/kubernetes/pki/apiserver.crt",
+            "--tls-private-key-file=/etc/kubernetes/pki/apiserver.key"
+          ],
+          "Args": [],
+          "CPURequest": 250,
+          "CPULimit": 0,
+          "MemoryRequest": 800960607166,
+          "MemoryLimit": 0,
+          "Hints": {}
+        }
+      }
+    },
+    "a8d240cb8a2ce4c57efe4ed6d5e8aa68d55ef13acc6d21320cb9503293a537da": {
+      "ID": "a8d240cb8a2ce4c57efe4ed6d5e8aa68d55ef13acc6d21320cb9503293a537da",
+      "UID": "24e675eb3e7c0413990cf79fb42a612c",
+      "Name": "etcd-r640-1",
+      "Containers": {
+        "da6a325594654d726058032de9200d1e6db522073903c05f67de44a72e2ca86a": {
+          "ID": "da6a325594654d726058032de9200d1e6db522073903c05f67de44a72e2ca86a",
+          "Name": "etcd",
+          "Command": [
+            "etcd",
+            "--advertise-client-urls=https://10.237.71.115:2379",
+            "--cert-file=/etc/kubernetes/pki/etcd/server.crt",
+            "--client-cert-auth=true",
+            "--data-dir=/var/lib/etcd",
+            "--initial-advertise-peer-urls=https://10.237.71.115:2380",
+            "--initial-cluster=r640-1=https://10.237.71.115:2380",
+            "--key-file=/etc/kubernetes/pki/etcd/server.key",
+            "--listen-client-urls=https://127.0.0.1:2379,https://10.237.71.115:2379",
+            "--listen-metrics-urls=http://127.0.0.1:2381",
+            "--listen-peer-urls=https://10.237.71.115:2380",
+            "--name=r640-1",
+            "--peer-cert-file=/etc/kubernetes/pki/etcd/peer.crt",
+            "--peer-client-cert-auth=true",
+            "--peer-key-file=/etc/kubernetes/pki/etcd/peer.key",
+            "--peer-trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt",
+            "--snapshot-count=10000",
+            "--trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt"
+          ],
+          "Args": [],
+          "CPURequest": 0,
+          "CPULimit": 0,
+          "MemoryRequest": 800960607166,
+          "MemoryLimit": 0,
+          "Hints": {
+            "/sys/devices/pci0000:17/0000:17:00.0/0000:18:00.0": {
+              "Provider": "/sys/devices/pci0000:17/0000:17:00.0/0000:18:00.0",
+              "CPUs": "0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108",
+              "NUMAs": "0",
+              "Sockets": ""
+            }
+          }
+        }
+      }
+    },
+    "c670fc0eb1244bb76f6063ee68c4a27f9113f4a621a3e8eda53c3e62278c852c": {
+      "ID": "c670fc0eb1244bb76f6063ee68c4a27f9113f4a621a3e8eda53c3e62278c852c",
+      "UID": "3e8107c440d304752f5d9be78ee94fe0",
+      "Name": "kube-controller-manager-r640-1",
+      "Containers": {
+        "4969b42224d35c016f3efe3815617bd08699ceedd6f49dc48aac3cda8e432ecf": {
+          "ID": "4969b42224d35c016f3efe3815617bd08699ceedd6f49dc48aac3cda8e432ecf",
+          "Name": "kube-controller-manager",
+          "Command": [
+            "kube-controller-manager",
+            "--authentication-kubeconfig=/etc/kubernetes/controller-manager.conf",
+            "--authorization-kubeconfig=/etc/kubernetes/controller-manager.conf",
+            "--bind-address=127.0.0.1",
+            "--client-ca-file=/etc/kubernetes/pki/ca.crt",
+            "--cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt",
+            "--cluster-signing-key-file=/etc/kubernetes/pki/ca.key",
+            "--controllers=*,bootstrapsigner,tokencleaner",
+            "--kubeconfig=/etc/kubernetes/controller-manager.conf",
+            "--leader-elect=true",
+            "--requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt",
+            "--root-ca-file=/etc/kubernetes/pki/ca.crt",
+            "--service-account-private-key-file=/etc/kubernetes/pki/sa.key",
+            "--use-service-account-credentials=true"
+          ],
+          "Args": [],
+          "CPURequest": 199,
+          "CPULimit": 0,
+          "MemoryRequest": 800960607166,
+          "MemoryLimit": 0,
+          "Hints": {
+            "/sys/devices/pci0000:17/0000:17:00.0/0000:18:00.0": {
+              "Provider": "/sys/devices/pci0000:17/0000:17:00.0/0000:18:00.0",
+              "CPUs": "0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108",
+              "NUMAs": "0",
+              "Sockets": ""
+            }
+          }
+        }
+      }
+    }
+  },
+  "Assignments": {
+    "0981be5a090bb74a4098d63986c40890354c0e3644147edd624ba5c54ffa6639": {
+      "ContainerID": "0981be5a090bb74a4098d63986c40890354c0e3644147edd624ba5c54ffa6639",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 100,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "0e415b5be6ae64dd630cb59a1ea7ba3e1d1f133ec41cf2cbb1619d46a303cde8": {
+      "ContainerID": "0e415b5be6ae64dd630cb59a1ea7ba3e1d1f133ec41cf2cbb1619d46a303cde8",
+      "SharedCPUs": "0,8,12,16,20,24,28,32,36,40,44,48,52,56,64,68,72,76,80,84,88,92,96,100,104,108",
+      "CPUShare": 1500,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "numa node #0"
+    },
+    "1608f81b76522e0fc9bf70fe046c1a2efd7d1fe6de1e59cefb2850fb4282d3a3": {
+      "ContainerID": "1608f81b76522e0fc9bf70fe046c1a2efd7d1fe6de1e59cefb2850fb4282d3a3",
+      "SharedCPUs": "2,10,14,18,22,26,30,34,38,42,46,50,54,58,66,70,74,78,82,86,90,94,98,102,106,110",
+      "CPUShare": 1500,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "numa node #2"
+    },
+    "4969b42224d35c016f3efe3815617bd08699ceedd6f49dc48aac3cda8e432ecf": {
+      "ContainerID": "4969b42224d35c016f3efe3815617bd08699ceedd6f49dc48aac3cda8e432ecf",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 199,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "54a1ecfb42d574982032dcd0796d89ac0fd4a6ccf7265597209ee81d41bcf2cb": {
+      "ContainerID": "54a1ecfb42d574982032dcd0796d89ac0fd4a6ccf7265597209ee81d41bcf2cb",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 100,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "72256c3bc02763448ca56eacbd3e8a33a437528aab14e71a538315a74ced1e8b": {
+      "ContainerID": "72256c3bc02763448ca56eacbd3e8a33a437528aab14e71a538315a74ced1e8b",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 0,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "723dfea9f14df6021d9204694490e41ac133ae245547b8ef24f02f058d78acc5": {
+      "ContainerID": "723dfea9f14df6021d9204694490e41ac133ae245547b8ef24f02f058d78acc5",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 100,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "81da976530a4f2118fa3834ea0e63a70c7712768aacf86d1ea983043cacff6e3": {
+      "ContainerID": "81da976530a4f2118fa3834ea0e63a70c7712768aacf86d1ea983043cacff6e3",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 10,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "b5b8955e42da669bb00a7e3be6b9e7deabe23446d39e1145d622ff2184fc0a39": {
+      "ContainerID": "b5b8955e42da669bb00a7e3be6b9e7deabe23446d39e1145d622ff2184fc0a39",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 10,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "d12cbfdb6baae8810180dd2af6b5b07074d43ee4a98d4331c85b8fe6f80b8fb4": {
+      "ContainerID": "d12cbfdb6baae8810180dd2af6b5b07074d43ee4a98d4331c85b8fe6f80b8fb4",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 250,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "da6a325594654d726058032de9200d1e6db522073903c05f67de44a72e2ca86a": {
+      "ContainerID": "da6a325594654d726058032de9200d1e6db522073903c05f67de44a72e2ca86a",
+      "SharedCPUs": "0-3,8-59,64-111",
+      "CPUShare": 0,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "root"
+    },
+    "e5c4977133d4bcef8c261476c4e4380df85a319cb1ea5cb3b412b9d4698a8a1d": {
+      "ContainerID": "e5c4977133d4bcef8c261476c4e4380df85a319cb1ea5cb3b412b9d4698a8a1d",
+      "SharedCPUs": "0,8,12,16,20,24,28,32,36,40,44,48,52,56,64,68,72,76,80,84,88,92,96,100,104,108",
+      "CPUShare": 1500,
+      "ExclusiveCPUs": "",
+      "Memory": "",
+      "RDTClass": "<root>",
+      "BlockIOClass": "",
+      "Pool": "numa node #0"
+    }
+  },
+  "System": {
+    "Sockets": {
+      "0": {
+        "ID": 0,
+        "CPUs": "0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,94,96,98,100,102,104,106,108,110"
+      },
+      "1": {
+        "ID": 1,
+        "CPUs": "1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95,97,99,101,103,105,107,109,111"
+      }
+    },
+    "Nodes": {
+      "0": {
+        "ID": 0,
+        "CPUs": "0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108"
+      },
+      "1": {
+        "ID": 1,
+        "CPUs": "1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77,81,85,89,93,97,101,105,109"
+      },
+      "2": {
+        "ID": 2,
+        "CPUs": "2,6,10,14,18,22,26,30,34,38,42,46,50,54,58,62,66,70,74,78,82,86,90,94,98,102,106,110"
+      },
+      "3": {
+        "ID": 3,
+        "CPUs": "3,7,11,15,19,23,27,31,35,39,43,47,51,55,59,63,67,71,75,79,83,87,91,95,99,103,107,111"
+      },
+      "4": {
+        "ID": 4,
+        "CPUs": ""
+      },
+      "5": {
+        "ID": 5,
+        "CPUs": ""
+      }
+    },
+    "Isolated": "4-7,60-63",
+    "Offlined": "",
+    "RDTClasses": [
+      "<root>"
+    ],
+    "Policy": "memtier"
+  },
+  "Error": ""
+}
