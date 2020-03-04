@@ -31,6 +31,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/visualizer"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -443,12 +444,22 @@ func (m *resmgr) startControllers() error {
 
 // setupIntrospection prepares the resource manager for serving external introspection requests.
 func (m *resmgr) setupIntrospection() error {
-	i, err := introspect.Setup(instrumentation.GetHTTPMux(), m.policy.Introspect())
+	mux := instrumentation.GetHTTPMux()
+
+	i, err := introspect.Setup(mux, m.policy.Introspect())
 	if err != nil {
 		return resmgrError("failed to set up introspection service: %v", err)
 	}
-
 	m.introspect = i
+
+	if !opt.DisableUI {
+		if err := visualizer.Setup(mux); err != nil {
+			m.Error("failed to set up UI for visualization: %v", err)
+		}
+	} else {
+		m.Warn("built-in visualization UIs are disabled")
+	}
+
 	return nil
 }
 
