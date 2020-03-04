@@ -1,6 +1,7 @@
 # Go compiler/toolchain and extra related binaries we ues/need.
 GO_CMD    := go
 GO_BUILD  := $(GO_CMD) build
+GO_GEN    := $(GO_CMD) generate -x
 GO_FMT    := gofmt
 GO_CYCLO  := gocyclo
 GO_LINT   := golint
@@ -15,7 +16,7 @@ GO_TEST   := $(GO_CMD) test $(TEST_TAGS)
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
 
 # Protoc compiler and protobuf definitions we might need to recompile.
-PROTOC    := $(shell command -v protoc || echo echo 'WARNING: no protoc, cannot run protoc ')
+PROTOC    := $(shell command -v protoc || echo 'WARNING: no protoc, cannot run protoc ')
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
@@ -43,6 +44,13 @@ IMAGE_REPO := ""
 # List of our active go modules.
 GO_MODULES = $(shell $(GO_CMD) list ./... | grep -v vendor/)
 GO_PKG_SRC = $(shell find pkg -name \*.go)
+
+# List of visualizer collateral files to go generate.
+UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
+        if [ -d "$$i" -a -e "$$i/assets_generate.go" ]; then \
+            echo $$i/assets_vfsdata.go; \
+        fi; \
+    done)
 
 # Git (tagged) version and revisions we'll use to linker-tag our binaries with.
 GIT_ID   = scripts/build/git-id
@@ -108,7 +116,7 @@ install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-systemd-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-sysconf-$(dir))
 
-clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec
+clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-ui-assets
 
 images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 
@@ -137,7 +145,7 @@ bin/%:
 	echo "Building $@ (version $$gitversion, build $$gitbuildid)..."; \
 	mkdir -p bin && \
 	cd $$src && \
-	    $(GO_BUILD) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
+	    $(GO_BUILD) $(BUILD_TAGS) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
 
 install-bin-%: bin/%
 	$(Q)bin=$(patsubst install-bin-%,%,$@); dir=cmd/$$bin; \
@@ -348,7 +356,7 @@ install-git-hooks:
 # go dependencies for our binaries (careful with that axe, Eugene...)
 #
 
-bin/cri-resmgr: $(wildcard cmd/cri-resmgr/*.go) \
+bin/cri-resmgr: $(wildcard cmd/cri-resmgr/*.go) $(UI_ASSETS) \
     $(shell for dir in \
                   $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/cri-resmgr/... | \
                           grep cri-resource-manager/pkg/ | \
@@ -371,6 +379,31 @@ bin/webhook: $(wildcard cmd/webhook/*.go) \
                           sed 's#github.com/intel/cri-resource-manager/##g'); do \
                 find $$dir -name \*.go; \
             done | sort | uniq)
+
+#
+# rules to run go generators
+#
+
+#
+# %_vfsdata.go should also depend on the collateral content.
+#
+# We'd need a correctly expanding/working equivalent of this:
+#    %_generate.go: $(shell find $(dir $@)/assets -type f)
+#
+
+clean-ui-assets:
+	$(Q)echo "Cleaning up generated UI assets..."; \
+	for i in $(UI_ASSETS); do \
+	    echo "  - $$i"; \
+	    rm -f $$i; \
+	done
+
+%_vfsdata.go:: %_generate.go
+	$(Q)echo "Generating $@..."; \
+	cd $(dir $@) && \
+	    $(GO_GEN) || exit 1 && \
+	cd - > /dev/null
+
 
 # phony targets
 .PHONY: all build install clean test images \

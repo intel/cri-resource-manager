@@ -22,6 +22,9 @@ jobs:
     - name: Gofmt
       run: make format
 
+    - name: InstallVFSGenDev
+      run: go get -u github.com/shurcooL/vfsgen/cmd/vfsgendev
+
     - name: Build
       run: make
 
