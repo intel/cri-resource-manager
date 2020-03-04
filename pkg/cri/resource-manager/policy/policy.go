@@ -20,12 +20,15 @@ import (
 	"sort"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/rdt"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
@@ -109,6 +112,8 @@ type Backend interface {
 	Rebalance() (bool, error)
 	// ExportResourceData provides resource data to export for the container.
 	ExportResourceData(cache.Container) map[string]string
+	// Introspect provides data for external introspection.
+	Introspect(*introspect.State)
 }
 
 // Policy is the exposed interface for container resource allocations decision making.
@@ -127,13 +132,16 @@ type Policy interface {
 	Rebalance() (bool, error)
 	// ExportResourceData exports/updates resource data for the container.
 	ExportResourceData(cache.Container)
+	// Introspect provides data for external introspection.
+	Introspect() *introspect.State
 }
 
 // Policy instance/state.
 type policy struct {
-	cache   cache.Cache   // system state cache
-	backend Backend       // our active backend
-	system  system.System // system/HW/topology info
+	cache   cache.Cache        // system state cache
+	backend Backend            // our active backend
+	system  system.System      // system/HW/topology info
+	inspsys *introspect.System // ditto for introspection
 }
 
 // backend is a registered Backend.
@@ -267,6 +275,85 @@ func (p *policy) ExportResourceData(c cache.Container) {
 	}
 
 	p.cache.WriteFile(c.GetCacheID(), ExportedResources, 0644, buf.Bytes())
+}
+
+// Introspect provides data for external introspection/visualization.
+func (p *policy) Introspect() *introspect.State {
+	pods := p.cache.GetPods()
+	state := &introspect.State{Pods: make(map[string]*introspect.Pod, len(pods))}
+
+	for _, p := range pods {
+		containers := p.GetContainers()
+		if len(containers) == 0 {
+			continue
+		}
+
+		pod := &introspect.Pod{
+			ID:         p.GetID(),
+			UID:        p.GetUID(),
+			Name:       p.GetName(),
+			Containers: make(map[string]*introspect.Container, len(containers)),
+		}
+
+		for _, c := range containers {
+			container := &introspect.Container{
+				ID:      c.GetID(),
+				Name:    c.GetName(),
+				Command: c.GetCommand(),
+				Args:    c.GetArgs(),
+				Hints:   introspect.TopologyHints(c.GetTopologyHints()),
+			}
+			resources := c.GetResourceRequirements()
+			if req, ok := resources.Requests[corev1.ResourceCPU]; ok {
+				if value := req.MilliValue(); value > 0 {
+					container.CPURequest = value
+				}
+			}
+			if lim, ok := resources.Limits[corev1.ResourceCPU]; ok {
+				if value := lim.MilliValue(); value > 0 {
+					container.CPULimit = value
+				}
+			}
+			if req, ok := resources.Requests[corev1.ResourceMemory]; ok {
+				if value := req.Value(); value > 0 {
+					container.MemoryRequest = value
+				}
+			}
+			if lim, ok := resources.Limits[corev1.ResourceMemory]; ok {
+				if value := lim.Value(); value > 0 {
+					container.MemoryLimit = value
+				}
+			}
+			pod.Containers[container.ID] = container
+		}
+		state.Pods[pod.ID] = pod
+	}
+
+	if p.inspsys == nil {
+		sys := &introspect.System{
+			Sockets: make(map[int]*introspect.Socket, p.system.PackageCount()),
+			Nodes:   make(map[int]*introspect.Node, p.system.NUMANodeCount()),
+		}
+		for _, id := range p.system.PackageIDs() {
+			pkg := p.system.Package(id)
+			sys.Sockets[int(id)] = &introspect.Socket{ID: int(id), CPUs: pkg.CPUSet().String()}
+		}
+		for _, id := range p.system.NodeIDs() {
+			node := p.system.Node(id)
+			sys.Nodes[int(id)] = &introspect.Node{ID: int(id), CPUs: node.CPUSet().String()}
+		}
+		sys.Isolated = p.system.Isolated().String()
+		sys.Offlined = p.system.Offlined().String()
+		p.inspsys = sys
+	}
+
+	p.inspsys.RDTClasses = append([]string{"<root>"}, rdt.GetClasses()...)
+	p.inspsys.Policy = opt.Policy
+
+	state.System = p.inspsys
+	p.backend.Introspect(state)
+
+	return state
 }
 
 // Register registers a policy backend.

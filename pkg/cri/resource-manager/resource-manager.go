@@ -24,8 +24,10 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
+	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -45,16 +47,17 @@ type ResourceManager interface {
 type resmgr struct {
 	logger.Logger
 	sync.Mutex
-	relay        relay.Relay       // our CRI relay
-	cache        cache.Cache       // cached state
-	policy       policy.Policy     // resource manager policy
-	configServer config.Server     // configuration management server
-	control      control.Control   // policy controllers/enforcement
-	agent        agent.Interface   // connection to cri-resmgr agent
-	conf         *config.RawConfig // pending for saving in cache
-	metrics      *metrics.Metrics  // metrics collector/pre-processor
-	events       chan interface{}  // channel for delivering events
-	stop         chan interface{}  // channel for signalling shutdown to goroutines
+	relay        relay.Relay        // our CRI relay
+	cache        cache.Cache        // cached state
+	policy       policy.Policy      // resource manager policy
+	configServer config.Server      // configuration management server
+	control      control.Control    // policy controllers/enforcement
+	agent        agent.Interface    // connection to cri-resmgr agent
+	conf         *config.RawConfig  // pending for saving in cache
+	metrics      *metrics.Metrics   // metrics collector/pre-processor
+	events       chan interface{}   // channel for delivering events
+	stop         chan interface{}   // channel for signalling shutdown to goroutines
+	ispect       *introspect.Server // server for external introspection
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -101,6 +104,10 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, err
 	}
 
+	if err := m.setupIntrospection(); err != nil {
+		return nil, err
+	}
+
 	return m, nil
 }
 
@@ -122,6 +129,8 @@ func (m *resmgr) Start() error {
 	if err := m.startEventProcessing(); err != nil {
 		return err
 	}
+
+	m.startIntrospection()
 
 	if err := m.relay.Start(); err != nil {
 		return resmgrError("failed to start CRI relay: %v", err)
@@ -156,6 +165,7 @@ func (m *resmgr) Stop() {
 
 	m.configServer.Stop()
 	m.relay.Stop()
+	m.stopIntrospection()
 	m.stopEventProcessing()
 }
 
@@ -350,4 +360,40 @@ func (m *resmgr) startControllers() error {
 	}
 
 	return nil
+}
+
+// setupIntrospection prepares the resource manager for serving external introspection requests.
+func (m *resmgr) setupIntrospection() error {
+	if policy.ActivePolicy() == policy.NullPolicy {
+		return nil
+	}
+
+	ispect, err := introspect.Setup(instrumentation.GetHTTPMux(), m.policy.Introspect())
+	if err != nil {
+		return resmgrError("failed to set up introspection service: %v", err)
+	}
+
+	m.ispect = ispect
+	return nil
+}
+
+// startIntrospection starts serving the external introspection requests.
+func (m *resmgr) startIntrospection() {
+	if m.ispect != nil {
+		m.ispect.Start()
+	}
+}
+
+// stopInstrospection stops serving external introspection requests.
+func (m *resmgr) stopIntrospection() {
+	if m.ispect != nil {
+		m.ispect.Stop()
+	}
+}
+
+// introspect pushes updated data for external introspection·
+func (m *resmgr) introspect() {
+	if m.ispect != nil {
+		m.ispect.Set(m.policy.Introspect())
+	}
 }

@@ -27,6 +27,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -185,6 +186,11 @@ func (s *static) ExportResourceData(c cache.Container) map[string]string {
 	}
 
 	return data
+}
+
+// Introspect provides data for external introspection.
+func (s *static) Introspect(*introspect.State) {
+	return
 }
 
 func (s *static) configNotify(event config.Event, source config.Source) error {

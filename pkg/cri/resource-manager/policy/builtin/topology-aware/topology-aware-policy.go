@@ -21,6 +21,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -242,6 +243,50 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	}
 
 	return data
+}
+
+// Introspect provides data for external introspection.
+func (p *policy) Introspect(state *introspect.State) {
+	pools := make(map[string]*introspect.Pool, len(p.pools))
+	for _, node := range p.nodes {
+		cpus := node.GetCPU()
+		pool := &introspect.Pool{
+			Name:   node.Name(),
+			CPUs:   cpus.SharableCPUs().Union(cpus.IsolatedCPUs()).String(),
+			Memory: node.GetMemset().String(),
+		}
+		if parent := node.Parent(); !parent.IsNil() {
+			pool.Parent = parent.Name()
+		}
+		if children := node.Children(); len(children) > 0 {
+			pool.Children = make([]string, 0, len(children))
+			for _, c := range children {
+				pool.Children = append(pool.Children, c.Name())
+			}
+		}
+		pools[pool.Name] = pool
+	}
+	state.Pools = pools
+
+	assignments := make(map[string]*introspect.Assignment, len(p.allocations.CPU))
+	for _, g := range p.allocations.CPU {
+		a := &introspect.Assignment{
+			ContainerID:   g.GetContainer().GetID(),
+			CPUShare:      g.SharedPortion(),
+			ExclusiveCPUs: g.ExclusiveCPUs().Union(g.IsolatedCPUs()).String(),
+			RDTClass:      g.GetContainer().GetRDTClass(),
+			BlockIOClass:  g.GetContainer().GetBlockIOClass(),
+			Pool:          g.GetNode().Name(),
+		}
+		if g.SharedPortion() > 0 || a.ExclusiveCPUs == "" {
+			a.SharedCPUs = g.SharedCPUs().String()
+		}
+		if a.RDTClass == "" {
+			a.RDTClass = "<root>"
+		}
+		assignments[a.ContainerID] = a
+	}
+	state.Assignments = assignments
 }
 
 func (p *policy) configNotify(event config.Event, source config.Source) error {
