@@ -424,6 +424,15 @@ clean-ui-assets:
 	    $(GO_GEN) || exit 1 && \
 	cd - > /dev/null
 
+#
+# dependencies for UI assets baked in using vfsgendev (can't come up with a working pattern rule)
+#
+
+pkg/cri/resource-manager/visualizer/bubbles/assets_vfsdata.go:: \
+	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/*.html) \
+	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/js/*.js) \
+	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/css/*.css)
+
 
 # phony targets
 .PHONY: all build install clean test images \
