@@ -34,6 +34,7 @@ type options struct {
 	ForceConfig    string
 	MetricsTimer   time.Duration
 	RebalanceTimer time.Duration
+	DisableUI      bool
 }
 
 // Relay command line options.
@@ -63,4 +64,7 @@ func init() {
 		"Interval for polling/gathering runtime metrics data. Use 'disable' for disabling.")
 	flag.DurationVar(&opt.RebalanceTimer, "rebalance-interval", 5*time.Minute,
 		"Minimum interval between two container rebalancing attempts. Use 'disable' for disabling.")
+
+	flag.BoolVar(&opt.DisableUI, "disable-ui", false,
+		"Disable serving container placement visualization UIs.")
 }

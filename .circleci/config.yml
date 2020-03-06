@@ -10,6 +10,7 @@ jobs:
           command: curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sudo sh -s -- -b $(go env GOPATH)/bin v1.18.0
       - run: go get -u github.com/golang/protobuf/protoc-gen-go
       - run: go get -u google.golang.org/grpc
+      - run: go get -u github.com/shurcooL/vfsgen/cmd/vfsgendev
       - run: make format
       - run: make
       - run: make golangci-lint

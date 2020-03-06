@@ -83,16 +83,35 @@ func NewControl(resctrlpath string) (Control, error) {
 	return r, nil
 }
 
-func (r *control) GetClasses() []string {
-	ret := make([]string, len(r.conf.Classes))
-
+// getClasses returns the names of RDT classes from the given configuration.
+func getClasses(conf interface{}) []string {
+	ret := []string{}
 	i := 0
-	for k := range r.conf.Classes {
-		ret[i] = k
-		i++
+	switch conf.(type) {
+	case *options:
+		for _, p := range conf.(*options).Partitions {
+			for k := range p.Classes {
+				ret[i] = k
+				i++
+			}
+		}
+	case *config:
+		for k := range conf.(*config).Classes {
+			ret[i] = k
+			i++
+		}
 	}
 	sort.Strings(ret)
 	return ret
+}
+
+// GetClasses returns the names of RDT classes in the current configuration.
+func GetClasses() []string {
+	return getClasses(opt.Partitions)
+}
+
+func (r *control) GetClasses() []string {
+	return getClasses(r.conf.Partitions)
 }
 
 func (r *control) SetProcessClass(class string, pids ...string) error {
