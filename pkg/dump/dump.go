@@ -168,17 +168,22 @@ func dumpLine(dir string, latency time.Duration, format string, args ...interfac
 	}
 }
 
+func dumpblock(fn func(string, ...interface{}), prefix string, format string, args ...interface{}) {
+	for _, line := range strings.Split(fmt.Sprintf(format, args...), "\n") {
+		fn("%s%s", prefix, line)
+	}
+}
+
 func dumpBlock(dir string, latency time.Duration, prefix, msg string) {
 	if !opt.Debug {
-		message.InfoBlock(prefix, msg)
+		message.InfoBlock(prefix, "%s", msg)
 	} else {
-		message.DebugBlock(prefix, msg)
+		message.DebugBlock(prefix, "%s", msg)
 	}
 	if opt.File != "" {
-		log.Block(
-			func(format string, args ...interface{}) {
-				dumpToFile(dir, latency, format, args...)
-			},
+		dumpblock(func(format string, args ...interface{}) {
+			dumpToFile(dir, latency, format, args...)
+		},
 			prefix, "%s", msg)
 	}
 }

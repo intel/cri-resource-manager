@@ -236,6 +236,13 @@ else
             exit $$rc
 endif
 
+race-test:
+ifndef WHAT
+	$(Q)echo "$(MAKE) $@ requires WHAT to point to a directory with test."; exit 1
+else
+	$(Q)cd $(WHAT) && $(GO_TEST) -race
+endif
+
 #
 # Rule for building dist-tarballs, SPEC files, RPMs, debian collateral, deb's.
 #
