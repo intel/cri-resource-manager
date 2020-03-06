@@ -8,6 +8,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1
+	github.com/hashicorp/go-multierror v1.0.0
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
 	github.com/iovisor/gobpf v0.0.0-20191024162143-7c8f8e040b4b
 	github.com/pkg/errors v0.9.1
