@@ -201,6 +201,13 @@ func (m *resmgr) setupCache() error {
 func (m *resmgr) setupConfigAgent() error {
 	var err error
 
+	if opt.ForceConfig != "" {
+		if opt.AgentSocket != "" {
+			m.Warn("using forced configuration %s, disabling agent", opt.ForceConfig)
+			opt.AgentSocket = agent.DontConnect
+		}
+	}
+
 	if m.agent, err = agent.NewAgentInterface(opt.AgentSocket); err != nil {
 		return err
 	}
