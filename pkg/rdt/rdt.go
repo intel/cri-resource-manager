@@ -33,9 +33,9 @@ import (
 
 const (
 	resctrlGroupPrefix = "cri-resmgr."
-	// rootClassName is the name we use in our config for the special class
+	// RootClassName is the name we use in our config for the special class
 	// that configures the "root" resctrl group of the system
-	rootClassName = "SYSTEM_DEFAULT"
+	RootClassName = "SYSTEM_DEFAULT"
 )
 
 type control struct {
@@ -177,8 +177,14 @@ func (c *control) configureResctrl(conf config) error {
 		}
 	}
 
-	// Try to apply given configuration
+	// Start with fresh set of classes. Root class is always present
 	c.classes = make(map[string]*ctrlGroup, len(conf.Classes))
+	c.classes[RootClassName], err = newCtrlGroup(RootClassName)
+	if err != nil {
+		return err
+	}
+
+	// Try to apply given configuration
 	for name, class := range conf.Classes {
 		cg, err := newCtrlGroup(name)
 		if err != nil {
@@ -332,7 +338,7 @@ func (r *resctrlGroup) AddPids(pids ...string) error {
 }
 
 func (r *resctrlGroup) relPath(elem ...string) string {
-	if r.name == rootClassName {
+	if r.name == RootClassName {
 		return filepath.Join(elem...)
 	}
 
