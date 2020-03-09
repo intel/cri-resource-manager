@@ -15,14 +15,13 @@
 package cpuallocator
 
 import (
-	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	//"github.com/google/go-cmp/cmp"
 )
 
-func TestCPUAllocator(t *testing.T) {
+func TestAllocatorHelper(t *testing.T) {
 	tcs := []struct {
 		description string
 		from        cpuset.CPUSet
@@ -53,13 +52,10 @@ func TestCPUAllocator(t *testing.T) {
 		},
 	}
 
-	// Mock system discovery failure
-	system = sysfsSingleton{sys: nil, err: fmt.Errorf("mock sysfs discovery error")}
-
 	// Run tests
 	for _, tc := range tcs {
 		t.Run(tc.description, func(t *testing.T) {
-			a := NewCPUAllocator(nil)
+			a := newAllocatorHelper(nil, newTopologyCache(nil))
 			a.from = tc.from
 			a.preferred = tc.preferred
 			a.cnt = tc.cnt

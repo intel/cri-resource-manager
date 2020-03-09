@@ -17,7 +17,6 @@ package topologyaware
 import (
 	"fmt"
 
-	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -230,7 +229,7 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 	// allocate isolated exclusive CPUs or slice them off the sharable set
 	switch {
 	case cr.full > 0 && cs.isolated.Size() >= cr.full:
-		exclusive, err = takeCPUs(&cs.isolated, nil, cr.full)
+		exclusive, err = cs.takeCPUs(&cs.isolated, nil, cr.full)
 		if err != nil {
 			return nil, policyError("internal error: "+
 				"can't allocate %d exclusive CPUs from %s of %s",
@@ -238,7 +237,7 @@ func (cs *cpuSupply) Allocate(r CPURequest) (CPUGrant, error) {
 		}
 
 	case cr.full > 0 && (1000*cs.sharable.Size()-cs.granted)/1000 > cr.full:
-		exclusive, err = takeCPUs(&cs.sharable, nil, cr.full)
+		exclusive, err = cs.takeCPUs(&cs.sharable, nil, cr.full)
 		if err != nil {
 			return nil, policyError("internal error: "+
 				"can't slice %d exclusive CPUs from %s(-%d) of %s",
@@ -297,6 +296,20 @@ func (cs *cpuSupply) String() string {
 	}
 
 	return "<" + cs.node.Name() + " CPU: " + none + isolated + sharable + ">"
+}
+
+// takeCPUs takes up to cnt CPUs from a given CPU set to another.
+func (cs *cpuSupply) takeCPUs(from, to *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
+	cset, err := cs.node.Policy().cpuAllocator.AllocateCpus(from, cnt, true)
+	if err != nil {
+		return cset, err
+	}
+
+	if to != nil {
+		*to = to.Union(cset)
+	}
+
+	return cset, err
 }
 
 // newCPURequest creates a new CPU request for the given container.
@@ -517,18 +530,4 @@ func (cg *cpuGrant) String() string {
 
 	return fmt.Sprintf("<CPU grant for %s from %s: %s%s%s>",
 		cg.container.PrettyName(), cg.node.Name(), isolated, exclusive, shared)
-}
-
-// takeCPUs takes up to cnt CPUs from a given CPU set to another.
-func takeCPUs(from, to *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
-	cset, err := cpuallocator.AllocateCpus(from, cnt, true)
-	if err != nil {
-		return cset, err
-	}
-
-	if to != nil {
-		*to = to.Union(cset)
-	}
-
-	return cset, err
 }
