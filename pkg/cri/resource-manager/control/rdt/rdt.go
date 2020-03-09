@@ -124,8 +124,12 @@ func (ctl *rdtctl) assign(c cache.Container, class string) error {
 		return rdtError("failed to get process list for container %s: %v", c.PrettyName(), err)
 	}
 
-	if err := rdt.SetProcessClass(class, pids...); err != nil {
-		return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
+	if cls, ok := rdt.GetClass(class); ok {
+		if err := cls.AddPids(pids...); err != nil {
+			return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
+		}
+	} else {
+		return rdtError("unknown RDT class %q", class)
 	}
 
 	log.Info("container %s assigned to class %s", c.PrettyName(), class)

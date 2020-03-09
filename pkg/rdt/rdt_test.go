@@ -32,8 +32,8 @@ func TestRdt(t *testing.T) {
 		t.Errorf("uninitialized rdt contains classes %s", cls)
 	}
 
-	if err := SetProcessClass("class-name", "1234"); err == nil {
-		t.Errorf("expected an error when setting rdt class via an uninitialized interface")
+	if _, ok := GetClass(""); ok {
+		t.Errorf("expected to not get a class with empty name")
 	}
 }
 
