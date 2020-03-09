@@ -55,6 +55,18 @@ var rdt *control = &control{
 // CtrlGroup defines the interface of one cri-resmgr managed RDT class
 type CtrlGroup interface {
 	ResctrlGroup
+
+	// CreateMonGroup creates a new monitoring group under the class.
+	CreateMonGroup(name string) (MonGroup, error)
+
+	// DeleteMonGroup deletes a monitoring group from the class.
+	DeleteMonGroup(name string) error
+
+	// GetMonGroup returns a specific monitoring group under the class
+	GetMonGroup(name string) (MonGroup, bool)
+
+	// GetMonGroups returns all monitoring groups under the class
+	GetMonGroups() []MonGroup
 }
 
 // ResctrlGroup is the generic interface for resctrl CTRL and MON groups
@@ -69,12 +81,27 @@ type ResctrlGroup interface {
 	AddPids(pids ...string) error
 }
 
+// MonGroup represents the interface to a RDT monitoring group
+type MonGroup interface {
+	ResctrlGroup
+
+	// Parent returns the CtrlGroup under which the monitoring group exists
+	Parent() CtrlGroup
+}
+
 type ctrlGroup struct {
+	resctrlGroup
+
+	monGroups map[string]*monGroup
+}
+
+type monGroup struct {
 	resctrlGroup
 }
 
 type resctrlGroup struct {
-	name string
+	name   string
+	parent *ctrlGroup // parent for MON groups
 }
 
 // Initialize discovers RDT support and initializes the  rdtControl singleton interface
@@ -117,6 +144,11 @@ func GetClasses() []CtrlGroup {
 	return rdt.getClasses()
 }
 
+// MonSupported returns true if RDT monitoring features are available
+func MonSupported() bool {
+	return rdt.monSupported()
+}
+
 func (c *control) getClass(name string) (CtrlGroup, bool) {
 	cls, ok := c.classes[name]
 	return cls, ok
@@ -131,6 +163,10 @@ func (c *control) getClasses() []CtrlGroup {
 	sort.Slice(ret, func(i, j int) bool { return ret[i].Name() < ret[j].Name() })
 
 	return ret
+}
+
+func (c *control) monSupported() bool {
+	return c.info.l3mon.Supported()
 }
 
 func (c *control) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
@@ -212,7 +248,7 @@ func (c *control) classesFromResctrlFs() ([]ctrlGroup, error) {
 	for _, file := range files {
 		fullName := file.Name()
 		if strings.HasPrefix(fullName, resctrlGroupPrefix) {
-			classes = append(classes, ctrlGroup{resctrlGroup{name: fullName[len(resctrlGroupPrefix):]}})
+			classes = append(classes, ctrlGroup{resctrlGroup: resctrlGroup{name: fullName[len(resctrlGroupPrefix):]}})
 		}
 	}
 	return classes, nil
@@ -242,12 +278,64 @@ func (c *control) cmdError(origErr error) error {
 }
 
 func newCtrlGroup(name string) (*ctrlGroup, error) {
-	cg := &ctrlGroup{resctrlGroup{name: name}}
+	cg := &ctrlGroup{
+		resctrlGroup: resctrlGroup{name: name},
+		monGroups:    make(map[string]*monGroup),
+	}
 
 	if err := os.Mkdir(cg.path(""), 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
 	return cg, nil
+}
+
+func (c *ctrlGroup) CreateMonGroup(name string) (MonGroup, error) {
+	if mg, ok := c.monGroups[name]; ok {
+		return mg, nil
+	}
+
+	log.Debug("creating monitoring group %s/%s", c.name, name)
+	mg, err := newMonGroup(name, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new monitoring group %q: %v", name, err)
+	}
+
+	c.monGroups[name] = mg
+
+	return mg, err
+}
+
+func (c *ctrlGroup) DeleteMonGroup(name string) error {
+	mg, ok := c.monGroups[name]
+	if !ok {
+		log.Warn("trying to delete non-existent mon group %s/%s", c.name, name)
+		return nil
+	}
+
+	log.Debug("deleting monitoring group %s/%s", c.name, name)
+	if err := os.Remove(mg.path("")); err != nil {
+		return rdtError("failed to remove monitoring group %q: %v", mg.relPath(""), err)
+	}
+
+	delete(c.monGroups, name)
+
+	return nil
+}
+
+func (c *ctrlGroup) GetMonGroup(name string) (MonGroup, bool) {
+	mg, ok := c.monGroups[name]
+	return mg, ok
+}
+
+func (c *ctrlGroup) GetMonGroups() []MonGroup {
+	ret := make([]MonGroup, 0, len(c.monGroups))
+
+	for _, v := range c.monGroups {
+		ret = append(ret, v)
+	}
+	sort.Slice(ret, func(i, j int) bool { return ret[i].Name() < ret[j].Name() })
+
+	return ret
 }
 
 func (c *ctrlGroup) configure(name string, class classConfig,
@@ -338,15 +426,33 @@ func (r *resctrlGroup) AddPids(pids ...string) error {
 }
 
 func (r *resctrlGroup) relPath(elem ...string) string {
-	if r.name == RootClassName {
-		return filepath.Join(elem...)
+	if r.parent == nil {
+		if r.name == RootClassName {
+			return filepath.Join(elem...)
+		}
+		return filepath.Join(append([]string{resctrlGroupPrefix + r.name}, elem...)...)
 	}
-
-	return filepath.Join(append([]string{resctrlGroupPrefix + r.name}, elem...)...)
+	// Parent is only intended for MON groups - non-root CTRL groups are considered
+	// as peers to the root CTRL group (as they are in HW) and do not have a parent
+	return r.parent.relPath(append([]string{"mon_groups", resctrlGroupPrefix + r.name}, elem...)...)
 }
 
 func (r *resctrlGroup) path(elem ...string) string {
 	return filepath.Join(rdt.info.resctrlPath, r.relPath(elem...))
+}
+
+func newMonGroup(name string, parent *ctrlGroup) (*monGroup, error) {
+	mg := &monGroup{resctrlGroup{name: name, parent: parent}}
+
+	if err := os.Mkdir(mg.path(""), 0755); err != nil && !os.IsExist(err) {
+		return nil, err
+	}
+
+	return mg, nil
+}
+
+func (m *monGroup) Parent() CtrlGroup {
+	return m.parent
 }
 
 func rdtError(format string, args ...interface{}) error {

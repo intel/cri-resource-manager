@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -35,6 +36,7 @@ type info struct {
 	l3               l3Info
 	l3code           l3Info
 	l3data           l3Info
+	l3mon            l3MonInfo
 	mb               mbInfo
 }
 
@@ -42,6 +44,11 @@ type l3Info struct {
 	cbmMask       Bitmask
 	minCbmBits    uint64
 	shareableBits Bitmask
+}
+
+type l3MonInfo struct {
+	numRmids    uint64
+	monFeatures []string
 }
 
 type mbInfo struct {
@@ -90,35 +97,43 @@ func getRdtInfo() (info, error) {
 		return info, rdtError("failed to read RDT info from %q: %v", infopath, err)
 	}
 
-	l3path := filepath.Join(infopath, "L3")
-	if _, err = os.Stat(l3path); err == nil {
-		info.l3, info.numClosids, err = getL3Info(l3path)
+	subpath := filepath.Join(infopath, "L3")
+	if _, err = os.Stat(subpath); err == nil {
+		info.l3, info.numClosids, err = getL3Info(subpath)
 		if err != nil {
-			return info, rdtError("failed to get L3 info from %q: %v", l3path, err)
+			return info, rdtError("failed to get L3 info from %q: %v", subpath, err)
 		}
 	}
 
-	l3path = filepath.Join(infopath, "L3CODE")
-	if _, err = os.Stat(l3path); err == nil {
-		info.l3code, info.numClosids, err = getL3Info(l3path)
+	subpath = filepath.Join(infopath, "L3CODE")
+	if _, err = os.Stat(subpath); err == nil {
+		info.l3code, info.numClosids, err = getL3Info(subpath)
 		if err != nil {
-			return info, rdtError("failed to get L3CODE info from %q: %v", l3path, err)
+			return info, rdtError("failed to get L3CODE info from %q: %v", subpath, err)
 		}
 	}
 
-	l3path = filepath.Join(infopath, "L3DATA")
-	if _, err = os.Stat(l3path); err == nil {
-		info.l3data, info.numClosids, err = getL3Info(l3path)
+	subpath = filepath.Join(infopath, "L3DATA")
+	if _, err = os.Stat(subpath); err == nil {
+		info.l3data, info.numClosids, err = getL3Info(subpath)
 		if err != nil {
-			return info, rdtError("failed to get L3DATA info from %q: %v", l3path, err)
+			return info, rdtError("failed to get L3DATA info from %q: %v", subpath, err)
 		}
 	}
 
-	mbpath := filepath.Join(infopath, "MB")
-	if _, err = os.Stat(mbpath); err == nil {
-		info.mb, info.numClosids, err = getMBInfo(mbpath)
+	subpath = filepath.Join(infopath, "L3_MON")
+	if _, err = os.Stat(subpath); err == nil {
+		info.l3mon, err = getL3MonInfo(subpath)
 		if err != nil {
-			return info, rdtError("failed to get MBA info from %q: %v", mbpath, err)
+			return info, rdtError("failed to get L3_MON info from %q: %v", subpath, err)
+		}
+	}
+
+	subpath = filepath.Join(infopath, "MB")
+	if _, err = os.Stat(subpath); err == nil {
+		info.mb, info.numClosids, err = getMBInfo(subpath)
+		if err != nil {
+			return info, rdtError("failed to get MBA info from %q: %v", subpath, err)
 		}
 	}
 
@@ -158,6 +173,30 @@ func getL3Info(basepath string) (l3Info, uint64, error) {
 // Supported returns true if L3 cache allocation has is supported and enabled in the system
 func (i l3Info) Supported() bool {
 	return i.cbmMask != 0
+}
+
+func getL3MonInfo(basepath string) (l3MonInfo, error) {
+	var err error
+	info := l3MonInfo{}
+
+	info.numRmids, err = readFileUint64(filepath.Join(basepath, "num_rmids"))
+	if err != nil {
+		return info, err
+	}
+
+	lines, err := readFileString(filepath.Join(basepath, "mon_features"))
+	if err != nil {
+		return info, err
+	}
+	info.monFeatures = strings.Split(lines, "\n")
+	sort.Strings(info.monFeatures)
+
+	return info, nil
+}
+
+// Supported returns true if L3 monitoring is supported and enabled in the system
+func (i l3MonInfo) Supported() bool {
+	return i.numRmids != 0 && len(i.monFeatures) > 0
 }
 
 func getMBInfo(basepath string) (mbInfo, uint64, error) {
