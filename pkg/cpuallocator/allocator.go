@@ -15,7 +15,6 @@
 package cpuallocator
 
 import (
-	"flag"
 	"fmt"
 	"sort"
 
@@ -39,7 +38,6 @@ const (
 	AllocDefault = AllocIdlePackages | AllocIdleCores
 
 	logSource = "cpuallocator"
-	debugFlag = "cpu-allocator-debug"
 )
 
 // CPUAllocator encapsulates state for allocating CPUs.
@@ -69,11 +67,8 @@ type sysfsSingleton struct {
 }
 
 var system sysfsSingleton
-var debug bool
 
 func init() {
-	flag.BoolVar(&debug, debugFlag, false, "enable CPU allocator debug log")
-
 	if err := system.init(); err != nil {
 		log.Warn("sysfs system discovery failed: %v", err)
 	}
@@ -210,14 +205,6 @@ func NewCPUAllocator(sys sysfs.System) *CPUAllocator {
 	}
 
 	return a
-}
-
-func (a *CPUAllocator) debug(format string, args ...interface{}) {
-	if !debug {
-		return
-	}
-
-	log.Info(format, args...)
 }
 
 // Allocate full idle CPU packages.
@@ -444,11 +431,7 @@ func AllocateCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPU
 
 // ReleaseCpus releases a number of CPUs from the given set.
 func ReleaseCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
-	var oset cpuset.CPUSet
-
-	if debug {
-		oset = from.Clone()
-	}
+	oset := from.Clone()
 
 	preferred := system.priorityCpus
 	if !preferHighPrio {
@@ -458,10 +441,7 @@ func ReleaseCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUS
 
 	result, err := allocateCpus(from, from.Size()-cnt, preferred)
 
-	if debug {
-		log.Info("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset.String(), cnt,
-			from.String(), result)
-	}
+	log.Debug("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset, cnt, from, result)
 
 	return result, err
 }
