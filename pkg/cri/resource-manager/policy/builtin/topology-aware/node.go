@@ -82,7 +82,7 @@ type Node interface {
 	// Get the height of this node (inverse of depth: tree depth - node depth).
 	NodeHeight() int
 	// System returns the policy sysfs instance.
-	System() discoveredSystem
+	System() system.System
 	// Policy returns the policy back pointer.
 	Policy() *policy
 	// DiscoverCPU
@@ -320,7 +320,7 @@ func (n *node) BreadthFirst(fn func(Node) error) error {
 }
 
 // System returns the policy System instance.
-func (n *node) System() discoveredSystem {
+func (n *node) System() system.System {
 	return n.policy.sys
 }
 

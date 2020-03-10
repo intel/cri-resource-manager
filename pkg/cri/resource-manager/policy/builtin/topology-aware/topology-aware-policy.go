@@ -41,24 +41,11 @@ type allocations struct {
 	CPU    map[string]CPUGrant
 }
 
-// TODO(rojkov): this is the interface of system.System we consume in this Go package. Should be moved to the package which is supposed to provide the interface.
-type discoveredSystem interface {
-	Node(system.ID) system.Node
-	Package(system.ID) system.CPUPackage
-	Offlined() cpuset.CPUSet
-	Isolated() cpuset.CPUSet
-	CPUSet() cpuset.CPUSet
-	SocketCount() int
-	NUMANodeCount() int
-	PackageIDs() []system.ID
-	NodeIDs() []system.ID
-}
-
 // policy is our runtime state for the topology aware policy.
 type policy struct {
 	options     policyapi.BackendOptions // options we were created or reconfigured with
 	cache       cache.Cache              // pod/container cache
-	sys         discoveredSystem         // system/HW topology info
+	sys         system.System            // system/HW topology info
 	allowed     cpuset.CPUSet            // bounding set of CPUs we're allowed to use
 	reserved    cpuset.CPUSet            // system-/kube-reserved CPUs
 	reserveCnt  int                      // number of CPUs to reserve if given as resource.Quantity

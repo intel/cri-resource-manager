@@ -65,10 +65,74 @@ func (fake *mockSystemCPUPackage) NodeIDs() []system.ID {
 	return []system.ID{}
 }
 
+type mockCPU struct {
+	id            system.ID
+	node          mockSystemNode
+	pkg           mockSystemCPUPackage
+	isolated      bool
+	online        bool
+	baseFrequency uint64
+}
+
+func (c *mockCPU) BaseFrequency() uint64 {
+	return c.baseFrequency
+}
+func (c *mockCPU) ID() system.ID {
+	return c.id
+}
+func (c *mockCPU) PackageID() system.ID {
+	return c.pkg.ID()
+}
+func (c *mockCPU) NodeID() system.ID {
+	return c.node.ID()
+}
+func (c *mockCPU) CoreID() system.ID {
+	return c.id
+}
+func (c *mockCPU) ThreadCPUSet() cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+func (c *mockCPU) FrequencyRange() system.CPUFreq {
+	return system.CPUFreq{}
+}
+func (c *mockCPU) Online() bool {
+	return c.online
+}
+func (c *mockCPU) Isolated() bool {
+	return c.isolated
+}
+func (c *mockCPU) SetFrequencyLimits(min, max uint64) error {
+	return nil
+}
+
 type mockSystem struct {
 	isolatedCPU int
 }
 
+func (fake *mockSystem) CPU(system.ID) system.CPU {
+	return &mockCPU{}
+}
+func (fake *mockSystem) CPUCount() int {
+	return 0
+}
+func (fake *mockSystem) Discover(flags system.DiscoveryFlag) error {
+	return nil
+}
+func (fake *mockSystem) CPUIDs() []system.ID {
+	return []system.ID{}
+}
+func (fake *mockSystem) PackageCount() int {
+	return 0
+}
+func (fake *mockSystem) ThreadCount() int {
+	return 0
+}
+func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus system.IDSet) error {
+	return nil
+}
+func (fake *mockSystem) SetCpusOnline(online bool, cpus system.IDSet) (system.IDSet, error) {
+	return system.NewIDSet(), nil
+}
 func (fake *mockSystem) Node(id system.ID) system.Node {
 	return &mockSystemNode{id: id}
 }
