@@ -194,9 +194,6 @@ func NewCPUAllocator(sys sysfs.System) *CPUAllocator {
 	if sys == nil {
 		sys = system.sys
 	}
-	if sys == nil {
-		return nil
-	}
 
 	a := &CPUAllocator{
 		Logger: log,
@@ -368,25 +365,36 @@ func (a *CPUAllocator) takeIdleThreads() {
 	}
 }
 
+// takeAny is a dummy allocator not dependent on sysfs topology information
+func (a *CPUAllocator) takeAny() {
+	a.Debug("* takeAnyCores()...")
+
+	cpus := a.from.Intersection(a.preferred).ToSlice()
+	cpus = append(cpus, a.from.Difference(a.preferred).ToSlice()...)
+
+	if len(cpus) >= a.cnt {
+		cset := cpuset.NewCPUSet(cpus[0:a.cnt]...)
+		a.result = a.result.Union(cset)
+		a.from = a.from.Difference(cset)
+		a.cnt = 0
+	}
+}
+
 // Perform CPU allocation.
 func (a *CPUAllocator) allocate() cpuset.CPUSet {
-	if (a.flags & AllocIdlePackages) != 0 {
-		a.takeIdlePackages()
-
-		if a.cnt == 0 {
-			return a.result
+	if a.sys != nil {
+		if (a.flags & AllocIdlePackages) != 0 {
+			a.takeIdlePackages()
 		}
-	}
-
-	if (a.flags & AllocIdleCores) != 0 {
-		a.takeIdleCores()
-
-		if a.cnt == 0 {
-			return a.result
+		if a.cnt > 0 && (a.flags&AllocIdleCores) != 0 {
+			a.takeIdleCores()
 		}
+		if a.cnt > 0 {
+			a.takeIdleThreads()
+		}
+	} else {
+		a.takeAny()
 	}
-
-	a.takeIdleThreads()
 	if a.cnt == 0 {
 		return a.result
 	}
