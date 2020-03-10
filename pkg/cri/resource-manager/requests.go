@@ -204,6 +204,18 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 	m.Lock()
 	defer m.Unlock()
 
+	// kubelet doesn't always clean up crashed containers so we try doing it here
+	if msg, ok := request.(*criapi.CreateContainerRequest); ok {
+		if pod, ok := m.cache.LookupPod(msg.PodSandboxId); ok {
+			if msg.Config != nil && msg.Config.Metadata != nil {
+				if c, ok := pod.GetContainer(msg.Config.Metadata.Name); ok {
+					m.Warn("re-creation of container %s, releasing old one", c.PrettyName())
+					m.policy.ReleaseResources(c)
+				}
+			}
+		}
+	}
+
 	container, err := m.cache.InsertContainer(request)
 	if err != nil {
 		m.Error("%s: failed to insert new container to cache: %v", method, err)
