@@ -465,13 +465,7 @@ func (sys *system) discoverCPUs() error {
 
 	sys.cpus = make(map[ID]*cpu)
 
-	offline, err := sys.SetCpusOnline(true, nil)
-	if err != nil {
-		return fmt.Errorf("failed to set CPUs online: %v", err)
-	}
-	defer sys.SetCpusOnline(false, offline)
-
-	_, err = readSysfsEntry(sys.path, filepath.Join(sysfsCPUPath, "isolated"), &sys.isolated, ",")
+	_, err := readSysfsEntry(sys.path, filepath.Join(sysfsCPUPath, "isolated"), &sys.isolated, ",")
 	if err != nil {
 		sys.Error("failed to get set of isolated cpus: %v", err)
 	}
@@ -492,15 +486,25 @@ func (sys *system) discoverCPU(path string) error {
 
 	cpu.isolated = sys.isolated.Has(cpu.id)
 
-	if _, err := readSysfsEntry(path, "topology/physical_package_id", &cpu.pkg); err != nil {
-		return err
+	if online, err := readSysfsEntry(path, "online", nil); err == nil {
+		sys.Warn("CPU %s online status: %s", cpu.path, online)
+		cpu.online = (online != "" && online[0] != '0')
 	}
-	if _, err := readSysfsEntry(path, "topology/core_id", &cpu.core); err != nil {
-		return err
+
+	if cpu.online {
+		if _, err := readSysfsEntry(path, "topology/physical_package_id", &cpu.pkg); err != nil {
+			return err
+		}
+		if _, err := readSysfsEntry(path, "topology/core_id", &cpu.core); err != nil {
+			return err
+		}
+		if _, err := readSysfsEntry(path, "topology/thread_siblings_list", &cpu.threads, ","); err != nil {
+			return err
+		}
+	} else {
+		sys.offline.Add(cpu.id)
 	}
-	if _, err := readSysfsEntry(path, "topology/thread_siblings_list", &cpu.threads, ","); err != nil {
-		return err
-	}
+
 	if _, err := readSysfsEntry(path, "cpufreq/base_frequency", &cpu.baseFreq); err != nil {
 		cpu.baseFreq = 0
 	}
@@ -515,10 +519,10 @@ func (sys *system) discoverCPU(path string) error {
 	}
 
 	if sys.threads < 1 {
-		sys.threads = cpu.threads.Size()
-	}
-	if sys.threads < 1 {
 		sys.threads = 1
+	}
+	if cpu.threads.Size() > sys.threads {
+		sys.threads = cpu.threads.Size()
 	}
 
 	sys.cpus[cpu.id] = cpu
