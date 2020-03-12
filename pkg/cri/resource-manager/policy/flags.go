@@ -30,7 +30,7 @@ const (
 	// NullPolicy is the reserved name for disabling policy altogether.
 	NullPolicy = "null"
 	// NullPolicyDescription is the description for the null policy.
-	NullPolicyDescription = "A policy to bypass even the agnostic policy layer."
+	NullPolicyDescription = "A policy to bypass local policy processing."
 )
 
 // Options captures our configurable parameters.

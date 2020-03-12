@@ -132,8 +132,9 @@ type Policy interface {
 // Policy instance/state.
 type policy struct {
 	cache   cache.Cache   // system state cache
-	backend Backend       // our active backend
+	active  Backend       // our active backend
 	system  system.System // system/HW/topology info
+	options Options       // policy options
 }
 
 // backend is a registered Backend.
@@ -154,102 +155,106 @@ func ActivePolicy() string {
 	return opt.Policy
 }
 
+// Bypassed checks if local policy processing is effectively disabled/bypassed.
+func Bypassed() bool {
+	return opt.Policy == NullPolicy
+}
+
 // NewPolicy creates a policy instance using the selected backend.
 func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
-	if opt.Policy == NullPolicy {
-		return nil, nil
-	}
-
-	backend, ok := backends[opt.Policy]
-	if !ok {
-		return nil, policyError("unknown policy '%s'", opt.Policy)
-	}
-
 	sys, err := system.DiscoverSystem()
 	if err != nil {
 		return nil, policyError("failed to discover system topology: %v", err)
 	}
 
 	p := &policy{
-		cache:  cache,
-		system: sys,
+		cache:   cache,
+		system:  sys,
+		options: *o,
 	}
 
-	log.Info("creating new policy '%s'...", backend.name)
-	if len(opt.Available) != 0 {
-		log.Info("  with resource availability constraints:")
-		for d := range opt.Available {
-			log.Info("    - %s=%s", d, ConstraintToString(opt.Available[d]))
-		}
-	}
-
-	if len(opt.Reserved) != 0 {
-		log.Info("  with resource reservation constraints:")
-		for d := range opt.Reserved {
-			log.Info("    - %s=%s", d, ConstraintToString(opt.Reserved[d]))
-		}
-	}
-
-	if log.DebugEnabled() {
-		log.Debug("*** enabling debugging for %s", opt.Policy)
-		logger.Get(opt.Policy).EnableDebug(true)
+	if Bypassed() {
+		log.Info("activating '%s' policy (no active backend)", opt.Policy)
 	} else {
-		log.Debug("*** leaving debugging for %s alone", opt.Policy)
-	}
+		active, ok := backends[opt.Policy]
+		if !ok {
+			return nil, policyError("unknown policy '%s' requested", opt.Policy)
+		}
 
-	backendOpts := &BackendOptions{
-		Cache:     p.cache,
-		System:    p.system,
-		Available: opt.Available,
-		Reserved:  opt.Reserved,
-		AgentCli:  o.AgentCli,
+		log.Info("activating '%s' policy...", active.name)
+
+		if len(opt.Available) != 0 {
+			log.Info("  with available resources:")
+			for n, r := range opt.Available {
+				log.Info("    - %s=%s", n, ConstraintToString(r))
+			}
+		}
+		if len(opt.Reserved) != 0 {
+			log.Info("  with reserved resources:")
+			for n, r := range opt.Reserved {
+				log.Info("    - %s=%s", n, ConstraintToString(r))
+			}
+		}
+
+		if log.DebugEnabled() {
+			logger.Get(opt.Policy).EnableDebug(true)
+		}
+
+		backendOpts := &BackendOptions{
+			Cache:     p.cache,
+			System:    p.system,
+			Available: opt.Available,
+			Reserved:  opt.Reserved,
+			AgentCli:  o.AgentCli,
+		}
+
+		p.active = active.create(backendOpts)
 	}
-	p.backend = backend.create(backendOpts)
 
 	return p, nil
 }
 
 // Start starts up policy, preparing it for resving requests.
 func (p *policy) Start(add []cache.Container, del []cache.Container) error {
-	if opt.Policy == NullPolicy {
+	if Bypassed() {
+		log.Info("policy '%s' active, nothing to start...", opt.Policy)
 		return nil
 	}
 
-	log.Info("starting policy '%s'...", p.backend.Name())
-
-	return p.backend.Start(add, del)
+	log.Info("starting policy '%s'...", p.active.Name())
+	return p.active.Start(add, del)
 }
 
 // Sync synchronizes the active policy state.
 func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
-	return p.backend.Sync(add, del)
+	return p.active.Sync(add, del)
 }
 
 // AllocateResources allocates resources for a container.
 func (p *policy) AllocateResources(c cache.Container) error {
-	return p.backend.AllocateResources(c)
+	return p.active.AllocateResources(c)
 }
 
 // ReleaseResources release resources of a container.
 func (p *policy) ReleaseResources(c cache.Container) error {
-	return p.backend.ReleaseResources(c)
+	return p.active.ReleaseResources(c)
 }
 
 // UpdateResources updates resource allocations of a container.
 func (p *policy) UpdateResources(c cache.Container) error {
-	return p.backend.UpdateResources(c)
+	return p.active.UpdateResources(c)
 }
 
 // Rebalance tries to find a more optimal allocation of resources for the current containers.
 func (p *policy) Rebalance() (bool, error) {
-	return p.backend.Rebalance()
+	return p.active.Rebalance()
 }
 
 // ExportResourceData exports/updates resource data for the container.
 func (p *policy) ExportResourceData(c cache.Container) {
 	var buf bytes.Buffer
 
-	data := p.backend.ExportResourceData(c)
+	data := p.active.ExportResourceData(c)
 	keys := []string{}
 	for key := range data {
 		keys = append(keys, key)
