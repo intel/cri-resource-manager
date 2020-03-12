@@ -17,7 +17,7 @@ sudo: required
 
 before_install:
   ## checkers
-  - curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(go env GOPATH)/bin v1.18.0
+  - curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(go env GOPATH)/bin v1.23.8
 
 addons:
   apt:
