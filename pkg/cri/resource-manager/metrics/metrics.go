@@ -125,8 +125,10 @@ func (m *Metrics) Start() error {
 
 // Stop stops metrics collection and processing.
 func (m *Metrics) Stop() {
-	close(m.stop)
-	m.stop = nil
+	if m.stop != nil {
+		close(m.stop)
+		m.stop = nil
+	}
 }
 
 // poll does a single round of raw metrics collection.
