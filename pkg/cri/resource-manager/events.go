@@ -19,6 +19,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -44,6 +45,10 @@ func (m *resmgr) setupEventProcessing() error {
 
 // startEventProcessing starts event and metrics processing.
 func (m *resmgr) startEventProcessing() error {
+	if policy.Bypassed() {
+		return nil
+	}
+
 	if err := m.metrics.Start(); err != nil {
 		return resmgrError("failed to start metrics (pre)processor: %v", err)
 	}
@@ -70,8 +75,11 @@ func (m *resmgr) startEventProcessing() error {
 
 // stopEventProcessing stops event and metrics processing.
 func (m *resmgr) stopEventProcessing() {
-	close(m.stop)
-	m.metrics.Stop()
+	if m.stop != nil {
+		close(m.stop)
+		m.metrics.Stop()
+		m.stop = nil
+	}
 }
 
 // SendEvent injects the given event to the resource manaager's event processing loop.

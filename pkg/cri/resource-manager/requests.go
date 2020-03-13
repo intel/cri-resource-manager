@@ -26,11 +26,6 @@ import (
 
 // setupRequestProcessing prepares the resource manager for CRI request processing.
 func (m *resmgr) setupRequestProcessing() error {
-	if policy.ActivePolicy() == policy.NullPolicy {
-		m.Info("%s policy active, CRI requests will not be intercepted", policy.NullPolicy)
-		return nil
-	}
-
 	interceptors := map[string]server.Interceptor{
 		"RunPodSandbox":    m.RunPod,
 		"RemovePodSandbox": m.RemovePod,
@@ -47,6 +42,8 @@ func (m *resmgr) setupRequestProcessing() error {
 		return resmgrError("failed to register resource-manager CRI interceptors: %v", err)
 	}
 
+	m.relay.Server().SetBypassCheckFn(policy.Bypassed)
+
 	return nil
 }
 
@@ -57,10 +54,6 @@ func (m *resmgr) startRequestProcessing() error {
 
 	if err != nil {
 		return err
-	}
-
-	if policy.ActivePolicy() == policy.NullPolicy {
-		return nil
 	}
 
 	if err := m.policy.Start(add, del); err != nil {
@@ -76,7 +69,7 @@ func (m *resmgr) startRequestProcessing() error {
 
 // syncWithCRI synchronizes cache pods and containers with the CRI runtime.
 func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Container, error) {
-	if !m.relay.Client().HasRuntimeService() {
+	if policy.Bypassed() || !m.relay.Client().HasRuntimeService() {
 		return nil, nil, nil
 	}
 

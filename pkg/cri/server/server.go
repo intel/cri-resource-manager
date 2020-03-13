@@ -55,6 +55,8 @@ type Server interface {
 	RegisterRuntimeService(api.RuntimeServiceServer) error
 	// RegisterInterceptors registers the given interceptors with the server.
 	RegisterInterceptors(map[string]Interceptor) error
+	// SetBypassCheckFn sets a function to check if interception should be bypassed.
+	SetBypassCheckFn(func() bool)
 	// Start starts the request processing loop (goroutine) of the server.
 	Start() error
 	// Stop stops the request processing loop (goroutine) of the server.
@@ -68,6 +70,7 @@ type server struct {
 	server       *grpc.Server              // our gRPC server
 	options      Options                   // server options
 	interceptors map[string]Interceptor    // request intercepting hooks
+	chkBypassFn  func() bool               // function to check interception bypass
 	runtime      *api.RuntimeServiceServer // CRI runtime service
 	image        *api.ImageServiceServer   // CRI image service
 }
@@ -137,6 +140,11 @@ func (s *server) RegisterInterceptors(intercept map[string]Interceptor) error {
 	return nil
 }
 
+// SetBypassCheckFn sets a function to check if interception should be bypassed.
+func (s *server) SetBypassCheckFn(fn func() bool) {
+	s.chkBypassFn = fn
+}
+
 // Start starts the servers request processing goroutine.
 func (s *server) Start() error {
 	s.Debug("starting server on socket %s...", s.options.Socket)
@@ -192,6 +200,10 @@ func (s *server) createGrpcServer() error {
 // getInterceptor finds an interceptor for the given method.
 func (s *server) getInterceptor(method string) (Interceptor, string) {
 	name := method[strings.LastIndex(method, "/")+1:]
+
+	if s.chkBypassFn != nil && s.chkBypassFn() {
+		return nil, name
+	}
 
 	if fn, ok := s.interceptors[name]; ok {
 		return fn, name
