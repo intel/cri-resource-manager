@@ -57,14 +57,15 @@ type Allocations map[string]*Assignment
 // static-plus policy runtime state.
 type staticplus struct {
 	logger.Logger
-	offline     cpuset.CPUSet // offlined cpus
-	available   cpuset.CPUSet // bounding set of cpus available for us
-	reserved    cpuset.CPUSet // pool (primarily) for system-/kube-tasks
-	isolated    cpuset.CPUSet // primary pool for exclusive allocations
-	allocations Allocations   // container cpu allocations
-	sys         sysfs.System  // system/topologu information
-	cache       cache.Cache   // system state/cache
-	shared      cpuset.CPUSet // pool for fractional and shared allocations
+	offline      cpuset.CPUSet             // offlined cpus
+	available    cpuset.CPUSet             // bounding set of cpus available for us
+	reserved     cpuset.CPUSet             // pool (primarily) for system-/kube-tasks
+	isolated     cpuset.CPUSet             // primary pool for exclusive allocations
+	allocations  Allocations               // container cpu allocations
+	sys          sysfs.System              // system/topologu information
+	cache        cache.Cache               // system state/cache
+	shared       cpuset.CPUSet             // pool for fractional and shared allocations
+	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
 }
 
 // Make sure staticplus implements the policy backend interface.
@@ -73,9 +74,10 @@ var _ policy.Backend = &staticplus{}
 // CreateStaticPlusPolicy creates a new policy instance.
 func CreateStaticPlusPolicy(opts *policy.BackendOptions) policy.Backend {
 	p := &staticplus{
-		Logger: logger.NewLogger(PolicyName),
-		cache:  opts.Cache,
-		sys:    opts.System,
+		Logger:       logger.NewLogger(PolicyName),
+		cache:        opts.Cache,
+		sys:          opts.System,
+		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
 	}
 
 	p.Info("creating policy...")
@@ -263,7 +265,7 @@ func (p *staticplus) setupPools(available, reserved policy.ConstraintSet) error 
 			p.reserved = cpuset.NewCPUSet(0)
 			p.available = p.available.Difference(p.reserved)
 		} else {
-			p.reserved, err = takeCPUs(&p.available, nil, count, false)
+			p.reserved, err = p.takeCPUs(&p.available, nil, count, false)
 			if err != nil {
 				return policyError("failed to reserve %d CPUs from %s: %v",
 					count, p.available.String())
@@ -358,7 +360,7 @@ func (p *staticplus) assignCpus(c cache.Container) (*Assignment, error) {
 
 	// if there is capacity in the isolated pool, slice cpus off from it
 	if p.isolated.Size() >= full && !p.optOutFromIsolation(c) {
-		cpus, err := takeCPUs(&p.isolated, nil, full, true)
+		cpus, err := p.takeCPUs(&p.isolated, nil, full, true)
 		if err != nil {
 			return nil, policyError("failed to allocate %d isolated CPUs: %v",
 				full, err)
@@ -368,7 +370,7 @@ func (p *staticplus) assignCpus(c cache.Container) (*Assignment, error) {
 
 	// otherwise, try to slice off cpus from the shared pool
 	if p.shared.Size() >= full {
-		cpus, err := takeCPUs(&p.shared, nil, full, true)
+		cpus, err := p.takeCPUs(&p.shared, nil, full, true)
 		if err != nil {
 			return nil, policyError("failed to allocate %d exclusive CPUs: %v",
 				full, err)
@@ -588,8 +590,8 @@ func (p *staticplus) dumpAllocations() {
 }
 
 // Take up to cnt CPUs from a given CPU set to another.
-func takeCPUs(from, to *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
-	cset, err := cpuallocator.AllocateCpus(from, cnt, preferHighPrio)
+func (p *staticplus) takeCPUs(from, to *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
+	cset, err := p.cpuAllocator.AllocateCpus(from, cnt, preferHighPrio)
 	if err != nil {
 		return cset, err
 	}

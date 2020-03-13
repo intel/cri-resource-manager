@@ -22,6 +22,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 
+	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
@@ -43,20 +44,20 @@ type allocations struct {
 
 // policy is our runtime state for the topology aware policy.
 type policy struct {
-	options     policyapi.BackendOptions // options we were created or reconfigured with
-	cache       cache.Cache              // pod/container cache
-	sys         system.System            // system/HW topology info
-	allowed     cpuset.CPUSet            // bounding set of CPUs we're allowed to use
-	reserved    cpuset.CPUSet            // system-/kube-reserved CPUs
-	reserveCnt  int                      // number of CPUs to reserve if given as resource.Quantity
-	isolated    cpuset.CPUSet            // (our allowed set of) isolated CPUs
-	nodes       map[string]Node          // pool nodes by name
-	pools       []Node                   // pre-populated node slice for scoring, etc...
-	root        Node                     // root of our pool/partition tree
-	nodeCnt     int                      // number of pools
-	depth       int                      // tree depth
-	allocations allocations              // container pool assignments
-
+	options      policyapi.BackendOptions  // options we were created or reconfigured with
+	cache        cache.Cache               // pod/container cache
+	sys          system.System             // system/HW topology info
+	allowed      cpuset.CPUSet             // bounding set of CPUs we're allowed to use
+	reserved     cpuset.CPUSet             // system-/kube-reserved CPUs
+	reserveCnt   int                       // number of CPUs to reserve if given as resource.Quantity
+	isolated     cpuset.CPUSet             // (our allowed set of) isolated CPUs
+	nodes        map[string]Node           // pool nodes by name
+	pools        []Node                    // pre-populated node slice for scoring, etc...
+	root         Node                      // root of our pool/partition tree
+	nodeCnt      int                       // number of pools
+	depth        int                       // tree depth
+	allocations  allocations               // container pool assignments
+	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
 }
 
 // Make sure policy implements the policy.Backend interface.
@@ -65,9 +66,10 @@ var _ policyapi.Backend = &policy{}
 // CreateTopologyAwarePolicy creates a new policy instance.
 func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 	p := &policy{
-		cache:   opts.Cache,
-		sys:     opts.System,
-		options: *opts,
+		cache:        opts.Cache,
+		sys:          opts.System,
+		options:      *opts,
+		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
 	}
 
 	p.nodes = make(map[string]Node)

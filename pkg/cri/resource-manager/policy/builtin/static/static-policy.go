@@ -44,14 +44,15 @@ const (
 type static struct {
 	logger.Logger
 
-	available     policy.ConstraintSet // resource availability constraints
-	reserved      policy.ConstraintSet // system/kube-reservation constraints
-	reservedCpus  cpuset.CPUSet        // CPUs reserved for system- and kube-tasks
-	availableCpus cpuset.CPUSet        // CPUs free usable by this policy
-	isolatedCpus  cpuset.CPUSet        // available CPUs isolated from normal scheduling
-	sys           sysfs.System         // system/topology information
-	numHT         int                  // number of hyperthreads per core
-	state         cache.Cache          // policy/state cache
+	available     policy.ConstraintSet      // resource availability constraints
+	reserved      policy.ConstraintSet      // system/kube-reservation constraints
+	reservedCpus  cpuset.CPUSet             // CPUs reserved for system- and kube-tasks
+	availableCpus cpuset.CPUSet             // CPUs free usable by this policy
+	isolatedCpus  cpuset.CPUSet             // available CPUs isolated from normal scheduling
+	sys           sysfs.System              // system/topology information
+	numHT         int                       // number of hyperthreads per core
+	state         cache.Cache               // policy/state cache
+	cpuAllocator  cpuallocator.CPUAllocator // CPU allocator used by the policy
 }
 
 // Make sure static implements the policy backend interface.
@@ -65,11 +66,12 @@ const (
 // NewStaticPolicy creates a new policy instance.
 func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 	s := &static{
-		Logger:    logger.NewLogger(PolicyName),
-		state:     opts.Cache,
-		sys:       opts.System,
-		available: opts.Available,
-		reserved:  opts.Reserved,
+		Logger:       logger.NewLogger(PolicyName),
+		state:        opts.Cache,
+		sys:          opts.System,
+		available:    opts.Available,
+		reserved:     opts.Reserved,
+		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
 	}
 
 	s.Info("creating policy...")
@@ -309,7 +311,7 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 // allocateOrdinaryCPUs tries to take a number of non-isolated CPUs.
 func (s *static) allocateOrdinaryCPUs(numCPUs int) (cpuset.CPUSet, error) {
 	assignable := s.assignableCPUs(numCPUs)
-	result, err := takeByTopology(assignable, numCPUs, true)
+	result, err := s.takeByTopology(assignable, numCPUs, true)
 
 	if err != nil {
 		return cpuset.NewCPUSet(), err
@@ -322,7 +324,7 @@ func (s *static) allocateOrdinaryCPUs(numCPUs int) (cpuset.CPUSet, error) {
 
 // allocateIsolatedCPUs tries to take a number of isolated CPUs, falling back to ordinary ones.
 func (s *static) allocateIsolatedCPUs(numCPUs int, prefer bool) (cpuset.CPUSet, error) {
-	result, err := takeByTopology(s.isolatedCpus, numCPUs, true)
+	result, err := s.takeByTopology(s.isolatedCpus, numCPUs, true)
 
 	switch {
 	case err != nil:
@@ -447,7 +449,7 @@ func (s *static) allocateReserved() error {
 		qty := cpus.(resource.Quantity)
 		count := (int(qty.MilliValue()) + 999) / 1000
 		from := s.availableCpus.Clone()
-		if reserved, err = takeByTopology(from, count, false); err != nil {
+		if reserved, err = s.takeByTopology(from, count, false); err != nil {
 			return policyError("failed to reserve %d CPUs: %v", cpus.(int), err)
 		}
 	}
@@ -525,9 +527,9 @@ func (s *static) validateState(state cache.Cache) error {
 }
 
 // Topology-aware-like allocation wrapper.
-func takeByTopology(available cpuset.CPUSet, numCPUs int, preferHighPrio bool) (cpuset.CPUSet, error) {
+func (s *static) takeByTopology(available cpuset.CPUSet, numCPUs int, preferHighPrio bool) (cpuset.CPUSet, error) {
 	from := &available
-	cset, err := cpuallocator.AllocateCpus(from, numCPUs, preferHighPrio)
+	cset, err := s.cpuAllocator.AllocateCpus(from, numCPUs, preferHighPrio)
 	if err != nil {
 		return cset, err
 	}

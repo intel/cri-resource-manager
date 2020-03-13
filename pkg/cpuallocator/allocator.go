@@ -40,10 +40,11 @@ const (
 	logSource = "cpuallocator"
 )
 
-// CPUAllocator encapsulates state for allocating CPUs.
-type CPUAllocator struct {
-	logger.Logger               // allocator logger instance
+// allocatorHelper encapsulates state for allocating CPUs.
+type allocatorHelper struct {
+	logger.Logger               // allocatorHelper logger instance
 	sys           sysfs.System  // sysfs CPU and topology information
+	topology      topologyCache // cached topology information
 	flags         AllocFlag     // allocation preferences
 	from          cpuset.CPUSet // set of CPUs to allocate from
 	preferred     cpuset.CPUSet // set of preferred CPUs
@@ -54,24 +55,24 @@ type CPUAllocator struct {
 	cpus []sysfs.CPU        // CPU cores, sorted by preference
 }
 
-// A singleton wrapper around sysfs.System.
-type sysfsSingleton struct {
-	sys     sysfs.System // wrapped sysfs.System instance
-	err     error        // error during recovery
-	cpusets struct {     // cached cpusets per
-		pkg  map[sysfs.ID]cpuset.CPUSet // package,
-		node map[sysfs.ID]cpuset.CPUSet // node, and
-		core map[sysfs.ID]cpuset.CPUSet // CPU core
-	}
-	priorityCpus cpuset.CPUSet // set of CPUs having higher priority
+// CPUAllocator is an interface for a generic CPU allocator
+type CPUAllocator interface {
+	AllocateCpus(*cpuset.CPUSet, int, bool) (cpuset.CPUSet, error)
+	ReleaseCpus(*cpuset.CPUSet, int, bool) (cpuset.CPUSet, error)
 }
 
-var system sysfsSingleton
+type cpuAllocator struct {
+	logger.Logger
+	sys           sysfs.System  // wrapped sysfs.System instance
+	topologyCache topologyCache // topology lookups
+	priorityCpus  cpuset.CPUSet // set of CPUs having higher priority
+}
 
-func init() {
-	if err := system.init(); err != nil {
-		log.Warn("sysfs system discovery failed: %v", err)
-	}
+// topologyCache caches topology lookups
+type topologyCache struct {
+	pkg  map[sysfs.ID]cpuset.CPUSet
+	node map[sysfs.ID]cpuset.CPUSet
+	core map[sysfs.ID]cpuset.CPUSet
 }
 
 // IDFilter helps filtering Ids.
@@ -83,62 +84,21 @@ type IDSorter func(int, int) bool
 // our logger instance
 var log = logger.NewLogger(logSource)
 
-// init does system discovery
-func (s *sysfsSingleton) init() error {
-	sys, err := sysfs.DiscoverSystem(sysfs.DiscoverCPUTopology)
-	if err != nil {
-		return err
-	}
-	s.sys = sys
-	s.cpusets.pkg = make(map[sysfs.ID]cpuset.CPUSet)
-	s.cpusets.node = make(map[sysfs.ID]cpuset.CPUSet)
-	s.cpusets.core = make(map[sysfs.ID]cpuset.CPUSet)
-
-	s.discoverPriorityCpus()
-
-	return err
-}
-
-// PackageCPUSet gets the CPUSet for the given package.
-func (s *sysfsSingleton) PackageCPUSet(id sysfs.ID) cpuset.CPUSet {
-	if cset, ok := s.cpusets.pkg[id]; ok {
-		return cset
+// NewCPUAllocator return a new cpuAllocator instance
+func NewCPUAllocator(sys sysfs.System) CPUAllocator {
+	ca := cpuAllocator{
+		Logger:        log,
+		sys:           sys,
+		topologyCache: newTopologyCache(sys),
 	}
 
-	cset := s.sys.Package(id).CPUSet()
-	s.cpusets.pkg[id] = cset
+	ca.discoverPriorityCpus()
 
-	return cset
-}
-
-// NodeCPUSet gets the CPUSet for the given node.
-func (s *sysfsSingleton) NodeCPUSet(id sysfs.ID) cpuset.CPUSet {
-	if cset, ok := s.cpusets.node[id]; ok {
-		return cset
-	}
-
-	cset := s.sys.Node(id).CPUSet()
-	s.cpusets.node[id] = cset
-
-	return cset
-}
-
-// CoreCPUSet gets the CPUSet for the given core.
-func (s *sysfsSingleton) CoreCPUSet(id sysfs.ID) cpuset.CPUSet {
-	if cset, ok := s.cpusets.core[id]; ok {
-		return cset
-	}
-
-	cset := s.sys.CPU(id).ThreadCPUSet()
-	for _, cid := range cset.ToSlice() {
-		s.cpusets.core[sysfs.ID(cid)] = cset
-	}
-
-	return cset
+	return &ca
 }
 
 // Pick packages, nodes or CPUs by filtering according to a function.
-func (s *sysfsSingleton) pick(idSlice []sysfs.ID, f IDFilter) []sysfs.ID {
+func pickIds(idSlice []sysfs.ID, f IDFilter) []sysfs.ID {
 	ids := make([]sysfs.ID, len(idSlice))
 
 	idx := 0
@@ -152,16 +112,16 @@ func (s *sysfsSingleton) pick(idSlice []sysfs.ID, f IDFilter) []sysfs.ID {
 	return ids[0:idx]
 }
 
-func (s *sysfsSingleton) discoverPriorityCpus() {
-	s.priorityCpus = cpuset.NewCPUSet()
-	if s.sys == nil {
+func (ca *cpuAllocator) discoverPriorityCpus() {
+	ca.priorityCpus = cpuset.NewCPUSet()
+	if ca.sys == nil {
 		return
 	}
 
 	// Group cpus by base frequency
 	freqs := map[uint64][]sysfs.ID{}
-	for _, id := range s.sys.CPUIDs() {
-		bf := s.sys.CPU(id).BaseFrequency()
+	for _, id := range ca.sys.CPUIDs() {
+		bf := ca.sys.CPU(id).BaseFrequency()
 		freqs[bf] = append(freqs[bf], id)
 	}
 
@@ -182,46 +142,43 @@ func (s *sysfsSingleton) discoverPriorityCpus() {
 		for _, freq := range freqList[1:] {
 			priorityCpus = append(priorityCpus, freqs[freq]...)
 		}
-		s.priorityCpus = sysfs.NewIDSet(priorityCpus...).CPUSet()
+		ca.priorityCpus = sysfs.NewIDSet(priorityCpus...).CPUSet()
 	}
-	if s.priorityCpus.Size() > 0 {
-		log.Debug("discovered high priority cpus: %v", s.priorityCpus)
+	if ca.priorityCpus.Size() > 0 {
+		log.Debug("discovered high priority cpus: %v", ca.priorityCpus)
 	}
 }
 
-// NewCPUAllocator creates a new CPU allocator.
-func NewCPUAllocator(sys sysfs.System) *CPUAllocator {
-	if sys == nil {
-		sys = system.sys
-	}
-
-	a := &CPUAllocator{
-		Logger: log,
-		sys:    sys,
-		flags:  AllocDefault,
+// newAllocatorHelper creates a new CPU allocatorHelper.
+func newAllocatorHelper(sys sysfs.System, topo topologyCache) *allocatorHelper {
+	a := &allocatorHelper{
+		Logger:   log,
+		sys:      sys,
+		topology: topo,
+		flags:    AllocDefault,
 	}
 
 	return a
 }
 
 // Allocate full idle CPU packages.
-func (a *CPUAllocator) takeIdlePackages() {
+func (a *allocatorHelper) takeIdlePackages() {
 	a.Debug("* takeIdlePackages()...")
 
 	offline := a.sys.Offlined()
 
 	// pick idle packages
-	pkgs := system.pick(a.sys.PackageIDs(),
+	pkgs := pickIds(a.sys.PackageIDs(),
 		func(id sysfs.ID) bool {
-			cset := system.PackageCPUSet(id).Difference(offline)
+			cset := a.topology.pkg[id].Difference(offline)
 			return cset.Intersection(a.from).Equals(cset)
 		})
 
 	// sorted by number of preferred cpus and then by cpu id
 	sort.Slice(pkgs,
 		func(i, j int) bool {
-			iPref := system.PackageCPUSet(pkgs[i]).Intersection(a.preferred).Size()
-			jPref := system.PackageCPUSet(pkgs[j]).Intersection(a.preferred).Size()
+			iPref := a.topology.pkg[pkgs[i]].Intersection(a.preferred).Size()
+			jPref := a.topology.pkg[pkgs[j]].Intersection(a.preferred).Size()
 			if iPref != jPref {
 				return iPref > jPref
 			}
@@ -232,7 +189,7 @@ func (a *CPUAllocator) takeIdlePackages() {
 
 	// take as many idle packages as we need/can
 	for _, id := range pkgs {
-		cset := system.PackageCPUSet(id).Difference(offline)
+		cset := a.topology.pkg[id].Difference(offline)
 		a.Debug(" => considering package %v (#%s)...", id, cset)
 		if a.cnt >= cset.Size() {
 			a.Debug(" => taking pakcage %v...", id)
@@ -248,23 +205,23 @@ func (a *CPUAllocator) takeIdlePackages() {
 }
 
 // Allocate full idle CPU cores.
-func (a *CPUAllocator) takeIdleCores() {
+func (a *allocatorHelper) takeIdleCores() {
 	a.Debug("* takeIdleCores()...")
 
 	offline := a.sys.Offlined()
 
 	// pick (first id for all) idle cores
-	cores := system.pick(a.sys.CPUIDs(),
+	cores := pickIds(a.sys.CPUIDs(),
 		func(id sysfs.ID) bool {
-			cset := system.CoreCPUSet(id).Difference(offline)
+			cset := a.topology.core[id].Difference(offline)
 			return cset.Intersection(a.from).Equals(cset) && cset.ToSlice()[0] == int(id)
 		})
 
 	// sorted by id
 	sort.Slice(cores,
 		func(i, j int) bool {
-			iPref := system.CoreCPUSet(cores[i]).Intersection(a.preferred).Size()
-			jPref := system.CoreCPUSet(cores[j]).Intersection(a.preferred).Size()
+			iPref := a.topology.core[cores[i]].Intersection(a.preferred).Size()
+			jPref := a.topology.core[cores[j]].Intersection(a.preferred).Size()
 			if iPref != jPref {
 				return iPref > jPref
 			}
@@ -275,7 +232,7 @@ func (a *CPUAllocator) takeIdleCores() {
 
 	// take as many idle cores as we can
 	for _, id := range cores {
-		cset := system.CoreCPUSet(id).Difference(offline)
+		cset := a.topology.core[id].Difference(offline)
 		a.Debug(" => considering core %v (#%s)...", id, cset)
 		if a.cnt >= cset.Size() {
 			a.Debug(" => taking core %v...", id)
@@ -291,11 +248,11 @@ func (a *CPUAllocator) takeIdleCores() {
 }
 
 // Allocate idle CPU hyperthreads.
-func (a *CPUAllocator) takeIdleThreads() {
+func (a *allocatorHelper) takeIdleThreads() {
 	offline := a.sys.Offlined()
 
 	// pick all threads with free capacity
-	cores := system.pick(a.sys.CPUIDs(),
+	cores := pickIds(a.sys.CPUIDs(),
 		func(id sysfs.ID) bool {
 			return a.from.Difference(offline).Contains(int(id))
 		})
@@ -317,10 +274,10 @@ func (a *CPUAllocator) takeIdleThreads() {
 			iPkg := a.sys.CPU(iCore).PackageID()
 			jPkg := a.sys.CPU(jCore).PackageID()
 
-			iCoreSet := system.CoreCPUSet(iCore)
-			jCoreSet := system.CoreCPUSet(jCore)
-			iPkgSet := system.PackageCPUSet(iPkg)
-			jPkgSet := system.PackageCPUSet(jPkg)
+			iCoreSet := a.topology.core[iCore]
+			jCoreSet := a.topology.core[jCore]
+			iPkgSet := a.topology.pkg[iPkg]
+			jPkgSet := a.topology.pkg[jPkg]
 
 			iPkgColo := iPkgSet.Intersection(a.result).Size()
 			jPkgColo := jPkgSet.Intersection(a.result).Size()
@@ -352,7 +309,7 @@ func (a *CPUAllocator) takeIdleThreads() {
 
 	// take as many idle cores as we can
 	for _, id := range cores {
-		cset := system.CoreCPUSet(id).Difference(offline)
+		cset := a.topology.core[id].Difference(offline)
 		a.Debug(" => considering thread %v (#%s)...", id, cset)
 		cset = cpuset.NewCPUSet(int(id))
 		a.result = a.result.Union(cset)
@@ -366,7 +323,7 @@ func (a *CPUAllocator) takeIdleThreads() {
 }
 
 // takeAny is a dummy allocator not dependent on sysfs topology information
-func (a *CPUAllocator) takeAny() {
+func (a *allocatorHelper) takeAny() {
 	a.Debug("* takeAnyCores()...")
 
 	cpus := a.from.Intersection(a.preferred).ToSlice()
@@ -381,7 +338,7 @@ func (a *CPUAllocator) takeAny() {
 }
 
 // Perform CPU allocation.
-func (a *CPUAllocator) allocate() cpuset.CPUSet {
+func (a *allocatorHelper) allocate() cpuset.CPUSet {
 	if a.sys != nil {
 		if (a.flags & AllocIdlePackages) != 0 {
 			a.takeIdlePackages()
@@ -402,7 +359,7 @@ func (a *CPUAllocator) allocate() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func allocateCpus(from *cpuset.CPUSet, cnt int, preferred cpuset.CPUSet) (cpuset.CPUSet, error) {
+func (ca *cpuAllocator) allocateCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
 	var result cpuset.CPUSet
 	var err error
 
@@ -412,44 +369,57 @@ func allocateCpus(from *cpuset.CPUSet, cnt int, preferred cpuset.CPUSet) (cpuset
 	case from.Size() == cnt:
 		result, err, *from = from.Clone(), nil, cpuset.NewCPUSet()
 	default:
-		a := NewCPUAllocator(nil)
+		a := newAllocatorHelper(ca.sys, ca.topologyCache)
 		a.from = from.Clone()
 		a.cnt = cnt
-		a.preferred = preferred
+
+		if preferHighPrio {
+			a.preferred = ca.priorityCpus
+		} else {
+			// Try to avoid high priority cpus
+			a.preferred = from.Difference(ca.priorityCpus)
+		}
 
 		result, err, *from = a.allocate(), nil, a.from.Clone()
 
-		a.Debug("%d cpus from #%v (preferring #%v) => #%v", cnt, from.Union(result), preferred, result)
+		a.Debug("%d cpus from #%v (preferring #%v) => #%v", cnt, from.Union(result), a.preferred, result)
 	}
 
 	return result, err
 }
 
 // AllocateCpus allocates a number of CPUs from the given set.
-func AllocateCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
-	preferred := system.priorityCpus
-	if !preferHighPrio {
-		// Try to avoid high priority cpus
-		preferred = from.Difference(system.priorityCpus)
-	}
-
-	result, err := allocateCpus(from, cnt, preferred)
+func (ca *cpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
+	result, err := ca.allocateCpus(from, cnt, preferHighPrio)
 	return result, err
 }
 
 // ReleaseCpus releases a number of CPUs from the given set.
-func ReleaseCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
+func (ca *cpuAllocator) ReleaseCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
 	oset := from.Clone()
 
-	preferred := system.priorityCpus
-	if !preferHighPrio {
-		// Try to avoid high priority cpus
-		preferred = from.Difference(system.priorityCpus)
-	}
+	result, err := ca.allocateCpus(from, from.Size()-cnt, preferHighPrio)
 
-	result, err := allocateCpus(from, from.Size()-cnt, preferred)
-
-	log.Debug("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset, cnt, from, result)
+	ca.Debug("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset, cnt, from, result)
 
 	return result, err
+}
+
+func newTopologyCache(sys sysfs.System) topologyCache {
+	c := topologyCache{
+		pkg:  make(map[sysfs.ID]cpuset.CPUSet),
+		node: make(map[sysfs.ID]cpuset.CPUSet),
+		core: make(map[sysfs.ID]cpuset.CPUSet)}
+	if sys != nil {
+		for _, id := range sys.PackageIDs() {
+			c.pkg[id] = sys.Package(id).CPUSet()
+		}
+		for _, id := range sys.NodeIDs() {
+			c.node[id] = sys.Node(id).CPUSet()
+		}
+		for _, id := range sys.CPUIDs() {
+			c.core[id] = sys.CPU(id).ThreadCPUSet()
+		}
+	}
+	return c
 }
