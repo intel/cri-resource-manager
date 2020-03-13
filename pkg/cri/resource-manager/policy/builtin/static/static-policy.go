@@ -261,12 +261,7 @@ func (s *static) RemoveContainer(containerID string) error {
 //
 //     - we globally prefer isolated exclusive CPUs, or
 //     - the pod prefers isolated exclusive CPUs, or
-//     - the container asks a single hyperthread worth of CPU, or
-//     - the container asks for a full core worth of CPU
-//
-//   For the full core worth of CPU case, if the result of the
-//   allocation is not a single full core, we fall back to taking
-//   ordinary CPUs, unless isolated ones are explicitly preferred.
+//     - the container asks a single hyperthread worth of CPU
 
 // cpuPreference checks if isolated CPUs should be tried and are preferred for an allocation.
 func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
@@ -296,12 +291,8 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 		}
 	}
 
-	if prefer {
-		return true, true
-	}
-
-	// For a single HT of CPU or a full core of CPU we always try isolated CPUs.
-	if (numCPUs == 1 || numCPUs == s.numHT) && s.isolatedCpus.Size() >= numCPUs {
+	// Try isolated cpus when explicitly asked, or, if a single HT of CPU is requested
+	if prefer || (numCPUs == 1 && s.isolatedCpus.Size() >= 1) {
 		try = true
 	}
 
@@ -333,32 +324,10 @@ func (s *static) allocateIsolatedCPUs(numCPUs int, prefer bool) (cpuset.CPUSet, 
 	case numCPUs == 1 || prefer:
 		s.Info("allocated %d isolated CPUs: %s", numCPUs, result.String())
 		return result, nil
-	case s.fullCore(result):
-		s.Info("allocated %d isolated CPUs: %s", numCPUs, result.String())
-		return result, nil
 	default:
 		s.Info("falling back to %d ordinary CPUs", numCPUs)
 		return s.allocateOrdinaryCPUs(numCPUs)
 	}
-}
-
-// fullCore checks if the CPUs in a cpuset consume a full single core.
-func (s *static) fullCore(cset cpuset.CPUSet) bool {
-	if cset.Size() != s.numHT {
-		return false
-	}
-	coreID := -1
-	for _, cpu := range cset.ToSlice() {
-		id := s.sys.CPU(sysfs.ID(cpu)).CoreID()
-		switch {
-		case coreID < 0:
-			coreID = int(id)
-		case coreID != int(id):
-			return false
-		}
-	}
-
-	return true
 }
 
 // allocateCPUs allocates the requested number of CPUs.
