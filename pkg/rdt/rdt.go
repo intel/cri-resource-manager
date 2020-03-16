@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -79,6 +80,9 @@ type ResctrlGroup interface {
 
 	// AddPids assigns the given process ids to the group
 	AddPids(pids ...string) error
+
+	// GetMonData retrieves the monitoring data of the group
+	GetMonData() MonData
 }
 
 // MonGroup represents the interface to a RDT monitoring group
@@ -88,6 +92,25 @@ type MonGroup interface {
 	// Parent returns the CtrlGroup under which the monitoring group exists
 	Parent() CtrlGroup
 }
+
+// MonData contains monitoring stats of one monitoring group
+type MonData struct {
+	L3 MonL3Data
+}
+
+// MonL3Data contains L3 monitoring stats of one monitoring group
+type MonL3Data map[uint64]MonLeafData
+
+// MonLeafData represents the raw numerical stats from one RDT monitor data leaf
+type MonLeafData map[string]uint64
+
+// MonResource is the type of RDT monitoring resource
+type MonResource string
+
+const (
+	// MonResourceL3 is the RDT L3 cache monitor resource
+	MonResourceL3 MonResource = "l3"
+)
 
 type ctrlGroup struct {
 	resctrlGroup
@@ -149,6 +172,11 @@ func MonSupported() bool {
 	return rdt.monSupported()
 }
 
+// GetMonFeatures returns the available monitoring stats of each available monitoring technology
+func GetMonFeatures() map[MonResource][]string {
+	return rdt.getMonFeatures()
+}
+
 func (c *control) getClass(name string) (CtrlGroup, bool) {
 	cls, ok := c.classes[name]
 	return cls, ok
@@ -167,6 +195,15 @@ func (c *control) getClasses() []CtrlGroup {
 
 func (c *control) monSupported() bool {
 	return c.info.l3mon.Supported()
+}
+
+func (c *control) getMonFeatures() map[MonResource][]string {
+	ret := make(map[MonResource][]string)
+	if c.info.l3mon.Supported() {
+		ret[MonResourceL3] = append([]string{}, c.info.l3mon.monFeatures...)
+	}
+
+	return ret
 }
 
 func (c *control) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
@@ -423,6 +460,76 @@ func (r *resctrlGroup) AddPids(pids ...string) error {
 		}
 	}
 	return nil
+}
+
+func (r *resctrlGroup) GetMonData() MonData {
+	m := MonData{}
+
+	if rdt.info.l3mon.Supported() {
+		l3, err := r.getMonL3Data()
+		if err != nil {
+			log.Warn("failed to retrieve L3 monitoring data: %v", err)
+		} else {
+			m.L3 = l3
+		}
+	}
+
+	return m
+}
+
+func (r *resctrlGroup) getMonL3Data() (MonL3Data, error) {
+	files, err := ioutil.ReadDir(r.path("mon_data"))
+	if err != nil {
+		return nil, err
+	}
+
+	m := MonL3Data{}
+	for _, file := range files {
+		name := file.Name()
+		if strings.HasPrefix(name, "mon_L3_") {
+			// Parse cache id from the dirname
+			id, err := strconv.ParseUint(strings.TrimPrefix(name, "mon_L3_"), 10, 32)
+			if err != nil {
+				// Just print a warning, we try to retrieve as much info as possible
+				log.Warn("error parsing L3 monitor data directory name %q: %v", name, err)
+				continue
+			}
+
+			data, err := r.getMonLeafData(filepath.Join("mon_data", name))
+			if err != nil {
+				log.Warn("failed to read monitor data: %v", err)
+				continue
+			}
+
+			m[id] = data
+		}
+	}
+
+	return m, nil
+}
+
+func (r *resctrlGroup) getMonLeafData(path string) (MonLeafData, error) {
+	files, err := ioutil.ReadDir(r.path(path))
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(MonLeafData, len(files))
+
+	for _, file := range files {
+		name := file.Name()
+
+		// We expect that all the files in the dir are regular files
+		val, err := readFileUint64(r.path(path, name))
+		if err != nil {
+			// Just print a warning, we want to retrieve as much info as possible
+			log.Warn("error reading data file: %v", err)
+			continue
+		}
+
+		m[name] = val
+	}
+	return m, nil
 }
 
 func (r *resctrlGroup) relPath(elem ...string) string {
