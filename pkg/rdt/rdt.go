@@ -276,17 +276,13 @@ func (c *control) configureResctrl(conf config) error {
 }
 
 func (c *control) classesFromResctrlFs() ([]ctrlGroup, error) {
-
-	files, err := ioutil.ReadDir(c.info.resctrlPath)
+	r, err := resctrlGroupsFromFs(c.info.resctrlPath)
 	if err != nil {
 		return nil, err
 	}
-	classes := make([]ctrlGroup, 0, len(files))
-	for _, file := range files {
-		fullName := file.Name()
-		if strings.HasPrefix(fullName, resctrlGroupPrefix) {
-			classes = append(classes, ctrlGroup{resctrlGroup: resctrlGroup{name: fullName[len(resctrlGroupPrefix):]}})
-		}
+	classes := make([]ctrlGroup, len(r))
+	for i, grp := range r {
+		classes[i] = ctrlGroup{resctrlGroup: grp}
 	}
 	return classes, nil
 }
@@ -323,6 +319,19 @@ func newCtrlGroup(name string) (*ctrlGroup, error) {
 	if err := os.Mkdir(cg.path(""), 0755); err != nil && !os.IsExist(err) {
 		return nil, err
 	}
+
+	// Reomve existing cri-resmgr specific monitor groups
+	// TODO: consider if these should be preserved and handled more intelligently
+	mgs, err := cg.monGroupsFromResctrlFs()
+	if err != nil {
+		return nil, fmt.Errorf("error when retrieving existing monitor groups: %v", err)
+	}
+	for _, mg := range mgs {
+		if err := os.Remove(mg.path("")); err != nil {
+			return nil, rdtError("failed to remove existing monitoring group %q: %v", mg.relPath(""), err)
+		}
+	}
+
 	return cg, nil
 }
 
@@ -425,6 +434,20 @@ func (c *ctrlGroup) configure(name string, class classConfig,
 	}
 
 	return nil
+}
+
+func (c *ctrlGroup) monGroupsFromResctrlFs() ([]*monGroup, error) {
+	r, err := resctrlGroupsFromFs(c.path("mon_groups"))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	grps := make([]*monGroup, len(r))
+	for i, grp := range r {
+		grp.parent = c
+		grps[i] = &monGroup{resctrlGroup: grp}
+	}
+	return grps, nil
 }
 
 func (r *resctrlGroup) Name() string {
@@ -560,6 +583,22 @@ func newMonGroup(name string, parent *ctrlGroup) (*monGroup, error) {
 
 func (m *monGroup) Parent() CtrlGroup {
 	return m.parent
+}
+
+func resctrlGroupsFromFs(path string) ([]resctrlGroup, error) {
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	grps := make([]resctrlGroup, 0, len(files))
+	for _, file := range files {
+		filename := file.Name()
+		if strings.HasPrefix(filename, resctrlGroupPrefix) {
+			grps = append(grps, resctrlGroup{name: filename[len(resctrlGroupPrefix):]})
+		}
+	}
+	return grps, nil
 }
 
 func rdtError(format string, args ...interface{}) error {
