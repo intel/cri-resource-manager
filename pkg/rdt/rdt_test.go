@@ -22,6 +22,21 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+// TestRdt tests the rdt public API, i.e. exported functionality of the package
+func TestRdt(t *testing.T) {
+	// Test uninitialized interface
+	rdt = &control{Logger: log}
+
+	cls := GetClasses()
+	if len(cls) != 0 {
+		t.Errorf("uninitialized rdt contains classes %s", cls)
+	}
+
+	if err := SetProcessClass("class-name", "1234"); err == nil {
+		t.Errorf("expected an error when setting rdt class via an uninitialized interface")
+	}
+}
+
 func TestBitMap(t *testing.T) {
 	// Test ListStr()
 	testSet := map[Bitmask]string{

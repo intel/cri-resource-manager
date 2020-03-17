@@ -37,57 +37,64 @@ const (
 	rootClassName = "SYSTEM_DEFAULT"
 )
 
-// Control is the interface managing Intel RDT resources
-type Control interface {
-	// GetClasses returns the names of RDT classes (or resctrl control groups)
-	// available
-	GetClasses() []string
-
-	// SetProcessClass assigns a set of processes to a RDT class
-	SetProcessClass(string, ...string) error
-}
-
-var rdtInfo Info
-
-var log logger.Logger = logger.NewLogger("rdt")
-
 type control struct {
 	logger.Logger
 
 	conf config
+	info info
 }
 
-// NewControl returns new instance of the RDT Control interface
-func NewControl(resctrlpath string) (Control, error) {
+var log logger.Logger = logger.NewLogger("rdt")
+
+var rdt *control = &control{
+	Logger: log,
+}
+
+// Initialize discovers RDT support and initializes the  rdtControl singleton interface
+// NOTE: should only be called once in order to avoid adding multiple notifiers
+// TODO: support make multiple initializations, allowing e.g. "hot-plug" when
+// 		 resctrl filesystem is mounted
+func Initialize(resctrlpath string) error {
 	var err error
-	r := &control{Logger: log}
+
+	rdt = &control{Logger: log}
 
 	// Get info from the resctrl filesystem
-	rdtInfo, err = getRdtInfo(resctrlpath)
+	rdt.info, err = getRdtInfo(resctrlpath)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Configure resctrl
-	r.conf, err = opt.resolve()
+	rdt.conf, err = opt.resolve()
 	if err != nil {
-		return nil, rdtError("invalid configuration: %v", err)
+		return rdtError("invalid configuration: %v", err)
 	}
 
-	if err := r.configureResctrl(r.conf); err != nil {
-		return nil, rdtError("configuration failed: %v", err)
+	if err := rdt.configureResctrl(rdt.conf); err != nil {
+		return rdtError("configuration failed: %v", err)
 	}
 
-	pkgcfg.GetModule("rdt").AddNotify(r.configNotify)
+	pkgcfg.GetModule("rdt").AddNotify(rdt.configNotify)
 
-	return r, nil
+	return nil
 }
 
-func (r *control) GetClasses() []string {
-	ret := make([]string, len(r.conf.Classes))
+// GetClasses returns the names of the available RDT classes
+func GetClasses() []string {
+	return rdt.getClasses()
+}
+
+// SetProcessClass assigns a set of processes to a RDT class
+func SetProcessClass(class string, pids ...string) error {
+	return rdt.setProcessClass(class, pids...)
+}
+
+func (c *control) getClasses() []string {
+	ret := make([]string, len(c.conf.Classes))
 
 	i := 0
-	for k := range r.conf.Classes {
+	for k := range c.conf.Classes {
 		ret[i] = k
 		i++
 	}
@@ -95,12 +102,12 @@ func (r *control) GetClasses() []string {
 	return ret
 }
 
-func (r *control) SetProcessClass(class string, pids ...string) error {
-	if _, ok := r.conf.Classes[class]; !ok {
+func (c *control) setProcessClass(class string, pids ...string) error {
+	if _, ok := c.conf.Classes[class]; !ok {
 		return rdtError("unknown RDT class %q", class)
 	}
 
-	path := filepath.Join(r.resctrlGroupPath(class), "tasks")
+	path := filepath.Join(c.resctrlGroupPath(class), "tasks")
 	f, err := os.OpenFile(path, os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -114,50 +121,50 @@ func (r *control) SetProcessClass(class string, pids ...string) error {
 				unwrapped = pathError.Unwrap()
 			}
 			if unwrapped == syscall.ESRCH {
-				r.Debug("no task %s", pid)
+				c.Debug("no task %s", pid)
 			} else {
-				return rdtError("failed to assign processes %v to class %q: %v", pids, class, r.cmdError(err))
+				return rdtError("failed to assign processes %v to class %q: %v", pids, class, c.cmdError(err))
 			}
 		}
 	}
 	return nil
 }
 
-func (r *control) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
-	r.Info("configuration %s", event)
+func (c *control) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+	c.Info("configuration %s", event)
 
 	conf, err := opt.resolve()
 	if err != nil {
 		return rdtError("invalid configuration: %v", err)
 	}
 
-	err = r.configureResctrl(conf)
+	err = c.configureResctrl(conf)
 	if err != nil {
 		return rdtError("resctrl configuration failed: %v", err)
 	}
 
-	r.conf = conf
-	r.Info("configuration finished")
+	c.conf = conf
+	c.Info("configuration finished")
 
 	return nil
 }
 
-func (r *control) configureResctrl(conf config) error {
-	r.DebugBlock("  applying ", "%s", utils.DumpJSON(conf))
+func (c *control) configureResctrl(conf config) error {
+	c.DebugBlock("  applying ", "%s", utils.DumpJSON(conf))
 
 	// Remove stale resctrl groups
-	existingClasses, err := r.getClasses()
+	existingClasses, err := c.classesFromResctrlFs()
 	if err != nil {
 		return err
 	}
 
 	for _, name := range existingClasses {
 		if _, ok := conf.Classes[name]; !ok {
-			tasks, err := r.getClassTasks(name)
+			tasks, err := c.getClassTasks(name)
 			if err != nil {
 				return rdtError("failed to get resctrl group tasks: %v", err)
 			}
-			path := r.resctrlGroupPath(name)
+			path := c.resctrlGroupPath(name)
 			if len(tasks) > 0 {
 				return rdtError("refusing to remove non-empty resctrl group %q", path)
 			}
@@ -171,7 +178,7 @@ func (r *control) configureResctrl(conf config) error {
 	// Try to apply given configuration
 	for name, class := range conf.Classes {
 		partition := conf.Partitions[class.Partition]
-		err := r.configureResctrlGroup(name, class, partition, conf.Options)
+		err := c.configureResctrlGroup(name, class, partition, conf.Options)
 		if err != nil {
 			return err
 		}
@@ -180,23 +187,23 @@ func (r *control) configureResctrl(conf config) error {
 	return nil
 }
 
-func (r *control) configureResctrlGroup(name string, class classConfig,
+func (c *control) configureResctrlGroup(name string, class classConfig,
 	partition partitionConfig, options schemaOptions) error {
 	if err :=
-		os.Mkdir(r.resctrlGroupPath(name), 0755); err != nil && !os.IsExist(err) {
+		os.Mkdir(c.resctrlGroupPath(name), 0755); err != nil && !os.IsExist(err) {
 		return err
 	}
 
 	schemata := ""
 	// Handle L3 cache allocation
 	switch {
-	case rdtInfo.l3.Supported():
+	case c.info.l3.Supported():
 		schema, err := class.L3Schema.ToStr(l3SchemaTypeUnified, partition.L3)
 		if err != nil {
 			return err
 		}
 		schemata += schema
-	case rdtInfo.l3data.Supported() || rdtInfo.l3code.Supported():
+	case c.info.l3data.Supported() || c.info.l3code.Supported():
 		schema, err := class.L3Schema.ToStr(l3SchemaTypeCode, partition.L3)
 		if err != nil {
 			return err
@@ -216,7 +223,7 @@ func (r *control) configureResctrlGroup(name string, class classConfig,
 
 	// Handle memory bandwidth allocation
 	switch {
-	case rdtInfo.mb.Supported():
+	case c.info.mb.Supported():
 		schemata += class.MBSchema.ToStr(partition.MB)
 	default:
 		if class.MBSchema != nil && !options.MB.Optional {
@@ -225,19 +232,19 @@ func (r *control) configureResctrlGroup(name string, class classConfig,
 	}
 
 	if len(schemata) > 0 {
-		r.Debug("writing schemata %q to %q", schemata, r.resctrlGroupDirName(name))
-		dirName := r.resctrlGroupDirName(name)
-		if err := r.writeRdtFile(filepath.Join(dirName, "schemata"), []byte(schemata)); err != nil {
+		c.Debug("writing schemata %q to %q", schemata, c.resctrlGroupDirName(name))
+		dirName := c.resctrlGroupDirName(name)
+		if err := c.writeRdtFile(filepath.Join(dirName, "schemata"), []byte(schemata)); err != nil {
 			return err
 		}
 	} else {
-		r.Debug("empty schemata")
+		c.Debug("empty schemata")
 	}
 
 	return nil
 }
 
-func (r *control) resctrlGroupDirName(name string) string {
+func (c *control) resctrlGroupDirName(name string) string {
 	if name == rootClassName {
 		return ""
 	}
@@ -245,13 +252,13 @@ func (r *control) resctrlGroupDirName(name string) string {
 	return resctrlGroupPrefix + name
 }
 
-func (r *control) resctrlGroupPath(name string) string {
-	return filepath.Join(rdtInfo.resctrlPath, r.resctrlGroupDirName(name))
+func (c *control) resctrlGroupPath(name string) string {
+	return filepath.Join(c.info.resctrlPath, c.resctrlGroupDirName(name))
 }
 
-func (r *control) getClasses() ([]string, error) {
+func (c *control) classesFromResctrlFs() ([]string, error) {
 
-	files, err := ioutil.ReadDir(rdtInfo.resctrlPath)
+	files, err := ioutil.ReadDir(c.info.resctrlPath)
 	if err != nil {
 		return nil, err
 	}
@@ -265,8 +272,8 @@ func (r *control) getClasses() ([]string, error) {
 	return classes, nil
 }
 
-func (r *control) getClassTasks(name string) ([]string, error) {
-	data, err := r.readRdtFile(filepath.Join(r.resctrlGroupDirName(name), "tasks"))
+func (c *control) getClassTasks(name string) ([]string, error) {
+	data, err := c.readRdtFile(filepath.Join(c.resctrlGroupDirName(name), "tasks"))
 	if err != nil {
 		return []string{}, err
 	}
@@ -277,19 +284,19 @@ func (r *control) getClassTasks(name string) ([]string, error) {
 	return []string{}, nil
 }
 
-func (r *control) readRdtFile(rdtPath string) ([]byte, error) {
-	return ioutil.ReadFile(filepath.Join(rdtInfo.resctrlPath, rdtPath))
+func (c *control) readRdtFile(rdtPath string) ([]byte, error) {
+	return ioutil.ReadFile(filepath.Join(c.info.resctrlPath, rdtPath))
 }
 
-func (r *control) writeRdtFile(rdtPath string, data []byte) error {
-	if err := ioutil.WriteFile(filepath.Join(rdtInfo.resctrlPath, rdtPath), data, 0644); err != nil {
-		return r.cmdError(err)
+func (c *control) writeRdtFile(rdtPath string, data []byte) error {
+	if err := ioutil.WriteFile(filepath.Join(c.info.resctrlPath, rdtPath), data, 0644); err != nil {
+		return c.cmdError(err)
 	}
 	return nil
 }
 
-func (r *control) cmdError(origErr error) error {
-	errData, readErr := r.readRdtFile(filepath.Join("info", "last_cmd_status"))
+func (c *control) cmdError(origErr error) error {
+	errData, readErr := c.readRdtFile(filepath.Join("info", "last_cmd_status"))
 	if readErr != nil {
 		return origErr
 	}

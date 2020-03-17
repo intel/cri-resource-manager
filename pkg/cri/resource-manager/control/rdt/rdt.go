@@ -34,8 +34,7 @@ const (
 
 // rdtctl encapsulates the runtime state of our RTD enforcement/controller.
 type rdtctl struct {
-	rdt   *rdt.Control // resctrl RDT control
-	cache cache.Cache  // resource manager cache
+	cache cache.Cache // resource manager cache
 }
 
 // Our logger instance.
@@ -54,16 +53,10 @@ func getRDTController() control.Controller {
 
 // Start initializes the controller for enforcing decisions.
 func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
-	if ctl.rdt != nil {
-		return nil
+	if err := rdt.Initialize(opt.ResctrlPath); err != nil {
+		return rdtError("failed to initialize RDT controls: %v", err)
 	}
 
-	rdtc, err := rdt.NewControl(opt.ResctrlPath)
-	if err != nil {
-		return rdtError("failed to create RDT controller: %v", err)
-	}
-
-	ctl.rdt = &rdtc
 	ctl.cache = cache
 
 	return nil
@@ -131,7 +124,7 @@ func (ctl *rdtctl) assign(c cache.Container, class string) error {
 		return rdtError("failed to get process list for container %s: %v", c.PrettyName(), err)
 	}
 
-	if err := (*ctl.rdt).SetProcessClass(class, pids...); err != nil {
+	if err := rdt.SetProcessClass(class, pids...); err != nil {
 		return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
 	}
 
