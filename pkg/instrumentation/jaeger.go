@@ -19,38 +19,83 @@ import (
 	"go.opencensus.io/trace"
 )
 
-// createJaegerExporter creates a trace data exporter for Jaeger.
-func (s *Service) createJaegerExporter() error {
-	var err error
+const (
+	// jaegerExporter is used in log messages.
+	jaegerExporter = "Jaeger trace exporter"
+)
 
-	log.Debug("creating Jaeger exporter...")
+// tracing encapsulates the state of our Jaeger exporter.
+type tracing struct {
+	exporter  *jaeger.Exporter
+	agent     string
+	collector string
+	sampling  Sampling
+}
+
+// start starts our Jaeger exporter.
+func (t *tracing) start(agent, collector string, sampling Sampling) error {
+	if agent == "" && collector == "" {
+		log.Info("%s is disabled", jaegerExporter)
+		return nil
+	}
+
+	log.Info("creating %s...", jaegerExporter)
 
 	cfg := jaeger.Options{
 		ServiceName:       ServiceName,
-		CollectorEndpoint: opt.Collector,
-		AgentEndpoint:     opt.Agent,
+		CollectorEndpoint: collector,
+		AgentEndpoint:     agent,
 
 		Process: jaeger.Process{ServiceName: ServiceName},
-		OnError: func(err error) { log.Error("%v", err) },
+		OnError: func(err error) { log.Error("jaeger error: %v", err) },
 	}
 
-	if s.jexport, err = jaeger.NewExporter(cfg); err != nil {
-		return instrumentationError("failed to create Jaeger exporter: %v", err)
+	exp, err := jaeger.NewExporter(cfg)
+	if err != nil {
+		return instrumentationError("failed to create %s: %v", jaegerExporter, err)
 	}
+
+	t.exporter = exp
+	t.agent = agent
+	t.collector = collector
+	t.sampling = sampling
+
+	trace.RegisterExporter(t.exporter)
+	trace.ApplyConfig(trace.Config{DefaultSampler: t.sampling.Sampler()})
 
 	return nil
 }
 
-// startJaegerExporter 'starts' the Jeager exporter by registering it.
-func (s *Service) startJaegerExporter() {
-	if s.jexport != nil && opt.Trace != Disabled {
-		trace.RegisterExporter(s.jexport)
+// stop stops our Jaeger exporter.
+func (t *tracing) stop() {
+	if t.exporter == nil {
+		return
 	}
+
+	log.Info("stopping Jaeger trace exporter...")
+
+	trace.UnregisterExporter(t.exporter)
+	*t = tracing{}
 }
 
-// stopJaegerExporter 'stops' the Jaeger exporter by unregistering and setting it to nil.
-func (s *Service) stopJaegerExporter() {
-	if s.jexport != nil {
-		trace.UnregisterExporter(s.jexport)
+// reconfigure reconfigures our Jaeger exporter.
+func (t *tracing) reconfigure(agent, collector string, sampling Sampling) error {
+	log.Info("reconfiguring %s...", jaegerExporter)
+
+	if agent == "" && collector == "" {
+		t.stop()
+		return nil
 	}
+
+	if t.agent != agent || t.collector != collector {
+		t.stop()
+	}
+
+	if t.exporter != nil {
+		t.sampling = sampling
+		trace.ApplyConfig(trace.Config{DefaultSampler: t.sampling.Sampler()})
+		return nil
+	}
+
+	return t.start(agent, collector, sampling)
 }

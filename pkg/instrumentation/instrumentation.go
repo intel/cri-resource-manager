@@ -16,11 +16,8 @@ package instrumentation
 
 import (
 	"fmt"
-	"net/http"
 
-	"go.opencensus.io/plugin/ocgrpc"
-	"google.golang.org/grpc"
-
+	"github.com/intel/cri-resource-manager/pkg/instrumentation/http"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -33,71 +30,45 @@ const (
 var log = logger.NewLogger("instrumentation")
 
 // Our instrumentation service instance.
-var service = createService()
+var svc = newService()
 
-// Get drop-in mux for external services.
+// GetHTTPMux returns our HTTP request mux for external services.
 func GetHTTPMux() *http.ServeMux {
-	if service == nil {
+	if svc == nil {
 		return nil
 	}
-	return service.ServeMux
+	return svc.http.GetMux()
 }
 
 // TracingEnabled returns true if the Jaeger tracing sampler is not disabled.
 func TracingEnabled() bool {
-	if service == nil {
+	if svc == nil {
 		return false
 	}
-	return service.TracingEnabled()
+	return svc.TracingEnabled()
 }
 
 // Start our internal instrumentation services.
 func Start() error {
-	if service == nil {
+	if svc == nil {
 		return instrumentationError("cannot start, no instrumentation service instance")
 	}
-	return service.Start()
+	return svc.Start()
 }
 
 // Stop stops our internal instrumentation services.
 func Stop() {
-	if service != nil {
-		service.Stop()
+	if svc != nil {
+		svc.Stop()
 	}
 }
 
 // Restart restarts our internal instrumentation services.
 func Restart() error {
-	if service == nil {
+	if svc == nil {
 		return instrumentationError("cannot restart, no instrumentation service instance")
 	}
-	return service.Restart()
-}
-
-// InjectGrpcClientTrace injects gRPC dial options for instrumentation if necessary.
-func InjectGrpcClientTrace(opts ...grpc.DialOption) []grpc.DialOption {
-	extra := grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
-
-	if len(opts) > 0 {
-		opts = append(opts, extra)
-	} else {
-		opts = []grpc.DialOption{extra}
-	}
-
-	return opts
-}
-
-// InjectGrpcServerTrace injects gRPC server options for instrumentation if necessary.
-func InjectGrpcServerTrace(opts ...grpc.ServerOption) []grpc.ServerOption {
-	extra := grpc.StatsHandler(&ocgrpc.ServerHandler{})
-
-	if len(opts) > 0 {
-		opts = append(opts, extra)
-	} else {
-		opts = []grpc.ServerOption{extra}
-	}
-
-	return opts
+	return svc.Restart()
 }
 
 // instrumentationError produces a formatted instrumentation-specific error.

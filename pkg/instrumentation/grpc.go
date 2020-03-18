@@ -15,12 +15,40 @@
 package instrumentation
 
 import (
+	"google.golang.org/grpc"
+
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/stats/view"
 )
 
+// InjectGrpcClientTrace injects gRPC dial options for instrumentation if necessary.
+func InjectGrpcClientTrace(opts ...grpc.DialOption) []grpc.DialOption {
+	extra := grpc.WithStatsHandler(&ocgrpc.ClientHandler{})
+
+	if len(opts) > 0 {
+		opts = append(opts, extra)
+	} else {
+		opts = []grpc.DialOption{extra}
+	}
+
+	return opts
+}
+
+// InjectGrpcServerTrace injects gRPC server options for instrumentation if necessary.
+func InjectGrpcServerTrace(opts ...grpc.ServerOption) []grpc.ServerOption {
+	extra := grpc.StatsHandler(&ocgrpc.ServerHandler{})
+
+	if len(opts) > 0 {
+		opts = append(opts, extra)
+	} else {
+		opts = []grpc.ServerOption{extra}
+	}
+
+	return opts
+}
+
 // registerGrpcViews registers default client and server trace views for gRPC.
-func (*Service) registerGrpcViews() error {
+func registerGrpcViews() error {
 	log.Debug("registering gRPC trace views...")
 
 	if err := view.Register(ocgrpc.DefaultClientViews...); err != nil {
@@ -34,7 +62,7 @@ func (*Service) registerGrpcViews() error {
 }
 
 // unregisterGrpcViews unregisters default client and server trace views for gRPC.
-func (*Service) unregisterGrpcViews() {
+func unregisterGrpcViews() {
 	view.Unregister(ocgrpc.DefaultClientViews...)
 	view.Unregister(ocgrpc.DefaultServerViews...)
 }
