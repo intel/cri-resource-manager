@@ -487,7 +487,6 @@ func (sys *system) discoverCPU(path string) error {
 	cpu.isolated = sys.isolated.Has(cpu.id)
 
 	if online, err := readSysfsEntry(path, "online", nil); err == nil {
-		sys.Warn("CPU %s online status: %s", cpu.path, online)
 		cpu.online = (online != "" && online[0] != '0')
 	}
 
