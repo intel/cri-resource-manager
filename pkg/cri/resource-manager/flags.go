@@ -23,17 +23,18 @@ import (
 
 // Options captures our command line parameters.
 type options struct {
-	ImageSocket    string
-	RuntimeSocket  string
-	RelaySocket    string
-	RelayDir       string
-	AgentSocket    string
-	ConfigSocket   string
-	ResctrlPath    string
-	FallbackConfig string
-	ForceConfig    string
-	MetricsTimer   time.Duration
-	RebalanceTimer time.Duration
+	ImageSocket       string
+	RuntimeSocket     string
+	RelaySocket       string
+	RelayDir          string
+	AgentSocket       string
+	ConfigSocket      string
+	ResctrlPath       string
+	FallbackConfig    string
+	ForceConfig       string
+	ForceConfigSignal string
+	MetricsTimer      time.Duration
+	RebalanceTimer    time.Duration
 }
 
 // Relay command line options.
@@ -58,6 +59,8 @@ func init() {
 		"Fallback configuration to use unless/until one is available from the cache or agent.")
 	flag.StringVar(&opt.ForceConfig, "force-config", "",
 		"Configuration used to override the one stored in the cache. Does not override the agent.")
+	flag.StringVar(&opt.ForceConfigSignal, "force-config-signal", "SIGHUP",
+		"Signal used to reload forced configuration.")
 
 	flag.DurationVar(&opt.MetricsTimer, "metrics-interval", 30*time.Second,
 		"Interval for polling/gathering runtime metrics data. Use 'disable' for disabling.")
