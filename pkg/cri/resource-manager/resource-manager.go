@@ -15,6 +15,10 @@
 package resmgr
 
 import (
+	"golang.org/x/sys/unix"
+	"os"
+	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +59,7 @@ type resmgr struct {
 	metrics      *metrics.Metrics  // metrics collector/pre-processor
 	events       chan interface{}  // channel for delivering events
 	stop         chan interface{}  // channel for signalling shutdown to goroutines
+	signals      chan os.Signal    // signal channel
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -154,6 +159,11 @@ func (m *resmgr) Stop() {
 	m.Lock()
 	defer m.Unlock()
 
+	if m.signals != nil {
+		close(m.signals)
+		m.signals = nil
+	}
+
 	m.configServer.Stop()
 	m.relay.Stop()
 	m.stopEventProcessing()
@@ -161,26 +171,58 @@ func (m *resmgr) Stop() {
 
 // SetConfig pushes new configuration to the resource manager.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
-	m.Info("applying new configuration...")
+	m.Info("applying new configuration from agent...")
 
 	m.Lock()
 	defer m.Unlock()
+	return m.setConfig(conf)
+}
 
-	// TODO: save current configuration and roll back if some controllers fail to start
+// setConfigFromFile pushes new configuration to the resource manager from a file.
+func (m *resmgr) setConfigFromFile(path string) error {
+	m.Info("applying new configuration from file %s...", path)
 
-	if err := pkgcfg.SetConfig(conf.Data); err != nil {
-		m.Error("new configuration was rejected: %v", err)
+	m.Lock()
+	defer m.Unlock()
+	return m.setConfig(path)
+}
+
+// setConfig pushes new configuration from the agent or a file.
+func (m *resmgr) setConfig(src interface{}) error {
+	var pending *config.RawConfig
+	var err error
+
+	switch cfg := src.(type) {
+	case *config.RawConfig:
+		pending = cfg // schedule for storing in the cache
+		err = pkgcfg.SetConfig(cfg.Data)
+	case string:
+		// never store a forced configuration in the cache
+		err = pkgcfg.SetConfigFromFile(cfg)
+	default:
+		return resmgrError("configuration source of invalid type %T", src)
+	}
+
+	if err != nil {
+		m.Error("configuration was rejected: %v", err)
 		return resmgrError("configuration rejected: %v", err)
 	}
+
+	// TODO: save current configuration and roll back if some controllers fail to start
 
 	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
 		m.Error("failed to activate new configuration: %v", err)
 		return resmgrError("failed to fully activate configuration: %v", err)
 	}
 
-	m.cache.SetConfig(conf)
-	m.Info("successfully switched to new configuration")
+	// If the update was not from a forced configuration (IOW it was from the
+	// agent) and the update was activated successfully, then store it in the
+	// cache now.
+	if pending != nil {
+		m.cache.SetConfig(pending)
+	}
 
+	m.Info("sucessfully switched to new configuration")
 	return nil
 }
 
@@ -255,7 +297,7 @@ func (m *resmgr) loadConfig() error {
 			return resmgrError("failed to load forced configuration %s: %v",
 				opt.ForceConfig, err)
 		}
-		return nil
+		return m.setupConfigSignal(opt.ForceConfigSignal)
 	}
 
 	m.Info("trying configuration from agent...")
@@ -286,6 +328,43 @@ func (m *resmgr) loadConfig() error {
 	}
 
 	m.Warn("no initial configuration found")
+	return nil
+}
+
+// setupConfigSignal sets up a signal handler for reloading forced configuration.
+func (m *resmgr) setupConfigSignal(signame string) error {
+	if signame == "" || strings.HasPrefix(strings.ToLower(signame), "disable") {
+		return nil
+	}
+
+	m.Info("setting up signal %s to reload forced configuration", signame)
+
+	sig := unix.SignalNum(signame)
+	if int(sig) == 0 {
+		return resmgrError("invalid forced configuration reload signal '%s'", signame)
+	}
+
+	m.signals = make(chan os.Signal, 1)
+	signal.Notify(m.signals, sig)
+
+	go func(signals <-chan os.Signal) {
+		for {
+			select {
+			case _, ok := <-signals:
+				if !ok {
+					return
+				}
+			}
+
+			m.Info("reloading forced configuration %s...", opt.ForceConfig)
+
+			if err := m.setConfigFromFile(opt.ForceConfig); err != nil {
+				m.Error("failed to reload forced configuration %s: %v",
+					opt.ForceConfig, err)
+			}
+		}
+	}(m.signals)
+
 	return nil
 }
 
