@@ -58,6 +58,8 @@ type mbInfo struct {
 	mbpsEnabled   bool // true if MBA_MBps is enabled
 }
 
+var mountInfoPath string = "/proc/mounts"
+
 // l3Info is a helper method for a "unified API" for getting L3 information
 func (i info) l3Info() l3Info {
 	switch {
@@ -278,7 +280,7 @@ func getCacheIds(basepath string) ([]uint64, error) {
 func getResctrlMountInfo() (string, map[string]struct{}, error) {
 	mountOptions := map[string]struct{}{}
 
-	f, err := os.Open("/proc/mounts")
+	f, err := os.Open(mountInfoPath)
 	if err != nil {
 		return "", mountOptions, err
 	}
@@ -295,7 +297,7 @@ func getResctrlMountInfo() (string, map[string]struct{}, error) {
 			return split[1], mountOptions, nil
 		}
 	}
-	return "", mountOptions, rdtError("resctrl not found in /proc/mounts")
+	return "", mountOptions, rdtError("resctrl not found in " + mountInfoPath)
 }
 
 func readFileUint64(path string) (uint64, error) {
