@@ -15,7 +15,7 @@ GO_TEST   := $(GO_CMD) test $(TEST_TAGS)
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
 
 # Protoc compiler and protobuf definitions we might need to recompile.
-PROTOC    := $(shell command -v protoc || echo echo 'WARNING: no protoc, cannot run protoc ')
+PROTOC    := $(shell command -v protoc)
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
@@ -332,8 +332,13 @@ docker/%: dockerfiles/Dockerfile.%
 
 # Rule for recompiling a changed protobuf.
 %.pb.go: %.proto
-	$(Q)echo "Generating go code ($@) for updated protobuf $<..."; \
-	$(PROTOC) -I . $< --go_out=plugins=grpc:.
+	$(Q)if [ -n "$(PROTOC)" -o ! -e "$@" ]; then \
+	        echo "Generating go code ($@) for updated protobuf $<..."; \
+	        $(PROTOC) -I . $< --go_out=plugins=grpc:.; \
+	else \
+	        echo "WARNING: no protoc found, compiling with OUTDATED $@..."; \
+	fi
+
 
 # Rule for installing in-repo git hooks.
 install-git-hooks:
