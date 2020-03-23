@@ -147,6 +147,8 @@ func (s *server) SetBypassCheckFn(fn func() bool) {
 
 // Start starts the servers request processing goroutine.
 func (s *server) Start() error {
+	s.trainMessageDumper()
+
 	s.Debug("starting server on socket %s...", s.options.Socket)
 	go func() {
 		s.server.Serve(s.listener)
@@ -231,6 +233,7 @@ func (s *server) intercept(ctx context.Context, req interface{},
 
 	var kind string
 	var start, send, recv, end time.Time
+	var sync bool
 
 	wrapHandler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		send = time.Now()
@@ -242,6 +245,7 @@ func (s *server) intercept(ctx context.Context, req interface{},
 	fn, name := s.getInterceptor(info.FullMethod)
 	if fn != nil {
 		kind = "intercepted"
+		sync = true
 	} else {
 		kind = "passthrough"
 		fn = func(c context.Context, n string, r interface{}, h Handler) (interface{}, error) {
@@ -250,7 +254,7 @@ func (s *server) intercept(ctx context.Context, req interface{},
 		}
 	}
 
-	dump.RequestMessage(kind, info.FullMethod, req)
+	dump.RequestMessage(kind, info.FullMethod, req, sync)
 
 	if span := trace.FromContext(ctx); span != nil {
 		span.AddAttributes(trace.StringAttribute("kind", kind))
@@ -262,9 +266,9 @@ func (s *server) intercept(ctx context.Context, req interface{},
 	elapsed := end.Sub(start)
 
 	if err != nil {
-		dump.ReplyMessage(kind, info.FullMethod, err, elapsed)
+		dump.ReplyMessage(kind, info.FullMethod, err, elapsed, false)
 	} else {
-		dump.ReplyMessage(kind, info.FullMethod, rpl, elapsed)
+		dump.ReplyMessage(kind, info.FullMethod, rpl, elapsed, false)
 	}
 
 	s.collectStatistics(kind, name, start, send, recv, end)
@@ -284,6 +288,18 @@ func (s *server) collectStatistics(kind, name string, start, send, recv, end tim
 
 	s.Debug(" * latency for %s: preprocess: %v, CRI server: %v, postprocess: %v, total: %v",
 		name, pre, server, post, pre+server+post)
+}
+
+// trainMessageDumper pre-trains the message dumper with our full set of service methods.
+func (s server) trainMessageDumper() {
+	methods := []string{}
+	svcinfo := s.server.GetServiceInfo()
+	for _, info := range svcinfo {
+		for _, m := range info.Methods {
+			methods = append(methods, m.Name)
+		}
+	}
+	dump.Train(methods)
 }
 
 // Return a formatter server error.

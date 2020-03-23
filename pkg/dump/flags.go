@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation. All Rights Reserved.
+// Copyright 2019-2020 Intel Corporation. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,291 +29,187 @@ package dump
 //
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
-	"os"
 	re "regexp"
 	"strings"
-	"sync"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 )
 
 const (
 	// DefaultConfig is the default dump configuration.
-	DefaultConfig = "full:.*,off:Version,.*List.*,.*Status.*,.*Info.*,.*Log.*,.*Reopen.*"
-	// optDump is the command line option to specify what to dump.
-	optDump = "dump"
-	// optDumpFile is the command line option to specify an additional file to dump to.
-	optDumpFile = "dump-file"
+	DefaultConfig = "off:.*,full:((Create)|(Start)|(Run)|(Update)|(Stop)|(Remove)).*,off:.*Image.*"
 )
-
-// verbosity defines the level of detail for a message dump.
-type verbosity int
-
-const (
-	// Off suppresses dumping matching messages.
-	Off verbosity = iota
-	// NameOnly dumps the names of matching messages.
-	NameOnly
-	// Full dumps full details of matching requests and replies.
-	Full
-)
-
-// Additional file to dump messages to.
-var file *os.File
-var fileName string
-
-// Dumping can be configured both from the command line and through pkg/config.
-// Options given on the command line change both the defaults and the runtime
-// configuration. Configuration received via pkg/config only changes the runtime
-// configuration. An empty runtime configuration causes fallback to defaults.
 
 // Dumping options configurable via the command line or pkg/config.
 type options struct {
-	sync.Mutex
-	Config   string               // last value Set()
-	File     dumpFile             // file to also dump to, if set
-	Debug    bool                 // log messages as debug messages
-	Disabled bool                 // whether dumping is globally disabled
-	methods  map[string]verbosity // method to verbosity map
-	matches  map[string]verbosity // regexp-matched method verbosity map
-	rules    []*rule              // regexp-based verbosity rules
+	Debug    bool    // log messages as debug messages
+	Disabled bool    // whether dumping is globally disabled
+	File     string  // file to also dump to, if set
+	Config   string  // dumping configuration
+	rules    ruleset // corresponding dumping rules
 }
 
+// ruleset is an ordered set of dumping rules.
+type ruleset []*rule
+
+// rule is a single dumping rule, declaring verbosity of a single or a set of methods.
 type rule struct {
-	source string
-	regexp *re.Regexp
-	v      verbosity
+	method string     // method, '*' wildcard, or regexp matching a set of methods
+	regexp *re.Regexp // compiled regexp, if applicable
+	detail level      // dumping verbosity
 }
-type dumpFile string
 
-// Our default and runtime configuration.
-var defaults = &options{}
-var opt = &options{}
+// level describes the level of detail to dump.
+type level int
 
-func (v verbosity) String() string {
-	switch v {
+const (
+	// Off suppresses dumping of matching methods
+	Off level = iota
+	// Name dumps only success/failure status of matching methods.
+	Name
+	// Full dumps matching methods with full level of detail.
+	Full
+)
+
+// Our runtime configuration.
+var opt = defaultOptions().(*options)
+
+// parse parses the given string into a ruleset.
+func (set *ruleset) parse(value string) error {
+	prev := Full
+	for _, spec := range strings.Split(value, ",") {
+		r := &rule{}
+		split := strings.SplitN(spec, ":", 2)
+		switch len(split) {
+		case 1:
+			r.detail = prev
+			r.method = split[0]
+		case 2:
+			switch strings.ToLower(split[0]) {
+			case "off", "suppress":
+				r.detail = Off
+			case "name", "short":
+				r.detail = Name
+			case "full", "verbose":
+				r.detail = Full
+			default:
+				return dumpError("invalid dump level '%s'", split[0])
+			}
+			r.method = split[1]
+			prev = r.detail
+		}
+
+		if strings.ContainsAny(r.method, ".*?+()[]|") && r.method != "*" {
+			regexp, err := re.Compile(r.method)
+			if err != nil {
+				return dumpError("invalid dump method regexp '%s': %v", r.method, err)
+			}
+			r.regexp = regexp
+		}
+		*set = append(*set, r)
+	}
+
+	return nil
+}
+
+// String returns the ruleset as a string.
+func (set *ruleset) String() string {
+	if set == nil || *set == nil {
+		return ""
+	}
+	prev := Off
+	value, sep := "", ""
+	for idx, r := range *set {
+		detail := ""
+		if idx == 0 || r.detail != prev {
+			detail = r.detail.String() + ":"
+		}
+		value += sep + detail + r.method
+		sep = ","
+		prev = r.detail
+	}
+	return value
+}
+
+// detailOf returns the level of detail for dumping the given method.
+func (set *ruleset) detailOf(method string) level {
+	log.Debug("%s: checking level of detail...", method)
+	if set == nil {
+		return Off
+	}
+	detail := Off
+	for _, r := range *set {
+		log.Debug("  - checking rule '%s'...", r.method)
+		switch {
+		case r.method == method:
+			log.Debug("    => exact match: %v", r.detail)
+			return r.detail
+		case r.method == "*":
+			log.Debug("    => wildcard match: %v", r.detail)
+			detail = r.detail
+		case r.regexp != nil && r.regexp.MatchString(method):
+			log.Debug("    => regexp match (%s): %v", r.method, r.detail)
+			detail = r.detail
+		}
+	}
+	return detail
+}
+
+// copy creates a (shallow) copy of the ruleset.
+func (set *ruleset) duplicate() ruleset {
+	if set == nil || *set == nil {
+		return nil
+	}
+	cp := make([]*rule, len(*set))
+	copy(cp, *set)
+	return cp
+}
+
+// String returns the level of detail as a string.
+func (detail level) String() string {
+	switch detail {
 	case Off:
 		return "off"
-	case NameOnly:
+	case Name:
 		return "name"
 	case Full:
 		return "full"
 	}
-	return fmt.Sprintf("<invalid verbosity %d>", v)
-}
-
-func (o *options) reset() {
-	o.methods = make(map[string]verbosity)
-	o.rules = []*rule{}
-	o.matches = make(map[string]verbosity)
-	o.Disabled = false
-	o.Debug = false
-}
-
-func (o *options) Set(value string) error {
-	o.Lock()
-	defer o.Unlock()
-	return o.set(value)
-}
-
-func (o *options) set(value string) error {
-	if o != defaults { // from the command line we cumulate --dump options
-		o.reset()
-	} else {
-		if o.methods == nil {
-			o.methods = make(map[string]verbosity)
-		}
-		if o.matches == nil {
-			o.matches = make(map[string]verbosity)
-		}
-	}
-	prev := ""
-	for _, req := range strings.Split(value, ",") {
-		switch strings.ToLower(req) {
-		case "enable":
-			o.Disabled = false
-			continue
-		case "disable":
-			o.Disabled = true
-			continue
-		case "debug":
-			o.Debug = true
-			continue
-		case "reset":
-			o.reset()
-			continue
-		}
-
-		var v verbosity
-		var level, method string
-
-		split := strings.SplitN(req, ":", 2)
-		switch len(split) {
-		case 1:
-			level = prev
-			method = split[0]
-		case 2:
-			level = split[0]
-			method = split[1]
-			prev = level
-		default:
-			continue
-		}
-
-		switch level {
-		case "off", "suppress":
-			v = Off
-		case "name", "short":
-			v = NameOnly
-		case "full", "long":
-			v = Full
-		default:
-			return dumpError("invalid dump verbosity: '%s'", split[0])
-		}
-
-		switch {
-		case method == "*":
-			o.methods["*"] = v
-		case strings.ContainsAny(method, ".*?+()[]|"):
-			regexp, err := re.Compile(method)
-			if err != nil {
-				return dumpError("invalid method regexp '%s': %v", method, err)
-			}
-			o.rules = append(o.rules, &rule{source: method, regexp: regexp, v: v})
-		default:
-			o.methods[method] = v
-		}
-	}
-
-	// propagate chanegs to defaults by command line options to runtime config as well
-	if o == defaults {
-		opt.Set(value)
-	}
-
-	o.Config = value
-
-	return nil
-}
-
-func (o *options) String() string {
-	if o == nil {
-		return DefaultConfig
-	}
-	return o.Config
-}
-
-func (f *dumpFile) Set(value string) error {
-	*f = dumpFile(value)
-
-	// propagate chanegs to defaults by command line options to runtime config as well
-	if defaults != nil && f == &defaults.File {
-		opt.File = defaults.File
-	}
-
-	return nil
-}
-
-func (f *dumpFile) String() string {
-	if f == nil {
-		return ""
-	}
-	return string(*f)
-}
-
-func (o *options) verbosityOf(method string) verbosity {
-	if v, ok := o.matches[method]; ok {
-		return v
-	}
-
-	log.Debug("%s: match checking verbosity...", method)
-	if v, ok := o.methods[method]; ok {
-		log.Debug("  => exact match: %v", v)
-		o.matches[method] = v
-		return v
-	}
-	if v, ok := o.methods["*"]; ok {
-		log.Debug("  => wildcard match: %v", v)
-		o.matches[method] = v
-		return v
-	}
-	v := Off
-	for _, rule := range o.rules {
-		log.Debug("  - checking match rule %s...", rule.source)
-		if rule.regexp.MatchString(method) {
-			log.Debug("    + regexp match (%s): %v", method, rule.source)
-			v = rule.v
-		}
-	}
-	log.Debug("  => final regexp match: %v", v)
-	o.matches[method] = v
-
-	return v
-}
-
-func (o *options) MarshalJSON() ([]byte, error) {
-	cfg := map[string]string{
-		"Config": o.Config,
-		"File":   string(o.File),
-	}
-	return json.Marshal(cfg)
-}
-
-func (o *options) UnmarshalJSON(raw []byte) error {
-	cfg := map[string]string{}
-	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return dumpError("failed to unmarshal dump configuration: %v", err)
-	}
-
-	for key, value := range cfg {
-		switch key {
-		case "Config":
-			if err := o.Set(value); err != nil {
-				return err
-			}
-		case "File":
-			if err := o.File.Set(value); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+	return fmt.Sprintf("<invalid dump level of detail %d>", detail)
 }
 
 // defaultOptions returns a new options instance, initialized to defaults.
 func defaultOptions() interface{} {
-	o := &options{}
-	o.Set(defaults.String())
-	o.File.Set(defaults.File.String())
+	o := &options{Config: DefaultConfig}
+	o.rules.parse(DefaultConfig)
 	return o
 }
 
 // configNotify updates our runtime configuration.
 func (o *options) configNotify(event config.Event, source config.Source) error {
 	log.Info("message dumper configuration %v", event)
+	log.Info(" * config: %s", o.Config)
 
-	checkAndScheduleDumpFileSwitch()
+	rules := ruleset{}
+	if err := rules.parse(o.Config); err != nil {
+		return err
+	}
 
-	log.Info(" * dumping: %s", opt.String())
+	o.rules = rules
+
+	log.Info(" * parsed: %s", o.rules.String())
 	log.Info(" * dump file: %v", opt.File)
 	log.Info(" * log with debug: %v", opt.Debug)
+
+	dump.configure(o)
 
 	return nil
 }
 
 // Register us for command line parsing and configuration handling.
 func init() {
-	defaults.Set(DefaultConfig)
-
-	flag.Var(defaults, optDump,
-		"value is a dump specification of the format [target:]message[,...].\n"+
-			"The possible targets are:\n    off, short, and full")
-	flag.Var(&defaults.File, optDumpFile,
-		"additional file to dump messages to")
-
+	opt.rules.parse(opt.Config)
 	config.Register("dump", configHelp, opt, defaultOptions,
 		config.WithNotify(opt.configNotify))
 }
