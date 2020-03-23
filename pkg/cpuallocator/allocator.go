@@ -22,6 +22,7 @@ import (
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 // AllocFlag represents CPU allocation preferences.
@@ -132,9 +133,7 @@ func (ca *cpuAllocator) discoverPriorityCpus() {
 			freqList = append(freqList, freq)
 		}
 	}
-	sort.Slice(freqList, func(i, j int) bool {
-		return freqList[i] < freqList[j]
-	})
+	utils.SortUint64s(freqList)
 
 	// All cpus NOT in the lowest base frequency bin are considered high prio
 	if len(freqList) > 0 {
