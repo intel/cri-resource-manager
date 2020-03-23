@@ -152,8 +152,15 @@ func (s l3Schema) ToStr(typ l3SchemaType, baseSchema l3Schema) (string, error) {
 	schema := "L3" + typ.ToResctrlStr() + ":"
 	sep := ""
 
-	for id, baseMasks := range baseSchema {
-		baseMask, ok := baseMasks.getEffective(typ).(l3AbsoluteAllocation)
+	// Get a sorted slice of cache ids for deterministic output
+	ids := make([]uint64, 0, len(baseSchema))
+	for id := range baseSchema {
+		ids = append(ids, id)
+	}
+	utils.SortUint64s(ids)
+
+	for _, id := range ids {
+		baseMask, ok := baseSchema[id].getEffective(typ).(l3AbsoluteAllocation)
 		if !ok {
 			return "", fmt.Errorf("BUG: basemask not of type l3AbsoluteAllocation")
 		}
@@ -315,7 +322,15 @@ func (s mbSchema) ToStr(base map[uint64]uint64) string {
 	schema := "MB:"
 	sep := ""
 
-	for id, baseAllocation := range base {
+	// Get a sorted slice of cache ids for deterministic output
+	ids := make([]uint64, 0, len(base))
+	for id := range base {
+		ids = append(ids, id)
+	}
+	utils.SortUint64s(ids)
+
+	for _, id := range ids {
+		baseAllocation := base[id]
 		value := uint64(0)
 		if rdt.info.mb.mbpsEnabled {
 			value = math.MaxUint32
