@@ -15,7 +15,7 @@ GO_TEST   := $(GO_CMD) test $(TEST_TAGS)
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
 
 # Protoc compiler and protobuf definitions we might need to recompile.
-PROTOC    := $(shell command -v protoc)
+PROTOC    := $(shell command -v protoc;)
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
