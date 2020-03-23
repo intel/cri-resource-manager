@@ -30,7 +30,6 @@ Here is a sample configuration fragment for this controller which sets up
 mappings for the 3 Kubernetes QoS classes and defines also a default class.
 
   rdt:
-    ResctrlPath: /sys/fs/resctrl
     Classes:
       Guaranteed: BestRDT
       Burstable: ModerateRDT

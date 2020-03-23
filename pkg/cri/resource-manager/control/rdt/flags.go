@@ -15,10 +15,7 @@
 package rdt
 
 import (
-	"flag"
-
 	"github.com/intel/cri-resource-manager/pkg/config"
-	"github.com/intel/cri-resource-manager/pkg/rdt"
 )
 
 // options captures our configurable parameters.
@@ -31,30 +28,16 @@ type options struct {
 
 // Our runtime configuration.
 var opt = defaultOptions().(*options)
-var defaultPath string
-
-// resctrlPath returns the default path for the resctrl pseudo-filesystem mount point.
-func resctrlPath() string {
-	if defaultPath != "" {
-		return defaultPath
-	}
-	path, _ := rdt.ResctrlMountPath()
-	return path
-}
 
 // defaultOptions returns a new options instance, all initialized to defaults.
 func defaultOptions() interface{} {
 	return &options{
-		ResctrlPath: resctrlPath(),
-		Classes:     make(map[string]string),
+		Classes: make(map[string]string),
 	}
 }
 
 // Register command line options and for configuration handling.
 func init() {
-	flag.StringVar(&defaultPath, "resctrl-path", resctrlPath(),
-		"Path of the resctrl filesystem mountpoint")
-
 	config.Register("resource-manager.rdt", configHelp, opt, defaultOptions,
 		config.WithNotify(getRDTController().(*rdtctl).configNotify))
 }

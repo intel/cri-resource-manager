@@ -53,7 +53,7 @@ func getRDTController() control.Controller {
 
 // Start initializes the controller for enforcing decisions.
 func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
-	if err := rdt.Initialize(opt.ResctrlPath); err != nil {
+	if err := rdt.Initialize(); err != nil {
 		return rdtError("failed to initialize RDT controls: %v", err)
 	}
 

@@ -28,13 +28,14 @@ import (
 
 // Info contains information about the RDT support in the system
 type info struct {
-	resctrlPath string
-	numClosids  uint64
-	cacheIds    []uint64
-	l3          l3Info
-	l3code      l3Info
-	l3data      l3Info
-	mb          mbInfo
+	resctrlPath      string
+	resctrlMountOpts map[string]struct{}
+	numClosids       uint64
+	cacheIds         []uint64
+	l3               l3Info
+	l3code           l3Info
+	l3data           l3Info
+	mb               mbInfo
 }
 
 type l3Info struct {
@@ -73,12 +74,18 @@ func (i info) l3MinCbmBits() uint64 {
 	return i.l3Info().minCbmBits
 }
 
-func getRdtInfo(resctrlpath string) (info, error) {
+func getRdtInfo() (info, error) {
 	var err error
-	info := info{resctrlPath: resctrlpath}
+	info := info{}
+
+	info.resctrlPath, info.resctrlMountOpts, err = getResctrlMountInfo()
+	if err != nil {
+		return info, rdtError("failed to detect resctrl mount point: %v", err)
+	}
+	log.Info("detected resctrl filesystem at %q", info.resctrlPath)
 
 	// Check that RDT is available
-	infopath := filepath.Join(resctrlpath, "info")
+	infopath := filepath.Join(info.resctrlPath, "info")
 	if _, err := os.Stat(infopath); err != nil {
 		return info, rdtError("failed to read RDT info from %q: %v", infopath, err)
 	}
@@ -115,7 +122,7 @@ func getRdtInfo(resctrlpath string) (info, error) {
 		}
 	}
 
-	info.cacheIds, err = getCacheIds(resctrlpath)
+	info.cacheIds, err = getCacheIds(info.resctrlPath)
 	if err != nil {
 		return info, rdtError("failed to get cache IDs: %v", err)
 	}
@@ -250,15 +257,6 @@ func getResctrlMountInfo() (string, map[string]struct{}, error) {
 		}
 	}
 	return "", mountOptions, rdtError("resctrl not found in /proc/mounts")
-}
-
-// ResctrlMountPath returns path of the mount point to the resctrl filesystem
-func ResctrlMountPath() (string, error) {
-	path, _, err := getResctrlMountInfo()
-	if err != nil {
-		return "", err
-	}
-	return path, nil
 }
 
 func readFileUint64(path string) (uint64, error) {

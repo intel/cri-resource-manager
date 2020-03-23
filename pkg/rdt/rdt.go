@@ -54,13 +54,13 @@ var rdt *control = &control{
 // NOTE: should only be called once in order to avoid adding multiple notifiers
 // TODO: support make multiple initializations, allowing e.g. "hot-plug" when
 // 		 resctrl filesystem is mounted
-func Initialize(resctrlpath string) error {
+func Initialize() error {
 	var err error
 
 	rdt = &control{Logger: log}
 
 	// Get info from the resctrl filesystem
-	rdt.info, err = getRdtInfo(resctrlpath)
+	rdt.info, err = getRdtInfo()
 	if err != nil {
 		return err
 	}
