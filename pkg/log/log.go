@@ -276,6 +276,7 @@ func ErrorBlock(prefix string, format string, args ...interface{}) {
 // EnableDebug controls debugging for the logger and returns the its previous debugging state.
 func (l *logger) EnableDebug(enable bool) bool {
 	previous := l.debug
+	l.debug = enable
 	opt.Debug.Set(l.source + ":" + map[bool]string{false: "false", true: "true"}[enable])
 	return previous
 }
