@@ -20,8 +20,6 @@ import (
 
 // options captures our configurable parameters.
 type options struct {
-	// ResctrlPath is the mount point of the resctrl pseudo-filesystem.
-	ResctrlPath string
 	// Class is a assigned to actual RDT class map.
 	Classes map[string]string
 }
