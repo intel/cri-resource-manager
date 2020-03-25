@@ -46,6 +46,8 @@ type ResourceManager interface {
 	SetConfig(*config.RawConfig) error
 	// SendEvent sends an event to be processed by the resource manager.
 	SendEvent(event interface{}) error
+	// Add-ons for testing.
+	ResourceManagerTestAPI
 }
 
 // resmgr is the implementation of ResourceManager.
