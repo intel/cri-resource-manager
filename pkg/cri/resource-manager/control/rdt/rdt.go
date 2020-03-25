@@ -96,6 +96,10 @@ func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
 	if !c.HasPending(RDTController) {
 		return nil
 	}
+	if err := ctl.deleteMonGroups(c); err != nil {
+		log.Warn("failed to remove monitoring group of %q: %v", c.PrettyName(), err)
+	}
+
 	if err := ctl.assign(c, ctl.RDTClass(c)); err != nil {
 		return err
 	}
@@ -105,6 +109,10 @@ func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
 
 // PostStop is the RDT controller post-stop hook.
 func (ctl *rdtctl) PostStopHook(c cache.Container) error {
+	if err := ctl.deleteMonGroups(c); err != nil {
+		return rdtError("failed to remove monitoring group of %q: %v", c.PrettyName(), err)
+	}
+
 	return nil
 }
 
@@ -128,12 +136,33 @@ func (ctl *rdtctl) assign(c cache.Container, class string) error {
 		if err := cls.AddPids(pids...); err != nil {
 			return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
 		}
+		if rdt.MonSupported() {
+			if mg, err := cls.CreateMonGroup(c.GetID()); err != nil {
+				log.Warn("failed to create monitoring group for %q: %v", c.PrettyName(), err)
+			} else {
+				if err := mg.AddPids(pids...); err != nil {
+					return rdtError("failed assign container %s to monitoring group %s/%s: %v", c.PrettyName(), class, mg.Name(), err)
+				}
+			}
+		}
 	} else {
 		return rdtError("unknown RDT class %q", class)
 	}
 
 	log.Info("container %s assigned to class %s", c.PrettyName(), class)
 
+	return nil
+}
+
+func (ctl *rdtctl) deleteMonGroups(c cache.Container) error {
+	name := c.PrettyName()
+	for _, cls := range rdt.GetClasses() {
+		if _, ok := cls.GetMonGroup(name); ok {
+			if err := cls.DeleteMonGroup(name); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
