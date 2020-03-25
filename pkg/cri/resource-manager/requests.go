@@ -135,6 +135,34 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 	pod := m.cache.InsertPod(podID, request)
 	m.updateIntrospection()
 
+	// search for any lingering old version and clean up if found
+	released := false
+	for _, p := range m.cache.GetPods() {
+		if p.GetUID() != pod.GetUID() || p == pod {
+			continue
+		}
+		m.Warn("re-creation of pod %s, releasing old one", p.GetName())
+		for _, c := range pod.GetInitContainers() {
+			m.Info("%s: removing stale init-container %s...", method, c.PrettyName())
+			m.policy.ReleaseResources(c)
+			c.UpdateState(cache.ContainerStateStale)
+			released = true
+		}
+		for _, c := range pod.GetContainers() {
+			m.Info("%s: removing stale container %s...", method, c.PrettyName())
+			m.policy.ReleaseResources(c)
+			c.UpdateState(cache.ContainerStateStale)
+			released = true
+		}
+		m.cache.DeletePod(p.GetID())
+	}
+	if released {
+		if err := m.runPostReleaseHooks(ctx, method); err != nil {
+			m.Error("%s: failed to run post-release hooks for lingering pod %s: %v",
+				method, pod.GetName(), err)
+		}
+	}
+
 	m.Info("created pod %s (%s)", pod.GetName(), podID)
 
 	return reply, nil
@@ -198,6 +226,18 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 
 	m.Lock()
 	defer m.Unlock()
+
+	// kubelet doesn't always clean up crashed containers so we try doing it here
+	if msg, ok := request.(*criapi.CreateContainerRequest); ok {
+		if pod, ok := m.cache.LookupPod(msg.PodSandboxId); ok {
+			if msg.Config != nil && msg.Config.Metadata != nil {
+				if c, ok := pod.GetContainer(msg.Config.Metadata.Name); ok {
+					m.Warn("re-creation of container %s, releasing old one", c.PrettyName())
+					m.policy.ReleaseResources(c)
+				}
+			}
+		}
+	}
 
 	container, err := m.cache.InsertContainer(request)
 	if err != nil {
