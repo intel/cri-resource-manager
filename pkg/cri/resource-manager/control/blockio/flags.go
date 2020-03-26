@@ -20,7 +20,7 @@ import (
 
 // options captures our configurable parameters.
 type options struct {
-	// Class is a assigned to actual RDT class map.
+	// Classes assigned to actual blockio classes, for example Guaranteed -> HighPrioNoThrottling.
 	Classes map[string]string `json:",omitempty"`
 }
 
@@ -29,11 +29,13 @@ var opt = defaultOptions().(*options)
 
 // defaultOptions returns a new options instance, all initialized to defaults.
 func defaultOptions() interface{} {
-	return &options{Classes: make(map[string]string)}
+	return &options{
+		Classes: make(map[string]string),
+	}
 }
 
 // Register us for configuration handling.
 func init() {
 	config.Register("resource-manager.blockio", configHelp, opt, defaultOptions,
-		config.WithNotify(getBlockIOController().(*blockio).configNotify))
+		config.WithNotify(getBlockIOController().(*blockioctl).configNotify))
 }
