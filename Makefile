@@ -237,6 +237,19 @@ else
             exit $$rc
 endif
 
+race-test racetest:
+ifndef WHAT
+	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
+	    $(GO_MODULES)
+else
+	$(Q)cd $(WHAT) && \
+	    $(GO_TEST) -race -coverprofile=cover.out -covermode=atomic || rc=1; \
+            $(GO_CMD) tool cover -html=cover.out -o coverage.html; \
+            rm cover.out; \
+            echo "Coverage report: file://$$(realpath coverage.html)"; \
+            exit $$rc
+endif
+
 #
 # Rule for building dist-tarballs, SPEC files, RPMs, debian collateral, deb's.
 #
