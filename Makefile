@@ -8,11 +8,12 @@ GO_CILINT := golangci-lint
 
 # TEST_TAGS is the set of extra build tags passed for tests.
 # We disable AVX collector for tests by default.
-TEST_TAGS := -tags noavx
-GO_TEST   := $(GO_CMD) test $(TEST_TAGS)
+TEST_TAGS := noavx,test
+GO_TEST   := $(GO_CMD) test -tags $(TEST_TAGS)
 
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
+GO_CILINT_RUNFLAGS := --build-tags $(TEST_TAGS)
 
 # Protoc compiler and protobuf definitions we might need to recompile.
 PROTOC    := $(shell command -v protoc;)
@@ -216,7 +217,7 @@ lint:
 	exit $$rc
 
 golangci-lint:
-	$(Q)$(GO_CILINT) run $(GO_CILINT_CHECKERS)
+	$(Q)$(GO_CILINT) run $(GO_CILINT_RUNFLAGS) $(GO_CILINT_CHECKERS)
 
 
 #
