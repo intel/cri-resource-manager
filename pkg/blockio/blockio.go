@@ -155,15 +155,22 @@ func getCurrentIOSchedulers() (map[string]string, error) {
 			log.Error("failed to read current IO scheduler %#v: %v\n", schedulerFile, err)
 			continue
 		}
-		schedulerData := string(schedulerDataB)
-		openB := strings.Index(schedulerData, "[")
-		closeB := strings.Index(schedulerData, "]")
-		if -1 < openB && openB < closeB {
-			currentScheduler := schedulerData[openB+1 : closeB]
-			ios["/dev/"+devName] = currentScheduler
+		schedulerData := strings.Trim(string(schedulerDataB), "\n")
+		currentScheduler := ""
+		if strings.IndexByte(schedulerData, ' ') == -1 {
+			currentScheduler = schedulerData
 		} else {
+			openB := strings.Index(schedulerData, "[")
+			closeB := strings.Index(schedulerData, "]")
+			if -1 < openB && openB < closeB {
+				currentScheduler = schedulerData[openB+1 : closeB]
+			}
+		}
+		if currentScheduler == "" {
 			return ios, blockioError("could not parse current scheduler in %#v\n", schedulerFile)
 		}
+
+		ios["/dev/"+devName] = currentScheduler
 	}
 	return ios, nil
 }
