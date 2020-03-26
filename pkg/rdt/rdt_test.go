@@ -229,12 +229,16 @@ func TestRdt(t *testing.T) {
 	// Test creating monitoring groups
 	cls, _ = GetClass("Guaranteed")
 	mgName := "test_group"
-	mg, err := cls.CreateMonGroup(mgName)
+	mgAnnotations := map[string]string{"a_key": "a_value"}
+	mg, err := cls.CreateMonGroup(mgName, mgAnnotations)
 	if err != nil {
 		t.Errorf("creating mon group failed: %v", err)
 	}
 	if n := mg.Name(); n != mgName {
 		t.Errorf("MonGroup.Name() returned %q, expected %q", n, mgName)
+	}
+	if a := mg.GetAnnotations(); !cmp.Equal(a, mgAnnotations) {
+		t.Errorf("MonGroup.GetAnnotations() returned %s, expected %s", a, mgAnnotations)
 	}
 	if n := mg.Parent().Name(); n != "Guaranteed" {
 		t.Errorf("MonGroup.Parent().Name() returned %q, expected %q", n, "Guaranteed")
@@ -280,7 +284,7 @@ func TestRdt(t *testing.T) {
 	mgName = "test_group_2"
 	mockFs.initMockMonGroup("Guaranteed", mgName)
 	cls, _ = GetClass("Guaranteed")
-	mg, _ = cls.CreateMonGroup(mgName)
+	mg, _ = cls.CreateMonGroup(mgName, nil)
 
 	pids = []string{"10"}
 	if err := mg.AddPids(pids...); err != nil {

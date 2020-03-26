@@ -137,7 +137,7 @@ func (ctl *rdtctl) assign(c cache.Container, class string) error {
 			return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
 		}
 		if rdt.MonSupported() {
-			if mg, err := cls.CreateMonGroup(c.GetID()); err != nil {
+			if mg, err := cls.CreateMonGroup(c.GetID(), nil); err != nil {
 				log.Warn("failed to create monitoring group for %q: %v", c.PrettyName(), err)
 			} else {
 				if err := mg.AddPids(pids...); err != nil {

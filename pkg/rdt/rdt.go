@@ -58,7 +58,7 @@ type CtrlGroup interface {
 	ResctrlGroup
 
 	// CreateMonGroup creates a new monitoring group under the class.
-	CreateMonGroup(name string) (MonGroup, error)
+	CreateMonGroup(name string, annotations map[string]string) (MonGroup, error)
 
 	// DeleteMonGroup deletes a monitoring group from the class.
 	DeleteMonGroup(name string) error
@@ -91,6 +91,9 @@ type MonGroup interface {
 
 	// Parent returns the CtrlGroup under which the monitoring group exists
 	Parent() CtrlGroup
+
+	// GetAnnotations returns the annotations stored to the monitoring group
+	GetAnnotations() map[string]string
 }
 
 // MonData contains monitoring stats of one monitoring group
@@ -120,6 +123,8 @@ type ctrlGroup struct {
 
 type monGroup struct {
 	resctrlGroup
+
+	annotations map[string]string
 }
 
 type resctrlGroup struct {
@@ -335,13 +340,13 @@ func newCtrlGroup(name string) (*ctrlGroup, error) {
 	return cg, nil
 }
 
-func (c *ctrlGroup) CreateMonGroup(name string) (MonGroup, error) {
+func (c *ctrlGroup) CreateMonGroup(name string, annotations map[string]string) (MonGroup, error) {
 	if mg, ok := c.monGroups[name]; ok {
 		return mg, nil
 	}
 
 	log.Debug("creating monitoring group %s/%s", c.name, name)
-	mg, err := newMonGroup(name, c)
+	mg, err := newMonGroup(name, c, annotations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new monitoring group %q: %v", name, err)
 	}
@@ -571,11 +576,16 @@ func (r *resctrlGroup) path(elem ...string) string {
 	return filepath.Join(rdt.info.resctrlPath, r.relPath(elem...))
 }
 
-func newMonGroup(name string, parent *ctrlGroup) (*monGroup, error) {
-	mg := &monGroup{resctrlGroup{name: name, parent: parent}}
+func newMonGroup(name string, parent *ctrlGroup, annotations map[string]string) (*monGroup, error) {
+	mg := &monGroup{
+		resctrlGroup: resctrlGroup{name: name, parent: parent},
+		annotations:  make(map[string]string, len(annotations))}
 
 	if err := os.Mkdir(mg.path(""), 0755); err != nil && !os.IsExist(err) {
 		return nil, err
+	}
+	for k, v := range annotations {
+		mg.annotations[k] = v
 	}
 
 	return mg, nil
@@ -583,6 +593,14 @@ func newMonGroup(name string, parent *ctrlGroup) (*monGroup, error) {
 
 func (m *monGroup) Parent() CtrlGroup {
 	return m.parent
+}
+
+func (m *monGroup) GetAnnotations() map[string]string {
+	a := make(map[string]string, len(m.annotations))
+	for k, v := range m.annotations {
+		a[k] = v
+	}
+	return a
 }
 
 func resctrlGroupsFromFs(path string) ([]resctrlGroup, error) {
