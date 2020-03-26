@@ -24,6 +24,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/metrics"
 )
 
+var customLabels []string = []string{}
+
 // collector implements prometheus.Collector interface
 type collector struct {
 	descriptors map[string]*prometheus.Desc
@@ -33,6 +35,20 @@ type collector struct {
 func NewCollector() (prometheus.Collector, error) {
 	c := &collector{descriptors: make(map[string]*prometheus.Desc)}
 	return c, nil
+}
+
+// RegisterCustomPrometheusLabels registers monitor group annotations to be
+// exported as Prometheus metrics labels
+func RegisterCustomPrometheusLabels(names ...string) {
+Names:
+	for _, n := range names {
+		for _, c := range customLabels {
+			if n == c {
+				break Names
+			}
+		}
+		customLabels = append(customLabels, n)
+	}
 }
 
 // Describe method of the prometheus.Collector interface
@@ -78,7 +94,8 @@ func (c *collector) describeL3(feature string) *prometheus.Desc {
 		case "mbm_total_bytes":
 			help = "total bytes transferred to/from memory through LLC"
 		}
-		d = prometheus.NewDesc(name, help, []string{"rdt_class", "rdt_mon_group", "cache_id"}, nil)
+		labels := append([]string{"rdt_class", "rdt_mon_group", "cache_id"}, customLabels...)
+		d = prometheus.NewDesc(name, help, labels, nil)
 		c.descriptors[feature] = d
 	}
 	return d
@@ -87,13 +104,21 @@ func (c *collector) describeL3(feature string) *prometheus.Desc {
 func (c *collector) collectGroupMetrics(ch chan<- prometheus.Metric, mg MonGroup) {
 	allData := mg.GetMonData()
 
+	annotations := mg.GetAnnotations()
+	customLabelValues := make([]string, len(customLabels))
+	for i, name := range customLabels {
+		customLabelValues[i] = annotations[name]
+	}
+
 	for cacheID, data := range allData.L3 {
 		for feature, value := range data {
+			labels := append([]string{mg.Parent().Name(), mg.Name(), string(cacheID)}, customLabelValues...)
+
 			ch <- prometheus.MustNewConstMetric(
 				c.describeL3(feature),
 				prometheus.CounterValue,
 				float64(value),
-				mg.Parent().Name(), mg.Name(), string(cacheID),
+				labels...,
 			)
 		}
 	}

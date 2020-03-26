@@ -137,7 +137,8 @@ func (ctl *rdtctl) assign(c cache.Container, class string) error {
 			return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
 		}
 		if rdt.MonSupported() {
-			if mg, err := cls.CreateMonGroup(c.GetID(), nil); err != nil {
+			mgAnnotations := map[string]string{"pod_name": pod.GetName(), "container_name": c.GetName()}
+			if mg, err := cls.CreateMonGroup(c.GetID(), mgAnnotations); err != nil {
 				log.Warn("failed to create monitoring group for %q: %v", c.PrettyName(), err)
 			} else {
 				if err := mg.AddPids(pids...); err != nil {
@@ -198,4 +199,5 @@ func rdtError(format string, args ...interface{}) error {
 // Register us as a controller.
 func init() {
 	control.Register(RDTController, "RDT controller", getRDTController())
+	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
 }
