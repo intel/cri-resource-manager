@@ -117,6 +117,8 @@ func (s *Service) stop() error {
 		return nil
 	}
 
+	log.Info("stopping instrumentation service...")
+
 	s.unregisterGrpcViews()
 	s.stopJaegerExporter()
 	s.stopPrometheusExporter()
