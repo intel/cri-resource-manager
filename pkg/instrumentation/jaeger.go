@@ -53,4 +53,5 @@ func (s *Service) stopJaegerExporter() {
 	if s.jexport != nil {
 		trace.UnregisterExporter(s.jexport)
 	}
+	s.jexport = nil
 }

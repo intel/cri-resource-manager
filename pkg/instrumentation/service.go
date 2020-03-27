@@ -38,9 +38,6 @@ type Service struct {
 func createService() *Service {
 	s := &Service{ServeMux: http.NewServeMux()}
 
-	if err := s.createJaegerExporter(); err != nil {
-		log.Error("failed to create instrumentation service: %v", err)
-	}
 	if err := s.createPrometheusExporter(); err != nil {
 		log.Error("failed to create instrumentation service: %v", err)
 	}
@@ -93,6 +90,9 @@ func (s *Service) start() error {
 
 	log.Info("starting instrumentation service...")
 
+	if err := s.createJaegerExporter(); err != nil {
+		log.Error("%v", err)
+	}
 	s.createHTTP()
 	s.startJaegerExporter()
 	s.startPrometheusExporter()
