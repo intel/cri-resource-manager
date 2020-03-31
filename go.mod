@@ -18,6 +18,7 @@ require (
 	go.opencensus.io v0.22.2
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	google.golang.org/grpc v1.23.1
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
