@@ -332,7 +332,7 @@ var (
 	// number of concurrent loggers, togglers, test duration, test verbosity
 	numLoggers    = getenv("LOGTEST_LOGGERS", 32).(int)
 	numTogglers   = getenv("LOGTEST_TOGGLERS", 4).(int)
-	testDuration  = getenv("LOGTEST_DURATION", 10*time.Second).(time.Duration)
+	testDuration  = getenv("LOGTEST_DURATION", 5*time.Second).(time.Duration)
 	testVerbosity = getenv("LOGTEST_VERBOSITY", []bool{true, false}).([]bool)
 )
 
@@ -523,6 +523,74 @@ func TestConcurrentLogging(t *testing.T) {
 
 		numCPUs++
 	}
+}
+
+// TestConcurrentFmtBackendLogging tests logging from multiple goroutines with the fmt backend.
+func TestConcurrentFmtBackendLogging(t *testing.T) {
+	var wg sync.WaitGroup
+
+	loggers := createLoggers(numLoggers)
+
+	numCPUs := runtime.NumCPU()
+	runtime.GOMAXPROCS(numCPUs)
+	SetBackend(FmtBackendName)
+	start := make(chan struct{})
+	stop := make(chan struct{})
+
+	prepareLoggerGoroutines(loggers, start, stop, &wg)
+	prepareTogglerGoroutines(loggers, start, stop, &wg)
+
+	Info("starting %d loggers with %d togglers, %v duration...",
+		numLoggers, numTogglers, testDuration)
+	close(start)
+	time.Sleep(testDuration)
+	close(stop)
+	wg.Wait()
+}
+
+// TestLoggingAndMutating tests logging and then mutating an objects with the fmt backend.
+func TestLoggingAndMutating(t *testing.T) {
+	numCPUs := runtime.NumCPU()
+	runtime.GOMAXPROCS(numCPUs)
+
+	tl := NewLogger("testlog")
+	obj := &testObj{0: "zero", 1: "one", 2: "two", 3: "three"}
+
+	stop := make(chan struct{})
+	go func() {
+		idx := 0
+		for {
+			switch {
+			case (idx & 0x7) == 0:
+				(*obj)[3] = "3"
+			case (idx & 0x3) == 0:
+				(*obj)[3] = "three"
+			}
+			tl.Info("#%d: obj: %s", idx, obj)
+			select {
+			case _ = <-stop:
+				return
+			default:
+			}
+			idx++
+		}
+	}()
+
+	time.Sleep(5 * time.Second)
+	close(stop)
+}
+
+type testObj map[int]string
+
+func (o *testObj) String() string {
+	str := "{"
+	sep := ""
+	for i, s := range *o {
+		str += sep + fmt.Sprintf("%d:%v", i, s)
+		sep = ","
+	}
+	str += "}"
+	return str
 }
 
 func init() {

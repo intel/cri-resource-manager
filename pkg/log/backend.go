@@ -82,8 +82,7 @@ type fmtReq struct {
 	level  Level         // logging severity level
 	source string        // logger source
 	prefix string        // block prefix
-	format string        // log message format string
-	args   []interface{} // any arguments for format
+	msg    string        // formatted log message
 	sync   chan struct{} // reverse-ack for synchronous requests
 	flush  bool          // Flush() and stop queueing
 }
@@ -157,8 +156,7 @@ func (f *fmtBackend) log(level Level, source, prefix, format string, args ...int
 		level:  level,
 		source: source,
 		prefix: prefix,
-		format: format,
-		args:   args,
+		msg:    fmt.Sprintf(format, args...),
 		sync:   sync,
 		flush:  level >= LevelError, // errors force buffer flush
 	}
@@ -218,11 +216,11 @@ func (f *fmtBackend) emit(req *fmtReq) {
 	source := "[" + fmt.Sprintf("%*s", prelen, "") + req.source + fmt.Sprintf("%*s", suflen, "") + "]"
 
 	if req.prefix == "" {
-		for _, line := range strings.Split(fmt.Sprintf(req.format, req.args...), "\n") {
+		for _, line := range strings.Split(req.msg, "\n") {
 			fmt.Println(fmtTags[req.level], source, line)
 		}
 	} else {
-		for _, line := range strings.Split(fmt.Sprintf(req.format, req.args...), "\n") {
+		for _, line := range strings.Split(req.msg, "\n") {
 			fmt.Println(fmtTags[req.level], source, req.prefix, line)
 		}
 	}
