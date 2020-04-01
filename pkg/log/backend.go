@@ -63,12 +63,12 @@ const (
 
 // severity tags fmtBackend uses to prefix emitted messages with.
 var fmtTags = map[Level]string{
-	LevelDebug: "D: ",
-	LevelInfo:  "I: ",
-	LevelWarn:  "W: ",
-	LevelError: "E: ",
-	LevelFatal: "FATAL ERROR: ",
-	LevelPanic: "PANIC: ",
+	LevelDebug: "D:",
+	LevelInfo:  "I:",
+	LevelWarn:  "W:",
+	LevelError: "E:",
+	LevelFatal: "FATAL ERROR:",
+	LevelPanic: "PANIC:",
 }
 
 // fmtBackend is our simple, default fmt.Printf-based Backend.
@@ -207,9 +207,10 @@ func (f *fmtBackend) run() {
 
 // emit formats and emits a single log message.
 func (f *fmtBackend) emit(req *fmtReq) {
-	if req.level > levelHighest {
+	if req.level >= levelHighest {
 		return
 	}
+
 	length := len(req.source)
 	suflen := (f.align - length) / 2
 	prelen := (f.align - (length + suflen))
