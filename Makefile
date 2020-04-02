@@ -10,6 +10,7 @@ GO_CILINT := golangci-lint
 # We disable AVX collector for tests by default.
 TEST_TAGS := noavx,test
 GO_TEST   := $(GO_CMD) test -tags $(TEST_TAGS)
+GO_VET    := $(GO_CMD) vet -tags $(TEST_TAGS)
 
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
@@ -199,7 +200,7 @@ format:
 	fi
 
 vet:
-	$(Q)$(GO_CMD) vet $(GO_MODULES)
+	$(Q)$(GO_VET) $(GO_MODULES)
 
 cyclomatic-check:
 	$(Q)report=`$(GO_CYCLO) -over 15 cmd pkg`; \
