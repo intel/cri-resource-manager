@@ -138,6 +138,10 @@ func (log *logging) setLevel(level Level) {
 
 // setBackend activates the named Backend for logging.
 func (log *logging) setBackend(name string) error {
+	if log.active.Name() == name {
+		return nil
+	}
+
 	createFn, ok := log.backend[name]
 	if !ok {
 		return loggerError("can't activate unknown backend '%s'", name)
@@ -145,6 +149,7 @@ func (log *logging) setBackend(name string) error {
 
 	log.active.Stop()
 	log.active = createFn()
+	log.active.SetSourceAlignment(log.maxname)
 
 	return nil
 }
@@ -246,7 +251,7 @@ func (log *logging) realign(maxname int) {
 	}
 	if maxname == 0 {
 		for id, cfg := range log.configs {
-			if !cfg.isEnabled() {
+			if !cfg.isEnabled() && !log.forced {
 				continue
 			}
 			if length := len(log.sources[id]); length > maxname {
