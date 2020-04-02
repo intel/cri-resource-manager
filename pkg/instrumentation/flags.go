@@ -16,140 +16,214 @@ package instrumentation
 
 import (
 	"encoding/json"
-	"github.com/intel/cri-resource-manager/pkg/config"
-	"go.opencensus.io/trace"
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"go.opencensus.io/trace"
+
+	"github.com/intel/cri-resource-manager/pkg/config"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
-// TraceConfig represents a pre-defined instrumentation configuration.
-type TraceConfig float64
+// Sampling defines how often trace samples are taken.
+type Sampling float64
 
 const (
 	// Disabled is the trace configuration for disabling tracing.
-	Disabled TraceConfig = 0.0
+	Disabled Sampling = 0.0
 	// Production is a trace configuration for production use.
-	Production TraceConfig = 0.1
+	Production Sampling = 0.1
 	// Testing is a trace configuration for testing.
-	Testing TraceConfig = 1.0
-	// defaultCollector is the default Jaeger collector endpoint.
-	defaultCollector = "http://localhost:14268/api/traces"
-	// defaultAgent is the default Jeager agent endpoint.
-	defaultAgent = "localhost:6831"
-	// defaultMetrics is the default Prometheus /metrics endpoint.
-	defaultMetrics = ":8888"
+	Testing Sampling = 1.0
+
+	// defaultSampling is the default sampling frequency.
+	defaultSampling = "0"
+	// defaultReportPeriod is the default report period
+	defaultReportPeriod = "15s"
+	// defaultJaegerCollector is the default Jaeger collector endpoint.
+	defaultJaegerCollector = ""
+	// defaultJaegerAgent is the default Jaeger agent endpoint.
+	defaultJaegerAgent = ""
+	// defaultHTTPEndpoint is the default HTTP endpoint serving Prometheus /metrics.
+	defaultHTTPEndpoint = ":8888"
+	// defaultPrometheusExport is the default state for Prometheus exporting.
+	defaultPrometheusExport = "true"
 )
 
 // options encapsulates our configurable instrumentation parameters.
-type options struct {
-	// Trace is the tracing configuration.
-	Trace TraceConfig
-	// Collector is the Jaeger collector endpoint.
-	Collector string
-	// Agent is the Jaeger agent endpoint.
-	Agent string
-	// Metrics is the Prometheus metrics exporter endpoint.
-	Metrics string
+type options optstruct
+
+type optstruct struct {
+	// Sampling is the sampling frequency for traces.
+	Sampling Sampling
+	// ReportPeriod is the OpenCensus view reporting period.
+	ReportPeriod time.Duration
+	// jaegerCollector is the URL to the Jaeger HTTP Thrift collector.
+	JaegerCollector string
+	// jaegerAgent, if set, defines the address of a Jaeger agent to send spans to.
+	JaegerAgent string
+	// HTTPEndpoint is our HTTP endpoint, used among others to export Prometheus /metrics.
+	HTTPEndpoint string
+	// PrometheusExport defines whether we export /metrics to/for Prometheus.
+	PrometheusExport bool `json:"PrometheusExport"`
+}
+
+// UnmarshalJSON is a resetting JSON unmarshaller for options.
+func (o *options) UnmarshalJSON(raw []byte) error {
+	ostruct := optstruct{}
+	if err := json.Unmarshal(raw, &ostruct); err != nil {
+		return instrumentationError("failed to unmashal options: %v", err)
+	}
+	*o = options(ostruct)
+	return nil
 }
 
 // Our instrumentation options.
 var opt = defaultOptions().(*options)
 
-// MarshalJSON is the JSON marshaller for TraceConfig values.
-func (tc TraceConfig) MarshalJSON() ([]byte, error) {
-	switch {
-	case tc <= 0.005:
-		return json.Marshal("disabled")
-	case tc <= 0.1:
-		return json.Marshal("production")
-	case tc >= 0.95:
-		return json.Marshal("testing")
-	}
-	return json.Marshal(tc)
+// MarshalJSON is the JSON marshaller for Sampling values.
+func (s Sampling) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
 }
 
-// UnmarshalJSON is the JSON unmarshaller for TraceConfig values.
-func (tc *TraceConfig) UnmarshalJSON(raw []byte) error {
+// UnmarshalJSON is the JSON unmarshaller for Sampling values.
+func (s *Sampling) UnmarshalJSON(raw []byte) error {
 	var obj interface{}
 	if err := json.Unmarshal(raw, &obj); err != nil {
-		return instrumentationError("failed to unmarshal TraceConfig value:%v", err)
+		return instrumentationError("failed to unmarshal Sampling value: %v", err)
 	}
-	switch obj.(type) {
+	switch v := obj.(type) {
 	case string:
-		switch strings.ToLower(obj.(string)) {
-		case "disabled":
-			*tc = Disabled
-		case "testing":
-			*tc = Testing
-		case "production":
-			*tc = Production
-		default:
-			return instrumentationError("invalid TraceConfig value '%s'", obj.(string))
+		if err := s.Parse(v); err != nil {
+			return err
 		}
 	case float64:
-		*tc = obj.(TraceConfig)
+		*s = Sampling(v)
 	default:
-		return instrumentationError("invalid TraceConfig value of type %T: %v", obj, obj)
+		return instrumentationError("invalid Sampling value of type %T: %v", obj, obj)
 	}
 	return nil
 }
 
-// Sampler returns a trace.Sampler corresponding to the TraceConfig value.
-func (tc TraceConfig) String() string {
-	switch {
-	case tc <= 0.005:
-		return "disabled"
-	case tc <= 0.1:
-		return "production"
-	case tc >= 0.95:
-		return "testing"
+// Parse parses the given string to a Sampling value.
+func (s *Sampling) Parse(value string) error {
+	switch strings.ToLower(value) {
+	case "disabled":
+		*s = Disabled
+	case "testing":
+		*s = Testing
+	case "production":
+		*s = Production
+	default:
+		f, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return instrumentationError("invalid Sampling value '%s': %v", value, err)
+		}
+		*s = Sampling(f)
 	}
-	return strconv.FormatFloat(float64(tc), 'f', -1, 64)
+	return nil
 }
 
-// Sampler returns a trace.Sampler corresponding to the TraceConfig value.
-func (tc TraceConfig) Sampler() trace.Sampler {
-	switch {
-	case tc >= 0.95:
-		return trace.AlwaysSample()
-	case tc <= 0.005:
+// String returns the Sampling value as a string.
+func (s Sampling) String() string {
+	switch s {
+	case Disabled:
+		return "disabled"
+	case Production:
+		return "production"
+	case Testing:
+		return "testing"
+	}
+	return strconv.FormatFloat(float64(s), 'f', -1, 64)
+}
+
+// Sampler returns a trace.Sampler corresponding to the Sampling value.
+func (s Sampling) Sampler() trace.Sampler {
+	if s == Disabled {
 		return trace.NeverSample()
-	default:
-		return trace.ProbabilitySampler(float64(tc))
+	}
+	return trace.ProbabilitySampler(float64(s))
+}
+
+// parseEnv parses the environment for default values.
+func parseEnv(name, defval string, parsefn func(string) error) {
+	if envval := os.Getenv(name); envval != "" {
+		err := parsefn(envval)
+		if err == nil {
+			return
+		}
+		log.Error("invalid environment %s=%q: %v, using default %q", name, envval, err, defval)
+	}
+	if err := parsefn(defval); err != nil {
+		log.Error("invalid default %s=%q: %v", name, defval, err)
 	}
 }
 
 // defaultOptions returns a new options instance, all initialized to defaults.
 func defaultOptions() interface{} {
-	collector := os.Getenv("JAEGER_COLLECTOR")
-	agent := os.Getenv("JAEGER_AGENT")
-	metrics := os.Getenv("PROMETHEUS_ENDPOINT")
+	o := &options{}
 
-	if collector == "" {
-		collector = defaultCollector
-	}
-	if agent == "" {
-		agent = defaultAgent
-	}
-	if metrics == "" {
-		metrics = defaultMetrics
+	type param struct {
+		defval  string
+		parsefn func(string) error
 	}
 
-	return &options{
-		Trace:     Disabled,
-		Collector: collector,
-		Agent:     agent,
-		Metrics:   metrics,
+	params := map[string]param{
+		"JAEGER_COLLECTOR": {
+			defaultJaegerCollector,
+			func(v string) error { o.JaegerCollector = v; return nil },
+		},
+		"JAEGER_AGENT": {
+			defaultJaegerAgent,
+			func(v string) error { o.JaegerAgent = v; return nil },
+		},
+		"HTTP_ENDPOINT": {
+			defaultHTTPEndpoint,
+			func(v string) error { o.HTTPEndpoint = v; return nil },
+		},
+		"PROMETHEUS_EXPORT": {
+			defaultPrometheusExport,
+			func(v string) error {
+				enabled, err := utils.ParseEnabled(v)
+				if err != nil {
+					return err
+				}
+				o.PrometheusExport = enabled
+				return nil
+			},
+		},
+		"SAMPLING_FREQUENCY": {
+			defaultSampling,
+			func(v string) error { return o.Sampling.Parse(v) },
+		},
+		"REPORT_PERIOD": {
+			defaultReportPeriod,
+			func(v string) error {
+				d, err := time.ParseDuration(v)
+				if err != nil {
+					return err
+				}
+				o.ReportPeriod = d
+				return nil
+			},
+		},
 	}
+
+	for envvar, p := range params {
+		parseEnv(envvar, p.defval, p.parsefn)
+	}
+
+	return o
 }
 
 // configNotify is our configuration udpate notification handler.
 func configNotify(event config.Event, source config.Source) error {
 	log.Info("instrumentation configuration is now %v", opt)
 
-	log.Info("restarting...")
-	if err := Restart(); err != nil {
+	log.Info("reconfiguring...")
+	if err := svc.reconfigure(); err != nil {
 		log.Error("failed to restart instrumentation: %v", err)
 	}
 

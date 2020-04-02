@@ -23,49 +23,85 @@ import (
 	pclient "github.com/prometheus/client_golang/prometheus"
 	model "github.com/prometheus/client_model/go"
 	"go.opencensus.io/stats/view"
+
+	"github.com/intel/cri-resource-manager/pkg/instrumentation/http"
 )
 
 const (
 	// PrometheusMetricsPath is the URL path for exposing metrics to Prometheus.
 	PrometheusMetricsPath = "/metrics"
+	// prometheusExporter is used in log messages.
+	prometheusExporter = "Prometheus metrics exporter"
 )
 
-// dynamically registered prometheus gatherers
-var dynamicGatherers = &gatherers{gatherers: pclient.Gatherers{}}
+// metrics encapsulates the state of our Prometheus exporter.
+type metrics struct {
+	exporter *prometheus.Exporter
+	mux      *http.ServeMux
+	period   time.Duration
+}
 
-// createPrometheusExporter creates a metrics exporter for Prometheus.
-func (s *Service) createPrometheusExporter() error {
-	var err error
+// start starts our Prometheus exporter.
+func (m *metrics) start(mux *http.ServeMux, period time.Duration, enable bool) error {
+	if !enable {
+		log.Info("%s is disabled", prometheusExporter)
+		return nil
+	}
 
-	log.Debug("creating Prometheus exporter...")
+	log.Info("starting %s...", prometheusExporter)
 
 	cfg := prometheus.Options{
 		Namespace: prometheusNamespace(ServiceName),
 		Gatherer:  pclient.Gatherers{dynamicGatherers},
-		OnError:   func(err error) { log.Error("%v", err) },
+		OnError:   func(err error) { log.Error("prometheus error: %v", err) },
 	}
 
-	if s.pexport, err = prometheus.NewExporter(cfg); err != nil {
-		return instrumentationError("failed to create Prometheus exporter: %v", err)
+	exp, err := prometheus.NewExporter(cfg)
+	if err != nil {
+		return instrumentationError("failed to create %s: %v", prometheusExporter, err)
 	}
+
+	m.exporter = exp
+	m.mux = mux
+	m.period = period
+
+	m.mux.Handle(PrometheusMetricsPath, m.exporter)
+	view.RegisterExporter(m.exporter)
+	view.SetReportingPeriod(m.period)
 
 	return nil
 }
 
-// startPrometheusExporter registers and starts the Prometheus exporter.
-func (s *Service) startPrometheusExporter() {
-	if s.pexport != nil && opt.Trace != Disabled {
-		s.reqmux.Handle(PrometheusMetricsPath, s.pexport)
-		view.RegisterExporter(s.pexport)
-		view.SetReportingPeriod(5 * time.Second) // XXX TODO, make this configurable ?
+// stop stops our Prometheus exporter.
+func (m *metrics) stop() {
+	if m.exporter == nil {
+		return
 	}
+
+	log.Info("stopping %s...", prometheusExporter)
+
+	view.UnregisterExporter(m.exporter)
+	m.mux.Unregister(PrometheusMetricsPath)
+
+	*m = metrics{}
 }
 
-// stopPrometheusExporter 'stops' the Prometheus exporter by unregistering it.
-func (s *Service) stopPrometheusExporter() {
-	if s.pexport != nil {
-		view.UnregisterExporter(s.pexport)
+// reconfigure reconfigures our Prometheus exporter.
+func (m *metrics) reconfigure(mux *http.ServeMux, period time.Duration, enable bool) error {
+	log.Info("reconfiguring %s...", prometheusExporter)
+
+	if !enable {
+		m.stop()
+		return nil
 	}
+
+	if m.exporter != nil {
+		m.period = period
+		view.SetReportingPeriod(m.period)
+		return nil
+	}
+
+	return m.start(mux, period, enable)
 }
 
 // mutate service name into a valid Prometheus namespace name.
@@ -78,6 +114,9 @@ type gatherers struct {
 	sync.RWMutex
 	gatherers pclient.Gatherers
 }
+
+// Our dynamically registered Prometheus gatherers.
+var dynamicGatherers = &gatherers{gatherers: pclient.Gatherers{}}
 
 // Register registers a new gatherer.
 func (g *gatherers) Register(gatherer pclient.Gatherer) {

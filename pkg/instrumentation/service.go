@@ -15,119 +15,99 @@
 package instrumentation
 
 import (
-	"net/http"
 	"sync"
 
-	"contrib.go.opencensus.io/exporter/jaeger"
-	"contrib.go.opencensus.io/exporter/prometheus"
-	"go.opencensus.io/trace"
+	"github.com/intel/cri-resource-manager/pkg/instrumentation/http"
 )
 
-// Service abstracts our internal state for instrumentation (tracing, metrics, etc.)
-type Service struct {
-	sync.RWMutex
-	*http.ServeMux                      // external HTTP request multiplexer
-	reqmux         *http.ServeMux       // internal HTTP request multiplexer
-	server         *http.Server         // HTTP server used to export various pieces of data
-	jexport        *jaeger.Exporter     // exporter for tracing information
-	pexport        *prometheus.Exporter // exporter for collected metrics
-	running        bool                 // whether our HTTP server is up and running
+// service is the state of our instrumentation services: HTTP endpoint, trace/metrics exporters.
+type service struct {
+	sync.RWMutex              // we're RW-lockable
+	http         *http.Server // HTTP server
+	tracing      *tracing     // tracing data exporter
+	metrics      *metrics     // metrics data exporter
 }
 
-// createService creates an instrumentation service instance.
-func createService() *Service {
-	s := &Service{ServeMux: http.NewServeMux()}
-
-	if err := s.createJaegerExporter(); err != nil {
-		log.Error("failed to create instrumentation service: %v", err)
+// newService creates an instance of our instrumentation services.
+func newService() *service {
+	return &service{
+		http:    http.NewServer(),
+		tracing: &tracing{},
+		metrics: &metrics{},
 	}
-	if err := s.createPrometheusExporter(); err != nil {
-		log.Error("failed to create instrumentation service: %v", err)
-	}
-
-	return s
 }
 
-// Start starts the instrumentation service.
-func (s *Service) Start() error {
+// Start starts instrumentation services.
+func (s *service) Start() error {
+	log.Info("starting instrumentation services...")
+
 	s.Lock()
 	defer s.Unlock()
-	return s.start()
-}
 
-// Stop stops the instrumentation service.
-func (s *Service) Stop() {
-	s.Lock()
-	defer s.Unlock()
-	s.stop()
-}
-
-// Restart restarts the instrumentation service.
-func (s *Service) Restart() error {
-	s.Lock()
-	defer s.Unlock()
-	s.stop()
-	return s.start()
-}
-
-// ConfigureTracing configures sampling for Jaeger tracing.
-func (s *Service) ConfigureTracing(c TraceConfig) {
-	s.RLock()
-	defer s.RUnlock()
-	s.configureTracing(c)
-}
-
-// TracingEnabled returns true if the Jaeger tracing sampler is not disabled.
-func (s *Service) TracingEnabled() bool {
-	s.RLock()
-	defer s.RUnlock()
-
-	return float64(opt.Trace) > 0.0
-}
-
-// start starts the instrumentation service.
-func (s *Service) start() error {
-	if s.running {
-		return nil
+	err := s.http.Start(opt.HTTPEndpoint)
+	if err != nil {
+		return instrumentationError("failed to start HTTP server: %v", err)
+	}
+	err = s.tracing.start(opt.JaegerAgent, opt.JaegerCollector, opt.Sampling)
+	if err != nil {
+		return instrumentationError("failed to start tracing: %v", err)
+	}
+	err = s.metrics.start(s.http.GetMux(), opt.ReportPeriod, opt.PrometheusExport)
+	if err != nil {
+		return instrumentationError("failed to start metrics: %v", err)
 	}
 
-	log.Info("starting instrumentation service...")
-
-	s.createHTTP()
-	s.startJaegerExporter()
-	s.startPrometheusExporter()
-
-	if err := s.registerGrpcViews(); err != nil {
-		s.stopJaegerExporter()
-		s.stopPrometheusExporter()
-		s.closeHTTP()
+	if err := registerGrpcViews(); err != nil {
+		s.metrics.stop()
+		s.tracing.stop()
+		s.http.Stop()
 		return err
 	}
-
-	s.startHTTP()
-	s.configureTracing(opt.Trace)
-	s.running = true
 
 	return nil
 }
 
-// stop stops the instrumentation service.
-func (s *Service) stop() error {
-	if !s.running {
-		return nil
-	}
+// Stop stops instrumentation services.
+func (s *service) Stop() {
+	s.Lock()
+	defer s.Unlock()
 
-	s.unregisterGrpcViews()
-	s.stopJaegerExporter()
-	s.stopPrometheusExporter()
-	err := s.closeHTTP()
-	s.running = false
-
-	return err
+	unregisterGrpcViews()
+	s.metrics.stop()
+	s.tracing.stop()
+	s.http.Stop()
 }
 
-// configureTracing configures sampling for Jaeger tracing.
-func (s *Service) configureTracing(c TraceConfig) {
-	log.Info("applying trace configuration '%s'...", c)
-	trace.ApplyConfig(trace.Config{DefaultSampler: c.Sampler()})
+// reconfigure reconfigures instrumentation services.
+func (s *service) reconfigure() error {
+	s.Lock()
+	defer s.Unlock()
+
+	err := s.http.Reconfigure(opt.HTTPEndpoint)
+	if err != nil {
+		return instrumentationError("failed to reconfigure HTTP server: %v", err)
+	}
+	err = s.tracing.reconfigure(opt.JaegerAgent, opt.JaegerCollector, opt.Sampling)
+	if err != nil {
+		return instrumentationError("failed to reconfigure tracing: %v", err)
+	}
+	err = s.metrics.reconfigure(s.http.GetMux(), opt.ReportPeriod, opt.PrometheusExport)
+	if err != nil {
+		return instrumentationError("failed to reconfigure metrics: %v", err)
+	}
+	return nil
+}
+
+// Restart restarts instrumentation services.
+func (s *service) Restart() error {
+	s.Stop()
+	return s.Start()
+}
+
+// TracingEnabled returns true if the Jaeger tracing sampler is not disabled.
+func (s *service) TracingEnabled() bool {
+	s.RLock()
+	defer s.RUnlock()
+
+	return float64(opt.Sampling) > 0.0
 }
