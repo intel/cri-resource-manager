@@ -5,11 +5,11 @@ go 1.13
 require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.1-0.20191218042359-6151c48ac7fa
+	github.com/cilium/ebpf v0.0.0-20200317182658-6f632cc9ee38
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
-	github.com/iovisor/gobpf v0.0.0-20191024162143-7c8f8e040b4b
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.2.1
 	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4

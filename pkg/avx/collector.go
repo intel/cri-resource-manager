@@ -1,20 +1,41 @@
+/*
+Copyright 2019 Intel Corporation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package avx
 
+//go:generate go run elfdump.go
+
 import (
-	"debug/elf"
-	"encoding/binary"
+	"bytes"
 	"flag"
 	"fmt"
-	"path"
+	"io/ioutil"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
 
+	bpf "github.com/cilium/ebpf"
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	bpf "github.com/iovisor/gobpf/elf"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -26,6 +47,10 @@ const (
 	AllSwitchCountName = "all_switch_count_per_cgroup"
 	// LastUpdateNs is the Prometheuse Gauge name for per cgroup AVX512 activity timestamp.
 	LastUpdateNs = "last_update_ns"
+	// Path to kernel tracepoints
+	kernelTracepointPath = "/sys/kernel/debug/tracing/events"
+	// rlimit value (512k) needed to lock map data in memory
+	mapMemLockLimit = 524288
 )
 
 // Prometheus Metric descriptor indices and descriptor table
@@ -77,111 +102,126 @@ var (
 	log = logger.NewLogger("avx")
 )
 
-func kernelVersionCode(major, minor, patch uint8) uint32 {
-	return uint32(major)<<16 + uint32(minor)<<8 + uint32(patch)
-}
-
-// getElfKernelVersion returns major, minor and patch parts of kernel version
-// compiled into eBPF ELF file.
-func getElfKernelVersion(path string) (uint8, uint8, uint8, error) {
-	elfFile, err := elf.Open(path)
-	if err != nil {
-		return 0, 0, 0, errors.Wrapf(err, "unable to open ELF file %s", path)
-	}
-	defer elfFile.Close()
-
-	sec := elfFile.Section("version")
-	if sec == nil {
-		return 0, 0, 0, errors.New("unable to find 'version' section")
-	}
-	data, err := sec.Data()
-	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "unable to get version data")
-	}
-
-	// Least Significant Byte first
-	return data[2], data[1], data[0], nil
-}
-
-func checkElfKernelVersion(path string) error {
-	elfMajor, elfMinor, _, err := getElfKernelVersion(path)
-	if err != nil {
-		return err
-	}
-
-	currentCode, err := bpf.CurrentKernelVersion()
-	if err != nil {
-		return errors.Wrap(err, "unable to get current kernel version")
-	}
-
-	if currentCode < kernelVersionCode(elfMajor, elfMinor, 0) {
-		return errors.New("host kernel is too old, consider rebuilding eBPF")
-	}
-
-	return nil
-}
-
 type collector struct {
-	root                     string
-	elfFilepath              string
-	bpfModule                *bpf.Module
-	avxContextSwitchCounters *bpf.Map
-	allContextSwitchCounters *bpf.Map
-	lastUpdateNs             *bpf.Map
-	lastCPUCounters          *bpf.Map
+	root string
+	ebpf *bpf.Collection
+	fds  []int
+}
+
+func enablePerfTracepoint(prog *bpf.Program, tracepoint string) (int, error) {
+
+	id, err := ioutil.ReadFile(filepath.Join(kernelTracepointPath, tracepoint, "id"))
+	if err != nil {
+		return -1, errors.Wrap(err, "unable to read tracepoint ID")
+	}
+
+	tid, err := strconv.Atoi(strings.TrimSpace(string(id)))
+	if err != nil {
+		return -1, errors.New("unable to convert tracepoint ID")
+	}
+
+	attr := unix.PerfEventAttr{
+		Type:        unix.PERF_TYPE_TRACEPOINT,
+		Config:      uint64(tid), // tracepoint id
+		Sample_type: unix.PERF_SAMPLE_RAW,
+		Sample:      1,
+		Wakeup:      1,
+	}
+
+	pfd, err := unix.PerfEventOpen(&attr, -1, 0, -1, unix.PERF_FLAG_FD_CLOEXEC)
+	if err != nil {
+		return -1, errors.Wrap(err, "unable to open perf events")
+	}
+
+	if _, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(pfd), unix.PERF_EVENT_IOC_ENABLE, 0); errno != 0 {
+		return -1, errors.Errorf("unable to set up perf events: %s", errno)
+	}
+
+	if _, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(pfd), unix.PERF_EVENT_IOC_SET_BPF, uintptr(prog.FD())); errno != 0 {
+		return -1, errors.Errorf("unable to attach bpf program to perf events: %s", errno)
+	}
+
+	return pfd, nil
+}
+
+func getKernelVersion() uint32 {
+
+	var uts unix.Utsname
+
+	err := unix.Uname(&uts)
+	if err != nil {
+		return 0
+	}
+
+	str := string(bytes.SplitN(uts.Release[:], []byte{0}, 2)[0])
+
+	ver := strings.SplitN(str, ".", 3)
+
+	major, err := strconv.ParseUint(ver[0], 10, 8)
+	if err != nil {
+		return 0
+	}
+	minor, err := strconv.ParseUint(ver[1], 10, 8)
+	if err != nil {
+		return uint32(major << 16)
+	}
+
+	// ignore patch version
+	return uint32(major<<16 + minor<<8)
+}
+
+func kernelVersionStr(v uint32) string {
+	return fmt.Sprintf("%d.%d.0", v>>16, (v>>8)&0xff)
 }
 
 // NewCollector creates new Prometheus collector for AVX metrics
 func NewCollector() (prometheus.Collector, error) {
 
-	elfFilepath := path.Join(bpfInstallpath, bpfBinaryName)
-
-	if err := checkElfKernelVersion(elfFilepath); err != nil {
-		return nil, err
+	// Set rlimit to be able to lock map values in memory
+	memlockLimit := &unix.Rlimit{
+		Cur: mapMemLockLimit,
+		Max: mapMemLockLimit,
+	}
+	err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, memlockLimit)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to set rlimit")
 	}
 
-	bpfModule := bpf.NewModule(elfFilepath)
-
-	sectionParams := make(map[string]bpf.SectionParams)
-	if err := bpfModule.Load(sectionParams); err != nil {
-		return nil, errors.Wrap(err, "unable to load eBPF ELF file")
+	spec, err := bpf.LoadCollectionSpec(filepath.Join(bpfInstallpath, bpfBinaryName))
+	if err != nil {
+		log.Info("Unable to load user eBPF (%v). Using default CollectionSpec from ELF program bytes", err)
+		spec, err = bpf.LoadCollectionSpecFromReader(bytes.NewReader(program[:]))
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to load default CollectionSpec from ELF program bytes")
+		}
 	}
 
-	allSwitchCounters := bpfModule.Map("all_context_switch_count")
-	if allSwitchCounters == nil {
-		return nil, errors.New("map all_context_switch_count not found")
+	hostVer := getKernelVersion()
+	progVer := spec.Programs["tracepoint__x86_fpu_regs_deactivated"].KernelVersion
+
+	if hostVer < progVer {
+		return nil, errors.Wrapf(err, "The host kernel version (v%s) is too old to run the AVX512 collector program. Minimum version is v%s.", kernelVersionStr(hostVer), kernelVersionStr(progVer))
 	}
 
-	avxSwitchCounters := bpfModule.Map("avx_context_switch_count")
-	if avxSwitchCounters == nil {
-		return nil, errors.New("map avx_context_switch_count not found")
+	collection, err := bpf.NewCollection(spec)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to create new Collection")
 	}
 
-	lastUpdateNs := bpfModule.Map("last_update_ns")
-	if lastUpdateNs == nil {
-		return nil, errors.New("map last_update_ns not found")
+	ffd, err := enablePerfTracepoint(collection.Programs["tracepoint__x86_fpu_regs_deactivated"], "x86_fpu/x86_fpu_regs_deactivated")
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to enable fpu tracepoint")
 	}
 
-	lastCPUCounters := bpfModule.Map("cpu")
-	if lastCPUCounters == nil {
-		return nil, errors.New("map cpu not found")
-	}
-
-	if err := bpfModule.EnableTracepoint("tracepoint/sched/sched_switch"); err != nil {
-		return nil, errors.Wrap(err, "couldn't enable tracepoint/sched/sched_switch")
-	}
-
-	if err := bpfModule.EnableTracepoint("tracepoint/x86_fpu/x86_fpu_regs_deactivated"); err != nil {
-		return nil, errors.Wrap(err, "couldn't enable tracepoint/x86_fpu/x86_fpu_regs_deactivated")
+	sfd, err := enablePerfTracepoint(collection.Programs["tracepoint__sched_switch"], "sched/sched_switch")
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to enable sched tracepoint")
 	}
 
 	return &collector{
-		root:                     cgroups.V2path,
-		bpfModule:                bpfModule,
-		avxContextSwitchCounters: avxSwitchCounters,
-		allContextSwitchCounters: allSwitchCounters,
-		lastUpdateNs:             lastUpdateNs,
-		lastCPUCounters:          lastCPUCounters,
+		root: cgroups.V2path,
+		ebpf: collection,
+		fds:  []int{ffd, sfd},
 	}, nil
 }
 
@@ -192,7 +232,7 @@ func (c *collector) Describe(ch chan<- *prometheus.Desc) {
 	}
 }
 
-// TODO use bpf.NowNanoseconds() after https://github.com/iovisor/gobpf/pull/222
+// from iovisor/gobpf: bpf.NowNanoseconds()
 // nowNanoseconds returns a time that can be compared to bpf_ktime_get_ns()
 func nowNanoseconds() uint64 {
 	var ts syscall.Timespec
@@ -203,7 +243,13 @@ func nowNanoseconds() uint64 {
 
 // Collect implements prometheus.Collector interface
 func (c collector) Collect(ch chan<- prometheus.Metric) {
-	var wg sync.WaitGroup
+	var (
+		wg  sync.WaitGroup
+		key uint64
+		val uint32
+	)
+
+	cgroupids := make(map[uint64]uint32)
 
 	wg.Add(1)
 	go func() {
@@ -212,20 +258,33 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	}()
 
 	cg := cgroups.NewCgroupID(c.root)
-	cgroupids, counters, err := c.moveAllElements(c.avxContextSwitchCounters, unsafe.Sizeof(uint64(0)), unsafe.Sizeof(uint32(0)))
-	if err != nil {
-		log.Error("unable to move elements of avx_context_switch_count: %+v", err)
+
+	m := c.ebpf.Maps["avx_context_switch_count_hash"]
+	iter := m.Iterate()
+
+	for iter.Next(&key, &val) {
+		cgroupids[key] = val
+		log.Debug("cgroupid %d => counter %d", key, val)
+
+		// reset the counter by deleting the key
+		err := m.Delete(key)
+		if err != nil {
+			log.Error("%+v", err)
+		}
+	}
+	if iter.Err() != nil {
+		log.Error("unable to iterate all elements of avx_context_switch_count: %+v", iter.Err())
 	}
 
-	for idx, cgroupid := range cgroupids {
+	for cgroupid, counter := range cgroupids {
 		wg.Add(1)
-		go func(idx_ int, cgroupid_ []byte) {
+		go func(cgroupid_ uint64, counter_ uint32) {
 			var allCount uint32
 			var lastUpdate uint64
 
 			defer wg.Done()
 
-			path, err := cg.Find(binary.LittleEndian.Uint64(cgroupid_[0:]))
+			path, err := cg.Find(cgroupid_)
 			if err != nil {
 				log.Error("failed to find cgroup by id: %v", err)
 				return
@@ -234,19 +293,21 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(
 				descriptors[avxSwitchCountDesc],
 				prometheus.GaugeValue,
-				float64(binary.LittleEndian.Uint32(counters[idx_][0:])),
+				float64(counter_),
 				path,
-				fmt.Sprintf("%d", binary.LittleEndian.Uint64(cgroupid_[0:])))
+				fmt.Sprintf("%d", cgroupid_))
 
-			if err := c.bpfModule.LookupElement(c.allContextSwitchCounters, unsafe.Pointer(&cgroupid_[0]), unsafe.Pointer(&allCount)); err != nil {
-				log.Error("unable to find 'all' switch count: %+v", err)
+			if err := c.ebpf.Maps["all_context_switch_count_hash"].Lookup(uint64(cgroupid_), &allCount); err != nil {
+				log.Error("unable to find 'all' context switch count: %+v", err)
 				return
 			}
+			log.Debug("all: %d", allCount)
 
-			if err := c.bpfModule.LookupElement(c.lastUpdateNs, unsafe.Pointer(&cgroupid_[0]), unsafe.Pointer(&lastUpdate)); err != nil {
+			if err := c.ebpf.Maps["last_update_ns_hash"].Lookup(uint64(cgroupid_), &lastUpdate); err != nil {
 				log.Error("unable to find last update timestamp: %+v", err)
 				return
 			}
+			log.Debug("last: %d", lastUpdate)
 
 			ch <- prometheus.MustNewConstMetric(
 				descriptors[allSwitchCountDesc],
@@ -260,66 +321,60 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 				float64(nowNanoseconds()-lastUpdate),
 				path)
 
-		}(idx, cgroupid)
+		}(cgroupid, counter)
 	}
 
 	// We need to wait so that the response channel doesn't get closed.
 	wg.Wait()
 
-	_, _, err = c.moveAllElements(c.allContextSwitchCounters, unsafe.Sizeof(uint64(0)), unsafe.Sizeof(uint32(0)))
-	if err != nil {
-		log.Error("unable to delete elements of all_context_switch_count: %+v", err)
-	}
-}
+	m = c.ebpf.Maps["all_context_switch_count_hash"]
+	iter = m.Iterate()
 
-func (c *collector) moveAllElements(table *bpf.Map, keySize, valueSize uintptr) ([][]byte, [][]byte, error) {
-	var keys [][]byte
-	var values [][]byte
-
-	zero := make([]byte, keySize)
-	nextKey := make([]byte, keySize)
-	value := make([]byte, valueSize)
-
-	for {
-		ok, err := c.bpfModule.LookupNextElement(table, unsafe.Pointer(&zero[0]), unsafe.Pointer(&nextKey[0]), unsafe.Pointer(&value[0]))
+	for iter.Next(&key, &val) {
+		// reset the counter by deleting the key
+		err := m.Delete(key)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "unable to look up")
-		}
-
-		if !ok {
-			break
-		}
-
-		keyClone := append(nextKey[:0:0], nextKey...)
-		keys = append(keys, keyClone)
-
-		valueClone := append(value[:0:0], value...)
-		values = append(values, valueClone)
-
-		if err := c.bpfModule.DeleteElement(table, unsafe.Pointer(&nextKey[0])); err != nil {
-			return nil, nil, errors.Wrap(err, "unable to delete")
+			log.Error("%+v", err)
 		}
 	}
 
-	return keys, values, nil
+	if iter.Err() != nil {
+		log.Error("unable to reset all elements of all_context_switch_count: %+v", iter.Err())
+	}
 }
 
 func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
-	// NB: (* struct fpu)->last_cpu is of type `unsigned int` which translates to Go's uint32, not uint (4 bytes size in IA)
-	lastCPUs, counters, err := c.moveAllElements(c.lastCPUCounters, unsafe.Sizeof(uint32(0)), unsafe.Sizeof(uint32(0)))
-	if err != nil {
-		log.Error("unable to move elements of cpu map: %+v", err)
+
+	lastCPUs := make(map[uint32]uint32)
+	var cpu uint32
+	var counter uint32
+
+	m := c.ebpf.Maps["cpu_hash"]
+	iter := m.Iterate()
+	for iter.Next(&cpu, &counter) {
+		lastCPUs[cpu] = counter
+
+		log.Debug("CPU%d = %d", cpu, counter)
+
+		// reset the counter by deleting key
+		err := m.Delete(cpu)
+		if err != nil {
+			log.Error("%+v", err)
+		}
+	}
+
+	if iter.Err() != nil {
+		log.Error("unable to iterate all elements of cpu_hash: %+v", iter.Err())
 		return
 	}
 
-	for idx, lastCPU := range lastCPUs {
+	for lastCPU, count := range lastCPUs {
 		ch <- prometheus.MustNewConstMetric(
 			descriptors[lastCPUDesc],
 			prometheus.GaugeValue,
-			float64(binary.LittleEndian.Uint32(counters[idx])),
-			fmt.Sprintf("CPU%d", binary.LittleEndian.Uint32(lastCPU)))
+			float64(count),
+			fmt.Sprintf("CPU%d", lastCPU))
 	}
-}
 
 func init() {
 	flag.StringVar(&bpfInstallpath, "bpf-install-path", bpfInstallpath,
