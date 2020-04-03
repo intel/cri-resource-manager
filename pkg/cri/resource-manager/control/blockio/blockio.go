@@ -17,6 +17,8 @@ package blockio
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/intel/cri-resource-manager/pkg/blockio"
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
@@ -26,6 +28,9 @@ import (
 )
 
 const (
+	// ConfigModuleName is the configuration section of blockio class definitions
+	ConfigModuleName = "resource-manager.blockio"
+
 	// BlockIOController is the name of the block I/O controller.
 	BlockIOController = cache.BlockIO
 )
@@ -42,7 +47,7 @@ var log logger.Logger = logger.NewLogger(BlockIOController)
 var singleton *blockioctl
 
 // getBlockIOController returns our singleton block I/O controller instance.
-func getBlockIOController() control.Controller {
+func getBlockIOController() *blockioctl {
 	if singleton == nil {
 		singleton = &blockioctl{}
 	}
@@ -51,12 +56,8 @@ func getBlockIOController() control.Controller {
 
 // Start initializes the controller for enforcing decisions.
 func (ctl *blockioctl) Start(cache cache.Cache, client client.Client) error {
-	if err := blockio.Initialize(); err != nil {
-		return blockioError("failed to initialize BlockIO controls: %w", err)
-	}
-
 	ctl.cache = cache
-
+	ctl.reconfigureRunningContainers()
 	return nil
 }
 
@@ -134,18 +135,37 @@ func (ctl *blockioctl) BlockIOClass(c cache.Container) string {
 		}
 	}
 
-	log.Debug("BlockIO class for %s (%s): %q", c.PrettyName(), cclass, blockioclass)
-
 	return blockioclass
 }
 
-// configNotify is blockio class mapping configuration notification callback.
+// configNotify is blockio class mapping and class definition configuration callback
 func (ctl *blockioctl) configNotify(event config.Event, source config.Source) error {
-	// BlockIO class mapping in opt (in flags.go) has changed.
-	// It will affect only new pods. cgroupsblkio parameters of running pods
-	// is not changed.
-	log.Info("class mapping configuration updated")
+	ignoreErrors := (event == config.RevertEvent)
+	err := blockio.UpdateOciConfig(ignoreErrors)
+	if err != nil {
+		return err
+	}
+	// Possible errors in reconfiguring running containers are not errors in
+	// the updated configuration, therefore silently ignored.
+	ctl.reconfigureRunningContainers()
 	return nil
+}
+
+// reconfigureRunningContainers force setting current blockio configuration to all containers running on the node
+func (ctl *blockioctl) reconfigureRunningContainers() error {
+	var errors *multierror.Error
+	if ctl.cache == nil {
+		return nil
+	}
+	for _, c := range ctl.cache.GetContainers() {
+		class := ctl.BlockIOClass(c)
+		log.Debug("configure container %q blockio class %q", c.PrettyName(), class)
+		err := blockio.SetContainerClass(c, class)
+		if err != nil {
+			errors = multierror.Append(errors, err)
+		}
+	}
+	return errors.ErrorOrNil()
 }
 
 // blockioError creates a block I/O-controller-specific formatted error message.
@@ -153,7 +173,8 @@ func blockioError(format string, args ...interface{}) error {
 	return fmt.Errorf("blockio: "+format, args...)
 }
 
-// Register us as a controller.
+// init registers this controller and sets configuration change handling.
 func init() {
 	control.Register(BlockIOController, "Block I/O controller", getBlockIOController())
+	config.GetModule(blockio.ConfigModuleName).AddNotify(getBlockIOController().configNotify)
 }

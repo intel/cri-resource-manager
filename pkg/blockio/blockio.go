@@ -31,13 +31,15 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
-	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
+	// ConfigModuleName is the configuration section of blockio class definitions
+	ConfigModuleName = "blockio"
+
 	// sysfsBlockDeviceIOSchedulerPaths expands (with glob) to block device scheduler files.
 	// If modified, check how to parse device node from expanded paths.
 	sysfsBlockDeviceIOSchedulerPaths = "/sys/block/*/queue/scheduler"
@@ -71,23 +73,8 @@ var staticOciBlockIO = map[string]cgroups.OciBlockIOParameters{}
 // {"/dev/sda": "bfq"}
 var currentIOSchedulers map[string]string
 
-// Initialize handles initial configuration and starts listening to config changes
-func Initialize() error {
-	pkgcfg.GetModule("blockio").AddNotify(configNotify)
-	applyConfig(true)
-	return nil
-}
-
-// configNotify is blockio class definition configuration notification callback.
-func configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
-	log.Info("blockio I/O class configuration updated")
-	ignoreErrors := (event == pkgcfg.RevertEvent)
-	err := applyConfig(ignoreErrors)
-	return err
-}
-
-// applyConfig takes the configuration from the opt variable into use for new pods.
-func applyConfig(ignoreErrors bool) error {
+// UpdateOciConfig converts the configuration in the opt variable into staticOciBlockIO
+func UpdateOciConfig(ignoreErrors bool) error {
 	currentIOSchedulers, ioSchedulerDetectionError := getCurrentIOSchedulers()
 	if ioSchedulerDetectionError != nil {
 		log.Warn("configuration validation partly disabled due to IO scheduler detection error %#v", ioSchedulerDetectionError.Error())
@@ -132,7 +119,7 @@ func SetContainerClass(c cache.Container, class string) error {
 		return blockioError("failed to find cgroup directory for container %s under %#v, container id %#v", c.PrettyName(), blkioCgroupPodDir, c.GetID())
 	}
 
-	err := cgroups.SetBlkioParameters(containerCgroupDir, ociBlockIO)
+	err := cgroups.ResetBlkioParameters(containerCgroupDir, ociBlockIO)
 	if err != nil {
 		return blockioError("assigning container %v to class %#v failed: %w", c.PrettyName(), class, err)
 	}
@@ -218,39 +205,19 @@ func devicesParametersToOci(dps []DevicesParameters, currentIOSchedulers map[str
 								"incompatible io-scheduler %#v (bfq or cfq required)", blockDeviceInfo.DevNode, ios)
 						}
 					}
-					oci.WeightDevice = updateOrAppendWeight(oci.WeightDevice,
-						cgroups.OciWeightDeviceParameters{
-							Major:  blockDeviceInfo.Major,
-							Minor:  blockDeviceInfo.Minor,
-							Weight: weight})
+					oci.WeightDevice.Update(blockDeviceInfo.Major, blockDeviceInfo.Minor, weight)
 				}
 				if throttleReadBps != -1 {
-					oci.ThrottleReadBpsDevice = updateOrAppendRate(oci.ThrottleReadBpsDevice,
-						cgroups.OciRateDeviceParameters{
-							Major: blockDeviceInfo.Major,
-							Minor: blockDeviceInfo.Minor,
-							Rate:  throttleReadBps})
+					oci.ThrottleReadBpsDevice.Update(blockDeviceInfo.Major, blockDeviceInfo.Minor, throttleReadBps)
 				}
 				if throttleWriteBps != -1 {
-					oci.ThrottleWriteBpsDevice = updateOrAppendRate(oci.ThrottleWriteBpsDevice,
-						cgroups.OciRateDeviceParameters{
-							Major: blockDeviceInfo.Major,
-							Minor: blockDeviceInfo.Minor,
-							Rate:  throttleWriteBps})
+					oci.ThrottleWriteBpsDevice.Update(blockDeviceInfo.Major, blockDeviceInfo.Minor, throttleWriteBps)
 				}
 				if throttleReadIOPS != -1 {
-					oci.ThrottleReadIOPSDevice = updateOrAppendRate(oci.ThrottleReadIOPSDevice,
-						cgroups.OciRateDeviceParameters{
-							Major: blockDeviceInfo.Major,
-							Minor: blockDeviceInfo.Minor,
-							Rate:  throttleReadIOPS})
+					oci.ThrottleReadIOPSDevice.Update(blockDeviceInfo.Major, blockDeviceInfo.Minor, throttleReadIOPS)
 				}
 				if throttleWriteIOPS != -1 {
-					oci.ThrottleWriteIOPSDevice = updateOrAppendRate(oci.ThrottleWriteIOPSDevice,
-						cgroups.OciRateDeviceParameters{
-							Major: blockDeviceInfo.Major,
-							Minor: blockDeviceInfo.Minor,
-							Rate:  throttleWriteIOPS})
+					oci.ThrottleWriteIOPSDevice.Update(blockDeviceInfo.Major, blockDeviceInfo.Minor, throttleWriteIOPS)
 				}
 			}
 		}
@@ -277,34 +244,6 @@ func parseAndValidateInt64(fieldName string, fieldContent string,
 		return defaultValue, fmt.Errorf("value of %#v (%#v) bigger than maximum (%#v)", fieldName, value, max)
 	}
 	return value, nil
-}
-
-// updateOrAppendRate updates Rate of a Major:Minor device if already in list, otherwise appends it
-func updateOrAppendRate(rateDevs []cgroups.OciRateDeviceParameters, newDev cgroups.OciRateDeviceParameters) []cgroups.OciRateDeviceParameters {
-	if rateDevs == nil {
-		return []cgroups.OciRateDeviceParameters{newDev}
-	}
-	for index, rateDev := range rateDevs {
-		if rateDev.Major == newDev.Major && rateDev.Minor == newDev.Minor {
-			rateDevs[index].Rate = newDev.Rate
-			return rateDevs
-		}
-	}
-	return append(rateDevs, newDev)
-}
-
-// updateOrAppendWeight updates Rate of a Major:Minor device if already in list, otherwise appends it
-func updateOrAppendWeight(weightDevs []cgroups.OciWeightDeviceParameters, newDev cgroups.OciWeightDeviceParameters) []cgroups.OciWeightDeviceParameters {
-	if weightDevs == nil {
-		return []cgroups.OciWeightDeviceParameters{newDev}
-	}
-	for index, weightDev := range weightDevs {
-		if weightDev.Major == newDev.Major && weightDev.Minor == newDev.Minor {
-			weightDevs[index].Weight = newDev.Weight
-			return weightDevs
-		}
-	}
-	return append(weightDevs, newDev)
 }
 
 // platformInterface includes functions that access the system. Enables mocking the system.

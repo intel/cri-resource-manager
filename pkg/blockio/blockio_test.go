@@ -164,19 +164,19 @@ func TestDevicesParametersToOci(t *testing.T) {
 			iosched: map[string]string{"/dev/sda": "bfq"},
 			expectedOci: &cgroups.OciBlockIOParameters{
 				Weight: 144,
-				WeightDevice: []cgroups.OciWeightDeviceParameters{
+				WeightDevice: cgroups.OciDeviceWeights{
 					{Major: 11, Minor: 12, Weight: 50},
 				},
-				ThrottleReadBpsDevice: []cgroups.OciRateDeviceParameters{
+				ThrottleReadBpsDevice: cgroups.OciDeviceRates{
 					{Major: 11, Minor: 12, Rate: 1000000000},
 				},
-				ThrottleWriteBpsDevice: []cgroups.OciRateDeviceParameters{
+				ThrottleWriteBpsDevice: cgroups.OciDeviceRates{
 					{Major: 11, Minor: 12, Rate: 2000000},
 				},
-				ThrottleReadIOPSDevice: []cgroups.OciRateDeviceParameters{
+				ThrottleReadIOPSDevice: cgroups.OciDeviceRates{
 					{Major: 11, Minor: 12, Rate: 3000},
 				},
-				ThrottleWriteIOPSDevice: []cgroups.OciRateDeviceParameters{
+				ThrottleWriteIOPSDevice: cgroups.OciDeviceRates{
 					{Major: 11, Minor: 12, Rate: 4},
 				},
 			},
@@ -203,12 +203,12 @@ func TestDevicesParametersToOci(t *testing.T) {
 			iosched: map[string]string{"/dev/sda": "bfq", "/dev/sdb": "bfq", "/dev/sdc": "cfq"},
 			expectedOci: &cgroups.OciBlockIOParameters{
 				Weight: -1,
-				WeightDevice: []cgroups.OciWeightDeviceParameters{
+				WeightDevice: cgroups.OciDeviceWeights{
 					{Major: 11, Minor: 12, Weight: 110},
 					{Major: 21, Minor: 22, Weight: 220},
 					{Major: 31, Minor: 32, Weight: 330},
 				},
-				ThrottleReadBpsDevice: []cgroups.OciRateDeviceParameters{
+				ThrottleReadBpsDevice: cgroups.OciDeviceRates{
 					{Major: 11, Minor: 12, Rate: 100},
 					{Major: 21, Minor: 22, Rate: 200},
 					{Major: 31, Minor: 32, Rate: 300},
