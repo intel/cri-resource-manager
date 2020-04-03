@@ -28,6 +28,9 @@ jobs:
     - name: Protoc-gRPC
       run: go get -u google.golang.org/grpc
 
+    - name: InstallVFSGenDev
+      run: go get -u github.com/shurcooL/vfsgen/cmd/vfsgendev
+
     - name: Build
       run: make
 

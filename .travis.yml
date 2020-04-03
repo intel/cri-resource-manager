@@ -28,6 +28,7 @@ addons:
 script:
   - go get -u github.com/golang/protobuf/protoc-gen-go
   - go get -u google.golang.org/grpc
+  - go get -u github.com/shurcooL/vfsgen/cmd/vfsgendev
   - make format
   - make
   - KERNEL_SRC_DIR=/lib/modules/5.3.0-23-generic/build make libexec/avx512.o
