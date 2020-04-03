@@ -35,14 +35,6 @@ static int (*bpf_map_update_elem)(void *map, void *key, void *value,
 static void *(*bpf_map_lookup_elem)(void *map, void *key) = (void *)
 	BPF_FUNC_map_lookup_elem;
 
-#define bpf_printk(fmt, ...)                                                   \
-	({                                                                     \
-		char ____fmt[] = fmt;                                          \
-		bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__);     \
-	})
-static int (*bpf_trace_printk)(const char *fmt, int fmt_size,
-			       ...) = (void *)BPF_FUNC_trace_printk;
-
 struct bpf_map_def
 	SEC("maps/all_context_switch_count") all_context_switch_count_hash = {
 		.type = BPF_MAP_TYPE_HASH,
@@ -161,7 +153,6 @@ int tracepoint__x86_fpu_regs_deactivated(struct x86_fpu_args *args)
 	u64 last = bpf_ktime_get_ns();
 	bpf_map_update_elem(&last_update_ns_hash, &cgroup_id, &last, BPF_ANY);
 
-	bpf_printk("AVX512 detected in cgroup %llu\n", cgroup_id);
 	return 0;
 }
 

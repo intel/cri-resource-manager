@@ -56,6 +56,10 @@ UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
         fi; \
     done)
 
+# Right now we don't depend on libexec/%.o on purpose so make sure the file
+# is always up-to-date when elf/avx512.c is changed.
+GEN_TARGETS := pkg/avx/programbytes_gendata.go
+
 # Git (tagged) version and revisions we'll use to linker-tag our binaries with.
 GIT_ID   = scripts/build/git-id
 BUILD_ID = "$(shell head -c20 /dev/urandom | od -An -tx1 | tr -d ' \n')"
@@ -182,6 +186,9 @@ clean-%:
 	$(Q)bin=$(patsubst clean-%,%,$@); src=cmd/$$bin; \
 	echo "Cleaning up $$bin..."; \
 	rm -f bin/$$bin
+
+clean-gen:
+	$(Q)rm -f $(GEN_TARGETS)
 
 image-%:
 	$(Q)bin=$(patsubst image-%,%,$@); \
@@ -372,7 +379,7 @@ install-git-hooks:
 # go dependencies for our binaries (careful with that axe, Eugene...)
 #
 
-bin/cri-resmgr: $(wildcard cmd/cri-resmgr/*.go) $(UI_ASSETS) \
+bin/cri-resmgr: $(wildcard cmd/cri-resmgr/*.go) $(UI_ASSETS) $(GEN_TARGETS) \
     $(shell for dir in \
                   $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/cri-resmgr/... | \
                           grep cri-resource-manager/pkg/ | \
