@@ -1,4 +1,4 @@
-// Copyright 2019 Intel Corporation. All Rights Reserved.
+// Copyright 2019-2020 Intel Corporation. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import (
 	"github.com/ghodss/yaml"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
@@ -45,175 +46,304 @@ const (
 	stampLen = len(stampLayout)
 )
 
+// dumper encapsulates the runtime state of our message dumper.
+type dumper struct {
+	sync.RWMutex                  // protect concurrent dumping/reconfiguration
+	rules        ruleset          // dumping rules
+	details      map[string]level // corresponding dump details per method
+	disabled     bool             // dumping globally disabled
+	debug        bool             // dump as debug messages
+	path         string           // extra dump file path
+	file         *os.File         // extra dump file
+	methods      []string         // training set for config
+	q            chan *dumpreq
+}
+
+// dumpreq is a request to dump a (CRI) request or a reply
+type dumpreq struct {
+	dir     direction
+	kind    string
+	method  string
+	msg     interface{}
+	latency time.Duration
+	sync    chan struct{}
+}
+
+// direction is a message direction, a request or a reply
+type direction int
+
+const (
+	request = iota
+	reply
+	nop
+)
+
+// Our global dumper instance.
+var dump = newDumper()
+
 // Our logger instances, one for generic logging and another for message dumps.
 var log = logger.NewLogger("dump")
 var message = logger.NewLogger("message")
 
-func checkAndScheduleDumpFileSwitch() {
-	opt.Lock()
-	defer opt.Unlock()
-	if fileName != string(opt.File) {
-		if file != nil {
-			file.Close()
-			file = nil
-			log.Info("old message dump file '%s' closed", fileName)
-		}
-	}
-}
-
-func checkDumpFile() bool {
-	// this must be called with opt.Lock()'ed
-	switch {
-	case file != nil:
-		return true
-	case opt.File == "":
-		return false
-	}
-
-	f, err := os.Create(string(opt.File))
-	if err != nil {
-		log.Error("failed to open message dump file '%v': %v", opt.File, err)
-		opt.File = dumpFile("")
-		return false
-	}
-
-	log.Info("opened new message dump file '%v'", opt.File)
-	file = f
-	fileName = string(opt.File)
-	return true
+// Train trains the message dumper for the given set of methods.
+func Train(methods []string) {
+	dump.Lock()
+	defer dump.Unlock()
+	dump.train(methods)
 }
 
 // RequestMessage dumps a CRI request.
-func RequestMessage(kind, name string, request interface{}) {
-	method := name[strings.LastIndex(name, "/")+1:]
-	opt.Lock()
-	defer opt.Unlock()
-	switch opt.verbosityOf(method) {
-	case NameOnly:
-		dumpName("request", kind, method, request, 0)
-	case Full:
-		dumpFull("request", kind, method, request, 0)
+func RequestMessage(kind, name string, req interface{}, sync bool) {
+	if !dump.disabled {
+		var ch chan struct{}
+		if sync {
+			ch = make(chan struct{})
+		}
+		dump.q <- &dumpreq{
+			dir:    request,
+			kind:   kind,
+			method: name,
+			msg:    req,
+			sync:   ch,
+		}
+		if ch != nil {
+			_ = <-ch
+		}
 	}
 }
 
 // ReplyMessage dumps a CRI reply.
-func ReplyMessage(kind, name string, reply interface{}, latency time.Duration) {
-	method := name[strings.LastIndex(name, "/")+1:]
-	opt.Lock()
-	defer opt.Unlock()
-	switch opt.verbosityOf(method) {
-	case NameOnly:
-		dumpName("reply", kind, method, reply, latency)
-	case Full:
-		dumpFull("reply", kind, method, reply, latency)
+func ReplyMessage(kind, name string, rpl interface{}, latency time.Duration, sync bool) {
+	if !dump.disabled {
+		var ch chan struct{}
+		if sync {
+			ch = make(chan struct{})
+		}
+		dump.q <- &dumpreq{
+			dir:     reply,
+			kind:    kind,
+			method:  name,
+			msg:     rpl,
+			latency: latency,
+			sync:    ch,
+		}
+		if ch != nil {
+			_ = <-ch
+		}
 	}
 }
 
-func dumpName(dir, kind, method string, msg interface{}, latency time.Duration) {
+// Sync returns once the last message currently being dumped is finished.
+func Sync() {
+	if !dump.disabled {
+		dump.sync()
+	}
+}
+
+// newDumper creates a dumper instance.
+func newDumper() *dumper {
+	d := &dumper{q: make(chan *dumpreq, 16)}
+	d.run()
+	return d
+}
+
+// run runs the dumping goroutine of the dumper.
+func (d *dumper) run() {
 	go func() {
-		switch dir {
-		case "request":
-			return
-		case "reply":
-			if _, ok := msg.(error); ok {
-				dumpWarn(dir, latency, "(%s) FAILED %s: %vs", kind, method, msg.(error))
-			} else {
-				dumpLine(dir, latency, "(%s) REQUEST %s", kind, method)
+		for req := range d.q {
+			if req.dir != nop {
+				method := methodName(req.method)
+				d.RLock()
+				detail, ok := d.details[method]
+				if !ok {
+					detail = d.rules.detailOf(method)
+				}
+				d.RUnlock()
+				switch detail {
+				case Name:
+					d.name(req.dir, req.kind, method, req.msg, req.latency)
+				case Full:
+					d.full(req.dir, req.kind, method, req.msg, req.latency)
+				}
+			}
+			if req.sync != nil {
+				close(req.sync)
 			}
 		}
 	}()
 }
 
-func dumpFull(dir, kind, method string, msg interface{}, latency time.Duration) {
-	go func() {
-		switch dir {
-		case "request":
+// sync waits until all the persent messages in the queue are dumped.
+func (d *dumper) sync() {
+	ch := make(chan struct{})
+	dump.q <- &dumpreq{dir: nop, sync: ch}
+	_ = <-ch
+}
+
+// configure (re)configures dumper
+func (d *dumper) configure(o *options) {
+	d.Lock()
+	defer d.Unlock()
+
+	d.debug = o.Debug
+	d.rules = o.rules.duplicate()
+
+	if d.path != o.File || d.disabled != o.Disabled {
+		if d.file != nil {
+			log.Info("closing old message dump file %q...", d.path)
+			d.file.Close()
+			d.file = nil
+		}
+		d.disabled = o.Disabled
+
+		if d.disabled {
+			return
+		}
+
+		d.path = o.File
+		if d.path != "" {
+			var err error
+			log.Info("opening new message dump file %q...", d.path)
+			d.file, err = os.Create(d.path)
+			if err != nil {
+				log.Error("failed to open file %q: %v", d.path, err)
+			}
+		}
+	}
+
+	d.train(nil)
+}
+
+// train trains the dumper with the given set of messages.
+func (d *dumper) train(names []string) {
+	if names != nil {
+		d.methods = make([]string, len(names), len(names))
+	} else {
+		names = d.methods
+	}
+	d.details = make(map[string]level)
+	for idx, name := range names {
+		method := methodName(name)
+		detail := d.rules.detailOf(method)
+		log.Info("%s: %v", method, detail)
+		d.methods[idx] = method
+		d.details[method] = detail
+	}
+}
+
+// name does a name-only dump of the given message.
+func (d *dumper) name(dir direction, kind, method string, msg interface{}, latency time.Duration) {
+	switch dir {
+	case request:
+		return
+	case reply:
+		if err, ok := msg.(error); ok {
+			d.warn(dir, latency, "(%s) FAILED %s: %v", kind, method, err)
+		} else {
+			d.line(dir, latency, "(%s) REQUEST %s", kind, method)
+		}
+	}
+}
+
+// full does a full dump of the given message.
+func (d *dumper) full(dir direction, kind, method string, msg interface{}, latency time.Duration) {
+	switch dir {
+	case request:
+		raw, _ := yaml.Marshal(msg)
+		str := strings.TrimRight(string(raw), "\n")
+		if strings.LastIndexByte(str, '\n') > 0 {
+			d.line(dir, latency, "(%s) REQUEST %s", kind, method)
+			d.block(dir, latency, "    "+method+" => ", str)
+		} else {
+			d.line(dir, latency, "(%s) REQUEST %s => %s", kind, method, str)
+		}
+
+	case reply:
+		if err, ok := msg.(error); ok {
+			d.warn(dir, latency, "(%s) FAILED %s", kind, method)
+			d.warn(dir, latency, "  %s <= %s", method, err)
+		} else {
 			raw, _ := yaml.Marshal(msg)
 			str := strings.TrimRight(string(raw), "\n")
 			if strings.LastIndexByte(str, '\n') > 0 {
-				dumpLine(dir, latency, "(%s) REQUEST %s", kind, method)
-				dumpBlock(dir, latency, "    "+method+" => ", str)
+				d.line(dir, latency, "(%s) REPLY %s", kind, method)
+				d.block(dir, latency, "    "+method+" <= ", str)
 			} else {
-				dumpLine(dir, latency, "(%s) REQUEST %s => %s", kind, method, str)
-			}
-
-		case "reply":
-			switch msg.(type) {
-			case error:
-				dumpWarn(dir, latency, "(%s) FAILED %s", kind, method)
-				dumpWarn(dir, latency, "  %s <= %s", method, msg.(error))
-			default:
-				raw, _ := yaml.Marshal(msg)
-				str := strings.TrimRight(string(raw), "\n")
-				if strings.LastIndexByte(str, '\n') > 0 {
-					dumpLine(dir, latency, "(%s) REPLY %s", kind, method)
-					dumpBlock(dir, latency, "    "+method+" <= ", str)
-				} else {
-					dumpLine(dir, latency, "(%s) REPLY %s <= %s", kind, method, str)
-				}
+				d.line(dir, latency, "(%s) REPLY %s <= %s", kind, method, str)
 			}
 		}
-	}()
+	}
 }
 
-func dumpLine(dir string, latency time.Duration, format string, args ...interface{}) {
+// line dumps a single line.
+func (d *dumper) line(dir direction, latency time.Duration, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	if !opt.Debug {
+	if !d.debug {
 		message.Info("%s", msg)
 	} else {
 		message.Debug("%s", msg)
 	}
-	if opt.File != "" {
-		dumpToFile(dir, latency, "%s", msg)
+	if d.file != nil {
+		d.tofile(dir, latency, "%s", msg)
 	}
 }
 
-func dumpblock(fn func(string, ...interface{}), prefix string, format string, args ...interface{}) {
-	for _, line := range strings.Split(fmt.Sprintf(format, args...), "\n") {
-		fn("%s%s", prefix, line)
-	}
-}
-
-func dumpBlock(dir string, latency time.Duration, prefix, msg string) {
-	if !opt.Debug {
-		message.InfoBlock(prefix, "%s", msg)
+// block dumps a block of lines.
+func (d *dumper) block(dir direction, latency time.Duration, prefix, msg string) {
+	if !d.debug {
+		message.InfoBlock(prefix, msg)
 	} else {
-		message.DebugBlock(prefix, "%s", msg)
+		message.DebugBlock(prefix, msg)
 	}
-	if opt.File != "" {
-		dumpblock(func(format string, args ...interface{}) {
-			dumpToFile(dir, latency, format, args...)
-		},
-			prefix, "%s", msg)
+	if d.file != nil {
+		for _, line := range strings.Split(msg, "\n") {
+			d.tofile(dir, latency, "%s%s", prefix, line)
+		}
 	}
 }
 
-func dumpWarn(dir string, latency time.Duration, format string, args ...interface{}) {
+// warn dumps a single line as a warning.
+func (d *dumper) warn(dir direction, latency time.Duration, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	log.Warn("%s", msg)
-	if opt.File != "" {
-		dumpToFile(dir, latency, "%s", msg)
+	message.Warn("%s", msg)
+	if d.file != nil {
+		d.tofile(dir, latency, "%s", msg)
 	}
 }
 
-func dumpToFile(dir string, latency time.Duration, format string, args ...interface{}) {
-	if !checkDumpFile() {
-		return
-	}
-
-	fmt.Fprintf(file, "["+stamp(dir, latency)+"] "+format+"\n", args...)
+// tofile dumps a single line to a file.
+func (d *dumper) tofile(dir direction, latency time.Duration, format string, args ...interface{}) {
+	fmt.Fprintf(d.file, "["+stamp(dir, latency)+"] "+format+"\n", args...)
 }
 
-func stamp(dir string, latency time.Duration) string {
+// stamp produces a stamp from a direction and a latency.
+func stamp(dir direction, latency time.Duration) string {
 	switch dir {
-	case "request":
+	case request:
 		return time.Now().Format(stampLayout)
-	case "reply":
+	case reply:
 		return fmt.Sprintf("%*s", stampLen, fmt.Sprintf("+%f", latency.Seconds()))
 	}
 	return ""
 }
 
+// String returns a string representing the direction.
+func (d direction) String() string {
+	switch d {
+	case request:
+		return "request"
+	case reply:
+		return "reply"
+	}
+	return "unknown"
+}
+
+// methodName returns the basename of a method.
+func methodName(method string) string {
+	return method[strings.LastIndex(method, "/")+1:]
+}
+
+// dumpError produces a formatted package-specific error.
 func dumpError(format string, args ...interface{}) error {
 	return fmt.Errorf("dump: "+format, args...)
 }
