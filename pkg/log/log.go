@@ -16,281 +16,434 @@ package log
 
 import (
 	"fmt"
+	"strings"
 	"sync"
+
+	"k8s.io/klog/v2"
 )
+
+// Level describes the severity of a log message.
+type Level int
+
+const (
+	// levelUnset denotes an unset level.
+	levelUnset Level = iota
+	// LevelDebug is the severity for debug messages.
+	LevelDebug
+	// LevelInfo is the severity for informational messages.
+	LevelInfo
+	// LevelWarn is the severity for warnings.
+	LevelWarn
+	// LevelError is the severity for errors.
+	LevelError
+	// LevelPanic is the severity for panic messages.
+	LevelPanic
+	// LevelFatal is the severity for fatal errors.
+	LevelFatal
+)
+
+// Per-level prefix tags.
+var levelTag = map[Level]string{
+	levelUnset: "?: ",
+	LevelDebug: "D: ",
+	LevelInfo:  "I: ",
+	LevelWarn:  "W: ",
+	LevelError: "E: ",
+	LevelFatal: "F: ",
+	LevelPanic: "P: ",
+}
+
+// Logger is the interface for producing log messages for/from a particular source.
+type Logger interface {
+	// Debug formats and emits a debug message.
+	Debug(format string, args ...interface{})
+	// Info formats and emits an informational message.
+	Info(format string, args ...interface{})
+	// Warn formats and emits a warning message.
+	Warn(format string, args ...interface{})
+	// Error formats and emits an error message.
+	Error(format string, args ...interface{})
+	// Panic formats and emits an error message then panics with the same.
+	Panic(format string, args ...interface{})
+	// Fatal formats and emits an error message and os.Exit()'s with status 1.
+	Fatal(format string, args ...interface{})
+
+	// DebugBlock formats and emits a multiline debug message.
+	DebugBlock(prefix string, format string, args ...interface{})
+	// InfoBlock formats and emits a multiline information message.
+	InfoBlock(prefix string, format string, args ...interface{})
+	// WarnBlock formats and emits a multiline warning message.
+	WarnBlock(prefix string, format string, args ...interface{})
+	// ErrorBlock formats and emits a multiline error message.
+	ErrorBlock(prefix string, format string, args ...interface{})
+
+	// EnableDebug enables debug messages for this Logger.
+	EnableDebug(bool) bool
+	// DebugEnabled checks if debug messages are enabled for this Logger.
+	DebugEnabled() bool
+
+	// Source returns the source name of this Logger.
+	Source() string
+}
+
+// logger implements Logger.
+type logger uint
 
 // logging encapsulates the full runtime state of logging.
 type logging struct {
 	sync.RWMutex
-	loggers map[string]logger    // source to logger mapping
-	sources map[logger]string    // logger to source mapping
-	configs map[logger]config    // logger configuration
-	maxname int                  // longest enabled/debugging source name
-	level   Level                // logging severity level
-	disable srcmap               // logging source configuration
-	debug   srcmap               // debugging source configuration
-	backend map[string]BackendFn // registered backends
-	active  Backend              // logging backend
-	forced  bool                 // whether forced debugging is on
+	level   Level               // logging threshold for stderr
+	dbgmap  srcmap              // debug configuration
+	loggers map[string]logger   // source to logger mapping
+	sources map[logger]string   // logger to source mapping
+	debug   map[logger]struct{} // loggers with debugging enabled
+	maxlen  int                 // max source length.
+	forced  bool                // forced global debugging
+	prefix  bool                // prefix messages with logger source
+	aligned map[logger]string   // logger sources aligned to maxlen
 }
 
-// our logging runtime state
+// log tracks our runtime state.
 var log = &logging{
-	level:   LevelInfo,
+	level:   DefaultLevel,
 	loggers: make(map[string]logger),
 	sources: make(map[logger]string),
-	configs: make(map[logger]config),
-	disable: make(srcmap),
-	debug:   make(srcmap),
-	backend: make(map[string]BackendFn),
-	active:  createFmtBackend(),
+	aligned: make(map[logger]string),
+	debug:   make(map[logger]struct{}),
 }
 
-// Flush flushes any initial message buffer and turns buffering on.
-func Flush() {
-	log.RLock()
-	defer log.RUnlock()
-	log.active.Flush()
-}
-
-// Sync waits for all current messages to get processed.
-func Sync() {
-	log.RLock()
-	defer log.RUnlock()
-	log.active.Sync()
-}
-
-// Get returns the Logger for source, creating one if necessary.
+// Get returns the named Logger.
 func Get(source string) Logger {
+	log.Lock()
+	defer log.Unlock()
 	return log.get(source)
 }
 
-// NewLogger is an alias for Get().
+// NewLogger creates the named logger.
 func NewLogger(source string) Logger {
-	return log.get(source)
-}
-
-// EnableLogging enables non-debug logging for the source.
-func EnableLogging(source string) bool {
-	log.Lock()
-	defer log.Unlock()
-
-	return log.setLogging(source, true)
-}
-
-// DisableLogging disables non-debug logging for the given source.
-func DisableLogging(source string) bool {
-	log.Lock()
-	defer log.Unlock()
-
-	return log.setLogging(source, false)
-}
-
-// LoggingEnabled checks if non-debug logging is enabled for the source.
-func LoggingEnabled(source string) bool {
-	log.RLock()
-	defer log.RUnlock()
-
-	return log.isLogging(source)
+	return Get(source)
 }
 
 // EnableDebug enables debug logging for the source.
 func EnableDebug(source string) bool {
 	log.Lock()
 	defer log.Unlock()
-
-	return log.setDebugging(source, true)
+	return log.setDebug(source, true)
 }
 
-// DisableDebug disables debug logging for the given source.
+// DisableDebug disables debug logging for the source.
 func DisableDebug(source string) bool {
 	log.Lock()
 	defer log.Unlock()
-
-	return log.setDebugging(source, false)
+	return log.setDebug(source, false)
 }
 
 // DebugEnabled checks if debug logging is enabled for the source.
 func DebugEnabled(source string) bool {
-	log.RLock()
-	defer log.RUnlock()
-
-	return log.isDebugging(source)
+	log.Lock()
+	defer log.Unlock()
+	return log.getDebug(source)
 }
 
 // SetLevel sets the logging severity level.
 func SetLevel(level Level) {
+	log.Lock()
+	defer log.Unlock()
 	log.setLevel(level)
 }
 
-// SetBackend activates the named Backend for logging.
-func SetBackend(name string) error {
-	log.Lock()
-	defer log.Unlock()
+// Flush flushes any pending log messages.
+func Flush() {
+	log.RLock()
+	defer log.RUnlock()
+	klog.Flush()
+}
 
-	return log.setBackend(name)
+//
+// logging
+//
+
+func (l Level) String() string {
+	switch l {
+	case LevelDebug:
+		return "debug"
+	case LevelInfo:
+		return "info"
+	case LevelWarn:
+		return "warning"
+	case LevelError:
+		return "error"
+	case LevelPanic:
+		return "panic"
+	case LevelFatal:
+		return "fatal"
+	}
+	return "unknown"
 }
 
 // setLevel sets the logging severity level.
-func (log *logging) setLevel(level Level) {
+func (log *logging) setLevel(level Level) error {
 	log.level = level
-}
-
-// setBackend activates the named Backend for logging.
-func (log *logging) setBackend(name string) error {
-	if log.active.Name() == name {
-		return nil
+	kThreshold := ""
+	switch level {
+	case LevelDebug, LevelInfo:
+		kThreshold = "INFO"
+	case LevelWarn:
+		kThreshold = "WARNING"
+	case LevelError, LevelPanic, LevelFatal:
+		kThreshold = "ERROR"
 	}
-
-	createFn, ok := log.backend[name]
-	if !ok {
-		return loggerError("can't activate unknown backend '%s'", name)
+	if err := klogctl.Set("stderrthreshold", kThreshold); err != nil {
+		return loggerError("failed to set log level/threshold to %s: %v", kThreshold, err)
 	}
-
-	log.active.Stop()
-	log.active = createFn()
-	log.active.SetSourceAlignment(log.maxname)
-
 	return nil
 }
 
-// forceDebug enables/disables forced full debugging.
-func (log *logging) forceDebug(state bool) bool {
-	log.Lock()
-	defer log.Unlock()
-
-	old := log.forced
-	log.forced = state
-	log.update(nil, nil)
-
+// setDebug sets the debug state for the given source and returns the previous one.
+func (log *logging) setDebug(source string, enabled bool) bool {
+	l := log.get(source)
+	_, old := log.debug[l]
+	if enabled {
+		log.debug[l] = struct{}{}
+	} else {
+		delete(log.debug, l)
+	}
 	return old
 }
 
-// debugForced checks if full debugging is forced.
-func (log *logging) debugForced() bool {
-	return log.forced
+// getDebug sets the debug state for the given source and returns the previous one.
+func (log *logging) getDebug(source string) bool {
+	if log.forced {
+		return true
+	}
+	l := log.get(source)
+	_, enabled := log.debug[l]
+	return enabled
 }
 
-// get returns the logger for source, creating one if necessary (write-locks log).
-func (log *logging) get(source string) Logger {
-	log.Lock()
-	defer log.Unlock()
-
-	if id, ok := log.loggers[source]; ok {
-		return id
+// setDbgMap updates the debug configuration of logging.
+func (log *logging) setDbgMap(dbgmap srcmap) {
+	log.dbgmap = dbgmap
+	log.debug = make(map[logger]struct{})
+	for source := range log.loggers {
+		state, ok := log.dbgmap[source]
+		if !ok {
+			state = log.dbgmap["*"]
+		}
+		log.setDebug(source, state)
 	}
-
-	return log.create(source)
 }
 
-// create creates a new logger for a source (should be called with log write-locked).
-func (log *logging) create(source string) Logger {
-	id := logger(len(log.loggers))
-	if uint64(id) >= maxLoggers {
-		panic(fmt.Sprintf("max. number of loggers (%d) exhausted", maxLoggers))
-	}
-
-	cfg := mkConfig(id, log.isLogging(source), log.isDebugging(source))
-	log.loggers[source] = id
-	log.sources[id] = source
-	log.configs[id] = cfg
-
-	if (cfg.isEnabled() || log.forced) && len(source) > log.maxname {
-		log.realign(len(source))
-	}
-
-	return id
+// setPrefix sets the prefix (source) logging preference.
+func (log *logging) setPrefix(prefix bool) {
+	log.prefix = prefix
 }
 
-// setLogging sets the logging state of the source (should be called with log write-locked).
-func (log *logging) setLogging(source string, state bool) bool {
-	// logging is opt-out (enabled by default) and administered by negated state
-	old := log.isLogging(source)
-	log.disable[source] = !state
+// align calculates and stores an aligned prefix for the given logger.
+func (log *logging) align(l logger) {
+	source := log.sources[l]
+	srclen := len(source)
 
-	return old
-}
-
-// isLogging gets the logging state of the source (should be called with log read-locked).
-func (log *logging) isLogging(source string) bool {
-	if state, ok := log.disable[source]; ok {
-		return !state
-	}
-	if state, ok := log.disable["*"]; ok {
-		return !state
-	}
-
-	return true
-}
-
-// setDebugging sets the debugging state of the source (should be called with log write-locked).
-func (log *logging) setDebugging(source string, state bool) bool {
-	// debugging is opt-in (disabled by default)
-	old := log.isDebugging(source)
-	log.debug[source] = state
-
-	return old
-}
-
-// isDebugging gets the debugging state of the source (should be called with log read-locked).
-func (log *logging) isDebugging(source string) bool {
-	if state, ok := log.debug[source]; ok {
-		return state
-	}
-	if state, ok := log.debug["*"]; ok {
-		return state
-	}
-
-	return false
-}
-
-// realign updates prefix alignment.
-func (log *logging) realign(maxname int) {
-	if log.maxname != 0 && log.maxname == maxname {
+	if srclen > log.maxlen {
+		log.realign(srclen)
 		return
 	}
-	if maxname == 0 {
-		for id, cfg := range log.configs {
-			if !cfg.isEnabled() && !log.forced {
-				continue
-			}
-			if length := len(log.sources[id]); length > maxname {
-				maxname = length
-			}
-		}
-	}
-	log.maxname = maxname
-	log.active.SetSourceAlignment(maxname)
+
+	pad := log.maxlen - srclen
+	pre := (pad + 1) / 2
+	suf := pad - pre
+	log.aligned[l] = "[" + fmt.Sprintf("%*s", pre, "") + source + fmt.Sprintf("%*s", suf, "") + "] "
 }
 
-// update updates the state of all loggers.
-func (log *logging) update(enabled srcmap, debug srcmap) {
-	if enabled != nil {
-		log.disable = make(srcmap)
-		for src, state := range enabled {
-			log.disable[src] = !state
-		}
-	}
-	if debug != nil {
-		log.debug = make(srcmap)
-		for src, state := range debug {
-			log.debug[src] = state
-		}
-	}
-	maxname := 0
-	for id, cfg := range log.configs {
-		source := log.sources[id]
-		logging := log.isLogging(source)
-		debugging := log.isDebugging(source)
-		cfg.setEnabled(log.isLogging(source), log.isDebugging(source))
-		log.configs[id] = cfg
-		if logging || debugging || log.forced {
-			if length := len(source); length > maxname {
-				maxname = length
+// realign recalculates aligned prefixes for all loggers.
+func (log *logging) realign(maxlen int) {
+	if maxlen <= 0 {
+		for _, source := range log.sources {
+			if srclen := len(source); srclen > maxlen {
+				maxlen = srclen
 			}
 		}
 	}
-	log.realign(maxname)
+	log.maxlen = maxlen
+	log.aligned = make(map[logger]string)
+	for l := range log.sources {
+		log.align(l)
+	}
+}
+
+//
+// Logger
+//
+
+// get returns the logger for source, creating one if necessary.
+func (log *logging) get(source string) logger {
+	if l, ok := log.loggers[source]; ok {
+		return l
+	}
+
+	l := logger(len(log.loggers))
+	log.loggers[source] = l
+	log.sources[l] = source
+	log.align(l)
+
+	state, ok := log.dbgmap[source]
+	if !ok {
+		state = log.dbgmap["*"]
+	}
+	log.setDebug(source, state)
+
+	return l
+}
+
+func (l logger) EnableDebug(state bool) bool {
+	log.Lock()
+	defer log.Unlock()
+	if _, ok := log.sources[l]; !ok {
+		return false
+	}
+	_, old := log.debug[l]
+	log.debug[l] = struct{}{}
+	return old
+}
+
+func (l logger) DebugEnabled() bool {
+	log.RLock()
+	defer log.RUnlock()
+	_, enabled := log.debug[l]
+	return enabled || log.forced
+}
+
+func (l logger) Source() string {
+	log.RLock()
+	defer log.RUnlock()
+	return log.sources[l]
+}
+
+func (l logger) Debug(format string, args ...interface{}) {
+	log.RLock()
+	defer log.RUnlock()
+
+	if !log.forced {
+		if _, ok := log.debug[l]; !ok {
+			return
+		}
+	}
+
+	msg := fmt.Sprintf(format, args...)
+
+	if log.prefix {
+		klog.InfoDepth(1, levelTag[LevelDebug], log.aligned[l], msg)
+	} else {
+		klog.InfoDepth(1, msg)
+	}
+}
+
+func (l logger) Info(format string, args ...interface{}) {
+	log.RLock()
+	defer log.RUnlock()
+
+	msg := fmt.Sprintf(format, args...)
+
+	if log.prefix {
+		klog.InfoDepth(1, levelTag[LevelInfo], log.aligned[l], msg)
+	} else {
+		klog.InfoDepth(1, msg)
+	}
+}
+
+func (l logger) Warn(format string, args ...interface{}) {
+	log.RLock()
+	defer log.RUnlock()
+
+	msg := fmt.Sprintf(format, args...)
+
+	if log.prefix {
+		klog.WarningDepth(1, levelTag[LevelWarn], log.aligned[l], msg)
+	} else {
+		klog.WarningDepth(1, msg)
+	}
+}
+
+func (l logger) Error(format string, args ...interface{}) {
+	log.RLock()
+	defer log.RUnlock()
+
+	msg := fmt.Sprintf(format, args...)
+	if log.prefix {
+		klog.ErrorDepth(1, levelTag[LevelError], log.aligned[l], msg)
+	} else {
+		klog.ErrorDepth(1, msg)
+	}
+}
+
+func (l logger) Fatal(format string, args ...interface{}) {
+	log.RLock()
+	defer log.RUnlock()
+
+	msg := fmt.Sprintf(format, args...)
+	if log.prefix {
+		klog.ExitDepth(1, levelTag[LevelFatal], log.aligned[l], msg)
+	} else {
+		klog.ExitDepth(1, msg)
+	}
+}
+
+func (l logger) Panic(format string, args ...interface{}) {
+	log.RLock()
+	defer log.RUnlock()
+
+	msg := fmt.Sprintf(format, args...)
+	if log.prefix {
+		klog.ErrorDepth(1, levelTag[LevelPanic], log.aligned[l], msg)
+	} else {
+		klog.ErrorDepth(1, msg)
+	}
+	panic(msg)
+}
+
+func (l logger) DebugBlock(prefix string, format string, args ...interface{}) {
+	l.block(LevelDebug, prefix, format, args...)
+}
+
+func (l logger) InfoBlock(prefix string, format string, args ...interface{}) {
+	l.block(LevelInfo, prefix, format, args...)
+}
+
+func (l logger) WarnBlock(prefix string, format string, args ...interface{}) {
+	l.block(LevelWarn, prefix, format, args...)
+}
+
+func (l logger) ErrorBlock(prefix string, format string, args ...interface{}) {
+	l.block(LevelError, prefix, format, args...)
+}
+
+func (l logger) block(level Level, prefix, format string, args ...interface{}) {
+	log.Lock()
+	defer log.Unlock()
+
+	var logFn func(int, ...interface{})
+
+	switch level {
+	case LevelDebug, LevelInfo:
+		logFn = klog.InfoDepth
+	case LevelWarn:
+		logFn = klog.WarningDepth
+	case LevelError:
+		logFn = klog.ErrorDepth
+	default:
+		return
+	}
+
+	if log.prefix {
+		src := log.aligned[l]
+		for _, msg := range strings.Split(fmt.Sprintf(format, args...), "\n") {
+			logFn(2, levelTag[level], src, prefix, msg)
+		}
+	} else {
+		for _, msg := range strings.Split(fmt.Sprintf(format, args...), "\n") {
+			logFn(2, prefix, msg)
+		}
+	}
 }
 
 // loggerError produces a formatted logger-specific error.
