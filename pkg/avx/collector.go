@@ -244,27 +244,34 @@ func nowNanoseconds() uint64 {
 // Collect implements prometheus.Collector interface
 func (c collector) Collect(ch chan<- prometheus.Metric) {
 	var (
-		wg  sync.WaitGroup
-		key uint64
-		val uint32
+		wg sync.WaitGroup
+
+		key       uint64
+		perCPUVal []uint32
 	)
 
 	cgroupids := make(map[uint64]uint32)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.collectLastCPUStats(ch)
-	}()
+	lastCPUs := make(map[string]uint32)
 
 	cg := cgroups.NewCgroupID(c.root)
 
 	m := c.ebpf.Maps["avx_context_switch_count_hash"]
 	iter := m.Iterate()
 
-	for iter.Next(&key, &val) {
-		cgroupids[key] = val
-		log.Debug("cgroupid %d => counter %d", key, val)
+	for iter.Next(&key, &perCPUVal) {
+		var sum uint32
+		for cpuID, count := range perCPUVal {
+			if count == 0 {
+				continue
+			}
+			sum = sum + count
+
+			cpuX := fmt.Sprintf("CPU%d", cpuID)
+			lastCPUs[cpuX] = lastCPUs[cpuX] + count
+
+		}
+		cgroupids[key] = sum
+		log.Debug("cgroupid %d => counter %d", key, sum)
 
 		// reset the counter by deleting the key
 		err := m.Delete(key)
@@ -274,6 +281,14 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	}
 	if iter.Err() != nil {
 		log.Error("unable to iterate all elements of avx_context_switch_count: %+v", iter.Err())
+	}
+
+	for lastCPU, count := range lastCPUs {
+		ch <- prometheus.MustNewConstMetric(
+			descriptors[lastCPUDesc],
+			prometheus.GaugeValue,
+			float64(count),
+			lastCPU)
 	}
 
 	for cgroupid, counter := range cgroupids {
@@ -330,6 +345,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	m = c.ebpf.Maps["all_context_switch_count_hash"]
 	iter = m.Iterate()
 
+	var val uint32
 	for iter.Next(&key, &val) {
 		// reset the counter by deleting the key
 		err := m.Delete(key)
@@ -342,39 +358,6 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 		log.Error("unable to reset all elements of all_context_switch_count: %+v", iter.Err())
 	}
 }
-
-func (c collector) collectLastCPUStats(ch chan<- prometheus.Metric) {
-
-	lastCPUs := make(map[uint32]uint32)
-	var cpu uint32
-	var counter uint32
-
-	m := c.ebpf.Maps["cpu_hash"]
-	iter := m.Iterate()
-	for iter.Next(&cpu, &counter) {
-		lastCPUs[cpu] = counter
-
-		log.Debug("CPU%d = %d", cpu, counter)
-
-		// reset the counter by deleting key
-		err := m.Delete(cpu)
-		if err != nil {
-			log.Error("%+v", err)
-		}
-	}
-
-	if iter.Err() != nil {
-		log.Error("unable to iterate all elements of cpu_hash: %+v", iter.Err())
-		return
-	}
-
-	for lastCPU, count := range lastCPUs {
-		ch <- prometheus.MustNewConstMetric(
-			descriptors[lastCPUDesc],
-			prometheus.GaugeValue,
-			float64(count),
-			fmt.Sprintf("CPU%d", lastCPU))
-	}
 
 func init() {
 	flag.StringVar(&bpfInstallpath, "bpf-install-path", bpfInstallpath,
