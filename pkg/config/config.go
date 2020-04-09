@@ -122,9 +122,12 @@ func Register(path, description string, ptr interface{}, getfn GetConfigFn, opts
 
 	m.check()
 
+	foreign := m.notifiers
+	m.notifiers = nil
 	for _, opt := range opts {
 		opt.apply(m)
 	}
+	m.notifiers = append(m.notifiers, foreign...)
 
 	return m
 }
