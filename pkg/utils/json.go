@@ -19,7 +19,7 @@ package utils
 import (
 	"fmt"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 )
 
 // DumpJSON dumps a json-compatible struct in human-readable form
