@@ -15,8 +15,8 @@
 package config
 
 import (
-	"github.com/ghodss/yaml"
 	"reflect"
+	"sigs.k8s.io/yaml"
 	"strings"
 )
 

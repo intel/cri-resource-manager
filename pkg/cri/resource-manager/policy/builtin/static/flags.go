@@ -15,8 +15,8 @@
 package static
 
 import (
-	"github.com/ghodss/yaml"
 	"github.com/intel/cri-resource-manager/pkg/config"
+	"sigs.k8s.io/yaml"
 )
 
 // Options captures our configurable policy parameters.

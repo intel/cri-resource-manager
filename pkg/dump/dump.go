@@ -30,8 +30,8 @@ package dump
 
 import (
 	"fmt"
-	"github.com/ghodss/yaml"
 	"os"
+	"sigs.k8s.io/yaml"
 	"strings"
 	"sync"
 	"time"

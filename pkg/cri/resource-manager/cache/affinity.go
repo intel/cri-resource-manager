@@ -16,8 +16,8 @@ package cache
 
 import (
 	"fmt"
-	"github.com/ghodss/yaml"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
+	"sigs.k8s.io/yaml"
 	"strings"
 )
 

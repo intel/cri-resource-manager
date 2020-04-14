@@ -5,7 +5,6 @@ go 1.13
 require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.1-0.20191218042359-6151c48ac7fa
-	github.com/ghodss/yaml v1.0.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1
 	github.com/hashicorp/go-multierror v1.0.0
@@ -27,6 +26,7 @@ require (
 	k8s.io/client-go v0.17.2
 	k8s.io/cri-api v0.0.0
 	k8s.io/kubernetes v1.17.2
+	sigs.k8s.io/yaml v1.1.0
 )
 
 replace (

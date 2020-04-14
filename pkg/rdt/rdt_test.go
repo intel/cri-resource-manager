@@ -17,11 +17,11 @@ limitations under the License.
 package rdt
 
 import (
-	"github.com/ghodss/yaml"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sigs.k8s.io/yaml"
 	"strings"
 	"testing"
 
