@@ -83,7 +83,10 @@ func (p *pod) GetInitContainers() []Container {
 
 	containers := []Container{}
 
-	for _, c := range p.cache.Containers {
+	for id, c := range p.cache.Containers {
+		if id != c.CacheID {
+			continue
+		}
 		if _, ok := p.Resources.InitContainers[c.ID]; ok {
 			containers = append(containers, c)
 		}
@@ -96,8 +99,8 @@ func (p *pod) GetInitContainers() []Container {
 func (p *pod) GetContainers() []Container {
 	containers := []Container{}
 
-	for _, c := range p.cache.Containers {
-		if c.PodID != p.ID {
+	for id, c := range p.cache.Containers {
+		if c.PodID != p.ID || id != c.CacheID {
 			continue
 		}
 		if p.Resources != nil {
