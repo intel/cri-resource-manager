@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package topologyaware
+package memtier
 
 import (
 	"os"
@@ -27,61 +27,67 @@ import (
 )
 
 type mockSystemNode struct {
-	id        system.ID // node id
-	packageID system.ID // node id
-	distance  int
+	id       system.ID // node id
+	memFree  uint64
+	memTotal uint64
 }
 
 func (fake *mockSystemNode) MemoryInfo() (*system.MemInfo, error) {
-	return nil, nil
+	return &system.MemInfo{MemFree: fake.memFree, MemTotal: fake.memTotal}, nil
 }
+
 func (fake *mockSystemNode) PackageID() system.ID {
-	return fake.packageID
+	return 0
 }
+
 func (fake *mockSystemNode) ID() system.ID {
 	return fake.id
 }
-func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
-}
-func (fake *mockSystemNode) Distance() []int {
-	return []int{}
-}
-func (fake *mockSystemNode) DistanceFrom(id system.ID) int {
-	return 0
-}
+
 func (fake *mockSystemNode) GetMemoryType() system.MemoryType {
 	return system.MemoryTypeDRAM
 }
 
-type mockSystemCPUPackage struct {
-	id system.ID // package id
-}
-
-func (fake *mockSystemCPUPackage) ID() system.ID {
-	return fake.id
-}
-func (fake *mockSystemCPUPackage) CPUSet() cpuset.CPUSet {
+func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
-func (fake *mockSystemCPUPackage) NodeIDs() []system.ID {
+
+func (fake *mockSystemNode) Distance() []int {
+	return []int{0}
+}
+
+func (fake *mockSystemNode) DistanceFrom(id system.ID) int {
+	return 0
+}
+
+type mockCPUPackage struct {
+}
+
+func (p *mockCPUPackage) ID() system.ID {
+	return system.ID(0)
+}
+
+func (p *mockCPUPackage) CPUSet() cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+
+func (p *mockCPUPackage) NodeIDs() []system.ID {
 	return []system.ID{}
 }
 
 type mockCPU struct {
-	id            system.ID
-	node          mockSystemNode
-	pkg           mockSystemCPUPackage
-	isolated      bool
-	online        bool
-	baseFrequency uint64
+	isolated cpuset.CPUSet
+	online   cpuset.CPUSet
+	id       system.ID
+	node     mockSystemNode
+	pkg      mockCPUPackage
 }
 
 func (c *mockCPU) BaseFrequency() uint64 {
-	return c.baseFrequency
+	return 0
 }
 func (c *mockCPU) ID() system.ID {
-	return c.id
+	return system.ID(0)
 }
 func (c *mockCPU) PackageID() system.ID {
 	return c.pkg.ID()
@@ -99,10 +105,10 @@ func (c *mockCPU) FrequencyRange() system.CPUFreq {
 	return system.CPUFreq{}
 }
 func (c *mockCPU) Online() bool {
-	return c.online
+	return true
 }
 func (c *mockCPU) Isolated() bool {
-	return c.isolated
+	return false
 }
 func (c *mockCPU) SetFrequencyLimits(min, max uint64) error {
 	return nil
@@ -110,37 +116,29 @@ func (c *mockCPU) SetFrequencyLimits(min, max uint64) error {
 
 type mockSystem struct {
 	isolatedCPU int
+	nodes       []system.Node
+}
+
+func (fake *mockSystem) Node(id system.ID) system.Node {
+	for _, node := range fake.nodes {
+		if node.ID() == id {
+			return node
+		}
+	}
+	return &mockSystemNode{}
 }
 
 func (fake *mockSystem) CPU(system.ID) system.CPU {
 	return &mockCPU{}
 }
 func (fake *mockSystem) CPUCount() int {
-	return 0
+	return 2
 }
 func (fake *mockSystem) Discover(flags system.DiscoveryFlag) error {
 	return nil
 }
-func (fake *mockSystem) CPUIDs() []system.ID {
-	return []system.ID{}
-}
-func (fake *mockSystem) PackageCount() int {
-	return 0
-}
-func (fake *mockSystem) ThreadCount() int {
-	return 0
-}
-func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus system.IDSet) error {
-	return nil
-}
-func (fake *mockSystem) SetCpusOnline(online bool, cpus system.IDSet) (system.IDSet, error) {
-	return system.NewIDSet(), nil
-}
-func (fake *mockSystem) Node(id system.ID) system.Node {
-	return &mockSystemNode{id: id}
-}
-func (fake *mockSystem) Package(id system.ID) system.CPUPackage {
-	return &mockSystemCPUPackage{id: id}
+func (fake *mockSystem) Package(system.ID) system.CPUPackage {
+	return &mockCPUPackage{}
 }
 func (fake *mockSystem) Offlined() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
@@ -155,17 +153,40 @@ func (fake *mockSystem) Isolated() cpuset.CPUSet {
 func (fake *mockSystem) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
+func (fake *mockSystem) CPUIDs() []system.ID {
+	return []system.ID{}
+}
+func (fake *mockSystem) PackageCount() int {
+	return len(fake.nodes)
+}
 func (fake *mockSystem) SocketCount() int {
-	return 2
+	return len(fake.nodes)
 }
 func (fake *mockSystem) NUMANodeCount() int {
-	return 2
+	return len(fake.nodes)
+}
+func (fake *mockSystem) ThreadCount() int {
+	return len(fake.nodes)
 }
 func (fake *mockSystem) PackageIDs() []system.ID {
-	return []system.ID{0, 1}
+	ids := make([]system.ID, len(fake.nodes))
+	for i, node := range fake.nodes {
+		ids[i] = node.PackageID()
+	}
+	return ids
 }
 func (fake *mockSystem) NodeIDs() []system.ID {
-	return []system.ID{0, 1}
+	ids := make([]system.ID, len(fake.nodes))
+	for i, node := range fake.nodes {
+		ids[i] = node.ID()
+	}
+	return ids
+}
+func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus system.IDSet) error {
+	return nil
+}
+func (fake *mockSystem) SetCpusOnline(online bool, cpus system.IDSet) (system.IDSet, error) {
+	return system.NewIDSet(), nil
 }
 
 type mockContainer struct {
@@ -173,6 +194,9 @@ type mockContainer struct {
 	namespace                             string
 	returnValueForGetResourceRequirements v1.ResourceRequirements
 	returnValueForGetCacheID              string
+	memoryLimit                           int64
+	cpuset                                cpuset.CPUSet
+	returnValueForQOSClass                v1.PodQOSClass
 }
 
 func (m *mockContainer) PrettyName() string {
@@ -207,7 +231,11 @@ func (m *mockContainer) GetState() cache.ContainerState {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetQOSClass() v1.PodQOSClass {
-	panic("unimplemented")
+	if len(m.returnValueForQOSClass) == 0 {
+		return v1.PodQOSGuaranteed
+	}
+
+	return m.returnValueForQOSClass
 }
 func (m *mockContainer) GetImage() string {
 	panic("unimplemented")
@@ -327,13 +355,13 @@ func (m *mockContainer) GetCPUShares() int64 {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetMemoryLimit() int64 {
-	panic("unimplemented")
+	return m.memoryLimit
 }
 func (m *mockContainer) GetOomScoreAdj() int64 {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetCpusetCpus() string {
-	panic("unimplemented")
+	return m.cpuset.String()
 }
 func (m *mockContainer) GetCpusetMems() string {
 	panic("unimplemented")
@@ -358,7 +386,6 @@ func (m *mockContainer) SetOomScoreAdj(int64) {
 func (m *mockContainer) SetCpusetCpus(string) {
 }
 func (m *mockContainer) SetCpusetMems(string) {
-	panic("unimplemented")
 }
 func (m *mockContainer) UpdateCriCreateRequest(*cri.CreateContainerRequest) error {
 	panic("unimplemented")
@@ -569,7 +596,7 @@ func (m *mockCache) GetConfig() *config.RawConfig {
 	panic("unimplemented")
 }
 func (m *mockCache) Save() error {
-	panic("unimplemented")
+	return nil
 }
 func (m *mockCache) Refresh(interface{}) ([]cache.Pod, []cache.Pod, []cache.Container, []cache.Container) {
 	panic("unimplemented")
