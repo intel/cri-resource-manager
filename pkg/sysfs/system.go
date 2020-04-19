@@ -529,6 +529,8 @@ func (sys *system) discoverCPU(path string) error {
 	}
 	if node, _ := filepath.Glob(filepath.Join(path, "node[0-9]*")); len(node) == 1 {
 		cpu.node = getEnumeratedID(node[0])
+	} else {
+		return fmt.Errorf("exactly one node per cpu allowed")
 	}
 
 	if sys.threads < 1 {
