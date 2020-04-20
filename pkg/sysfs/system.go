@@ -16,6 +16,7 @@ package sysfs
 
 import (
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -51,6 +52,18 @@ const (
 	DiscoverAll DiscoveryFlag = 0xffffffff
 	// DiscoverDefault is the default set of discovery flags.
 	DiscoverDefault DiscoveryFlag = (DiscoverCPUTopology | DiscoverMemTopology)
+)
+
+// MemoryType is an enum for the Node memory
+type MemoryType int
+
+const (
+	// MemoryTypeDRAM means that the node has regular DRAM-type memory
+	MemoryTypeDRAM MemoryType = iota
+	// MemoryTypePMEM means that the node has persistent memory
+	MemoryTypePMEM
+	// MemoryTypeHBMEM means that the node has high bandwidth memory
+	MemoryTypeHBMEM
 )
 
 // System devices
@@ -109,15 +122,16 @@ type Node interface {
 	Distance() []int
 	DistanceFrom(id ID) int
 	MemoryInfo() (*MemInfo, error)
+	GetMemoryType() MemoryType
 }
 
-// Node is a NUMA node.
 type node struct {
-	path     string // sysfs path
-	id       ID     // node id
-	pkg      ID     // package id
-	cpus     IDSet  // cpus in this node
-	distance []int  // distance/cost to other NUMA nodes
+	path       string     // sysfs path
+	id         ID         // node id
+	pkg        ID         // package id
+	cpus       IDSet      // cpus in this node
+	memoryType MemoryType // node memory type
+	distance   []int      // distance/cost to other NUMA nodes
 }
 
 // CPU is a CPU core.
@@ -515,6 +529,8 @@ func (sys *system) discoverCPU(path string) error {
 	}
 	if node, _ := filepath.Glob(filepath.Join(path, "node[0-9]*")); len(node) == 1 {
 		cpu.node = getEnumeratedID(node[0])
+	} else {
+		return fmt.Errorf("exactly one node per cpu allowed")
 	}
 
 	if sys.threads < 1 {
@@ -614,11 +630,37 @@ func (c *cpu) SetFrequencyLimits(min, max uint64) error {
 	return nil
 }
 
+func readCPUsetFile(base, entry string) (cpuset.CPUSet, error) {
+	path := filepath.Join(base, entry)
+
+	blob, err := ioutil.ReadFile(path)
+	if err != nil {
+		return cpuset.NewCPUSet(), sysfsError(path, "failed to read sysfs entry: %v", err)
+	}
+
+	return cpuset.Parse(strings.Trim(string(blob), "\n"))
+}
+
 // Discover NUMA nodes present in the system.
 func (sys *system) discoverNodes() error {
 	if sys.nodes != nil {
 		return nil
 	}
+
+	cpuNodes, err := readCPUsetFile(filepath.Join(sys.path, sysfsNumaNodePath), "has_cpu")
+	if err != nil {
+		return err
+	}
+	memoryNodes, err := readCPUsetFile(filepath.Join(sys.path, sysfsNumaNodePath), "has_memory")
+	if err != nil {
+		return err
+	}
+
+	dramNodes := memoryNodes.Intersection(cpuNodes)
+	pmemOrHbmemNodes := memoryNodes.Difference(dramNodes)
+
+	dramNodeIds := FromCPUSet(dramNodes)
+	pmemOrHbmemNodeIds := FromCPUSet(pmemOrHbmemNodes)
 
 	sys.nodes = make(map[ID]*node)
 
@@ -626,6 +668,53 @@ func (sys *system) discoverNodes() error {
 	for _, entry := range entries {
 		if err := sys.discoverNode(entry); err != nil {
 			return fmt.Errorf("failed to discover node for entry %s: %v", entry, err)
+		}
+	}
+
+	infos := make(map[ID]*MemInfo)
+	dramAvg := uint64(0)
+	if len(pmemOrHbmemNodeIds) > 0 && len(dramNodeIds) > 0 {
+		// There is special memory present in the system.
+
+		// FIXME assumption: if a node only has memory (and no CPUs), it's PMEM or HBMEM. Otherwise it's DRAM.
+		// Also, we figure out if the memory is HBMEM or PMEM based on the amount. If the amount of memory is
+		// smaller than the average amount of DRAM per node, it's HBMEM, otherwise PMEM.
+		dramTotal := uint64(0)
+		for _, node := range sys.nodes {
+			info, err := node.MemoryInfo()
+			if err != nil {
+				return fmt.Errorf("failed to get memory info for node %v: %s", node, err)
+			}
+			infos[node.id] = info
+			if _, ok := dramNodeIds[node.id]; ok {
+				dramTotal += info.MemTotal
+			}
+		}
+		dramAvg = dramTotal / uint64(len(dramNodeIds))
+		if dramAvg == 0 {
+			// FIXME: should be no reason to bail out when memory types are properly determined.
+			return fmt.Errorf("no dram in the system, cannot determine special memory types")
+		}
+	}
+
+	for _, node := range sys.nodes {
+		if _, ok := pmemOrHbmemNodeIds[node.id]; ok {
+			mem, ok := infos[node.id]
+			if !ok {
+				return fmt.Errorf("not able to determine system special memory types")
+			}
+			if mem.MemTotal < dramAvg {
+				sys.Logger.Info("node %d has HBMEM memory", node.id)
+				node.memoryType = MemoryTypeHBMEM
+			} else {
+				sys.Logger.Info("node %d has PMEM memory", node.id)
+				node.memoryType = MemoryTypePMEM
+			}
+		} else if _, ok := dramNodeIds[node.id]; ok {
+			sys.Logger.Info("node %d has DRAM memory", node.id)
+			node.memoryType = MemoryTypeDRAM
+		} else {
+			return fmt.Errorf("Unknown memory type for node %v (pmem nodes: %s, dram nodes: %s)", node, pmemOrHbmemNodes, dramNodes)
 		}
 	}
 
@@ -705,6 +794,11 @@ func (n *node) MemoryInfo() (*MemInfo, error) {
 		return nil, err
 	}
 	return buf, nil
+}
+
+// GetMemoryType returns the memory type for this node.
+func (n *node) GetMemoryType() MemoryType {
+	return n.memoryType
 }
 
 // Discover physical packages (CPU sockets) present in the system.

@@ -15,8 +15,11 @@
 package sysfs
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -160,4 +163,32 @@ func (s IDSet) StringWithSeparator(args ...string) string {
 	}
 
 	return str
+}
+
+// MarshalJSON is the JSON marshaller for IDSet.
+func (s IDSet) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
+}
+
+// UnmarshalJSON is the JSON unmarshaller for IDSet.
+func (s *IDSet) UnmarshalJSON(data []byte) error {
+	str := ""
+	if err := json.Unmarshal(data, &str); err != nil {
+		return fmt.Errorf("invalid IDSet entry '%s': %v", string(data), err)
+	}
+
+	*s = NewIDSet()
+	if str == "" {
+		return nil
+	}
+
+	for _, idstr := range strings.Split(str, ",") {
+		id, err := strconv.ParseUint(idstr, 10, 0)
+		if err != nil {
+			return fmt.Errorf("invalid IDSet entry '%s': %v", idstr, err)
+		}
+		s.Add(ID(id))
+	}
+
+	return nil
 }
