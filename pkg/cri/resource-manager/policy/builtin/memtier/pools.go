@@ -559,6 +559,10 @@ func (p *policy) compareScores(request Request, scores map[int]Score,
 	isolated2, shared2 := score2.IsolatedCapacity(), score2.SharedCapacity()
 	affinity1, affinity2 := affinity[id1], affinity[id2]
 
+	log.Debug("comparing scores for %s and %s", node1.Name(), node2.Name())
+	log.Debug("  score1: %s", score1.String())
+	log.Debug("  score2: %s", score2.String())
+
 	//
 	// Notes:
 	//
@@ -586,28 +590,40 @@ func (p *policy) compareScores(request Request, scores map[int]Score,
 
 	// 1) a node with insufficient isolated or shared capacity loses
 	switch {
-	case isolated2 < 0 || shared2 < 0:
+	case (isolated2 < 0 && isolated1 >= 0) || (shared2 < 0 && shared1 >= 0):
+		log.Debug("  => %s loses, insufficent isolated or shared", node2.Name())
 		return true
-	case isolated1 < 0 || shared1 < 0:
+	case (isolated1 < 0 && isolated2 >= 0) || (shared1 < 0 && shared2 >= 0):
+		log.Debug("  => %s loses, insufficent isolated or shared", node1.Name())
 		return false
 	}
 
+	log.Debug("  - isolated/shared inusfficiency is a TIE")
+
 	// 2) higher affinity wins
 	if affinity1 > affinity2 {
+		log.Debug("  => %s loses on affinity", node2.Name())
 		return true
 	}
 	if affinity2 > affinity1 {
+		log.Debug("  => %s loses on affinity", node1.Name())
 		return false
 	}
+
+	log.Debug("  - affinity is a TIE")
 
 	// 3) matching memory type wins
 	if reqType := request.MemoryType(); reqType != memoryUnspec {
 		if node1.HasMemoryType(reqType) && !node2.HasMemoryType(reqType) {
+			log.Debug("  => %s WINS on memory type", node1.Name())
 			return true
 		}
 		if !node1.HasMemoryType(reqType) && node2.HasMemoryType(reqType) {
+			log.Debug("  => %s WINS on memory type", node2.Name())
 			return false
 		}
+
+		log.Debug("  - memory type is a TIE")
 	}
 
 	// 4) better topology hint score wins
@@ -618,40 +634,58 @@ func (p *policy) compareScores(request Request, scores map[int]Score,
 		hs2, nz2 := combineHintScores(hScores2)
 
 		if hs1 > hs2 {
+			log.Debug("  => %s WINS on hints", node1.Name())
 			return true
 		}
 		if hs2 > hs1 {
+			log.Debug("  => %s WINS on hints", node2.Name())
 			return false
 		}
 
+		log.Debug("  - hints are a TIE")
+
 		if hs1 == 0 {
 			if nz1 > nz2 {
+				log.Debug("  => %s WINS on non-zero hints", node1.Name())
 				return true
 			}
 			if nz2 > nz1 {
+				log.Debug("  => %s WINS on non-zero hints", node2.Name())
 				return false
 			}
+
+			log.Debug("  - non-zero hints are a TIE")
 		}
 
 		// for a tie, prefer lower nodes and smaller ids
 		if hs1 == hs2 && nz1 == nz2 && (hs1 != 0 || nz1 != 0) {
 			if depth1 > depth2 {
+				log.Debug("  => %s WINS as it is lower", node1.Name())
 				return true
 			}
 			if depth1 < depth2 {
+				log.Debug("  => %s WINS as it is lower", node2.Name())
 				return false
 			}
+
+			log.Debug("  => %s WINS based on equal hint socres, lower id",
+				map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
+
 			return id1 < id2
 		}
 	}
 
 	// 5) a lower node wins
 	if depth1 > depth2 {
+		log.Debug("  => %s WINS on depth", node1.Name())
 		return true
 	}
 	if depth1 < depth2 {
+		log.Debug("  => %s WINS on depth", node2.Name())
 		return false
 	}
+
+	log.Debug("  - depth is a TIE")
 
 	// 6) more isolated capacity wins
 	if request.Isolate() {
@@ -661,38 +695,56 @@ func (p *policy) compareScores(request Request, scores map[int]Score,
 		if isolated2 > isolated1 {
 			return false
 		}
+
+		log.Debug("  => %s WINS based on equal isolated capacity, lower id",
+			map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
+
 		return id1 < id2
 	}
 
 	// 7) more slicable shared capacity wins
 	if request.FullCPUs() > 0 {
 		if shared1 > shared2 {
+			log.Debug("  => %s WINS on more slicable capacity", node1.Name())
 			return true
 		}
 		if shared2 > shared1 {
+			log.Debug("  => %s WINS on more slicable capacity", node2.Name())
 			return false
 		}
+
+		log.Debug("  => %s WINS based on equal slicable capacity, lower id",
+			map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
 		return id1 < id2
 	}
 
 	// 8) fewer colocated containers win
 	if score1.Colocated() < score2.Colocated() {
+		log.Debug("  => %s WINS on colocation score", node1.Name())
 		return true
 	}
 	if score2.Colocated() < score1.Colocated() {
+		log.Debug("  => %s WINS on colocation score", node2.Name())
 		return false
 	}
 
+	log.Debug("  - colocation score is a TIE")
+
 	// more shared capacity wins
 	if shared1 > shared2 {
+		log.Debug("  => %s WINS on more shared capacity", node1.Name())
 		return true
 	}
 	if shared2 > shared1 {
+		log.Debug("  => %s WINS on more shared capacity", node2.Name())
 		return false
 	}
 
 	// lower id wins
+	log.Debug("  => %s WINS based on lower id",
+		map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
+
 	return id1 < id2
 }
 
