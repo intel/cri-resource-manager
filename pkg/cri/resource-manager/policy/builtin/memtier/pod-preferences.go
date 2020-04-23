@@ -190,6 +190,7 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
 	value, ok := pod.GetResmgrAnnotation(keyMemoryTypePreference)
 	if !ok {
+		log.Debug("pod %s has no memory preference annotations", pod.GetName())
 		return memoryUnspec
 	}
 
@@ -200,6 +201,7 @@ func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
 		name := c.GetName()
 		p, ok := preferences[name]
 		if !ok {
+			log.Debug("container %s has no entry among memory preferences", c.PrettyName())
 			return memoryUnspec
 		}
 		pref = p
@@ -213,6 +215,7 @@ func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
 			pref, keyMemoryTypePreference, err)
 		return memoryUnspec
 	}
+	log.Debug("container %s has effective memory preference: %s", c.PrettyName(), mtype)
 	return mtype
 }
 
