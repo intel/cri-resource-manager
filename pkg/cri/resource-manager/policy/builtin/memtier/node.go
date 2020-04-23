@@ -107,6 +107,7 @@ type Node interface {
 	dump(string, ...int)
 
 	GetMemoryType() memoryType
+	HasMemoryType(memoryType) bool
 	GetPhysicalNodeIDs() []system.ID
 
 	GetScore(Request) Score
@@ -401,6 +402,11 @@ func (n *node) GetMemoryType() memoryType {
 		memoryMask |= memoryHBMEM
 	}
 	return memoryMask
+}
+
+func (n *node) HasMemoryType(reqType memoryType) bool {
+	nodeType := n.GetMemoryType()
+	return (nodeType & reqType) == reqType
 }
 
 // NewNumaNode create a node for a CPU socket.

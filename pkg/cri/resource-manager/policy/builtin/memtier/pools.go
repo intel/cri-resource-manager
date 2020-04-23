@@ -601,11 +601,11 @@ func (p *policy) compareScores(request Request, scores map[int]Score,
 	}
 
 	// 3) matching memory type wins
-	if request.MemoryType() != memoryUnspec {
-		// see if the nodes have different memory types and whether they match the request
-		if node1.GetMemoryType() == request.MemoryType() && node2.GetMemoryType() != request.MemoryType() {
+	if reqType := request.MemoryType(); reqType != memoryUnspec {
+		if node1.HasMemoryType(reqType) && !node2.HasMemoryType(reqType) {
 			return true
-		} else if node1.GetMemoryType() != request.MemoryType() && node2.GetMemoryType() == request.MemoryType() {
+		}
+		if !node1.HasMemoryType(reqType) && node2.HasMemoryType(reqType) {
 			return false
 		}
 	}
