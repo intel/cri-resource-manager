@@ -213,6 +213,9 @@ func (a *allocatorHelper) takeIdleCores() {
 	cores := pickIds(a.sys.CPUIDs(),
 		func(id sysfs.ID) bool {
 			cset := a.topology.core[id].Difference(offline)
+			if cset.IsEmpty() {
+				return false
+			}
 			return cset.Intersection(a.from).Equals(cset) && cset.ToSlice()[0] == int(id)
 		})
 
