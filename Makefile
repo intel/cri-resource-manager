@@ -52,7 +52,7 @@ GO_PKG_SRC = $(shell find pkg -name \*.go)
 # List of visualizer collateral files to go generate.
 UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
         if [ -d "$$i" -a -e "$$i/assets_generate.go" ]; then \
-            echo $$i/assets_vfsdata.go; \
+            echo $$i/assets_gendata.go; \
         fi; \
     done)
 
@@ -399,14 +399,6 @@ bin/webhook: $(wildcard cmd/cri-resmgr-webhook/*.go) \
 #
 # rules to run go generators
 #
-
-#
-# %_vfsdata.go should also depend on the collateral content.
-#
-# We'd need a correctly expanding/working equivalent of this:
-#    %_generate.go: $(shell find $(dir $@)/assets -type f)
-#
-
 clean-ui-assets:
 	$(Q)echo "Cleaning up generated UI assets..."; \
 	for i in $(UI_ASSETS); do \
@@ -414,7 +406,7 @@ clean-ui-assets:
 	    rm -f $$i; \
 	done
 
-%_vfsdata.go:: %_generate.go
+%_gendata.go::
 	$(Q)echo "Generating $@..."; \
 	cd $(dir $@) && \
 	    $(GO_GEN) || exit 1 && \
@@ -424,7 +416,7 @@ clean-ui-assets:
 # dependencies for UI assets baked in using vfsgendev (can't come up with a working pattern rule)
 #
 
-pkg/cri/resource-manager/visualizer/bubbles/assets_vfsdata.go:: \
+pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/*.html) \
 	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/js/*.js) \
 	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/css/*.css)
