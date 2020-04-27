@@ -24,8 +24,14 @@ RUN mkdir /install_root \
     && rm -rf /install_root/var/lib/swupd/*
 
 WORKDIR /go/build
-COPY . .
 
+# Fetch go dependencies in a separate layer for caching
+COPY go.mod go.sum ./
+COPY pkg/topology/ pkg/topology/
+RUN go mod download
+
+# Build webhook
+COPY . .
 RUN make BUILD_DIRS=webhook
 
 FROM scratch as final
