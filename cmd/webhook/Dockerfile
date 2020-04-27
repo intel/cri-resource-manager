@@ -23,19 +23,17 @@ RUN mkdir /install_root \
     --no-boot-update \
     && rm -rf /install_root/var/lib/swupd/*
 
-ARG DIR=/go/src/build
-WORKDIR $DIR
-ADD . $DIR
+WORKDIR /go/build
+COPY . .
 
-ENV GO111MODULE=on GOFLAGS=-mod=vendor
 RUN make BUILD_DIRS=webhook
 
 FROM scratch as final
 ARG DIR=/go/src/build
 COPY --from=builder /install_root /
 
-COPY --from=builder /go/src/build/bin/webhook /bin/webhook
-COPY --from=builder /go/src/build/test/data/cri-resmgr-webhook.cri-resmgr.svc.* /etc/cri-resmgr-webhook/certs.d/
+COPY --from=builder /go/build/bin/webhook /bin/webhook
+COPY --from=builder /go/build/test/data/cri-resmgr-webhook.cri-resmgr.svc.* /etc/cri-resmgr-webhook/certs.d/
 
 ENTRYPOINT ["/bin/webhook", "-cert-file=/etc/cri-resmgr-webhook/certs.d/cri-resmgr-webhook.cri-resmgr.svc.crt", "-key-file=/etc/cri-resmgr-webhook/certs.d/cri-resmgr-webhook.cri-resmgr.svc.key"]
 
