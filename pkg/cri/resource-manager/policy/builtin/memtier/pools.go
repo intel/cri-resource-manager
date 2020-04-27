@@ -542,16 +542,16 @@ func (p *policy) sortPoolsByScore(req Request, aff map[int]int32) (map[int]Score
 	filteredPools := p.filterInsufficientResources(req, p.pools)
 
 	sort.Slice(filteredPools, func(i, j int) bool {
-		return p.compareScores(req, scores, aff, i, j)
+		return p.compareScores(req, filteredPools, scores, aff, i, j)
 	})
 
 	return scores, filteredPools
 }
 
 // Compare two pools by scores for allocation preference.
-func (p *policy) compareScores(request Request, scores map[int]Score,
+func (p *policy) compareScores(request Request, pools []Node, scores map[int]Score,
 	affinity map[int]int32, i int, j int) bool {
-	node1, node2 := p.pools[i], p.pools[j]
+	node1, node2 := pools[i], pools[j]
 	depth1, depth2 := node1.RootDistance(), node2.RootDistance()
 	id1, id2 := node1.NodeID(), node2.NodeID()
 	score1, score2 := scores[id1], scores[id2]
