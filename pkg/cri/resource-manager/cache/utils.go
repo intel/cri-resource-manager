@@ -33,16 +33,14 @@ const (
 	milliCPUToCPU  = 1000
 	QuotaPeriod    = 100000
 	minQuotaPeriod = 1000
-
-	// memory limit to OOM score adjustement
-	guaranteedOOMScoreAdj int = -998
-	besteffortOOMScoreAdj int = 1000
 )
 
 var memoryCapacity int64
 
 // estimateComputeResources calculates resource requests/limits from a CRI request.
-func estimateComputeResources(lnx *cri.LinuxContainerResources) corev1.ResourceRequirements {
+func estimateComputeResources(lnx *cri.LinuxContainerResources, cgroupParent string) corev1.ResourceRequirements {
+	var qos corev1.PodQOSClass
+
 	resources := corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{},
 		Limits:   corev1.ResourceList{},
@@ -52,28 +50,31 @@ func estimateComputeResources(lnx *cri.LinuxContainerResources) corev1.ResourceR
 		return resources
 	}
 
+	if cgroupParent != "" {
+		qos = cgroupParentToQOS(cgroupParent)
+	}
+
 	// calculate CPU request
 	if value := SharesToMilliCPU(lnx.CpuShares); value > 0 {
 		qty := resapi.NewMilliQuantity(value, resapi.DecimalSI)
 		resources.Requests[corev1.ResourceCPU] = *qty
 	}
 
-	// calculate CPU limit
-	if value := QuotaToMilliCPU(lnx.CpuQuota, lnx.CpuPeriod); value > 0 {
-		qty := resapi.NewMilliQuantity(value, resapi.DecimalSI)
-		resources.Limits[corev1.ResourceCPU] = *qty
-	}
-
-	// calculate memory request
-	if value := OomScoreAdjToMemoryRequest(lnx.OomScoreAdj); value != 0 {
-		qty := resapi.NewQuantity(value, resapi.DecimalSI)
-		resources.Requests[corev1.ResourceMemory] = *qty
-	}
-
-	// calculate memory limit
+	// get memory limit
 	if value := lnx.MemoryLimitInBytes; value > 0 {
 		qty := resapi.NewQuantity(value, resapi.DecimalSI)
 		resources.Limits[corev1.ResourceMemory] = *qty
+	}
+
+	// set or calculate CPU limit, set memory request if known
+	if qos == corev1.PodQOSGuaranteed {
+		resources.Limits[corev1.ResourceCPU] = resources.Requests[corev1.ResourceCPU]
+		resources.Requests[corev1.ResourceMemory] = resources.Limits[corev1.ResourceMemory]
+	} else {
+		if value := QuotaToMilliCPU(lnx.CpuQuota, lnx.CpuPeriod); value > 0 {
+			qty := resapi.NewMilliQuantity(value, resapi.DecimalSI)
+			resources.Limits[corev1.ResourceCPU] = *qty
+		}
 	}
 
 	return resources
@@ -124,34 +125,6 @@ func MilliCPUToQuota(milliCPU int64) (int64, int64) {
 	}
 
 	return quota, period
-}
-
-// MemoryRequestToOomScoreAdj -- We don't do this direction (we leave the adjustment intact)...
-func MemoryRequestToOomScoreAdj(namespace string, configSource string, qos corev1.PodQOSClass,
-	memRequest int64) int64 {
-	panic("this shouldn't be called... better leave the OOM score adjustment intact.")
-	// return 0
-}
-
-// OomScoreAdjToMemoryRequest tries to convert OOM score to original memory request.
-func OomScoreAdjToMemoryRequest(value int64) int64 {
-	if value == 0 {
-		return 0
-	}
-
-	switch value {
-	case int64(1000 + guaranteedOOMScoreAdj):
-		// lossy case, let's use boundary OOMScoreAdj value
-		value = int64(1000 + guaranteedOOMScoreAdj - 1)
-		return (memoryCapacity * (int64(1000) - value)) / int64(1000)
-
-	case int64(besteffortOOMScoreAdj - 1):
-		value = int64(besteffortOOMScoreAdj)
-		return (memoryCapacity * (int64(1000) - value)) / int64(1000)
-
-	default:
-		return (memoryCapacity * (int64(1000) - value)) / int64(1000)
-	}
 }
 
 // getMemoryCapacity parses memory capacity from /proc/meminfo (mimicking cAdvisor).
