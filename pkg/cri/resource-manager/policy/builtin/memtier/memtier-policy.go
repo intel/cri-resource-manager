@@ -424,12 +424,11 @@ func (p *policy) restoreCache() error {
 		p.saveConfig()
 	}
 
-	if !p.restoreAllocations() {
-		log.Warn("no allocations found in cache...")
-		p.saveAllocations()
-	} else {
-		p.allocations.Dump(log.Info, "restored ")
+	if err := p.restoreAllocations(); err != nil {
+		return policyError("failed to restore cached allocations: %v", err)
 	}
+	p.allocations.Dump(log.Info, "restored ")
+	p.saveAllocations()
 
 	return nil
 }

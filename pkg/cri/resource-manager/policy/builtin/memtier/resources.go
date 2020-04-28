@@ -60,6 +60,9 @@ type Supply interface {
 	SetExtraMemoryReservation(Grant)
 	ReleaseExtraMemoryReservation(Grant)
 	MemoryLimit() memoryMap
+
+	// Reserve accounts for grant after reloading cached allocations.
+	Reserve(Grant) error
 	// String returns a printable representation of this supply.
 	String() string
 }
@@ -500,6 +503,39 @@ func (cs *supply) SetExtraMemoryReservation(g Grant) {
 	}
 	res[memoryAll] = extraMemory
 	cs.extraMemReservations[g] = res
+}
+
+func (cs *supply) Reserve(g Grant) error {
+	isolated := g.IsolatedCPUs()
+	exclusive := g.ExclusiveCPUs().Difference(isolated)
+	fraction := g.SharedPortion()
+
+	if !cs.isolated.Intersection(isolated).Equals(isolated) {
+		return policyError("can't reserve isolated CPUs (%s) of %s from %s",
+			isolated.String(), g.String(), cs.String())
+	}
+	if !cs.sharable.Intersection(exclusive).Equals(exclusive) {
+		return policyError("can't reserve exclusive CPUs (%s) of %s from %s",
+			exclusive.String(), g.String(), cs.String())
+	}
+
+	if 1000*(cs.sharable.Size()-exclusive.Size())-(cs.granted+fraction) < 0 {
+		return policyError("can't reserve %d fractional CPUs of %s from %s",
+			fraction, g.String(), cs.String())
+	}
+
+	cs.isolated = cs.isolated.Difference(isolated)
+	cs.sharable = cs.sharable.Difference(exclusive)
+	cs.granted += fraction
+
+	cs.node.DepthFirst(func(n Node) error {
+		n.FreeSupply().AccountAllocate(g)
+		return nil
+	})
+
+	// TODO: do the same for memory
+
+	return nil
 }
 
 // takeCPUs takes up to cnt CPUs from a given CPU set to another.

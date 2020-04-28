@@ -33,26 +33,40 @@ func (p *policy) saveAllocations() {
 	p.cache.Save()
 }
 
-func (p *policy) restoreAllocations() bool {
+func (p *policy) restoreAllocations() error {
 	// Get the allocations map.
-	success := p.cache.GetPolicyEntry(keyAllocations, &p.allocations)
-	// Based on the allocations, set the extra memory allocations to the nodes
-	// below the grant in the tree. We assume (for now) that the allocations are
-	// correct and the workloads don't need moving.
-	if success {
-		for _, grant := range p.allocations.grants {
-			pool := grant.GetMemoryNode()
-			pool.DepthFirst(func(n Node) error {
-				if !n.IsSameNode(pool) {
-					supply := n.FreeSupply()
-					supply.SetExtraMemoryReservation(grant)
-				}
-				return nil
-			})
-			return success
-		}
+	if !p.cache.GetPolicyEntry(keyAllocations, &p.allocations) {
+		return nil
 	}
-	return success
+
+	//
+	// Based on the allocations
+	//   1) update the free supply of the grant's pool to account for the grant
+	//   2) set the extra memory allocations to the nodes below the grant in the tree
+	//
+	// We assume (for now) that the allocations are correct and the workloads don't
+	// need moving.
+	//
+	for id, grant := range p.allocations.grants {
+		pool := grant.GetCPUNode()
+
+		log.Info("updating pool %s for container %s CPU grant", pool.Name(), id)
+		supply := pool.FreeSupply()
+		if err := supply.Reserve(grant); err != nil {
+			return err
+		}
+
+		pool = grant.GetMemoryNode()
+		log.Info("updating pool %s for container %s extra memory", pool.Name(), id)
+		pool.DepthFirst(func(n Node) error {
+			if !n.IsSameNode(pool) {
+				supply := n.FreeSupply()
+				supply.SetExtraMemoryReservation(grant)
+			}
+			return nil
+		})
+	}
+	return nil
 }
 
 func (p *policy) saveConfig() error {
