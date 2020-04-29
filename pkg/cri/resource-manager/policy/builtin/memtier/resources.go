@@ -63,6 +63,7 @@ type Supply interface {
 
 	// Reserve accounts for grant after reloading cached allocations.
 	Reserve(Grant) error
+	ReserveMemory(Grant) error
 	// String returns a printable representation of this supply.
 	String() string
 }
@@ -535,6 +536,31 @@ func (cs *supply) Reserve(g Grant) error {
 
 	// TODO: do the same for memory
 
+	return nil
+}
+
+func (cs *supply) ReserveMemory(g Grant) error {
+	mem := uint64(0)
+	allocatedMemory := g.MemLimit()
+	for key, value := range allocatedMemory {
+		if cs.mem[key] < value {
+			return policyError("internal error: not enough memory for allocation at %s", g.GetMemoryNode().Name())
+		}
+		cs.mem[key] -= value
+		cs.grantedMem[key] += value
+		mem += value
+	}
+	cs.grantedMem[memoryAll] += mem
+	cs.mem[memoryAll] -= mem
+
+	// Restore extra memory reservations if any.
+	g.GetMemoryNode().DepthFirst(func(n Node) error {
+		if !n.IsSameNode(g.GetMemoryNode()) {
+			supply := n.FreeSupply()
+			supply.SetExtraMemoryReservation(g)
+		}
+		return nil
+	})
 	return nil
 }
 

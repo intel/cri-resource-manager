@@ -56,15 +56,11 @@ func (p *policy) restoreAllocations() error {
 			return err
 		}
 
-		pool = grant.GetMemoryNode()
 		log.Info("updating pool %s for container %s extra memory", pool.Name(), id)
-		pool.DepthFirst(func(n Node) error {
-			if !n.IsSameNode(pool) {
-				supply := n.FreeSupply()
-				supply.SetExtraMemoryReservation(grant)
-			}
-			return nil
-		})
+		pool = grant.GetMemoryNode()
+		if err := supply.ReserveMemory(grant); err != nil {
+			return err
+		}
 	}
 	return nil
 }
