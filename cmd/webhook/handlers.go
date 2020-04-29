@@ -23,15 +23,13 @@ import (
 	"log"
 	"net/http"
 
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
-
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"sigs.k8s.io/yaml"
 )
 
 type jsonPatch struct {
@@ -51,12 +49,12 @@ var codecs = serializer.NewCodecFactory(scheme)
 // Module inatialization
 func init() {
 	utilruntime.Must(corev1.AddToScheme(scheme))
-	utilruntime.Must(admissionv1beta1.AddToScheme(scheme))
+	utilruntime.Must(admissionv1.AddToScheme(scheme))
 }
 
 // Helper for creating an AdmissionResponse with an error
-func errResponse(err error) *v1beta1.AdmissionResponse {
-	return &v1beta1.AdmissionResponse{
+func errResponse(err error) *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
 		Result: &metav1.Status{
 			Message: err.Error(),
 		},
@@ -89,8 +87,8 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Deserialize AdmissionReview request and create an AdmissionReview response
-	arReq := v1beta1.AdmissionReview{}
-	arRsp := v1beta1.AdmissionReview{}
+	arReq := admissionv1.AdmissionReview{}
+	arRsp := admissionv1.AdmissionReview{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &arReq); err != nil {
 		log.Printf("ERROR: deserializing admission request failed: %v", err)
@@ -103,6 +101,8 @@ func handle(w http.ResponseWriter, r *http.Request) {
 			res := arReq.Request.Resource.Resource
 			switch res {
 			case "pods":
+				arRsp.Kind = "AdmissionReview"
+				arRsp.APIVersion = "admission.k8s.io/v1"
 				arRsp.Response = mutatePodObject(&arReq.Request.Object)
 			default:
 				arRsp.Response = errResponse(fmt.Errorf("Unexpected resource %s", arReq.Request.Resource))
@@ -125,7 +125,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 }
 
 // Handle AdmissionReview requests for Pod objects
-func mutatePodObject(rawObj *runtime.RawExtension) *v1beta1.AdmissionResponse {
+func mutatePodObject(rawObj *runtime.RawExtension) *admissionv1.AdmissionResponse {
 	pod := corev1.Pod{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(rawObj.Raw, nil, &pod); err != nil {
@@ -133,7 +133,7 @@ func mutatePodObject(rawObj *runtime.RawExtension) *v1beta1.AdmissionResponse {
 		return errResponse(err)
 	}
 
-	reviewResponse := v1beta1.AdmissionResponse{}
+	reviewResponse := admissionv1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 
 	patches := []jsonPatch{}
@@ -153,7 +153,7 @@ func mutatePodObject(rawObj *runtime.RawExtension) *v1beta1.AdmissionResponse {
 		log.Printf("ERROR: failed to marshal Pod patch: %v", err)
 		return errResponse(err)
 	}
-	patchType := v1beta1.PatchTypeJSONPatch
+	patchType := admissionv1.PatchTypeJSONPatch
 	reviewResponse.PatchType = &patchType
 
 	return &reviewResponse
