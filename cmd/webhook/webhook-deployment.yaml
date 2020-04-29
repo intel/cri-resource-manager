@@ -27,7 +27,7 @@ spec:
         # with this 'make images'/docker-build tries to build, tag, and push...
         # image: my-docker-registry:5000/cri-resmgr-webhook:testing
         # with this 'make images'/docker-build builds and tags...
-        image: cri-resmgr-webhook:testing
+        image: IMAGE_PLACEHOLDER
         # Convenience pull policy for development
         imagePullPolicy: Always
         ports:
