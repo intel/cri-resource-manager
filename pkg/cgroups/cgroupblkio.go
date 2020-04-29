@@ -16,9 +16,11 @@ package cgroups
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 
@@ -50,30 +52,74 @@ var blkioThrottleWriteIOPSFiles = []string{"blkio.throttle.write_iops_device"}
 //  other |  Write to cgroups, sets the value
 type OciBlockIOParameters struct {
 	Weight                  int64
-	WeightDevice            []OciWeightDeviceParameters
-	ThrottleReadBpsDevice   []OciRateDeviceParameters
-	ThrottleWriteBpsDevice  []OciRateDeviceParameters
-	ThrottleReadIOPSDevice  []OciRateDeviceParameters
-	ThrottleWriteIOPSDevice []OciRateDeviceParameters
+	WeightDevice            OciDeviceWeights
+	ThrottleReadBpsDevice   OciDeviceRates
+	ThrottleWriteBpsDevice  OciDeviceRates
+	ThrottleReadIOPSDevice  OciDeviceRates
+	ThrottleWriteIOPSDevice OciDeviceRates
 }
 
-// OciWeightDeviceParameters contains values for
+// OciDeviceWeight contains values for
 // - blkio.[io-scheduler].weight
-type OciWeightDeviceParameters struct {
+type OciDeviceWeight struct {
 	Major  int64
 	Minor  int64
 	Weight int64
 }
 
-// OciRateDeviceParameters contains values for
+// OciDeviceRate contains values for
 // - blkio.throttle.read_bps_device
 // - blkio.throttle.write_bps_device
 // - blkio.throttle.read_iops_device
 // - blkio.throttle.write_iops_device
-type OciRateDeviceParameters struct {
+type OciDeviceRate struct {
 	Major int64
 	Minor int64
 	Rate  int64
+}
+
+// OciDeviceWeights contains weights for devices
+type OciDeviceWeights []OciDeviceWeight
+
+// OciDeviceRates contains throttling rates for devices
+type OciDeviceRates []OciDeviceRate
+
+// OciDeviceParameters interface provides functions common to OciDeviceWeights and OciDeviceRates
+type OciDeviceParameters interface {
+	Append(maj, min, val int64)
+	Update(maj, min, val int64)
+}
+
+// Append appends (major, minor, value) to OciDeviceWeights slice.
+func (w *OciDeviceWeights) Append(maj, min, val int64) {
+	*w = append(*w, OciDeviceWeight{Major: maj, Minor: min, Weight: val})
+}
+
+// Append appends (major, minor, value) to OciDeviceRates slice.
+func (r *OciDeviceRates) Append(maj, min, val int64) {
+	*r = append(*r, OciDeviceRate{Major: maj, Minor: min, Rate: val})
+}
+
+// Update updates device weight in OciDeviceWeights slice, or appends it if not found.
+func (w *OciDeviceWeights) Update(maj, min, val int64) {
+	for index, devWeight := range *w {
+		if devWeight.Major == maj && devWeight.Minor == min {
+			(*w)[index].Weight = val
+			return
+		}
+	}
+	w.Append(maj, min, val)
+}
+
+// Update updates device rate in OciDeviceRates slice, or appends it if not found.
+func (r *OciDeviceRates) Update(maj, min, val int64) {
+	for index, devRate := range *r {
+		if devRate.Major == maj && devRate.Minor == min {
+			(*r)[index].Rate = val
+			return
+		}
+	}
+	r.Append(maj, min, val)
 }
 
 // NewOciBlockIOParameters creates new OciBlockIOParameters instance.
@@ -83,18 +129,18 @@ func NewOciBlockIOParameters() OciBlockIOParameters {
 	}
 }
 
-// NewOciWeightDeviceParametes creates new OciWeightDeviceParameters instance.
-func NewOciWeightDeviceParametes() OciWeightDeviceParameters {
-	return OciWeightDeviceParameters{
+// NewOciDeviceWeight creates new OciDeviceWeight instance.
+func NewOciDeviceWeight() OciDeviceWeight {
+	return OciDeviceWeight{
 		Major:  -1,
 		Minor:  -1,
 		Weight: -1,
 	}
 }
 
-// NewOciRateDeviceParameters creates new OciRateDeviceParameters instance.
-func NewOciRateDeviceParameters() OciRateDeviceParameters {
-	return OciRateDeviceParameters{
+// NewOciDeviceRate creates new OciDeviceRate instance.
+func NewOciDeviceRate() OciDeviceRate {
+	return OciDeviceRate{
 		Major: -1,
 		Minor: -1,
 		Rate:  -1,
@@ -104,6 +150,131 @@ func NewOciRateDeviceParameters() OciRateDeviceParameters {
 // GetBlkioDir returns the cgroups blkio controller directory.
 func GetBlkioDir() string {
 	return blkioCgroupDir
+}
+
+type devMajMin struct {
+	Major int64
+	Minor int64
+}
+
+// ResetBlkioParameters adds new, changes existing and removes missing blockIO parameters in cgroupsDir
+func ResetBlkioParameters(cgroupsDir string, blockIO OciBlockIOParameters) error {
+	var errors *multierror.Error
+	oldBlockIO, getErr := GetBlkioParameters(cgroupsDir)
+	errors = multierror.Append(errors, getErr)
+	newBlockIO := NewOciBlockIOParameters()
+	newBlockIO.Weight = blockIO.Weight
+	// Set new device weights
+	seenDev := map[devMajMin]bool{}
+	for _, ociWDP := range blockIO.WeightDevice {
+		seenDev[devMajMin{ociWDP.Major, ociWDP.Minor}] = true
+		newBlockIO.WeightDevice = append(newBlockIO.WeightDevice, ociWDP)
+	}
+	// Reset old device weights that were missing from blockIO.WeightDevice
+	for _, ociWDP := range oldBlockIO.WeightDevice {
+		if !seenDev[devMajMin{ociWDP.Major, ociWDP.Minor}] {
+			newBlockIO.WeightDevice = append(newBlockIO.WeightDevice, OciDeviceWeight{ociWDP.Major, ociWDP.Minor, 0})
+		}
+	}
+	newBlockIO.ThrottleReadBpsDevice = resetDevRates(oldBlockIO.ThrottleReadBpsDevice, blockIO.ThrottleReadBpsDevice)
+	newBlockIO.ThrottleWriteBpsDevice = resetDevRates(oldBlockIO.ThrottleWriteBpsDevice, blockIO.ThrottleWriteBpsDevice)
+	newBlockIO.ThrottleReadIOPSDevice = resetDevRates(oldBlockIO.ThrottleReadIOPSDevice, blockIO.ThrottleReadIOPSDevice)
+	newBlockIO.ThrottleWriteIOPSDevice = resetDevRates(oldBlockIO.ThrottleWriteIOPSDevice, blockIO.ThrottleWriteIOPSDevice)
+	errors = multierror.Append(errors, SetBlkioParameters(cgroupsDir, newBlockIO))
+	return errors.ErrorOrNil()
+}
+
+// resetDevRates adds wanted rate parameters to new and resets unwated rates
+func resetDevRates(old, wanted []OciDeviceRate) []OciDeviceRate {
+	new := []OciDeviceRate{}
+	seenDev := map[devMajMin]bool{}
+	for _, rdp := range wanted {
+		new = append(new, rdp)
+		seenDev[devMajMin{rdp.Major, rdp.Minor}] = true
+	}
+	for _, rdp := range old {
+		if !seenDev[devMajMin{rdp.Major, rdp.Minor}] {
+			new = append(new, OciDeviceRate{rdp.Major, rdp.Minor, 0})
+		}
+	}
+	return new
+}
+
+// GetBlkioParameters returns OCI BlockIO parameters from files in cgroups blkio controller directory.
+func GetBlkioParameters(cgroupsDir string) (OciBlockIOParameters, error) {
+	var errors *multierror.Error
+	blockIO := NewOciBlockIOParameters()
+	content, err := readFromFileInDir(cgroupsDir, blkioWeightFiles)
+	if err == nil {
+		weight, err := strconv.ParseInt(strings.TrimSuffix(content, "\n"), 10, 64)
+		if err == nil {
+			blockIO.Weight = weight
+		} else {
+			errors = multierror.Append(errors, fmt.Errorf("parsing weight from %#v failed: %w", content, err))
+		}
+	} else {
+		errors = multierror.Append(errors, err)
+	}
+	errors = multierror.Append(errors, readOciDeviceParameters(cgroupsDir, blkioWeightDeviceFiles, &blockIO.WeightDevice))
+	errors = multierror.Append(errors, readOciDeviceParameters(cgroupsDir, blkioThrottleReadBpsFiles, &blockIO.ThrottleReadBpsDevice))
+	errors = multierror.Append(errors, readOciDeviceParameters(cgroupsDir, blkioThrottleWriteBpsFiles, &blockIO.ThrottleWriteBpsDevice))
+	errors = multierror.Append(errors, readOciDeviceParameters(cgroupsDir, blkioThrottleReadIOPSFiles, &blockIO.ThrottleReadIOPSDevice))
+	errors = multierror.Append(errors, readOciDeviceParameters(cgroupsDir, blkioThrottleWriteIOPSFiles, &blockIO.ThrottleWriteIOPSDevice))
+	return blockIO, errors.ErrorOrNil()
+}
+
+// readOciDeviceParameters parses device lines used for weights and throttling rates
+func readOciDeviceParameters(baseDir string, filenames []string, params OciDeviceParameters) error {
+	var errors *multierror.Error
+	contents, err := readFromFileInDir(baseDir, filenames)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(contents, "\n") {
+		// Device weight files may have "default NNN" line at the beginning. Skip it.
+		if line == "" || strings.HasPrefix(line, "default ") {
+			continue
+		}
+		// Expect syntax MAJOR:MINOR VALUE
+		devVal := strings.Split(line, " ")
+		if len(devVal) != 2 {
+			errors = multierror.Append(errors, fmt.Errorf("invalid line %q, single space expected", line))
+			continue
+		}
+		majMin := strings.Split(devVal[0], ":")
+		if len(majMin) != 2 {
+			errors = multierror.Append(errors, fmt.Errorf("invalid line %q, single colon expected before space", line))
+			continue
+		}
+		major, majErr := strconv.ParseInt(majMin[0], 10, 64)
+		minor, minErr := strconv.ParseInt(majMin[1], 10, 64)
+		value, valErr := strconv.ParseInt(devVal[1], 10, 64)
+		if majErr != nil || minErr != nil || valErr != nil {
+			errors = multierror.Append(errors, fmt.Errorf("invalid number when parsing \"major:minor value\" from \"%s:%s %s\"", majMin[0], majMin[1], devVal[1]))
+			continue
+		}
+		params.Append(major, minor, value)
+	}
+	return errors.ErrorOrNil()
+}
+
+// readFromFileInDir returns content from the first successfully read file.
+func readFromFileInDir(baseDir string, filenames []string) (string, error) {
+	var errors *multierror.Error
+	// If reading all the files fails, return list of read errors.
+	for _, filename := range filenames {
+		filepath := filepath.Join(baseDir, filename)
+		content, err := currentPlatform.readFromFile(filepath)
+		if err == nil {
+			return content, nil
+		}
+		errors = multierror.Append(errors, err)
+	}
+	err := errors.ErrorOrNil()
+	if err != nil {
+		return "", fmt.Errorf("could not read any of files %q: %w", filenames, err)
+	}
+	return "", nil
 }
 
 // SetBlkioParameters writes OCI BlockIO parameters to files in cgroups blkio contoller directory.
@@ -158,6 +329,7 @@ func writeToFileInDir(baseDir string, filenames []string, content string) error 
 
 // platformInterface includes functions that access the system. Enables mocking the platform.
 type platformInterface interface {
+	readFromFile(filename string) (string, error)
 	writeToFile(filename string, content string) error
 }
 
@@ -166,6 +338,12 @@ type defaultPlatform struct{}
 
 // currentPlatform defines which platformInterface is used: defaultPlatform or a mock, for instance.
 var currentPlatform platformInterface = defaultPlatform{}
+
+// readFromFile returns file contents as a string.
+func (dpm defaultPlatform) readFromFile(filename string) (string, error) {
+	content, err := ioutil.ReadFile(filename)
+	return string(content), err
+}
 
 // writeToFile writes content to an existing file.
 func (dpm defaultPlatform) writeToFile(filename string, content string) error {

@@ -34,8 +34,7 @@ func defaultOptions() interface{} {
 	}
 }
 
-// Register us for configuration handling.
+// init registers blockio class mapping configuration.
 func init() {
-	config.Register("resource-manager.blockio", configHelp, opt, defaultOptions,
-		config.WithNotify(getBlockIOController().(*blockioctl).configNotify))
+	config.Register(ConfigModuleName, configHelp, opt, defaultOptions)
 }

@@ -45,5 +45,5 @@ func defaultOptions() interface{} {
 }
 
 func init() {
-	pkgcfg.Register("blockio", "BlockIO control", opt, defaultOptions)
+	pkgcfg.Register(ConfigModuleName, "Block I/O class control", opt, defaultOptions)
 }
