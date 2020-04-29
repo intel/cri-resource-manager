@@ -82,11 +82,29 @@ func estimateComputeResources(lnx *cri.LinuxContainerResources, cgroupParent str
 
 // SharesToMilliCPU converts CFS CPU shares to milliCPU.
 func SharesToMilliCPU(shares int64) int64 {
+	return sharesToMilliCPU(shares)
+}
+
+// QuotaToMilliCPU converts CFS quota and period to milliCPU.
+func QuotaToMilliCPU(quota, period int64) int64 {
+	return quotaToMilliCPU(quota, period)
+}
+
+// sharesToMilliCPU converts CFS CPU shares to milliCPU.
+func sharesToMilliCPU(shares int64) int64 {
 	if shares == minShares {
 		return 0
 	}
-
+	//return int64(float64(shares*milliCPUToCPU) / float64(sharesPerCPU) + 0.5)
 	return int64((float64(shares*milliCPUToCPU) / float64(sharesPerCPU)) + 0.5)
+}
+
+// quotaToMilliCPU converts CFS quota and period to milliCPU.
+func quotaToMilliCPU(quota, period int64) int64 {
+	if quota == 0 || period == 0 {
+		return 0
+	}
+	return int64(float64(quota*milliCPUToCPU)/float64(period) + 0.5)
 }
 
 // MilliCPUToShares converts milliCPU to CFS CPU shares.
@@ -101,15 +119,6 @@ func MilliCPUToShares(milliCPU int) int64 {
 	}
 
 	return int64(shares)
-}
-
-// QuotaToMilliCPU converts CFS quota and period to milliCPU.
-func QuotaToMilliCPU(quota, period int64) int64 {
-	if quota == 0 || period == 0 {
-		return 0
-	}
-
-	return int64(float64(quota*milliCPUToCPU)/float64(period) + 0.5)
 }
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
