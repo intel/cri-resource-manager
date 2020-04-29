@@ -472,6 +472,7 @@ func (cs *supply) ReleaseMemory(g Grant) {
 	releasedMemory := uint64(0)
 	for key, value := range g.MemLimit() {
 		cs.grantedMem[key] -= value
+		cs.mem[key] += value
 		releasedMemory += value
 	}
 	cs.grantedMem[memoryAll] -= releasedMemory
