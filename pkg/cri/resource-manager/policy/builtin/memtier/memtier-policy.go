@@ -15,8 +15,6 @@
 package memtier
 
 import (
-	"fmt"
-
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -318,65 +316,6 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	p.saveConfig()
 
 	return nil
-}
-
-func (p *policy) expandMemset(g Grant) (bool, error) {
-	supply := g.GetMemoryNode().FreeSupply()
-	mems := g.MemLimit()
-	node := g.GetMemoryNode()
-	parent := node.Parent()
-
-	// We have to assume that the memory has been allocated how we granted it (if PMEM ran out
-	// the allocations have been made from DRAM and so on).
-
-	// Figure out if there is enough memory now to have grant as-is.
-	fits := true
-	for memType, limit := range mems {
-		if limit > 0 {
-			// This memory type was granted.
-			extra := supply.ExtraMemoryReservation(memType)
-			granted := supply.GrantedMemory(memType)
-			limit := supply.MemoryLimit()[memType]
-
-			if extra+granted > limit {
-				log.Debug("%s: extra():%d + granted(): %d > limit: %d -> moving from %s to %s", memType, extra, granted, limit, node.Name(), parent.Name())
-				fits = false
-				break
-			}
-		}
-	}
-
-	if fits {
-		return false, nil
-	}
-	// Else it doesn't fit, so move the grant up in the memory tree.
-
-	if parent.IsNil() {
-		return false, fmt.Errorf("trying to move a grant up past the root of the tree")
-	}
-
-	// Release granted memory from the node and allocate it from the parent node.
-	err := parent.FreeSupply().ReallocateMemory(g)
-	if err != nil {
-		return false, err
-	}
-	g.SetMemoryNode(parent)
-
-	// For every subnode, make sure that this grant is added to the extra memory allocation.
-	parent.DepthFirst(func(n Node) error {
-		// No extra allocation should be done to the node itself.
-		if !n.IsSameNode(parent) {
-			supply := n.FreeSupply()
-			supply.SetExtraMemoryReservation(g)
-		}
-		return nil
-	})
-
-	// Make the container to use the new memory set.
-	// FIXME: this could be done in a second pass to avoid doing this many times
-	p.applyGrant(g)
-
-	return true, nil
 }
 
 // Check the constraints passed to us.

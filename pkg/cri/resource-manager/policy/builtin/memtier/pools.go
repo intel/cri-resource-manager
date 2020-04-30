@@ -273,14 +273,7 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 
 	// Add an extra memory reservation to all subnodes.
 	// TODO: no need to do any of this if no memory request
-	pool.DepthFirst(func(n Node) error {
-		// No extra allocation should be done to the node itself.
-		if !n.IsSameNode(pool) {
-			supply := n.FreeSupply()
-			supply.SetExtraMemoryReservation(grant)
-		}
-		return nil
-	})
+	grant.UpdateExtraMemoryReservation()
 
 	// See how much memory reservations the workloads on the
 	// nodes up from this one cause to the node. We only need to
@@ -300,7 +293,7 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 		for _, oldGrant := range p.allocations.grants {
 			oldMemset := oldGrant.GetMemoryNode().GetMemset(grant.MemoryType())
 			if oldMemset.Size() < memset.Size() && memset.Has(oldMemset.Members()...) {
-				changed, err = p.expandMemset(oldGrant)
+				changed, err = oldGrant.ExpandMemset()
 				if err != nil {
 					return nil, err
 				}
