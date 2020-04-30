@@ -379,9 +379,9 @@ bin/cri-resmgr-agent: $(wildcard cmd/cri-resmgr-agent/*.go) \
                 find $$dir -name \*.go; \
             done | sort | uniq)
 
-bin/webhook: $(wildcard cmd/webhook/*.go) \
+bin/webhook: $(wildcard cmd/cri-resmgr-webhook/*.go) \
     $(shell for dir in \
-                  $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/webhook/... | \
+                  $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/cri-resmgr-webhook/... | \
                           grep cri-resource-manager/pkg/ | \
                           sed 's#github.com/intel/cri-resource-manager/##g'); do \
                 find $$dir -name \*.go; \

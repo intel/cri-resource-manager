@@ -32,12 +32,12 @@ RUN go mod download
 
 # Build webhook
 COPY . .
-RUN make BUILD_DIRS=webhook
+RUN make BUILD_DIRS=cri-resmgr-webhook
 
 FROM scratch as final
 COPY --from=builder /install_root /
 
-COPY --from=builder /go/build/bin/webhook /bin/webhook
+COPY --from=builder /go/build/bin/cri-resmgr-webhook /bin/cri-resmgr-webhook
 
-ENTRYPOINT ["/bin/webhook"]
+ENTRYPOINT ["/bin/cri-resmgr-webhook"]
 
