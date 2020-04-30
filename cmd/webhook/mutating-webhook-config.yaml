@@ -1,7 +1,7 @@
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: cri-resmgr-mutating-webhook-config
+  name: cri-resmgr
 webhooks:
 - name: cri-resmgr.intel.com
   rules:
