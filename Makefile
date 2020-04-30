@@ -40,7 +40,7 @@ BUILD_BINS = $(foreach dir,$(BUILD_DIRS),bin/$(dir))
 
 # Directories (in cmd) with go code we'll want to create Docker images from.
 IMAGE_DIRS  = $(shell find cmd -name Dockerfile | sed 's:cmd/::g;s:/.*::g' | uniq)
-IMAGE_TAG  := testing
+IMAGE_TAG  := $(shell git describe --dirty 2> /dev/null || echo unknown)
 IMAGE_REPO := ""
 
 # List of our active go modules.
