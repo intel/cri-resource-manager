@@ -40,7 +40,7 @@ BUILD_BINS = $(foreach dir,$(BUILD_DIRS),bin/$(dir))
 
 # Directories (in cmd) with go code we'll want to create Docker images from.
 IMAGE_DIRS  = $(shell find cmd -name Dockerfile | sed 's:cmd/::g;s:/.*::g' | uniq)
-IMAGE_TAG  := $(shell git describe --dirty 2> /dev/null || echo unknown)
+IMAGE_VERSION  := $(shell git describe --dirty 2> /dev/null || echo unknown)
 IMAGE_REPO := ""
 
 # List of our active go modules.
@@ -180,21 +180,8 @@ clean-%:
 	rm -f bin/$$bin
 
 image-%:
-	$(Q)bin=$(patsubst image-%,%,$@); src=cmd/$$bin; \
-	echo "Building docker image for $$src"; \
-	    buildopts="--image cri-resmgr-$${bin#cri-resmgr-}"; \
-	    if [ -n "$(IMAGE_TAG)" ]; then \
-		buildopts="$$buildopts --tag $(IMAGE_TAG)"; \
-	    fi; \
-	    if [ -n "$(IMAGE_REPO)" ]; then \
-	        buildopts="$$buildopts --publish $(IMAGE_REPO)"; \
-	    fi; \
-	    echo "Vendoring dependencies..."; \
-	    go mod vendor && \
-	        scripts/build/docker-build $(DOCKER_OPTIONS) $$buildopts $$src; \
-	        rc=$$?; \
-	    rm -fr vendor; \
-	    exit $$rc
+	$(Q)bin=$(patsubst image-%,%,$@); \
+	    docker build . -f "cmd/$$bin/Dockerfile" -t $$bin:$(IMAGE_VERSION)
 
 #
 # Rules for format checking, various code quality and complexity checks and measures.
