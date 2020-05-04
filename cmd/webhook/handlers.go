@@ -108,10 +108,9 @@ func handle(w http.ResponseWriter, r *http.Request) {
 				arRsp.Response = errResponse(fmt.Errorf("Unexpected resource %s", arReq.Request.Resource))
 			}
 		}
+		// Use the same UID in response that was used in the request
+		arRsp.Response.UID = arReq.Request.UID
 	}
-
-	// Use same the UID in response that was used in the request
-	arRsp.Response.UID = arReq.Request.UID
 
 	log.Printf("RESPONSE:\n%s", stringify(arRsp.Response))
 
