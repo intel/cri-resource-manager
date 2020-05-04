@@ -35,7 +35,6 @@ COPY . .
 RUN make BUILD_DIRS=webhook
 
 FROM scratch as final
-ARG DIR=/go/src/build
 COPY --from=builder /install_root /
 
 COPY --from=builder /go/build/bin/webhook /bin/webhook
