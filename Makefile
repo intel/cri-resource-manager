@@ -40,8 +40,10 @@ BUILD_BINS = $(foreach dir,$(BUILD_DIRS),bin/$(dir))
 
 # Directories (in cmd) with go code we'll want to create Docker images from.
 IMAGE_DIRS  = $(shell find cmd -name Dockerfile | sed 's:cmd/::g;s:/.*::g' | uniq)
-IMAGE_TAG  := testing
-IMAGE_REPO := ""
+IMAGE_VERSION  := $(shell git describe --dirty 2> /dev/null || echo unknown)
+ifdef IMAGE_REPO
+    override IMAGE_REPO := $(IMAGE_REPO)/
+endif
 
 # List of our active go modules.
 GO_MODULES = $(shell $(GO_CMD) list ./... | grep -v vendor/)
@@ -122,6 +124,8 @@ clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-ui-assets
 
 images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 
+images-push: $(foreach dir,$(IMAGE_DIRS),image-push-$(dir))
+
 #
 # Rules for building and installing binaries, or building docker images, and cleaning up.
 #
@@ -180,21 +184,13 @@ clean-%:
 	rm -f bin/$$bin
 
 image-%:
-	$(Q)bin=$(patsubst image-%,%,$@); src=cmd/$$bin; \
-	echo "Building docker image for $$src"; \
-	    buildopts="--image cri-resmgr-$${bin#cri-resmgr-}"; \
-	    if [ -n "$(IMAGE_TAG)" ]; then \
-		buildopts="$$buildopts --tag $(IMAGE_TAG)"; \
-	    fi; \
-	    if [ -n "$(IMAGE_REPO)" ]; then \
-	        buildopts="$$buildopts --publish $(IMAGE_REPO)"; \
-	    fi; \
-	    echo "Vendoring dependencies..."; \
-	    go mod vendor && \
-	        scripts/build/docker-build $(DOCKER_OPTIONS) $$buildopts $$src; \
-	        rc=$$?; \
-	    rm -fr vendor; \
-	    exit $$rc
+	$(Q)bin=$(patsubst image-%,%,$@); \
+		docker build . -f "cmd/$$bin/Dockerfile" -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
+
+image-push-%: image-%
+	$(Q)bin=$(patsubst image-push-%,%,$@); \
+		if [ -z "$(IMAGE_REPO)" ]; then echo "ERROR: no IMAGE_REPO specified"; exit 1; fi; \
+		docker push $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
 #
 # Rules for format checking, various code quality and complexity checks and measures.
@@ -392,9 +388,9 @@ bin/cri-resmgr-agent: $(wildcard cmd/cri-resmgr-agent/*.go) \
                 find $$dir -name \*.go; \
             done | sort | uniq)
 
-bin/webhook: $(wildcard cmd/webhook/*.go) \
+bin/webhook: $(wildcard cmd/cri-resmgr-webhook/*.go) \
     $(shell for dir in \
-                  $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/webhook/... | \
+                  $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/cri-resmgr-webhook/... | \
                           grep cri-resource-manager/pkg/ | \
                           sed 's#github.com/intel/cri-resource-manager/##g'); do \
                 find $$dir -name \*.go; \
@@ -435,6 +431,6 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_vfsdata.go:: \
 
 
 # phony targets
-.PHONY: all build install clean test images \
+.PHONY: all build install clean test images images-push\
 	format vet cyclomatic-check lint golangci-lint \
 	git-version git-buildid

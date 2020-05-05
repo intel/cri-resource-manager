@@ -23,15 +23,18 @@ RUN mkdir /install_root \
     --no-boot-update \
     && rm -rf /install_root/var/lib/swupd/*
 
-ARG DIR=/go/src/build
-WORKDIR $DIR
-ADD . $DIR
+WORKDIR /go/build
 
-ENV GO111MODULE=on GOFLAGS=-mod=vendor
+# Fetch go dependencies in a separate layer for caching
+COPY go.mod go.sum ./
+COPY pkg/topology/ pkg/topology/
+RUN go mod download
+
+# Build agent
+COPY . .
 RUN make BUILD_DIRS=cri-resmgr-agent
 
 FROM scratch as final
-ARG DIR=/go/src/build
 COPY --from=builder /install_root /
-COPY --from=builder $DIR/bin/cri-resmgr-agent /bin/cri-resmgr-agent
+COPY --from=builder /go/build/bin/cri-resmgr-agent /bin/cri-resmgr-agent
 ENTRYPOINT ["/bin/cri-resmgr-agent"]
