@@ -24,14 +24,20 @@ spec:
     spec:
       containers:
       - name: cri-resmgr-webhook
-        # with this 'make images'/docker-build tries to build, tag, and push...
-        # image: my-docker-registry:5000/cri-resmgr-webhook:testing
-        # with this 'make images'/docker-build builds and tags...
-        image: cri-resmgr-webhook:testing
+        image: IMAGE_PLACEHOLDER
         # Convenience pull policy for development
         imagePullPolicy: Always
         ports:
         - containerPort: 443
+        # Mount the tls cert/key in the default location
+        volumeMounts:
+        - name: certs
+          mountPath: /etc/cri-resmgr-webhook/certs.d/
+          readOnly: true
+        args:
+         - "-cert-file=/etc/cri-resmgr-webhook/certs.d/svc.crt"
+         - "-key-file=/etc/cri-resmgr-webhook/certs.d/svc.key"
+
       nodeSelector:
         node-role.kubernetes.io/master: ""
       tolerations:
@@ -39,6 +45,14 @@ spec:
           operator: "Equal"
           value: ""
           effect: "NoSchedule"
+      volumes:
+      # This example deployment uses k8s secrests to store TLS secrets
+      # You need to manually generate the cert/key pair, and, the accompanying secret
+      # Expected filenames are "svc.crt" and "svc.key"
+      - name: certs
+        secret:
+          secretName: cri-resmgr-webhook-secret
+
 ---
 apiVersion: v1
 kind: Service
