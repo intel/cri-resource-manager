@@ -31,6 +31,11 @@ import (
 func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 	c.PodID = req.PodSandboxId
 
+	pod, ok := c.cache.Pods[c.PodID]
+	if !ok {
+		return cacheError("can't find cached pod %s for container to create", c.PodID)
+	}
+
 	cfg := req.Config
 	if cfg == nil {
 		return cacheError("container of pod %s has no config", c.PodID)
@@ -90,23 +95,18 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 
 	c.Tags = make(map[string]string)
 
-	// if we get more than one hint, check that there are no duplicates
-	// if len(c.TopologyHints) > 1 {
-	// 	c.TopologyHints = topology.DeDuplicateTopologyHints(c.TopologyHints)
-	// }
-
 	c.LinuxReq = cfg.GetLinux().GetResources()
 
-	if p, _ := c.cache.Pods[c.PodID]; p != nil && p.Resources != nil {
-		if r, ok := p.Resources.InitContainers[c.Name]; ok {
+	if pod.Resources != nil {
+		if r, ok := pod.Resources.InitContainers[c.Name]; ok {
 			c.Resources = r
-		} else if r, ok := p.Resources.Containers[c.Name]; ok {
+		} else if r, ok := pod.Resources.Containers[c.Name]; ok {
 			c.Resources = r
 		}
 	}
 
 	if len(c.Resources.Requests) == 0 && len(c.Resources.Limits) == 0 {
-		c.Resources = estimateComputeResources(c.LinuxReq)
+		c.Resources = estimateComputeResources(c.LinuxReq, pod.CgroupParent)
 	}
 
 	c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
@@ -118,8 +118,8 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 func (c *container) fromListResponse(lrc *cri.Container) error {
 	c.PodID = lrc.PodSandboxId
 
-	p, _ := c.cache.Pods[c.PodID]
-	if p == nil {
+	pod, ok := c.cache.Pods[c.PodID]
+	if !ok {
 		return cacheError("can't find cached pod %s for listed container", c.PodID)
 	}
 
@@ -130,19 +130,23 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 
 	c.ID = lrc.Id
 	c.Name = meta.Name
-	c.Namespace = p.Namespace
+	c.Namespace = pod.Namespace
 	c.State = ContainerState(int32(lrc.State))
 	c.Image = lrc.GetImage().GetImage()
 	c.Labels = lrc.Labels
 	c.Annotations = lrc.Annotations
 	c.Tags = make(map[string]string)
 
-	if p.Resources != nil {
-		if r, ok := p.Resources.InitContainers[c.Name]; ok {
+	if pod.Resources != nil {
+		if r, ok := pod.Resources.InitContainers[c.Name]; ok {
 			c.Resources = r
-		} else if r, ok := p.Resources.Containers[c.Name]; ok {
+		} else if r, ok := pod.Resources.Containers[c.Name]; ok {
 			c.Resources = r
 		}
+	}
+
+	if len(c.Resources.Requests) == 0 && len(c.Resources.Limits) == 0 {
+		c.Resources = estimateComputeResources(c.LinuxReq, pod.CgroupParent)
 	}
 
 	return nil
