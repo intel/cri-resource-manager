@@ -55,11 +55,19 @@ type Supply interface {
 	ReleaseMemory(Grant)
 	// ReallocateMemory updates the Grant to allocate memory from this supply.
 	ReallocateMemory(Grant) error
-	// ExtraMemoryReservation returns the m
+	// ExtraMemoryReservation returns the memory reservation.
 	ExtraMemoryReservation(memoryType) uint64
+	// SetExtraMemroyReservation sets the extra memory reservation based on the granted memory.
 	SetExtraMemoryReservation(Grant)
+	// ReleaseExtraMemoryReservation removes the extra memory reservations based on the granted memory.
 	ReleaseExtraMemoryReservation(Grant)
+	// MemoryLimit returns the amount of various memory types belonging to this grant.
 	MemoryLimit() memoryMap
+
+	// Reserve accounts for CPU grants after reloading cached allocations.
+	Reserve(Grant) error
+	// ReserveMemory accounts for memory grants after reloading cached allocations.
+	ReserveMemory(Grant) error
 	// String returns a printable representation of this supply.
 	String() string
 }
@@ -108,6 +116,9 @@ type Grant interface {
 	SetMemoryNode(Node)
 	// Memset returns the granted memory controllers as a string.
 	Memset() system.IDSet
+	// ExpandMemset() makes the memory controller set larger as the grant
+	// is moved up in the node hierarchy.
+	ExpandMemset() (bool, error)
 	// MemLimit returns the amount of memory that the container is
 	// allowed to use.
 	MemLimit() memoryMap
@@ -115,6 +126,9 @@ type Grant interface {
 	String() string
 	// Release releases the grant from all the Supplys it uses.
 	Release()
+	// UpdateExtraMemoryReservation() updates the reservations in the subtree
+	// of nodes under the node from which the memory was granted.
+	UpdateExtraMemoryReservation()
 }
 
 // Score represents how well a supply can satisfy a request.
@@ -468,6 +482,7 @@ func (cs *supply) ReleaseMemory(g Grant) {
 	releasedMemory := uint64(0)
 	for key, value := range g.MemLimit() {
 		cs.grantedMem[key] -= value
+		cs.mem[key] += value
 		releasedMemory += value
 	}
 	cs.grantedMem[memoryAll] -= releasedMemory
@@ -500,6 +515,56 @@ func (cs *supply) SetExtraMemoryReservation(g Grant) {
 	}
 	res[memoryAll] = extraMemory
 	cs.extraMemReservations[g] = res
+}
+
+func (cs *supply) Reserve(g Grant) error {
+	isolated := g.IsolatedCPUs()
+	exclusive := g.ExclusiveCPUs().Difference(isolated)
+	fraction := g.SharedPortion()
+
+	if !cs.isolated.Intersection(isolated).Equals(isolated) {
+		return policyError("can't reserve isolated CPUs (%s) of %s from %s",
+			isolated.String(), g.String(), cs.String())
+	}
+	if !cs.sharable.Intersection(exclusive).Equals(exclusive) {
+		return policyError("can't reserve exclusive CPUs (%s) of %s from %s",
+			exclusive.String(), g.String(), cs.String())
+	}
+
+	if 1000*(cs.sharable.Size()-exclusive.Size())-(cs.granted+fraction) < 0 {
+		return policyError("can't reserve %d fractional CPUs of %s from %s",
+			fraction, g.String(), cs.String())
+	}
+
+	cs.isolated = cs.isolated.Difference(isolated)
+	cs.sharable = cs.sharable.Difference(exclusive)
+	cs.granted += fraction
+
+	cs.node.DepthFirst(func(n Node) error {
+		n.FreeSupply().AccountAllocate(g)
+		return nil
+	})
+
+	// TODO: do the same for memory
+
+	return nil
+}
+
+func (cs *supply) ReserveMemory(g Grant) error {
+	mem := uint64(0)
+	allocatedMemory := g.MemLimit()
+	for key, value := range allocatedMemory {
+		if cs.mem[key] < value {
+			return policyError("internal error: not enough memory for allocation at %s", g.GetMemoryNode().Name())
+		}
+		cs.mem[key] -= value
+		cs.grantedMem[key] += value
+		mem += value
+	}
+	cs.grantedMem[memoryAll] += mem
+	cs.mem[memoryAll] -= mem
+	g.UpdateExtraMemoryReservation()
+	return nil
 }
 
 // takeCPUs takes up to cnt CPUs from a given CPU set to another.
@@ -834,4 +899,66 @@ func (cg *grant) String() string {
 func (cg *grant) Release() {
 	cg.GetCPUNode().FreeSupply().ReleaseCPU(cg)
 	cg.GetMemoryNode().FreeSupply().ReleaseMemory(cg)
+}
+
+func (cg *grant) ExpandMemset() (bool, error) {
+	supply := cg.GetMemoryNode().FreeSupply()
+	mems := cg.MemLimit()
+	node := cg.GetMemoryNode()
+	parent := node.Parent()
+
+	// We have to assume that the memory has been allocated how we granted it (if PMEM ran out
+	// the allocations have been made from DRAM and so on).
+
+	// Figure out if there is enough memory now to have grant as-is.
+	fits := true
+	for memType, limit := range mems {
+		if limit > 0 {
+			// This memory type was granted.
+			extra := supply.ExtraMemoryReservation(memType)
+			granted := supply.GrantedMemory(memType)
+			limit := supply.MemoryLimit()[memType]
+
+			if extra+granted > limit {
+				log.Debug("%s: extra():%d + granted(): %d > limit: %d -> moving from %s to %s", memType, extra, granted, limit, node.Name(), parent.Name())
+				fits = false
+				break
+			}
+		}
+	}
+
+	if fits {
+		return false, nil
+	}
+	// Else it doesn't fit, so move the grant up in the memory tree.
+
+	if parent.IsNil() {
+		return false, fmt.Errorf("trying to move a grant up past the root of the tree")
+	}
+
+	// Release granted memory from the node and allocate it from the parent node.
+	err := parent.FreeSupply().ReallocateMemory(cg)
+	if err != nil {
+		return false, err
+	}
+	cg.SetMemoryNode(parent)
+	cg.UpdateExtraMemoryReservation()
+
+	// Make the container to use the new memory set.
+	// FIXME: this could be done in a second pass to avoid doing this many times
+	cg.GetMemoryNode().Policy().applyGrant(cg)
+
+	return true, nil
+}
+
+func (cg *grant) UpdateExtraMemoryReservation() {
+	// For every subnode, make sure that this grant is added to the extra memory allocation.
+	cg.GetMemoryNode().DepthFirst(func(n Node) error {
+		// No extra allocation should be done to the node itself.
+		if !n.IsSameNode(cg.GetMemoryNode()) {
+			supply := n.FreeSupply()
+			supply.SetExtraMemoryReservation(cg)
+		}
+		return nil
+	})
 }

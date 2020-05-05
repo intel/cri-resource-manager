@@ -273,14 +273,7 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 
 	// Add an extra memory reservation to all subnodes.
 	// TODO: no need to do any of this if no memory request
-	pool.DepthFirst(func(n Node) error {
-		// No extra allocation should be done to the node itself.
-		if !n.IsSameNode(pool) {
-			supply := n.FreeSupply()
-			supply.SetExtraMemoryReservation(grant)
-		}
-		return nil
-	})
+	grant.UpdateExtraMemoryReservation()
 
 	// See how much memory reservations the workloads on the
 	// nodes up from this one cause to the node. We only need to
@@ -300,7 +293,7 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 		for _, oldGrant := range p.allocations.grants {
 			oldMemset := oldGrant.GetMemoryNode().GetMemset(grant.MemoryType())
 			if oldMemset.Size() < memset.Size() && memset.Has(oldMemset.Members()...) {
-				changed, err = p.expandMemset(oldGrant)
+				changed, err = oldGrant.ExpandMemset()
 				if err != nil {
 					return nil, err
 				}
@@ -542,16 +535,16 @@ func (p *policy) sortPoolsByScore(req Request, aff map[int]int32) (map[int]Score
 	filteredPools := p.filterInsufficientResources(req, p.pools)
 
 	sort.Slice(filteredPools, func(i, j int) bool {
-		return p.compareScores(req, scores, aff, i, j)
+		return p.compareScores(req, filteredPools, scores, aff, i, j)
 	})
 
 	return scores, filteredPools
 }
 
 // Compare two pools by scores for allocation preference.
-func (p *policy) compareScores(request Request, scores map[int]Score,
+func (p *policy) compareScores(request Request, pools []Node, scores map[int]Score,
 	affinity map[int]int32, i int, j int) bool {
-	node1, node2 := p.pools[i], p.pools[j]
+	node1, node2 := pools[i], pools[j]
 	depth1, depth2 := node1.RootDistance(), node2.RootDistance()
 	id1, id2 := node1.NodeID(), node2.NodeID()
 	score1, score2 := scores[id1], scores[id2]
