@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
@@ -392,7 +393,7 @@ func TestCPULimitCalculationAccuracy(t *testing.T) {
 			if diff < 0 {
 				diff = -diff
 			}
-			if quota != minQuotaPeriod {
+			if quota != kubecm.MinQuotaPeriod {
 				t.Errorf("CPU limit %v: estimate %v, unexpected inaccuracy %v > %v",
 					limit, estimate, diff, expectedAccuracy)
 			} else {
