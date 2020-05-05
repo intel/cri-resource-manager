@@ -62,6 +62,9 @@ spec:
           image: mandark.fi.intel.com:5000/cri-resmgr-agent:testing
           imagePullPolicy: Always # for testing
           securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
             readOnlyRootFilesystem: true
           volumeMounts:
           - name: resmgrsockets
