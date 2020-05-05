@@ -69,6 +69,10 @@ spec:
           volumeMounts:
           - name: resmgrsockets
             mountPath: /var/run/cri-resmgr
+          resources:
+            limits:
+              cpu: 1
+              memory: 512Mi
       volumes:
       - name: resmgrsockets
         hostPath:
