@@ -42,7 +42,7 @@ func (m *resmgr) setupRequestProcessing() error {
 		return resmgrError("failed to register resource-manager CRI interceptors: %v", err)
 	}
 
-	m.relay.Server().SetBypassCheckFn(policy.Bypassed)
+	m.relay.Server().SetBypassCheckFn(m.policy.Bypassed)
 
 	return nil
 }
@@ -69,7 +69,7 @@ func (m *resmgr) startRequestProcessing() error {
 
 // syncWithCRI synchronizes cache pods and containers with the CRI runtime.
 func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Container, error) {
-	if policy.Bypassed() || !m.relay.Client().HasRuntimeService() {
+	if m.policy.Bypassed() || !m.relay.Client().HasRuntimeService() {
 		return nil, nil, nil
 	}
 
