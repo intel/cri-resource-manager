@@ -59,7 +59,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-          image: mandark.fi.intel.com:5000/cri-resmgr-agent:testing
+          image: IMAGE_PLACEHOLDER
           imagePullPolicy: Always # for testing
           securityContext:
             allowPrivilegeEscalation: false
