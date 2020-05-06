@@ -319,6 +319,9 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 
 // Apply the result of allocation to the requesting container.
 func (p *policy) applyGrant(grant Grant) error {
+	p.updateLock.Lock()
+	defer p.updateLock.Unlock()
+
 	log.Debug("* applying grant %s", grant)
 
 	container := grant.GetContainer()
@@ -507,6 +510,10 @@ func (p *policy) filterInsufficientResources(req Request, originals []Node) []No
 				// Can't go negative
 				bitsToFit -= supply.MemoryLimit()[memoryPMEM] - supply.ExtraMemoryReservation(memoryPMEM)
 			}
+		}
+		if req.ColdStart() > 0 {
+			// For a "cold start" request, the memory request must fit completely in the PMEM. So reject the node.
+			continue
 		}
 		if memType&memoryDRAM != 0 {
 			if supply.MemoryLimit()[memoryDRAM]-supply.ExtraMemoryReservation(memoryDRAM) >= bitsToFit {

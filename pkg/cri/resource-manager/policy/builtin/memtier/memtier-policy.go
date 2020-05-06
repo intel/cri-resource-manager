@@ -27,6 +27,8 @@ import (
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+
+	"sync"
 )
 
 const (
@@ -60,6 +62,7 @@ type policy struct {
 	depth        int                       // tree depth
 	allocations  allocations               // container pool assignments
 	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
+	updateLock   sync.Mutex
 }
 
 // Make sure policy implements the policy.Backend interface.

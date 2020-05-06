@@ -34,6 +34,8 @@ const (
 	keySharedCPUPreference = "prefer-shared-cpus"
 	// annotation key for type of memory to allocate
 	keyMemoryTypePreference = "memory-type"
+	// annotation key for type "cold start" of workloads
+	keyColdStartPreference = "cold-start"
 )
 
 // types by memory type name
@@ -141,6 +143,28 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int
 	}
 
 	return true, int(elevate)
+}
+
+// coldStartPreference figures out if the container memory should be first allocated from PMEM.
+// It returns the time (in milliseconds) after which DRAM controller should be added to the mix.
+func coldStartPreference(pod cache.Pod, container cache.Container) (int, error) {
+	value, ok := pod.GetResmgrAnnotation(keyColdStartPreference)
+	if !ok {
+		return 0, nil
+	}
+	preferences := map[string]int{}
+	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
+		log.Error("failed to parse cold start preference %s = '%s': %v",
+			keyColdStartPreference, value, err)
+		return 0, err
+	}
+	name := container.GetName()
+	coldStartTimeout, ok := preferences[name]
+	if !ok {
+		log.Debug("container %s has no entry among cold start preferences", container.PrettyName())
+		return 0, nil
+	}
+	return coldStartTimeout, nil
 }
 
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.
