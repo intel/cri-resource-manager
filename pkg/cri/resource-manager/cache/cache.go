@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 )
@@ -43,6 +44,11 @@ const (
 
 	// TagAVX512 tags containers that use AVX512 instructions.
 	TagAVX512 = "AVX512"
+
+	// RDTClassKey is the pod annotation key for specifying a container RDT class.
+	RDTClassKey = "rdtclass" + "." + kubernetes.ResmgrKeyNamespace
+	// BlockIOClassKey is the pod annotation key for specifying a container Block I/O class.
+	BlockIOClassKey = "blockioclass" + "." + kubernetes.ResmgrKeyNamespace
 )
 
 // PodState is the pod state in the runtime.

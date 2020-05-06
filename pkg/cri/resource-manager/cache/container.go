@@ -111,6 +111,8 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 
 	c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
 
+	c.setDefaultClasses()
+
 	return nil
 }
 
@@ -149,7 +151,23 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 		c.Resources = estimateComputeResources(c.LinuxReq, pod.CgroupParent)
 	}
 
+	c.setDefaultClasses()
+
 	return nil
+}
+
+func (c *container) setDefaultClasses() {
+	class, ok := c.GetEffectiveAnnotation(RDTClassKey)
+	if !ok {
+		class = string(c.GetQOSClass())
+	}
+	c.SetRDTClass(class)
+
+	class, ok = c.GetEffectiveAnnotation(BlockIOClassKey)
+	if !ok {
+		class = string(c.GetQOSClass())
+	}
+	c.SetBlockIOClass(class)
 }
 
 func (c *container) PrettyName() string {
