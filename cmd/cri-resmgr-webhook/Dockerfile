@@ -35,8 +35,10 @@ COPY . .
 RUN make BUILD_DIRS=cri-resmgr-webhook
 
 FROM scratch as final
-COPY --from=builder /install_root /
 
+USER 65534:65534
+
+COPY --from=builder /install_root /
 COPY --from=builder /go/build/bin/cri-resmgr-webhook /bin/cri-resmgr-webhook
 
 ENTRYPOINT ["/bin/cri-resmgr-webhook"]

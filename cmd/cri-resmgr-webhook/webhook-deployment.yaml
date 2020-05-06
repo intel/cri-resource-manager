@@ -37,6 +37,7 @@ spec:
         args:
          - "-cert-file=/etc/cri-resmgr-webhook/certs.d/svc.crt"
          - "-key-file=/etc/cri-resmgr-webhook/certs.d/svc.key"
+         - "-port=8443"
 
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -64,5 +65,6 @@ spec:
     app: cri-resmgr-webhook
   ports:
   - port: 443
+    targetPort: 8443
     protocol: TCP
 
