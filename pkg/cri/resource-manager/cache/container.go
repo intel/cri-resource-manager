@@ -312,6 +312,14 @@ func (c *container) GetResmgrAnnotation(key string, objPtr interface{}) (string,
 	return c.GetAnnotation(kubernetes.ResmgrKey(key), objPtr)
 }
 
+func (c *container) GetEffectiveAnnotation(key string) (string, bool) {
+	pod, ok := c.GetPod()
+	if !ok {
+		return "", false
+	}
+	return pod.GetEffectiveAnnotation(key, c.Name)
+}
+
 func (c *container) GetAnnotations() map[string]string {
 	if c.Annotations == nil {
 		return nil

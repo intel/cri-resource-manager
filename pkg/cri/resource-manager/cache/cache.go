@@ -112,6 +112,14 @@ type Pod interface {
 	// cri-resource-manager namespace.
 	GetResmgrAnnotationObject(key string, objPtr interface{},
 		decode func([]byte, interface{}) error) (bool, error)
+	// GetEffectiveAnnotation returns the effective annotation for a container.
+	// For any given key $K and container $C it will look for annotations in
+	// this order and return the first one found:
+	//     $K/container.$C
+	//     $K/pod
+	//     $K
+	// and return the value of the first key found.
+	GetEffectiveAnnotation(key, container string) (string, bool)
 	// GetCgroupParentDir returns the pods cgroup parent directory.
 	GetCgroupParentDir() string
 	// GetPodResourceRequirements returns container resource requirements if the
@@ -210,6 +218,8 @@ type Container interface {
 	// GetAnnotation returns the value of a container annotation from the
 	// cri-resource-manager namespace.
 	GetResmgrAnnotation(key string, objPtr interface{}) (string, bool)
+	// GetEffectiveAnnotation returns the effective annotation for the container from the pod.
+	GetEffectiveAnnotation(key string) (string, bool)
 	// GetAnnotations returns a copy of all container annotations.
 	GetAnnotations() map[string]string
 	// GetEnvKeys returns the keys of all container environment variables.
