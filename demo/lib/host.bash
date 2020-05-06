@@ -1,18 +1,17 @@
+source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
+
 HOST_PROMPT=${HOST_PROMPT-"\e[38;5;11mhost>\e[0m "}
 GOVM=${GOVM-govm}
 
 host-command() {
-    speed=${speed-10}
-    if [ -n "$PV" ]; then
-        echo -e -n "$HOST_PROMPT"
-        echo "$1" | $PV $speed
-    fi
-    bash -c "$1" | tee command.output
-    command_status=${PIPESTATUS[0]}
-    if [ -n "$PV" ]; then
-        echo | $PV $speed
-    fi
-    return $command_status
+    command-start "host" "$HOST_PROMPT" "$1"
+    bash -c "$COMMAND" 2>&1 | command-handle-output
+    command-end ${PIPESTATUS[0]}
+    return $COMMAND_STATUS
+}
+
+host-require-govm() {
+    command -v "$GOVM" >/dev/null || error "cannot run govm \"$GOVM\". Check PATH or set GOVM=/path/to/govm."
 }
 
 host-create-vm() {
@@ -20,9 +19,8 @@ host-create-vm() {
     if [ -z "$VM_NAME" ]; then
         error "cannot create VM: missing name"
     fi
-    command -v "$GOVM" >/dev/null || error "cannot run govm \"$GOVM\""
     VM_OPT_CPUS=${VM_OPT_CPUS-4}
-
+    host-require-govm
     # If VM does not exist, create it from scrach
     ${GOVM} ls | grep -q "$VM_NAME" || {
         [ -f "$VM_IMAGE" ] || {
@@ -33,7 +31,7 @@ host-create-vm() {
 
     VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
     while [ "x$VM_IP" == "x" ]; do
-        ${GOVM} start "$VM_NAME"
+        host-command "${GOVM} start \"$VM_NAME\""
         sleep 5
         VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
     done
@@ -53,4 +51,20 @@ host-create-vm() {
         fi
     done
     [ "$retries" == "$retries_left" ] || echo ""
+}
+
+host-stop-vm() {
+    VM_NAME=$1
+    host-require-govm
+    host-command "${GOVM} stop $VM_NAME" || {
+        command-error "stopping govm \"$VM_NAME\" failed"
+    }
+}
+
+host-delete-vm() {
+    VM_NAME=$1
+    host-require-govm
+    host-command "${GOVM} delete $VM_NAME" || {
+        command-error "deleting govm \"$VM_NAME\" failed"
+    }
 }
