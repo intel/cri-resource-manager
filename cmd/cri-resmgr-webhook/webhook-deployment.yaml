@@ -38,6 +38,16 @@ spec:
          - "-cert-file=/etc/cri-resmgr-webhook/certs.d/svc.crt"
          - "-key-file=/etc/cri-resmgr-webhook/certs.d/svc.key"
          - "-port=8443"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        resources:
+          limits:
+            cpu: 1
+            memory: 256Mi
 
       nodeSelector:
         node-role.kubernetes.io/master: ""
@@ -53,7 +63,6 @@ spec:
       - name: certs
         secret:
           secretName: cri-resmgr-webhook-secret
-
 ---
 apiVersion: v1
 kind: Service

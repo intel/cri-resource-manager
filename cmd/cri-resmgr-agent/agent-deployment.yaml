@@ -59,13 +59,20 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-          image: mandark.fi.intel.com:5000/cri-resmgr-agent:testing
+          image: IMAGE_PLACEHOLDER
           imagePullPolicy: Always # for testing
           securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
             readOnlyRootFilesystem: true
           volumeMounts:
           - name: resmgrsockets
             mountPath: /var/run/cri-resmgr
+          resources:
+            limits:
+              cpu: 1
+              memory: 512Mi
       volumes:
       - name: resmgrsockets
         hostPath:
