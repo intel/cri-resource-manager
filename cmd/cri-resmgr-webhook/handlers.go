@@ -18,6 +18,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -93,6 +94,9 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	if _, _, err := deserializer.Decode(body, nil, &arReq); err != nil {
 		log.Printf("ERROR: deserializing admission request failed: %v", err)
 		arRsp.Response = errResponse(err)
+	} else if arReq.Request == nil {
+		log.Printf("REQUEST empty")
+		arRsp.Response = errResponse(errors.New("Empty request"))
 	} else {
 		log.Printf("REQUEST:\n%s", stringify(&arReq))
 		if arReq.Request.Resource.Group != "" || arReq.Request.Resource.Version != "v1" {
