@@ -19,7 +19,6 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -45,7 +44,7 @@ func (m *resmgr) setupEventProcessing() error {
 
 // startEventProcessing starts event and metrics processing.
 func (m *resmgr) startEventProcessing() error {
-	if policy.Bypassed() {
+	if m.policy.Bypassed() {
 		return nil
 	}
 

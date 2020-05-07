@@ -134,6 +134,8 @@ type Policy interface {
 	ExportResourceData(cache.Container)
 	// Introspect provides data for external introspection.
 	Introspect() *introspect.State
+	// Bypassed checks if local policy processing is effectively disabled/bypassed.
+	Bypassed() bool
 }
 
 // Policy instance/state.
@@ -163,11 +165,6 @@ func ActivePolicy() string {
 	return opt.Policy
 }
 
-// Bypassed checks if local policy processing is effectively disabled/bypassed.
-func Bypassed() bool {
-	return opt.Policy == NullPolicy
-}
-
 // NewPolicy creates a policy instance using the selected backend.
 func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 	sys, err := system.DiscoverSystem()
@@ -181,7 +178,7 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 		options: *o,
 	}
 
-	if Bypassed() {
+	if opt.Policy == NullPolicy {
 		log.Info("activating '%s' policy (no active backend)", opt.Policy)
 	} else {
 		active, ok := backends[opt.Policy]
@@ -224,13 +221,17 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 
 // Start starts up policy, preparing it for resving requests.
 func (p *policy) Start(add []cache.Container, del []cache.Container) error {
-	if Bypassed() {
+	if p.Bypassed() {
 		log.Info("policy '%s' active, nothing to start...", opt.Policy)
 		return nil
 	}
 
 	log.Info("starting policy '%s'...", p.active.Name())
 	return p.active.Start(add, del)
+}
+
+func (p *policy) Bypassed() bool {
+	return p.active == nil
 }
 
 // Sync synchronizes the active policy state.
@@ -360,7 +361,7 @@ func (p *policy) Introspect() *introspect.State {
 	p.inspsys.Policy = opt.Policy
 
 	state.System = p.inspsys
-	if !Bypassed() {
+	if !p.Bypassed() {
 		p.active.Introspect(state)
 	}
 
