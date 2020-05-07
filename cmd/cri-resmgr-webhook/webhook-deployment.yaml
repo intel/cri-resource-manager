@@ -48,6 +48,15 @@ spec:
           limits:
             cpu: 1
             memory: 256Mi
+        livenessProbe:
+          httpGet:
+            scheme: HTTPS
+            port: 8443
+            httpHeaders:
+            - name: "Content-Type"
+              value: "application/json"
+          initialDelaySeconds: 5
+          periodSeconds: 30
 
       nodeSelector:
         node-role.kubernetes.io/master: ""
