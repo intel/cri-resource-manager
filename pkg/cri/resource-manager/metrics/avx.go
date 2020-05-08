@@ -19,15 +19,10 @@ import (
 	"path/filepath"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 )
 
-// AvxEvent describes cgroup/container AVX512 instruction usage.
-type AvxEvent struct {
-	// Updates contains updates to cgroup/container AVX512 instruction usage.
-	Updates map[string]bool
-}
-
-func (m *Metrics) collectAvxEvents(raw map[string]*model.MetricFamily) *AvxEvent {
+func (m *Metrics) collectAvxEvents(raw map[string]*model.MetricFamily) *events.Avx {
 	all, ok := raw["all_switch_count_per_cgroup"]
 	if !ok {
 		return nil
@@ -63,5 +58,5 @@ func (m *Metrics) collectAvxEvents(raw map[string]*model.MetricFamily) *AvxEvent
 		usage["/"+cgroup] = active
 	}
 
-	return &AvxEvent{Updates: usage}
+	return &events.Avx{Updates: usage}
 }

@@ -20,6 +20,7 @@ import (
 	criapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/cri/server"
 )
@@ -472,6 +473,36 @@ func (m *resmgr) RebalanceContainers() error {
 
 	if changes {
 		if err := m.runPostUpdateHooks(context.Background(), method); err != nil {
+			m.Error("%s: failed to run post-update hooks: %v", method, err)
+			return resmgrError("%s: failed to run post-update hooks: %v", method, err)
+		}
+	}
+
+	m.cache.Save()
+	return nil
+}
+
+// DeliverPolicyEvent delivers a policy-specific event to the active policy.
+func (m *resmgr) DeliverPolicyEvent(e *events.Policy) error {
+	m.Lock()
+	defer m.Unlock()
+
+	if e.Source == "" {
+		e.Source = "unspecified"
+	}
+
+	m.Info("delivering policy event %s.%s...", e.Source, e.Type)
+
+	method := "DeliverPolicyEvent"
+	changes, err := m.policy.HandleEvent(e)
+
+	if err != nil {
+		m.Error("%s: handling event %s.%s failed: %v", method, e.Source, e.Type, err)
+		return err
+	}
+
+	if changes {
+		if err = m.runPostUpdateHooks(context.Background(), method); err != nil {
 			m.Error("%s: failed to run post-update hooks: %v", method, err)
 			return resmgrError("%s: failed to run post-update hooks: %v", method, err)
 		}

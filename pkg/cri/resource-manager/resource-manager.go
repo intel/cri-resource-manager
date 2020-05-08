@@ -396,7 +396,7 @@ func (m *resmgr) setupPolicy() error {
 		m.cache.SetActivePolicy(active)
 	}
 
-	options := &policy.Options{AgentCli: m.agent}
+	options := &policy.Options{AgentCli: m.agent, SendEvent: m.SendEvent}
 	if m.policy, err = policy.NewPolicy(m.cache, options); err != nil {
 		return resmgrError("failed to create policy %s: %v", active, err)
 	}
