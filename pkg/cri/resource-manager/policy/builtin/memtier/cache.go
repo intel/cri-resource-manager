@@ -91,6 +91,7 @@ type cachedGrant struct {
 	MemType     memoryType
 	Memset      system.IDSet
 	MemoryLimit memoryMap
+	ColdStart   int
 }
 
 func newCachedGrant(cg Grant) *cachedGrant {
@@ -107,6 +108,8 @@ func newCachedGrant(cg Grant) *cachedGrant {
 	for key, value := range cg.MemLimit() {
 		ccg.MemoryLimit[key] = value
 	}
+
+	ccg.ColdStart = cg.ColdStart()
 
 	return ccg
 }
@@ -129,6 +132,7 @@ func (ccg *cachedGrant) ToGrant(policy *policy) (Grant, error) {
 		ccg.MemType,
 		ccg.MemType,
 		ccg.MemoryLimit,
+		ccg.ColdStart,
 	)
 
 	if g.Memset().String() != ccg.Memset.String() {

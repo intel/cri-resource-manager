@@ -135,10 +135,14 @@ type Grant interface {
 	// RestoreMemset restores the granted memory set to node maximum
 	// and reapplies the grant.
 	RestoreMemset()
+	// ColdStart returns the cold start timeout in milliseconds.
+	ColdStart() int
 	// AddTimer adds a cold start timer.
 	AddTimer(*time.Timer)
 	// StopTimer stops a cold start timer.
 	StopTimer()
+	// ClearTimer clears the cold start timer pointer.
+	ClearTimer()
 }
 
 // Score represents how well a supply can satisfy a request.
@@ -211,6 +215,7 @@ type grant struct {
 	fullMemType    memoryType      // after a cold start, restore
 	memset         system.IDSet    // assigned memory nodes
 	allocatedMem   memoryMap       // memory limit
+	coldStart      int
 	coldStartTimer *time.Timer
 }
 
@@ -464,18 +469,7 @@ func (cs *supply) Allocate(r Request) (Grant, error) {
 		memType = cr.memType
 	}
 
-	grant := newGrant(cs.node, cr.GetContainer(), exclusive, cr.fraction, memType, cr.memType, allocatedMem)
-
-	if coldStart > 0 {
-		// start a timer to restore the grant memset to full.
-		duration := time.Duration(int64(coldStart) * int64(time.Millisecond))
-		// TODO: store the timer so that we can release it if the grant is destroyed before the timer elapses
-		timer := time.AfterFunc(duration, func() {
-			log.Info("restoring memset to grant %v", grant)
-			grant.RestoreMemset()
-		})
-		grant.AddTimer(timer)
-	}
+	grant := newGrant(cs.node, cr.GetContainer(), exclusive, cr.fraction, memType, cr.memType, allocatedMem, coldStart)
 
 	cs.node.DepthFirst(func(n Node) error {
 		n.FreeSupply().AccountAllocate(grant)
@@ -854,7 +848,7 @@ func (score *score) String() string {
 }
 
 // newGrant creates a CPU grant from the given node for the container.
-func newGrant(n Node, c cache.Container, exclusive cpuset.CPUSet, portion int, initialMt, mt memoryType, allocatedMem memoryMap) Grant {
+func newGrant(n Node, c cache.Container, exclusive cpuset.CPUSet, portion int, initialMt, mt memoryType, allocatedMem memoryMap, coldStart int) Grant {
 	mems := n.GetMemset(initialMt)
 	if mems.Size() == 0 {
 		mems = n.GetMemset(memoryDRAM)
@@ -872,6 +866,7 @@ func newGrant(n Node, c cache.Container, exclusive cpuset.CPUSet, portion int, i
 		memType:      mt,
 		memset:       mems.Clone(),
 		allocatedMem: allocatedMem,
+		coldStart:    coldStart,
 	}
 }
 
@@ -1027,6 +1022,10 @@ func (cg *grant) UpdateExtraMemoryReservation() {
 	})
 }
 
+func (cg *grant) ColdStart() int {
+	return cg.coldStart
+}
+
 func (cg *grant) AddTimer(timer *time.Timer) {
 	cg.coldStartTimer = timer
 }
@@ -1034,5 +1033,12 @@ func (cg *grant) AddTimer(timer *time.Timer) {
 func (cg *grant) StopTimer() {
 	if cg.coldStartTimer != nil {
 		cg.coldStartTimer.Stop()
+		cg.coldStartTimer = nil
+	}
+}
+
+func (cg *grant) ClearTimer() {
+	if cg.coldStartTimer != nil {
+		cg.coldStartTimer = nil
 	}
 }
