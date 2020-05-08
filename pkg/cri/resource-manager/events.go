@@ -92,7 +92,7 @@ func (m *resmgr) stopEventProcessing() {
 	}
 }
 
-// SendEvent injects the given event to the resource manaager's event processing loop.
+// SendEvent injects the given event to the resource manager's event processing loop.
 func (m *resmgr) SendEvent(event interface{}) error {
 	if m.events == nil {
 		return resmgrError("can't send event, no event channel")
