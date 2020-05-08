@@ -40,15 +40,15 @@ const (
 var memoryNamedTypes = map[string]memoryType{
 	"dram":  memoryDRAM,
 	"pmem":  memoryPMEM,
-	"hbmem": memoryHBMEM,
+	"hbm":   memoryHBM,
 	"mixed": memoryAll,
 }
 
 // names by memory type
 var memoryTypeNames = map[memoryType]string{
-	memoryDRAM:  "DRAM",
-	memoryPMEM:  "PMEM",
-	memoryHBMEM: "HBMEM",
+	memoryDRAM: "DRAM",
+	memoryPMEM: "PMEM",
+	memoryHBM:  "HBM",
 }
 
 // memoryType is bitmask of types of memory to allocate
@@ -59,7 +59,7 @@ const (
 	memoryUnspec memoryType = (0x1 << iota) >> 1
 	memoryDRAM
 	memoryPMEM
-	memoryHBMEM
+	memoryHBM
 	memoryFirstUnusedBit
 	memoryAll = memoryFirstUnusedBit - 1
 
@@ -239,7 +239,7 @@ func memoryAllocationPreference(pod cache.Pod, c cache.Container) (uint64, uint6
 func (t memoryType) String() string {
 	str := ""
 	sep := ""
-	for _, bit := range []memoryType{memoryDRAM, memoryPMEM, memoryHBMEM} {
+	for _, bit := range []memoryType{memoryDRAM, memoryPMEM, memoryHBM} {
 		if int(t)&int(bit) != 0 {
 			str += sep + memoryTypeNames[bit]
 			sep = ","

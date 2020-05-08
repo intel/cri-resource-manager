@@ -128,7 +128,7 @@ type node struct {
 	freeres  Supply       // CPU and memory allocatable at this node
 	mem      system.IDSet // controllers with normal DRAM attached
 	pMem     system.IDSet // controllers with PMEM attached
-	hbMem    system.IDSet // controllers with HBM attached
+	hbm      system.IDSet // controllers with HBM attached
 }
 
 // nodeself is used to 'upcast' a generic Node interface to a type-specific one.
@@ -280,7 +280,7 @@ func (n *node) Dump(prefix string, level ...int) {
 	log.Debug("%s  - node CPU: %v", idt, n.noderes)
 	log.Debug("%s  - free CPU: %v", idt, n.freeres)
 	log.Debug("%s  - normal memory: %v", idt, n.mem)
-	log.Debug("%s  - HBM memory: %v", idt, n.hbMem)
+	log.Debug("%s  - HBM memory: %v", idt, n.hbm)
 	log.Debug("%s  - PMEM memory: %v", idt, n.pMem)
 	for _, grant := range n.policy.allocations.grants {
 		if grant.GetCPUNode().NodeID() == n.id {
@@ -398,8 +398,8 @@ func (n *node) GetMemoryType() memoryType {
 	if n.mem.Size() > 0 {
 		memoryMask |= memoryDRAM
 	}
-	if n.hbMem.Size() > 0 {
-		memoryMask |= memoryHBMEM
+	if n.hbm.Size() > 0 {
+		memoryMask |= memoryHBM
 	}
 	return memoryMask
 }
@@ -451,7 +451,7 @@ func (n *numanode) DiscoverSupply() Supply {
 		mem = createMemoryMap(meminfo.MemTotal, 0, 0)
 	case memoryPMEM:
 		mem = createMemoryMap(0, meminfo.MemTotal, 0)
-	case memoryHBMEM:
+	case memoryHBM:
 		mem = createMemoryMap(0, 0, meminfo.MemTotal)
 	case memoryUnspec:
 		mem = createMemoryMap(meminfo.MemTotal, 0, 0)
@@ -482,8 +482,8 @@ func (n *numanode) GetMemset(mtype memoryType) system.IDSet {
 	if mtype&memoryDRAM != 0 {
 		mset.Add(n.mem.Members()...)
 	}
-	if mtype&memoryHBMEM != 0 {
-		mset.Add(n.hbMem.Members()...)
+	if mtype&memoryHBM != 0 {
+		mset.Add(n.hbm.Members()...)
 	}
 	if mtype&memoryPMEM != 0 {
 		mset.Add(n.pMem.Members()...)
@@ -496,7 +496,7 @@ func (n *numanode) GetMemset(mtype memoryType) system.IDSet {
 func (n *numanode) DiscoverMemset() {
 	nID := n.sysnode.ID()
 	n.mem = system.NewIDSet(nID)
-	n.hbMem = system.NewIDSet()
+	n.hbm = system.NewIDSet()
 	n.pMem = system.NewIDSet()
 
 	if !n.IsLeafNode() {
@@ -601,7 +601,7 @@ func (n *socketnode) DiscoverSupply() Supply {
 				mem = createMemoryMap(meminfo.MemTotal, 0, 0)
 			case memoryPMEM:
 				mem = createMemoryMap(0, meminfo.MemTotal, 0)
-			case memoryHBMEM:
+			case memoryHBM:
 				mem = createMemoryMap(0, 0, meminfo.MemTotal)
 			case memoryUnspec:
 				mem = createMemoryMap(meminfo.MemTotal, 0, 0)
@@ -631,8 +631,8 @@ func (n *socketnode) GetMemset(mtype memoryType) system.IDSet {
 	if mtype&memoryDRAM != 0 {
 		mset.Add(n.mem.Members()...)
 	}
-	if mtype&memoryHBMEM != 0 {
-		mset.Add(n.hbMem.Members()...)
+	if mtype&memoryHBM != 0 {
+		mset.Add(n.hbm.Members()...)
 	}
 	if mtype&memoryPMEM != 0 {
 		mset.Add(n.pMem.Members()...)
@@ -644,11 +644,11 @@ func (n *socketnode) GetMemset(mtype memoryType) system.IDSet {
 // DiscoverMemset discovers the set of memory attached to this socket.
 func (n *socketnode) DiscoverMemset() {
 	n.mem = system.NewIDSet()
-	n.hbMem = system.NewIDSet()
+	n.hbm = system.NewIDSet()
 	n.pMem = system.NewIDSet()
 	for _, c := range n.children {
 		n.mem.Add(c.GetMemset(memoryDRAM).Members()...)
-		n.hbMem.Add(c.GetMemset(memoryHBMEM).Members()...)
+		n.hbm.Add(c.GetMemset(memoryHBM).Members()...)
 		n.pMem.Add(c.GetMemset(memoryPMEM).Members()...)
 	}
 }
@@ -708,8 +708,8 @@ func (n *virtualnode) GetMemset(mtype memoryType) system.IDSet {
 	if mtype&memoryDRAM != 0 {
 		mset.Add(n.mem.Members()...)
 	}
-	if mtype&memoryHBMEM != 0 {
-		mset.Add(n.hbMem.Members()...)
+	if mtype&memoryHBM != 0 {
+		mset.Add(n.hbm.Members()...)
 	}
 	if mtype&memoryPMEM != 0 {
 		mset.Add(n.pMem.Members()...)
@@ -721,11 +721,11 @@ func (n *virtualnode) GetMemset(mtype memoryType) system.IDSet {
 // DiscoverMemset discovers the set of memory attached to this socket.
 func (n *virtualnode) DiscoverMemset() {
 	n.mem = system.NewIDSet()
-	n.hbMem = system.NewIDSet()
+	n.hbm = system.NewIDSet()
 	n.pMem = system.NewIDSet()
 	for _, c := range n.children {
 		n.mem.Add(c.GetMemset(memoryDRAM).Members()...)
-		n.hbMem.Add(c.GetMemset(memoryHBMEM).Members()...)
+		n.hbm.Add(c.GetMemset(memoryHBM).Members()...)
 		n.pMem.Add(c.GetMemset(memoryPMEM).Members()...)
 	}
 }

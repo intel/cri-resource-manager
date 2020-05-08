@@ -273,7 +273,7 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	mems := grant.Memset()
 	dram := system.NewIDSet()
 	pmem := system.NewIDSet()
-	hbmem := system.NewIDSet()
+	hbm := system.NewIDSet()
 	for _, id := range mems.SortedMembers() {
 		node := p.sys.Node(id)
 		switch node.GetMemoryType() {
@@ -282,8 +282,8 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 		case system.MemoryTypePMEM:
 			pmem.Add(id)
 			/*
-			   case system.MemoryTypeHBMEM:
-			       hbmem.Add(id)
+				case system.MemoryTypeHBM:
+					hbm.Add(id)
 			*/
 		}
 	}
@@ -294,8 +294,8 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	if pmem.Size() > 0 {
 		data["PMEM_MEMS"] = pmem.String()
 	}
-	if hbmem.Size() > 0 {
-		data["HBMEM_MEMS"] = hbmem.String()
+	if hbm.Size() > 0 {
+		data["HBM_MEMS"] = hbm.String()
 	}
 
 	return data
