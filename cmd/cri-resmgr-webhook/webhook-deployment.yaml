@@ -27,8 +27,6 @@ spec:
         image: IMAGE_PLACEHOLDER
         # Convenience pull policy for development
         imagePullPolicy: Always
-        ports:
-        - containerPort: 443
         # Mount the tls cert/key in the default location
         volumeMounts:
         - name: certs
