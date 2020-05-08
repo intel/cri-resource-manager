@@ -75,7 +75,7 @@ spec:
               memory: 512Mi
           livenessProbe:
             exec:
-              command: ["nc", "-U", "-z", "/var/run/cri-resmgr/cri-resmgr-agent.sock"]
+              command: ["/bin/cri-resmgr-agent-probe"]
             initialDelaySeconds: 5
             periodSeconds: 30
       volumes:

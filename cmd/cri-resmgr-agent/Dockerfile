@@ -19,7 +19,7 @@ RUN mkdir /install_root \
     ${CLEAR_LINUX_VERSION} \
     --path /install_root \
     --statedir /swupd-state \
-    --bundles=os-core,network-basic \
+    --bundles=os-core \
     --no-boot-update \
     && rm -rf /install_root/var/lib/swupd/*
 
@@ -32,9 +32,9 @@ RUN go mod download
 
 # Build agent
 COPY . .
-RUN make BUILD_DIRS=cri-resmgr-agent
+RUN make BUILD_DIRS="cri-resmgr-agent cri-resmgr-agent-probe"
 
 FROM scratch as final
 COPY --from=builder /install_root /
-COPY --from=builder /go/build/bin/cri-resmgr-agent /bin/cri-resmgr-agent
+COPY --from=builder /go/build/bin/* /bin/
 ENTRYPOINT ["/bin/cri-resmgr-agent"]
