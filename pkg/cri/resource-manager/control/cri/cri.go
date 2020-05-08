@@ -86,6 +86,9 @@ func (ctl *crictl) PreCreateHook(c cache.Container) error {
 	create.Config.Envs = c.GetCRIEnvs()
 	create.Config.Mounts = c.GetCRIMounts()
 	create.Config.Devices = c.GetCRIDevices()
+	if create.Config.Linux == nil {
+		create.Config.Linux = &criapi.LinuxContainerConfig{}
+	}
 	create.Config.Linux.Resources = c.GetLinuxResources()
 
 	c.ClearPending(CRIController)
