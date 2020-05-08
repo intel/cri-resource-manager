@@ -325,6 +325,15 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 
 	container.UpdateState(cache.ContainerStateRunning)
 
+	e := &events.Policy{
+		Type:   events.ContainerStarted,
+		Source: "resource-manager",
+		Data:   container,
+	}
+	if _, err := m.policy.HandleEvent(e); err != nil {
+		m.Error("%s: policy failed to handle event %s: %v", method, e.Type, err)
+	}
+
 	if err := m.runPostStartHooks(ctx, method, container); err != nil {
 		m.Error("%s: failed to run post-start hooks for %s: %v",
 			method, container.PrettyName(), err)
