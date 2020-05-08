@@ -27,6 +27,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/blockio"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/rdt"
@@ -59,6 +60,8 @@ type ConstraintSet map[Domain]Constraint
 type Options struct {
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
+	// SendEvent is the function for delivering events back to the resource manager.
+	SendEvent SendEventFn
 }
 
 // BackendOptions describes the options for a policy backend instance
@@ -73,10 +76,15 @@ type BackendOptions struct {
 	Reserved ConstraintSet
 	// Client interface to cri-resmgr agent
 	AgentCli agent.Interface
+	// SendEvent is the function for delivering events up to the resource manager.
+	SendEvent SendEventFn
 }
 
 // CreateFn is the type for functions used to create a policy instance.
 type CreateFn func(*BackendOptions) Backend
+
+// SendEventFn is the type for a function to send events back to the resource manager.
+type SendEventFn func(interface{}) error
 
 const (
 	// ExportedResources is the basename of the file container resources are exported to.
@@ -111,6 +119,9 @@ type Backend interface {
 	UpdateResources(cache.Container) error
 	// Rebalance tries an optimal allocation of resources for the current container.
 	Rebalance() (bool, error)
+	// HandleEvent processes the given event. The returned boolean indicates whether
+	// changes have been made to any of the containers while handling the event.
+	HandleEvent(*events.Policy) (bool, error)
 	// ExportResourceData provides resource data to export for the container.
 	ExportResourceData(cache.Container) map[string]string
 	// Introspect provides data for external introspection.
@@ -131,6 +142,10 @@ type Policy interface {
 	UpdateResources(cache.Container) error
 	// Rebalance tries to find an optimal allocation of resources for the current containers.
 	Rebalance() (bool, error)
+	// HandleEvent passes on the given event to the active policy. The returned boolean
+	// indicates whether changes have been made to any of the containers while handling
+	// the event.
+	HandleEvent(*events.Policy) (bool, error)
 	// ExportResourceData exports/updates resource data for the container.
 	ExportResourceData(cache.Container)
 	// Introspect provides data for external introspection.
@@ -141,11 +156,12 @@ type Policy interface {
 
 // Policy instance/state.
 type policy struct {
-	options Options            // policy options
-	cache   cache.Cache        // system state cache
-	active  Backend            // our active backend
-	system  system.System      // system/HW/topology info
-	inspsys *introspect.System // ditto for introspection
+	options   Options            // policy options
+	cache     cache.Cache        // system state cache
+	active    Backend            // our active backend
+	system    system.System      // system/HW/topology info
+	inspsys   *introspect.System // ditto for introspection
+	sendEvent SendEventFn        // function to send event up to the resource manager
 }
 
 // backend is a registered Backend.
@@ -212,6 +228,7 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 			Available: opt.Available,
 			Reserved:  opt.Reserved,
 			AgentCli:  o.AgentCli,
+			SendEvent: o.SendEvent,
 		}
 
 		p.active = active.create(backendOpts)
@@ -258,6 +275,14 @@ func (p *policy) UpdateResources(c cache.Container) error {
 // Rebalance tries to find a more optimal allocation of resources for the current containers.
 func (p *policy) Rebalance() (bool, error) {
 	return p.active.Rebalance()
+}
+
+// HandleEvent passes on the given event to the active policy.
+func (p *policy) HandleEvent(e *events.Policy) (bool, error) {
+	if !p.Bypassed() {
+		return p.active.HandleEvent(e)
+	}
+	return false, nil
 }
 
 // ExportResourceData exports/updates resource data for the container.

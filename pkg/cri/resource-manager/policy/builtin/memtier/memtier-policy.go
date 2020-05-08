@@ -22,6 +22,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
@@ -207,6 +208,12 @@ func (p *policy) Rebalance() (bool, error) {
 	}
 
 	return true, errors
+}
+
+// HandleEvent handles policy-specific events.
+func (p *policy) HandleEvent(*events.Policy) (bool, error) {
+	log.Debug("should handle policy event %v...")
+	return false, nil
 }
 
 // Introspect provides data for external introspection.

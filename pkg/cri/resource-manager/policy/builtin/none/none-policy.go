@@ -16,6 +16,7 @@ package none
 
 import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
@@ -85,6 +86,12 @@ func (n *none) UpdateResources(c cache.Container) error {
 // Rebalance tries to find an optimal allocation of resources for the current containers.
 func (n *none) Rebalance() (bool, error) {
 	n.Debug("(not) rebalancing containers...")
+	return false, nil
+}
+
+// HandleEvent handles policy-specific events.
+func (n *none) HandleEvent(*events.Policy) (bool, error) {
+	n.Debug("(not) handling event...")
 	return false, nil
 }
 

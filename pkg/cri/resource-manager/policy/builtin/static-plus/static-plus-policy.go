@@ -28,6 +28,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -171,6 +172,12 @@ func (p *staticplus) UpdateResources(c cache.Container) error {
 // Rebalance tries to find an optimal allocation of resources for the current containers.
 func (p *staticplus) Rebalance() (bool, error) {
 	p.Debug("(not) rebalancing containers...")
+	return false, nil
+}
+
+// HandleEvent handles policy-specific events.
+func (p *staticplus) HandleEvent(*events.Policy) (bool, error) {
+	p.Debug("(not) handling event...")
 	return false, nil
 }
 
