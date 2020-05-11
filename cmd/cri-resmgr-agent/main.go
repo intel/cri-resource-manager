@@ -24,7 +24,10 @@ import (
 )
 
 func main() {
+	// Disable buffering and make sure that all messages have been emitted at
+	// program exit
 	log.Flush()
+	defer log.Flush()
 
 	flag.Parse()
 
