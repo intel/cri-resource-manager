@@ -24,16 +24,16 @@ import (
 )
 
 func main() {
-	logger := log.Default()
+	log.Flush()
 
 	flag.Parse()
 
 	a, err := agent.NewResourceManagerAgent()
 	if err != nil {
-		logger.Fatal("failed to create resource manager agent instance: %v", err)
+		log.Fatal("failed to create resource manager agent instance: %v", err)
 	}
 
 	if err := a.Run(); err != nil {
-		logger.Fatal("%v", err)
+		log.Fatal("%v", err)
 	}
 }
