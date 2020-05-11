@@ -92,8 +92,8 @@ type Request interface {
 	MemoryType() memoryType
 	// MemAmountToAllocate retuns how much memory we need to reserve for a request.
 	MemAmountToAllocate() uint64
-	// ColdStart returns the cold start timeout in milliseconds.
-	ColdStart() int
+	// ColdStart returns the cold start timeout.
+	ColdStart() time.Duration
 }
 
 // Grant represents CPU and memory capacity allocated to a container from a node.
@@ -135,8 +135,8 @@ type Grant interface {
 	// RestoreMemset restores the granted memory set to node maximum
 	// and reapplies the grant.
 	RestoreMemset()
-	// ColdStart returns the cold start timeout in milliseconds.
-	ColdStart() int
+	// ColdStart returns the cold start timeout.
+	ColdStart() time.Duration
 	// AddTimer adds a cold start timer.
 	AddTimer(*time.Timer)
 	// StopTimer stops a cold start timer.
@@ -197,9 +197,9 @@ type request struct {
 	// coldStart tells the timeout (in milliseconds) how long to wait until
 	// a DRAM memory controller should be added to a container asking for a
 	// mixed DRAM/PMEM memory allocation. This allows for a "cold start" where
-	// initial memory requests are made to the PMEM memory. A value of -1
+	// initial memory requests are made to the PMEM memory. A value of 0
 	// indicates that cold start is not explicitly requested.
-	coldStart int
+	coldStart time.Duration
 }
 
 var _ Request = &request{}
@@ -212,11 +212,10 @@ type grant struct {
 	exclusive      cpuset.CPUSet   // exclusive CPUs
 	portion        int             // milliCPUs granted from shared set
 	memType        memoryType      // requested types of memory
-	fullMemType    memoryType      // after a cold start, restore
 	memset         system.IDSet    // assigned memory nodes
 	allocatedMem   memoryMap       // memory limit
-	coldStart      int
-	coldStartTimer *time.Timer
+	coldStart      time.Duration   // how long until cold start is done
+	coldStartTimer *time.Timer     // timer to trigger cold start timeout
 }
 
 var _ Grant = &grant{}
@@ -377,6 +376,8 @@ func (cs *supply) allocateMemory(cr *request) (memoryMap, error) {
 	}
 
 	if remaining > 0 && cr.ColdStart() > 0 {
+		cs.mem[memoryPMEM] += amount - remaining
+		cs.grantedMem[memoryPMEM] = amount - remaining
 		return nil, policyError("internal error: not enough memory at %s, short circuit due to cold start", cs.node.Name())
 	}
 
@@ -411,6 +412,7 @@ func (cs *supply) allocateMemory(cr *request) (memoryMap, error) {
 	}
 
 	if remaining > 0 {
+		// FIXME: restore the already allocated memory to the supply
 		return nil, policyError("internal error: not enough memory at %s", cs.node.Name())
 	}
 
@@ -640,18 +642,18 @@ func newRequest(container cache.Container) Request {
 	pod, _ := container.GetPod()
 	full, fraction, isolate, elevate := cpuAllocationPreferences(pod, container)
 	req, lim, mtype := memoryAllocationPreference(pod, container)
-	coldStart := -1
+	coldStart := time.Duration(0)
 
 	if mtype == memoryUnspec {
 		mtype = defaultMemoryType
 	}
 
-	if mtype&memoryPMEM == memoryPMEM && mtype&memoryDRAM == memoryDRAM {
+	if mtype&memoryPMEM != 0 && mtype&memoryDRAM != 0 {
 		parsedColdStart, err := coldStartPreference(pod, container)
 		if err != nil {
 			log.Error("Failed to parse cold start preference")
 		} else {
-			coldStart = parsedColdStart
+			coldStart = parsedColdStart.duration
 		}
 	}
 
@@ -745,7 +747,7 @@ func (cr *request) MemoryType() memoryType {
 }
 
 // ColdStart returns the cold start timeout (in milliseconds).
-func (cr *request) ColdStart() int {
+func (cr *request) ColdStart() time.Duration {
 	return cr.coldStart
 }
 
@@ -848,7 +850,7 @@ func (score *score) String() string {
 }
 
 // newGrant creates a CPU grant from the given node for the container.
-func newGrant(n Node, c cache.Container, exclusive cpuset.CPUSet, portion int, initialMt, mt memoryType, allocatedMem memoryMap, coldStart int) Grant {
+func newGrant(n Node, c cache.Container, exclusive cpuset.CPUSet, portion int, initialMt, mt memoryType, allocatedMem memoryMap, coldStart time.Duration) Grant {
 	mems := n.GetMemset(initialMt)
 	if mems.Size() == 0 {
 		mems = n.GetMemset(memoryDRAM)
@@ -915,7 +917,7 @@ func (cg *grant) MemoryType() memoryType {
 	return cg.memType
 }
 
-// Memset returns the granted memory controllers as a string.
+// Memset returns the granted memory controllers as an IDSet.
 func (cg *grant) Memset() system.IDSet {
 	return cg.memset
 }
@@ -1022,7 +1024,7 @@ func (cg *grant) UpdateExtraMemoryReservation() {
 	})
 }
 
-func (cg *grant) ColdStart() int {
+func (cg *grant) ColdStart() time.Duration {
 	return cg.coldStart
 }
 

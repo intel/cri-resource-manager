@@ -27,8 +27,6 @@ import (
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-
-	"sync"
 )
 
 const (
@@ -65,14 +63,13 @@ type policy struct {
 	depth        int                       // tree depth
 	allocations  allocations               // container pool assignments
 	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
-	updateLock   sync.Mutex
 }
 
 // Make sure policy implements the policy.Backend interface.
 var _ policyapi.Backend = &policy{}
 
-// CreateTopologyAwarePolicy creates a new policy instance.
-func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
+// CreateMemtierPolicy creates a new policy instance.
+func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 	p := &policy{
 		cache:        opts.Cache,
 		sys:          opts.System,
@@ -237,6 +234,7 @@ func (p *policy) HandleEvent(e *events.Policy) (bool, error) {
 		}
 		c, ok := p.cache.LookupContainer(id)
 		if !ok {
+			// TODO: This is probably a race condition. Should we return nil error here?
 			return false, policyError("%s event: failed to lookup container %s", id)
 		}
 		log.Info("finishing coldstart period for %s", c.PrettyName())
@@ -410,5 +408,5 @@ func (p *policy) restoreCache() error {
 
 // Register us as a policy implementation.
 func init() {
-	policyapi.Register(PolicyName, PolicyDescription, CreateTopologyAwarePolicy)
+	policyapi.Register(PolicyName, PolicyDescription, CreateMemtierPolicy)
 }

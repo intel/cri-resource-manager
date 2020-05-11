@@ -319,9 +319,6 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 
 // Apply the result of allocation to the requesting container.
 func (p *policy) applyGrant(grant Grant) error {
-	p.updateLock.Lock()
-	defer p.updateLock.Unlock()
-
 	log.Debug("* applying grant %s", grant)
 
 	container := grant.GetContainer()

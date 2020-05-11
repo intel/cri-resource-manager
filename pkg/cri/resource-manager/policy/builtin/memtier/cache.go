@@ -16,6 +16,7 @@ package memtier
 
 import (
 	"encoding/json"
+	"time"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -91,7 +92,7 @@ type cachedGrant struct {
 	MemType     memoryType
 	Memset      system.IDSet
 	MemoryLimit memoryMap
-	ColdStart   int
+	ColdStart   time.Duration
 }
 
 func newCachedGrant(cg Grant) *cachedGrant {
