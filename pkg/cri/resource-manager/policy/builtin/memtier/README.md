@@ -32,12 +32,12 @@ cri-resmgr --policy memtier --reserved-resources cpu=750m
 ## Configuration
 
 The `memtier` policy knows of three kinds of memory: `DRAM`, `PMEM`, and
-`HBMEM`. The various memory types are accessed via separate memory controllers.
+`HBM`. The various memory types are accessed via separate memory controllers.
 
   * DRAM (dynamic random-access memory) is regular system main memory.
   * PMEM (persistent memory) is large-capacity memory, such as
     Intel® Optane™ memory.
-  * HBMEM (high-bandwidth memory) is high speed memory, typically found
+  * HBM (high-bandwidth memory) is high speed memory, typically found
     on some special-purpose computing systems.
 
 In order to configure a pod to use a certain memory type, use

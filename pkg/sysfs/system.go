@@ -62,8 +62,8 @@ const (
 	MemoryTypeDRAM MemoryType = iota
 	// MemoryTypePMEM means that the node has persistent memory
 	MemoryTypePMEM
-	// MemoryTypeHBMEM means that the node has high bandwidth memory
-	MemoryTypeHBMEM
+	// MemoryTypeHBM means that the node has high bandwidth memory
+	MemoryTypeHBM
 )
 
 // System devices
@@ -657,10 +657,10 @@ func (sys *system) discoverNodes() error {
 	}
 
 	dramNodes := memoryNodes.Intersection(cpuNodes)
-	pmemOrHbmemNodes := memoryNodes.Difference(dramNodes)
+	pmemOrHbmNodes := memoryNodes.Difference(dramNodes)
 
 	dramNodeIds := FromCPUSet(dramNodes)
-	pmemOrHbmemNodeIds := FromCPUSet(pmemOrHbmemNodes)
+	pmemOrHbmNodeIds := FromCPUSet(pmemOrHbmNodes)
 
 	sys.nodes = make(map[ID]*node)
 
@@ -673,12 +673,12 @@ func (sys *system) discoverNodes() error {
 
 	infos := make(map[ID]*MemInfo)
 	dramAvg := uint64(0)
-	if len(pmemOrHbmemNodeIds) > 0 && len(dramNodeIds) > 0 {
+	if len(pmemOrHbmNodeIds) > 0 && len(dramNodeIds) > 0 {
 		// There is special memory present in the system.
 
-		// FIXME assumption: if a node only has memory (and no CPUs), it's PMEM or HBMEM. Otherwise it's DRAM.
-		// Also, we figure out if the memory is HBMEM or PMEM based on the amount. If the amount of memory is
-		// smaller than the average amount of DRAM per node, it's HBMEM, otherwise PMEM.
+		// FIXME assumption: if a node only has memory (and no CPUs), it's PMEM or HBM. Otherwise it's DRAM.
+		// Also, we figure out if the memory is HBM or PMEM based on the amount. If the amount of memory is
+		// smaller than the average amount of DRAM per node, it's HBM, otherwise PMEM.
 		dramTotal := uint64(0)
 		for _, node := range sys.nodes {
 			info, err := node.MemoryInfo()
@@ -698,14 +698,14 @@ func (sys *system) discoverNodes() error {
 	}
 
 	for _, node := range sys.nodes {
-		if _, ok := pmemOrHbmemNodeIds[node.id]; ok {
+		if _, ok := pmemOrHbmNodeIds[node.id]; ok {
 			mem, ok := infos[node.id]
 			if !ok {
 				return fmt.Errorf("not able to determine system special memory types")
 			}
 			if mem.MemTotal < dramAvg {
-				sys.Logger.Info("node %d has HBMEM memory", node.id)
-				node.memoryType = MemoryTypeHBMEM
+				sys.Logger.Info("node %d has HBM memory", node.id)
+				node.memoryType = MemoryTypeHBM
 			} else {
 				sys.Logger.Info("node %d has PMEM memory", node.id)
 				node.memoryType = MemoryTypePMEM
@@ -714,7 +714,7 @@ func (sys *system) discoverNodes() error {
 			sys.Logger.Info("node %d has DRAM memory", node.id)
 			node.memoryType = MemoryTypeDRAM
 		} else {
-			return fmt.Errorf("Unknown memory type for node %v (pmem nodes: %s, dram nodes: %s)", node, pmemOrHbmemNodes, dramNodes)
+			return fmt.Errorf("Unknown memory type for node %v (pmem nodes: %s, dram nodes: %s)", node, pmemOrHbmNodes, dramNodes)
 		}
 	}
 

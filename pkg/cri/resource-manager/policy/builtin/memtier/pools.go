@@ -511,8 +511,8 @@ func (p *policy) filterInsufficientResources(req Request, originals []Node) []No
 				bitsToFit -= supply.MemoryLimit()[memoryDRAM] - supply.ExtraMemoryReservation(memoryDRAM)
 			}
 		}
-		if memType&memoryHBMEM != 0 {
-			if supply.MemoryLimit()[memoryHBMEM]-supply.ExtraMemoryReservation(memoryHBMEM) >= bitsToFit {
+		if memType&memoryHBM != 0 {
+			if supply.MemoryLimit()[memoryHBM]-supply.ExtraMemoryReservation(memoryHBM) >= bitsToFit {
 				filtered = append(filtered, node)
 			}
 		}

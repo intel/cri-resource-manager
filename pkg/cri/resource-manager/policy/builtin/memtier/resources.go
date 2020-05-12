@@ -227,7 +227,7 @@ func createMemoryMap(normalMemory, persistentMemory, hbMemory uint64) memoryMap 
 	return memoryMap{
 		memoryDRAM:   normalMemory,
 		memoryPMEM:   persistentMemory,
-		memoryHBMEM:  hbMemory,
+		memoryHBM:    hbMemory,
 		memoryAll:    normalMemory + persistentMemory + hbMemory,
 		memoryUnspec: 0,
 	}
@@ -333,7 +333,7 @@ func (cs *supply) allocateMemory(cr *request) (memoryMap, error) {
 	amount := cr.MemAmountToAllocate()
 	remaining := amount
 
-	// First allocate from PMEM, then DRAM, finally HBMEM. No need to care about
+	// First allocate from PMEM, then DRAM, finally HBM. No need to care about
 	// extra memory reservations since the nodes into which the request won't
 	// fit have already been filtered out.
 
@@ -367,17 +367,17 @@ func (cs *supply) allocateMemory(cr *request) (memoryMap, error) {
 		}
 	}
 
-	if remaining > 0 && memType&memoryHBMEM != 0 {
-		available := cs.mem[memoryHBMEM] - cs.grantedMem[memoryHBMEM]
+	if remaining > 0 && memType&memoryHBM != 0 {
+		available := cs.mem[memoryHBM] - cs.grantedMem[memoryHBM]
 		if remaining < available {
-			cs.grantedMem[memoryHBMEM] += remaining
-			cs.mem[memoryHBMEM] -= remaining
-			allocatedMem[memoryHBMEM] = remaining
+			cs.grantedMem[memoryHBM] += remaining
+			cs.mem[memoryHBM] -= remaining
+			allocatedMem[memoryHBM] = remaining
 			remaining = 0
 		} else {
-			cs.grantedMem[memoryHBMEM] += available
-			cs.mem[memoryHBMEM] = 0
-			allocatedMem[memoryHBMEM] = available
+			cs.grantedMem[memoryHBM] += available
+			cs.mem[memoryHBM] = 0
+			allocatedMem[memoryHBM] = available
 			remaining -= available
 		}
 	}
