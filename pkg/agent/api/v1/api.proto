@@ -24,6 +24,7 @@ service Agent{
     rpc PatchNode(PatchNodeRequest) returns (PatchNodeReply) {}
     rpc UpdateNodeCapacity(UpdateNodeCapacityRequest) returns (UpdateNodeCapacityReply) {}
     rpc GetConfig(GetConfigRequest) returns (GetConfigReply) {}
+    rpc HealthCheck(HealthCheckRequest) returns (HealthCheckReply) {}
 }
 
 message GetNodeRequest {
@@ -62,4 +63,11 @@ message GetConfigRequest {
 message GetConfigReply {
     string node_name = 1;
     map<string, string> config = 2;
+}
+
+message HealthCheckRequest {
+}
+
+message HealthCheckReply {
+    string error = 1;
 }

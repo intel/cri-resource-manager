@@ -169,6 +169,12 @@ func (g *grpcServer) UpdateNodeCapacity(ctx context.Context, req *v1.UpdateNodeC
 	return rpl, err
 }
 
+// HealthCheck checks if the agent is in healthy state
+func (g *grpcServer) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) (*v1.HealthCheckReply, error) {
+	g.Debug("received HealthCheckRequest: %v", req)
+	return &v1.HealthCheckReply{}, nil
+}
+
 func isNativeResource(name string) bool {
 	switch {
 	case name == string(core_v1.ResourceCPU), name == string(core_v1.ResourceMemory):
