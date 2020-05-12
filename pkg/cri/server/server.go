@@ -19,7 +19,9 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +41,12 @@ import (
 type Options struct {
 	// Socket is the path of our gRPC servers unix-domain socket.
 	Socket string
+	// User is the user ID for our gRPC socket.
+	User int
+	// Group is the group ID for our gRPC socket.
+	Group int
+	// Mode is the permission mode bits for our gRPC socket.
+	Mode os.FileMode
 }
 
 // Handler is a CRI server generic request handler.
@@ -61,6 +69,10 @@ type Server interface {
 	Start() error
 	// Stop stops the request processing loop (goroutine) of the server.
 	Stop()
+	// Chmod changes the permissions of the server's socket.
+	Chmod(mode os.FileMode) error
+	// Chown changes ownership of the server's socket.
+	Chown(uid, gid int) error
 }
 
 // server is the implementation of Server.
@@ -193,8 +205,65 @@ func (s *server) createGrpcServer() error {
 				s.options.Socket, err)
 		}
 	}
+
 	s.listener = l
+
+	if s.options.User >= 0 {
+		if err := s.Chown(s.options.User, s.options.Group); err != nil {
+			l.Close()
+			s.listener = nil
+			return err
+		}
+	}
+
+	if s.options.Mode != 0 {
+		if err := s.Chmod(s.options.Mode); err != nil {
+			l.Close()
+			s.listener = nil
+			return err
+		}
+	}
+
 	s.server = grpc.NewServer(instrumentation.InjectGrpcServerTrace()...)
+
+	return nil
+}
+
+// Chmod changes the permissions of the server's socket.
+func (s *server) Chmod(mode os.FileMode) error {
+	if s.listener != nil {
+		if err := os.Chmod(s.options.Socket, mode); err != nil {
+			return serverError("failed to change permissions of socket %q to %v: %v",
+				s.options.Socket, mode, err)
+		}
+		s.Info("changed permissions of socket %q to %v", s.options.Socket, mode)
+	}
+
+	s.options.Mode = mode
+
+	return nil
+}
+
+// Chown changes ownership of the server's socket.
+func (s *server) Chown(uid, gid int) error {
+	if s.listener != nil {
+		userName := strconv.FormatInt(int64(uid), 10)
+		if u, err := user.LookupId(userName); u != nil && err == nil {
+			userName = u.Name
+		}
+		groupName := strconv.FormatInt(int64(gid), 10)
+		if g, err := user.LookupGroupId(groupName); g != nil && err == nil {
+			groupName = g.Name
+		}
+		if err := os.Chown(s.options.Socket, uid, gid); err != nil {
+			return serverError("failed to change ownership of socket %q to %s/%s: %v",
+				s.options.Socket, userName, groupName, err)
+		}
+		s.Info("changed ownership of socket %q to %s/%s", s.options.Socket, userName, groupName)
+	}
+
+	s.options.User = uid
+	s.options.Group = gid
 
 	return nil
 }
