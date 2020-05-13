@@ -16,6 +16,7 @@ package cache
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -492,6 +493,20 @@ const (
 	CacheVersion = "1"
 )
 
+// permissions describe preferred/expected ownership and permissions for a file or directory.
+type permissions struct {
+	prefer os.FileMode // permissions to create file/directory with
+	reject os.FileMode // bits that cause rejection to use an existing entry
+}
+
+// permissions to create with/check against
+var (
+	cacheDirPerm  = &permissions{prefer: 0710, reject: 0022}
+	cacheFilePerm = &permissions{prefer: 0644, reject: 0022}
+	dataDirPerm   = &permissions{prefer: 0755, reject: 0022}
+	dataFilePerm  = &permissions{prefer: 0644, reject: 0022}
+)
+
 // Our cache of objects.
 type cache struct {
 	sync.Mutex    `json:"-"` // we're lockable
@@ -536,11 +551,15 @@ func NewCache(options Options) (Cache, error) {
 		implicit:   make(map[string]*ImplicitAffinity),
 	}
 
-	if err := os.MkdirAll(options.CacheDir, 0700); err != nil {
-		return nil, cacheError("failed to create cache directory %s: %v",
-			options.CacheDir, err)
+	if _, err := cch.checkPerm("cache", cch.filePath, false, cacheFilePerm); err != nil {
+		return nil, cacheError("refusing to use existing cache file: %v", err)
 	}
-
+	if err := cch.mkdirAll("cache", options.CacheDir, cacheDirPerm); err != nil {
+		return nil, err
+	}
+	if err := cch.mkdirAll("container", cch.dataDir, dataDirPerm); err != nil {
+		return nil, err
+	}
 	if err := cch.Load(); err != nil {
 		return nil, err
 	}
@@ -1110,6 +1129,70 @@ func (cch *cache) setEntry(key string, ptr, obj interface{}) error {
 	return nil
 }
 
+// checkPerm checks permissions of an already existing file or directory.
+func (cch *cache) checkPerm(what, path string, isDir bool, p *permissions) (bool, error) {
+	if isDir {
+		what += " directory"
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return true, cacheError("failed to os.Stat() %s %q: %v", what, path, err)
+		}
+		return false, nil
+	}
+
+	// check expected file type
+	if isDir {
+		if !info.IsDir() {
+			return true, cacheError("%s %q exists, but is not a directory", what, path)
+		}
+	} else {
+		if info.Mode()&os.ModeType != 0 {
+			return true, cacheError("%s %q exists, but is not a regular file", what, path)
+		}
+	}
+
+	existing := info.Mode().Perm()
+	expected := p.prefer
+	rejected := p.reject
+	if ((expected | rejected) &^ os.ModePerm) != 0 {
+		cch.Panic("internal error: current permissions check only handles permission bits (rwx)")
+	}
+
+	// check that we don't have any of the rejectable permission bits set
+	if existing&rejected != 0 {
+		return true, cacheError("existing %s %q has disallowed permissions set: %v",
+			what, path, existing&rejected)
+	}
+
+	// warn if permissions are less strict than the preferred defaults
+	if (existing | expected) != expected {
+		cch.Warn("existing %s %q has less strict permissions %v than expected %v",
+			what, path, existing, expected)
+	}
+
+	return true, nil
+}
+
+// mkdirAll creates a directory, checking permissions if it already exists.
+func (cch *cache) mkdirAll(what, path string, p *permissions) error {
+	exists, err := cch.checkPerm(what, path, true, p)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+
+	if err := os.MkdirAll(path, p.prefer); err != nil {
+		return cacheError("failed to create %s directory %q: %v", what, path, err)
+	}
+
+	return nil
+}
+
 // snapshot is used to serialize the cache into a saveable/loadable state.
 type snapshot struct {
 	Version    string
@@ -1209,7 +1292,7 @@ func (cch *cache) Save() error {
 		return cacheError("failed to save cache: %v", err)
 	}
 
-	if err = ioutil.WriteFile(cch.filePath, data, 0644); err != nil {
+	if err = ioutil.WriteFile(cch.filePath, data, cacheFilePerm.prefer); err != nil {
 		return cacheError("failed to write cache to file '%s': %v", cch.filePath, err)
 	}
 
@@ -1247,9 +1330,9 @@ func (cch *cache) ContainerDirectory(id string) string {
 func (cch *cache) createContainerDirectory(id string) error {
 	dir := cch.ContainerDirectory(id)
 	if dir == "" {
-		return cacheError("failed to create directory for container %s", id)
+		return cacheError("failed to determine container directory path for container %s", id)
 	}
-	return os.MkdirAll(dir, os.FileMode(0755))
+	return cch.mkdirAll("container directory", dir, dataDirPerm)
 }
 
 func (cch *cache) removeContainerDirectory(id string) error {
@@ -1261,18 +1344,25 @@ func (cch *cache) removeContainerDirectory(id string) error {
 }
 
 func (cch *cache) OpenFile(id string, name string, perm os.FileMode) (*os.File, error) {
-	if _, ok := cch.Containers[id]; !ok {
-		return nil, cacheError("failed to open '%s' for container '%s': no such container",
-			name, id)
+	dir := cch.ContainerDirectory(id)
+	if dir == "" {
+		return nil, cacheError("failed to determine data directory for container %s", id)
+	}
+	if err := cch.mkdirAll("container directory", dir, dataDirPerm); err != nil {
+		return nil, cacheError("container %s: can't create data file %q: %v", id, name, err)
 	}
 
-	path := filepath.Join(cch.ContainerDirectory(id), name)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return nil, cacheError("container %s: can't write data file '%s': %v", id, name, err)
+	path := filepath.Join(dir, name)
+	if _, err := cch.checkPerm("container", path, false, dataFilePerm); err != nil {
+		return nil, err
 	}
 
-	flags := os.O_CREATE | os.O_TRUNC | os.O_WRONLY
-	return os.OpenFile(path, flags, perm)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, perm)
+	if err != nil {
+		return nil, cacheError("container %s: can't open data file %q: %v", id, path, err)
+	}
+
+	return file, nil
 }
 
 func (cch *cache) WriteFile(id string, name string, perm os.FileMode, data []byte) error {
