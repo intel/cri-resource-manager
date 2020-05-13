@@ -17,6 +17,8 @@ package client
 import (
 	"fmt"
 	"net"
+	"os"
+	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
@@ -29,12 +31,17 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
+// DialNotifyFn is a function to call after a successful net.Dial[Timeout]().
+type DialNotifyFn func(string, int, int, os.FileMode, error)
+
 // Options contains the configurable options of our CRI client.
 type Options struct {
 	// ImageSocket is the socket path for the CRI image service.
 	ImageSocket string
 	// RuntimeSocket is the socket path for the CRI runtime service.
 	RuntimeSocket string
+	// DialNotify is an optional function to notify after net.Dial returns for a socket.
+	DialNotify DialNotifyFn
 }
 
 // ConnectOptions contains options for connecting to the server.
@@ -185,7 +192,12 @@ func (c *client) connect(kind, socket string, options ConnectOptions) (*grpc.Cli
 		grpc.WithBlock(),
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithDialer(func(socket string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", socket, timeout)
+			conn, err := net.DialTimeout("unix", socket, timeout)
+			if err != nil {
+				return conn, err
+			}
+			c.dialNotify(socket)
+			return conn, err
 		}))
 
 	if options.Wait {
@@ -200,6 +212,29 @@ func (c *client) connect(kind, socket string, options ConnectOptions) (*grpc.Cli
 	}
 
 	return cc, nil
+}
+
+func (c *client) dialNotify(socket string) {
+	if c.options.DialNotify == nil {
+		return
+	}
+
+	info, err := os.Stat(socket)
+	if err != nil {
+		c.options.DialNotify(socket, -1, -1, 0, err)
+		return
+	}
+
+	st, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		err := clientError("failed to stat socket %q: %v", socket, err)
+		c.options.DialNotify(socket, -1, -1, 0, err)
+		return
+	}
+
+	uid, gid := int(st.Uid), int(st.Gid)
+	mode := info.Mode() & os.ModePerm
+	c.options.DialNotify(socket, uid, gid, mode, nil)
 }
 
 // Return a formatted client-specific error.

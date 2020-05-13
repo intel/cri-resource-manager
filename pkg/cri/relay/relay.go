@@ -16,6 +16,7 @@ package relay
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
@@ -73,6 +74,7 @@ func NewRelay(options Options) (Relay, error) {
 	cltopts := client.Options{
 		ImageSocket:   r.options.ImageSocket,
 		RuntimeSocket: r.options.RuntimeSocket,
+		DialNotify:    r.dialNotify,
 	}
 	if r.client, err = client.NewClient(cltopts); err != nil {
 		return nil, relayError("failed to create relay client: %v", err)
@@ -80,6 +82,9 @@ func NewRelay(options Options) (Relay, error) {
 
 	srvopts := server.Options{
 		Socket: r.options.RelaySocket,
+		User:   -1,
+		Group:  -1,
+		Mode:   0660,
 	}
 	if r.server, err = server.NewServer(srvopts); err != nil {
 		return nil, relayError("failed to create relay server: %v", err)
@@ -132,6 +137,36 @@ func (r *relay) Client() client.Client {
 // Server returns the relays Server interface.
 func (r *relay) Server() server.Server {
 	return r.server
+}
+
+func (r *relay) dialNotify(socket string, uid int, gid int, mode os.FileMode, err error) {
+	if err != nil {
+		r.Error("failed to determine permissions/ownership of client socket %q: %v",
+			socket, err)
+		return
+	}
+
+	// Notes:
+	//   Kubelet has separate configuration/command line options for the container
+	//   runtime's Image and Runtime Services. Hence, in principle it is possible
+	//   that we run with two separate sockets for those. However, we always expose
+	//   both services over our single relay socket. Since we cannot set two set of
+	//   ownerships and permissions on a single socket, if this situation arises in
+	//   practice we choose to go with the runtime socket's properties.
+	if r.options.ImageSocket != r.options.RuntimeSocket {
+		if socket != r.options.RuntimeSocket && r.options.RuntimeSocket != client.DontConnect {
+			r.Warn("ignoring ownership/permissions of dedicated CR Image Service socket...")
+			return
+		}
+	}
+
+	if err := r.server.Chown(uid, gid); err != nil {
+		r.Error("server socket ownership change request failed: %v", err)
+	} else {
+		if err := r.server.Chmod(mode); err != nil {
+			r.Error("server socket permissions change request failed: %v", err)
+		}
+	}
 }
 
 // relayError creates a formatted relay-specific error.
