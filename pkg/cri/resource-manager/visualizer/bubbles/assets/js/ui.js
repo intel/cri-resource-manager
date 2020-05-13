@@ -1,5 +1,3 @@
-
-
 var svg = d3.select("svg")
    .attr("preserveAspectRatio", "xMinYMin meet")
    .attr("viewBox", "0 0 800 800"),
@@ -28,7 +26,7 @@ function drawBubbleGraph(filename) {
     d3.json(filename, function(error, introspectJSON) {
         if (error) throw error;
 
-        root = AdaptJSON(introspectJSON)
+        var root = AdaptJSON(introspectJSON)
         root = d3.hierarchy(root)
             .sum(function(d) { return d.CPURequest; })
             .sort(function(a, b) { console.log (b.value + " - " + a.value);return b.value - a.value; });

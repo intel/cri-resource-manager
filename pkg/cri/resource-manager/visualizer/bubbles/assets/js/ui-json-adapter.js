@@ -1,6 +1,8 @@
 // CRI-RM introspection data to UI JSON data format adaptation.
+"use strict";
 
 function AdaptJSON(data) {
+    "use strict";
     var root, nodes, containers
 
     console.log("should translate introspection to d3obj: %o", data)
@@ -11,11 +13,11 @@ function AdaptJSON(data) {
 
     // create tree of pools
     for (var name in data.Pools) {
-        p = data.Pools[name]
+        var p = data.Pools[name]
+        var node = new Object()
 
         console.log("got pool %o: %o", name, p)
 
-        node = new Object()
         node.name     = p.Name
         node.CPUs     = p.CPUs
         node.Memory   = p.Memory
@@ -27,14 +29,15 @@ function AdaptJSON(data) {
         nodes[name] = node
     }
     for (var name in data.Pools) {
-        p = data.Pools[name]
-        n = nodes[name]
+        var p = data.Pools[name]
+        var n = nodes[name]
+
         if (n == null) {
             console.log("failed to look up node %o", name)
         }
         if (p.Children != null) {
-            for (i = 0; i < p.Children.length; i++) {
-                cname = p.Children[i]
+            for (var i = 0; i < p.Children.length; i++) {
+                var cname = p.Children[i]
                 n.children.push(nodes[cname])
             }
         }
@@ -42,13 +45,14 @@ function AdaptJSON(data) {
 
     // create lookup table of containers
     for (var pid in data.Pods) {
+        var p = data.Pods[pid]
+
         console.log("got pod %o", pid)
 
-        p = data.Pods[pid]
         for (var cid in p.Containers) {
-            console.log("got container %o", cid)
+            var c = p.Containers[cid]
 
-            c = p.Containers[cid]
+            console.log("got container %o", cid)
 
             node = new Object()
             node.name = p.Name + ":" + c.Name
@@ -64,21 +68,21 @@ function AdaptJSON(data) {
 
     // attach containers to pools
     for (var cid in data.Assignments) {
+        var a = data.Assignments[cid]
+        var n = containers[cid]
+        var shared = ""
+        var exclusive = ""
+        var cpu = ""
+        var sep = ""
+
         console.log("got assignment for container %o", cid)
 
-        a = data.Assignments[cid]
-        n = containers[cid]
-
-        shared = ""
-        exclusive = ""
         if (a.SharedCPUs != "") {
             shared = "shared:"+a.SharedCPUs+"(share:"+a.CPUShare+")"
         }
         if (a.ExclusiveCPUs != "") {
             exclusive = "exclusive:"+a.ExclusiveCPUs
         }
-        cpu = ""
-        sep = ""
         if (exclusive != "") {
             cpus = exclusive
             sep = " + "
