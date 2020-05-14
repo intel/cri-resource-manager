@@ -179,7 +179,7 @@ const (
 type Container interface {
 	// PrettyName returns the user-friendly <podname>:<containername> for the container.
 	PrettyName() string
-	// GetPod returns the pod of the container.
+	// GetPod returns the pod of the container and a boolean indicating if there was one.
 	GetPod() (Pod, bool)
 	// GetID returns the ID of the container.
 	GetID() string
