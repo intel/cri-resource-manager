@@ -16,6 +16,7 @@ package memtier
 
 import (
 	"os"
+	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
@@ -30,6 +31,8 @@ type mockSystemNode struct {
 	id       system.ID // node id
 	memFree  uint64
 	memTotal uint64
+	memType  system.MemoryType
+	distance []int
 }
 
 func (fake *mockSystemNode) MemoryInfo() (*system.MemInfo, error) {
@@ -45,7 +48,7 @@ func (fake *mockSystemNode) ID() system.ID {
 }
 
 func (fake *mockSystemNode) GetMemoryType() system.MemoryType {
-	return system.MemoryTypeDRAM
+	return fake.memType
 }
 
 func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
@@ -53,7 +56,10 @@ func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
 }
 
 func (fake *mockSystemNode) Distance() []int {
-	return []int{0}
+	if len(fake.distance) == 0 {
+		return []int{0}
+	}
+	return fake.distance
 }
 
 func (fake *mockSystemNode) DistanceFrom(id system.ID) int {
@@ -115,8 +121,11 @@ func (c *mockCPU) SetFrequencyLimits(min, max uint64) error {
 }
 
 type mockSystem struct {
-	isolatedCPU int
-	nodes       []system.Node
+	isolatedCPU  int
+	nodes        []system.Node
+	cpuCount     int
+	packageCount int
+	socketCount  int
 }
 
 func (fake *mockSystem) Node(id system.ID) system.Node {
@@ -132,7 +141,10 @@ func (fake *mockSystem) CPU(system.ID) system.CPU {
 	return &mockCPU{}
 }
 func (fake *mockSystem) CPUCount() int {
-	return 2
+	if fake.cpuCount == 0 {
+		return 1
+	}
+	return fake.cpuCount
 }
 func (fake *mockSystem) Discover(flags system.DiscoveryFlag) error {
 	return nil
@@ -157,16 +169,25 @@ func (fake *mockSystem) CPUIDs() []system.ID {
 	return []system.ID{}
 }
 func (fake *mockSystem) PackageCount() int {
-	return len(fake.nodes)
+	if fake.packageCount == 0 {
+		return 1
+	}
+	return fake.packageCount
 }
 func (fake *mockSystem) SocketCount() int {
-	return len(fake.nodes)
+	if fake.socketCount == 0 {
+		return 1
+	}
+	return fake.socketCount
 }
 func (fake *mockSystem) NUMANodeCount() int {
 	return len(fake.nodes)
 }
 func (fake *mockSystem) ThreadCount() int {
-	return len(fake.nodes)
+	if fake.cpuCount == 0 {
+		return 1
+	}
+	return fake.cpuCount
 }
 func (fake *mockSystem) PackageIDs() []system.ID {
 	ids := make([]system.ID, len(fake.nodes))
@@ -194,19 +215,24 @@ type mockContainer struct {
 	namespace                             string
 	returnValueForGetResourceRequirements v1.ResourceRequirements
 	returnValueForGetCacheID              string
+	returnValueForGetID                   string
 	memoryLimit                           int64
 	cpuset                                cpuset.CPUSet
 	returnValueForQOSClass                v1.PodQOSClass
+	pod                                   cache.Pod
 }
 
 func (m *mockContainer) PrettyName() string {
 	return m.name
 }
 func (m *mockContainer) GetPod() (cache.Pod, bool) {
-	return &mockPod{}, false
+	if m.pod == nil {
+		return &mockPod{}, false
+	}
+	return m.pod, true
 }
 func (m *mockContainer) GetID() string {
-	panic("unimplemented")
+	return m.returnValueForGetID
 }
 func (m *mockContainer) GetPodID() string {
 	panic("unimplemented")
@@ -453,6 +479,8 @@ type mockPod struct {
 	returnValueFotGetQOSClass          v1.PodQOSClass
 	returnValue1FotGetResmgrAnnotation string
 	returnValue2FotGetResmgrAnnotation bool
+	coldStartTimeout                   time.Duration
+	coldStartContainerName             string
 }
 
 func (m *mockPod) GetInitContainers() []cache.Container {
@@ -507,6 +535,9 @@ func (m *mockPod) GetResmgrAnnotationKeys() []string {
 	panic("unimplemented")
 }
 func (m *mockPod) GetResmgrAnnotation(key string) (string, bool) {
+	if key == keyColdStartPreference && len(m.coldStartContainerName) > 0 {
+		return m.coldStartContainerName + ": { duration: " + m.coldStartTimeout.String() + " }", true
+	}
 	return m.returnValue1FotGetResmgrAnnotation, m.returnValue2FotGetResmgrAnnotation
 }
 func (m *mockPod) GetResmgrAnnotationObject(string, interface{}, func([]byte, interface{}) error) (bool, error) {
