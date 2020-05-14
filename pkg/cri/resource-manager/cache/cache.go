@@ -1277,11 +1277,10 @@ func (cch *cache) OpenFile(id string, name string, perm os.FileMode) (*os.File, 
 
 func (cch *cache) WriteFile(id string, name string, perm os.FileMode, data []byte) error {
 	file, err := cch.OpenFile(id, name, perm)
-	defer file.Close()
-
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	_, err = file.Write(data)
 
 	return err
