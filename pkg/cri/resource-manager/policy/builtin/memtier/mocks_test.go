@@ -273,6 +273,9 @@ func (m *mockContainer) GetResmgrAnnotationKeys() []string {
 func (m *mockContainer) GetResmgrAnnotation(string, interface{}) (string, bool) {
 	panic("unimplemented")
 }
+func (m *mockContainer) GetEffectiveAnnotation(string) (string, bool) {
+	panic("unimplemented")
+}
 func (m *mockContainer) GetAnnotations() map[string]string {
 	panic("unimplemented")
 }
@@ -507,6 +510,9 @@ func (m *mockPod) GetResmgrAnnotation(key string) (string, bool) {
 	return m.returnValue1FotGetResmgrAnnotation, m.returnValue2FotGetResmgrAnnotation
 }
 func (m *mockPod) GetResmgrAnnotationObject(string, interface{}, func([]byte, interface{}) error) (bool, error) {
+	panic("unimplemented")
+}
+func (m *mockPod) GetEffectiveAnnotation(string, string) (string, bool) {
 	panic("unimplemented")
 }
 func (m *mockPod) GetCgroupParentDir() string {

@@ -275,6 +275,18 @@ func (p *pod) GetResmgrAnnotationObject(key string, objPtr interface{},
 	return p.GetAnnotationObject(kubernetes.ResmgrKey(key), objPtr, decode)
 }
 
+// Get the effective annotation for the container.
+func (p *pod) GetEffectiveAnnotation(key, container string) (string, bool) {
+	if v, ok := p.Annotations[key+"/container."+container]; ok {
+		return v, true
+	}
+	if v, ok := p.Annotations[key+"/pod"]; ok {
+		return v, true
+	}
+	v, ok := p.Annotations[key]
+	return v, ok
+}
+
 // Get the cgroup parent directory of a pod, if known.
 func (p *pod) GetCgroupParentDir() string {
 	return p.CgroupParent

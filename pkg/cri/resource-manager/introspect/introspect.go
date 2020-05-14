@@ -82,12 +82,13 @@ type Node struct {
 
 // System describes the underlying HW/system.
 type System struct {
-	Sockets    map[int]*Socket // physical sockets in the system
-	Nodes      map[int]*Node   // NUMA nodes in the system
-	Isolated   string          // kernel-isolated CPUs
-	Offlined   string          // CPUs offline
-	RDTClasses []string        // RDT classes
-	Policy     string          // active policy
+	Sockets        map[int]*Socket // physical sockets in the system
+	Nodes          map[int]*Node   // NUMA nodes in the system
+	Isolated       string          // kernel-isolated CPUs
+	Offlined       string          // CPUs offline
+	RDTClasses     []string        // list of RDT classes
+	BlockIOClasses []string        // list of block I/O classes
+	Policy         string          // active policy
 }
 
 // State is the current introspected state of the resource manager.

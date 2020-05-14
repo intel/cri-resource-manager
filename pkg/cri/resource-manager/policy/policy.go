@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
+	"github.com/intel/cri-resource-manager/pkg/blockio"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
@@ -356,6 +357,10 @@ func (p *policy) Introspect() *introspect.State {
 	rdtClassNames := []string{}
 	for _, rdtClass := range rdt.GetClasses() {
 		rdtClassNames = append(rdtClassNames, rdtClass.Name())
+	}
+	blkioClassNames := []string{}
+	for _, blkioClass := range blockio.GetClasses() {
+		blkioClassNames = append(blkioClassNames, blkioClass.Name)
 	}
 	p.inspsys.RDTClasses = rdtClassNames
 	p.inspsys.Policy = opt.Policy

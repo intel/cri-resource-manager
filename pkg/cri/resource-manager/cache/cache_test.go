@@ -24,6 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
 
 var nextFakePodID = 1
@@ -79,6 +81,7 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 	fp.labels[kubetypes.KubernetesPodUIDLabel] = fp.uid
 	nextFakePodID++
 
+	qos := strings.ToLower(string(fp.qos))
 	req := &cri.RunPodSandboxRequest{
 		Config: &cri.PodSandboxConfig{
 			Metadata: &cri.PodSandboxMetadata{
@@ -89,7 +92,7 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 			Labels:      fp.labels,
 			Annotations: fp.annotations,
 			Linux: &cri.LinuxPodSandboxConfig{
-				CgroupParent: "/kubepods.slice/kubepods-" + string(fp.qos) + ".slice/" +
+				CgroupParent: "/kubepods.slice/kubepods-" + qos + ".slice/" +
 					"kubepods-" + string(fp.qos) + "-pod-" + fp.id + ".slice",
 			},
 		},
@@ -207,6 +210,139 @@ func TestLookupContainerByCgroup(t *testing.T) {
 
 		if chk.GetID() != c.GetID() {
 			t.Errorf("found container %s is not the expected %s", chk.GetID(), c.GetID())
+		}
+	}
+}
+
+func TestDefaultRDTAndBlockIOClasses(t *testing.T) {
+	fakePods := map[string]*fakePod{
+		"pod1": {
+			name: "pod1",
+			qos:  v1.PodQOSBestEffort,
+			annotations: map[string]string{
+				"rdtclass." + kubernetes.ResmgrKeyNamespace + "/pod": "Pod1RDT",
+
+				"rdtclass." + kubernetes.ResmgrKeyNamespace + "/container.container1":     "RDT1",
+				"blockioclass." + kubernetes.ResmgrKeyNamespace + "/container.container1": "BLKIO1",
+				"rdtclass." + kubernetes.ResmgrKeyNamespace + "/container.container2":     "RDT2",
+				"blockioclass." + kubernetes.ResmgrKeyNamespace + "/container.container2": "BLKIO2",
+				"rdtclass." + kubernetes.ResmgrKeyNamespace + "/container.container3":     "RDT3",
+				"blockioclass." + kubernetes.ResmgrKeyNamespace + "/container.container4": "BLKIO4",
+			},
+		},
+		"pod2": {
+			name: "pod2",
+			qos:  v1.PodQOSBurstable,
+			annotations: map[string]string{
+				"blockioclass." + kubernetes.ResmgrKeyNamespace: "Pod2BLKIO",
+
+				"rdtclass." + kubernetes.ResmgrKeyNamespace + "/container.3":     "RDT3",
+				"blockioclass." + kubernetes.ResmgrKeyNamespace + "/container.3": "BLKIO3",
+				"rdtclass." + kubernetes.ResmgrKeyNamespace + "/container.4":     "RDT4",
+				"rdtclass." + kubernetes.ResmgrKeyNamespace + "/container.1":     "RDT1",
+				"blockioclass." + kubernetes.ResmgrKeyNamespace + "/container.2": "BLKIO2",
+			},
+		},
+	}
+
+	fakePodContainers := map[string][]*fakeContainer{
+		"pod1": {
+			{name: "container1"},
+			{name: "container2"},
+			{name: "container3"},
+			{name: "container4"},
+		},
+	}
+
+	type classes struct {
+		RDT     string
+		BlockIO string
+	}
+
+	expected := map[string]map[string]classes{
+		"pod1": {
+			"container1": {
+				RDT:     "RDT1",
+				BlockIO: "BLKIO1",
+			},
+			"container2": {
+				RDT:     "RDT2",
+				BlockIO: "BLKIO2",
+			},
+			"container3": {
+				RDT:     "RDT3",
+				BlockIO: string(fakePods["pod1"].qos),
+			},
+			"container4": {
+				RDT:     "Pod1RDT",
+				BlockIO: "BLKIO4",
+			},
+		},
+		"pod2": {
+			"container1": {
+				RDT:     "RDT1",
+				BlockIO: "Pod2BLKIO",
+			},
+			"container2": {
+				RDT:     string(fakePods["pod2"].qos),
+				BlockIO: "BLKIO2",
+			},
+			"container3": {
+				RDT:     "RDT3",
+				BlockIO: "BLKIO3",
+			},
+			"container4": {
+				RDT:     "RDT4",
+				BlockIO: "Pod2BLKIO",
+			},
+		},
+	}
+
+	cch, dir, err := createTmpCache()
+	if err != nil {
+		t.Errorf("failed: %v", err)
+	}
+	defer removeTmpCache(dir)
+
+	for _, fp := range fakePods {
+		_, err := createFakePod(cch, fp)
+		if err != nil {
+			t.Errorf("failed to create fake pod: %v", err)
+		}
+	}
+
+	for podName, fcs := range fakePodContainers {
+		fp, ok := fakePods[podName]
+		if !ok {
+			t.Errorf("failed to find fake pod '%s'", podName)
+		}
+		for _, fc := range fcs {
+			fc.fakePod = fp
+			if _, err := createFakeContainer(cch, fc); err != nil {
+				t.Errorf("failed to create fake container '%s.%s': %v", podName, fc.name, err)
+			}
+		}
+	}
+
+	for _, c := range cch.GetContainers() {
+		pod, ok := c.GetPod()
+		if !ok {
+			t.Errorf("failed to find Pod for Container %s", c.PrettyName())
+		}
+
+		exp, ok := expected[pod.GetName()][c.GetName()]
+		if !ok {
+			t.Errorf("failed to find expected results Container %s", c.PrettyName())
+		}
+
+		if c.GetRDTClass() != exp.RDT {
+			t.Errorf("container %s: RDT class %s, expected %s", c.PrettyName(),
+				c.GetRDTClass(), exp.RDT)
+		}
+
+		if c.GetBlockIOClass() != exp.BlockIO {
+			t.Errorf("container %s: BlockIO class %s, expected %s", c.PrettyName(),
+				c.GetBlockIOClass(), exp.BlockIO)
 		}
 	}
 }

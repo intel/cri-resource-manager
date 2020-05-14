@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -44,6 +45,15 @@ const (
 	// If modified, check how to parse device node from expanded paths.
 	sysfsBlockDeviceIOSchedulerPaths = "/sys/block/*/queue/scheduler"
 )
+
+// Class represents a block I/O class, a class name together with its associated
+// parameters, essentially a single key/value pair from staticOciBlockIO below.
+// This type is only used for querying all (static) block I/O classes in a sorting-
+// form.
+type Class struct {
+	Name       string
+	Parameters cgroups.OciBlockIOParameters
+}
 
 // BlockDeviceInfo holds information on a block device to be configured.
 // As users can specify block devices using wildcards ("/dev/disk/by-id/*SSD*")
@@ -72,6 +82,18 @@ var staticOciBlockIO = map[string]cgroups.OciBlockIOParameters{}
 // sysfsBlockDeviceIOSchedulerPaths) of device nodes:
 // {"/dev/sda": "bfq"}
 var currentIOSchedulers map[string]string
+
+// GetClasses returns block I/O class names and associated parameters in sorted slice.
+func GetClasses() []*Class {
+	classes := make([]*Class, 0, len(staticOciBlockIO))
+	for name, params := range staticOciBlockIO {
+		classes = append(classes, &Class{Name: name, Parameters: params})
+	}
+	sort.Slice(classes, func(i, j int) bool {
+		return strings.Compare(classes[i].Name, classes[j].Name) < 0
+	})
+	return classes
+}
 
 // UpdateOciConfig converts the configuration in the opt variable into staticOciBlockIO
 func UpdateOciConfig(ignoreErrors bool) error {
