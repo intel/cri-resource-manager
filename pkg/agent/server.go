@@ -30,6 +30,7 @@ import (
 	k8sclient "k8s.io/client-go/kubernetes"
 
 	v1 "github.com/intel/cri-resource-manager/pkg/agent/api/v1"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 	"github.com/intel/cri-resource-manager/pkg/log"
 )
 
@@ -61,7 +62,7 @@ func newAgentServer(cli *k8sclient.Clientset, getFn getConfigFn) (agentServer, e
 // Start runs server instance.
 func (s *server) Start(socket string) error {
 	// Make sure we have a directory for the socket.
-	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(socket), sockets.DirPermissions); err != nil {
 		return agentError("failed to create directory for socket %s: %v", socket, err)
 	}
 

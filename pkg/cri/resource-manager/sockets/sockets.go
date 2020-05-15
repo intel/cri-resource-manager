@@ -23,4 +23,6 @@ const (
 	ResourceManagerAgent = "/var/run/cri-resmgr/cri-resmgr-agent.sock"
 	// ResourceManagerConfig for resource manager configuration notifications.
 	ResourceManagerConfig = "/var/run/cri-resmgr/cri-resmgr-config.sock"
+	// DirPermissions is the permissions to create the directory for sockets with.
+	DirPermissions = 0711
 )
