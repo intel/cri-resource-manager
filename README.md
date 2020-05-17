@@ -2,200 +2,220 @@
 
 ## Introduction
 
-The main purpose of this CRI relay/proxy is to apply various (hardware) resource
-allocation policies to containers in a system. The relay sits between the kubelet
-and the container runtime, relaying request and responses back and forth between
-these two, potentially altering requests as they fly by.
+CRI Resource Manager is a Container Runtime Interface Proxy. It sits between 
+clients and the actual Container Runtime implementation (containerd, cri-o,
+dockershim+docker), relaying requests and responses back and forth. The main
+purpose of the proxy is to apply hardware-aware resource allocation policies
+to the containers running in the system.
 
-The details of how requests are altered depends on which policy is active inside
-the relay. There are several policies available, each geared towards a different
-set of goals and implementing different hardware allocation strategies.
+Policies are applied by either modifying a request before forwarding it, or
+by performing extra actions related to the request during its processing and
+proxying. There are several policies available, each with a different set of
+goals in mind and implementing different hardware allocation strategies. The
+details of whether and how a CRI request is altered or if extra actions are
+performed depend on which policy is active in CRI Resource Manager, and how
+that policy is configured.
 
-
-## Running the relay as a CRI message dumper
-
-The relay can be run without any real policies activated. This can be useful if
-one simply wants to inspect the messages passed over CRI between the kubelet or
-any other client using the CRI and the container runtime itself.
-
-For inspecting messages between kubelet and the runtime (or image) services you
-need to
-1. run dockershim out of the main kubelet process
-2. point the relay to the dockershim socket for the runtime (and image) service
-3. point the kubelet to the relay socket for the runtime and image service
-
-### Running dockershim
-
-You can use the scripts/testing/dockershim script to start dockershim
-separately or to see how this needs to be done. Basically what you need to do
-is to pass the kubelet the `--experimental-dockershim` option. For instance:
-```
-  kubelet --experimental-dockershim --port 11250 --cgroup-driver {systemd|cgroupfs}
-```
-choosing the cgroup driver according to your system setup.
-
-### Running the CRI relay with no policy, full message dumping
-
-For full message dumping you start the CRI relay like this:
-```
-  ./cmd/cri-resmgr/cri-resmgr -policy null -dump 'reset,full:.*' -dump-file /tmp/cri.dump
-```
-
-### Running kubelet using the proxy as the runtime
-
-You can take a look at the scripts/testing/kubelet script to see how the kubelet
-can be started pointing at relay socket for the CRI runtime and image services.
-Basically you run kubelet with the same options as you do regularly but pass
-also the following extra ones:
-```
-  --container-runtime=remote \
-      --container-runtime-endpoint=unix:///var/run/cri-relay.sock \
-      --image-service-endpoint=unix:///var/run/dockershim.sock
-```
+The current goal for the CRI Resource Manager is to prototype and experiment
+with new Kubernetes container placement policies. The existing policies are
+written with this in mind and the intended setup is for the Resource Manager
+to only act as a proxy for the Kubernetes Node Agent, kubelet.
 
 
-## Resource-annotating webhook
+## TL;DR Setup
 
-If you want to test the relay with active policying enabled, you also need to
-run a webhook specifically designed to help the policying CRI relay. The webhook
-inspects passing Pod creation requests and duplicates the resource requirements
-from the pods containers specs as a CRI relay specific annotation.
+If you want to give CRI Resource Manager a try, here is the list of things
+you need to do, assuming you already have a Kubernetes cluster up and running,
+using either `containerd` or `cri-o` as the runtime.
 
-You can build the webhook docker images with
-```
-  make images
-```
+  1. Set up kubelet to use CRI Resource Manager as the runtime.
+  2. Set up CRI Resource Manager to use the runtime with a policy.
 
-Publish it in a docker registry your cluster can access, edit the webhook
-deployment file accordingly in cmd/webhook then configure and deploy it with
+For kubelet you do this by altering its command line options like this:
 
 ```
-  kubectl apply -f cmd/webhook/mutating-webhook-config.yaml
-  kubectl apply -f cmd/webhook/webhook-deployment.yaml
+   kubelet <other-kubelet-options> --container-runtime=remote \
+     --container-runtime-endpoint=unix:///var/run/cri-resmgr/cri-resmgr.sock
 ```
 
-If you want you can try your luck with just updating the deployment file with
-the image pointing to your docker registry and see if everything will
-automatically get docker built, tagged and published there...
+For CRI Resource Manager, you need to provide a configuration file, and also a
+socket path if you don't use `containerd` or you run it with a different socket
+path.
+
+```
+   # for containerd with default socket path
+   cri-resmgr --force-config <config-file> --runtime-socket unix:///var/run/containerd/containerd.sock
+   # for cri-o
+   cri-resmgr --force-config <config-file> --runtime-socket unix:///var/run/crio/crio.sock
+```
+
+The choice of policy to use along with any potential parameters specific to that
+policy are taken from the configuration file. You can take a look at the
+[sample configurations](sample-configs) for some minimal/trivial examples. For instance,
+you can use [sample-configs/memtier-policy.cfg](sample-configs/memtier-policy.cfg)
+as `<config-file>` to activate the topology aware policy with memory tiering support.
+
+**NOTE**: Currently the available policies are work in progress.
+
+### Setting Up kubelet To Use CRI Resource Manager as the Runtime
+
+To let CRI Resource Manager act as a proxy between kubelet and the CRI runtime
+you need to configure kubelet to connect to CRI Resource Manager instead of
+the runtime. You do this by passing extra command line options to kubelet like
+this:
+
+```
+   kubelet <other-kubelet-options> --container-runtime=remote \
+     --container-runtime-endpoint=unix:///var/run/cri-resmgr/cri-resmgr.sock
+```
+
+## Setting Up CRI Resource Manager
+
+Setting up CRI Resource Manager involves pointing it to your runtime and
+providing it with a configuration. Pointing to the runtime is done using
+the `--runtime-socket <path>` and, optionally, the `--image-socket <path>`.
+
+For providing a configuration there are two options:
+
+  1. use a local configuration YAML file
+  2. use the CRI Resource Manager Agent and a `ConfigMap`
+
+The former is easier to set up and it is also the preferred way to run CRI
+Resource Manager for development, and in some cases testing. Setting up the
+latter is a bit more involved but it allows you to
+
+  - manage policy configuration for your cluster as a single source, and
+  - dynamically update that configuration
+
+### Using a Local Configuration From a File
+
+This is the easiest way to run CRI Resource Manager for development or testing.
+You can do it with the following command:
+
+```
+   cri-resmgr --force-config <config-file> --runtime-socket <path>
+```
+
+When started this way CRI Resource Manager reads its configuration from the
+given file. It also disables its agent interface for external configuration
+and updates.
+
+### Using CRI Resource Manager Agent and a ConfigMap
+
+This setup requires an extra component, the CRI Resource Manager Node Agent,
+to monitor and fetch configuration from the ConfigMap and pass it on to CRI
+Resource Manager. By default CRI Resource Manager will automatically try to
+use the agent to acquire configuration, unless you override this by forcing
+a static local configuration using the `--force-config <config-file>` option.
+When using the agent, it is also possible to provide an initial fallback for
+configuration using the `--fallback-config <config-file>`. This file will be
+use before the very first configuration is successfully acquired from the
+agent.
+
+See the [later chapter](#cri-resource-manager-node-agent) about how to set
+up and configure the agent.
+
+
+## CRI Resource Manager Mutating Webhook
+
+By default CRI Resource Manager does not see the original container *resource
+requirements* specified in the *Pod Spec*. It tries to calculate these for `cpu`
+and `memory` *compute resource*s using the related parameters present in the
+CRI container creation request. The resulting estimates are normally accurate
+for `cpu`, and also for `memory` `limits`. However, it is not possible to use
+these parameters to estimate `memory` `request`s or any *extended resource*s.
+
+If you want to make sure that CRI Resource Manager uses the origin *Pod Spec*
+*resource requirement*s, you need to duplicate these as *annotations* on the Pod.
+This is necessary if you plan using or writing a policy which needs *extended
+resource*s.
+
+This process can be fully automated using the [CRI Resource Manager Annotating
+Webhook](cmd/cri-resmgr-webhook). Once you built the docker image for it using
+the [provided Dockerfile][cmd/cri-resmgr-webhook/Dockerfile] and published it,
+you can set up the webhook with these commands:
+
+```
+  kubectl apply -f cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
+  kubectl apply -f cmd/cri-resmgr-webhook/webhook-deployment.yaml
+
+```
+
 
 ## CRI Resource Manager Node Agent
 
-There is a separate daemon `cri-resmgr-agent` that is expected to be running on
-each node alongside `cri-resmgr`. The node agent is responsible for all
-communication with the Kubernetes control plane. It has two purposes:
-1. Watch for changes in ConfigMap containing the dynamic cri-resmgr
-   configuration and relaying any updates to `cri-resmgr`a
-2. Relaying any cluster operations (i.e. accesses to the control plane) from
-   `cri-resmgr` and its policies to the Kubernetes API server.
+CRI Resource Manager can be configured dynamically using the CRI Resource
+Manager Node Agent and Kubernetes ConfigMaps. The agent can be build using
+the [provided Dockerfile](cmd/cri-resmgr-agent/Dockerfile). It can be deployed
+as a `DaemonSet` in the cluster using the [provided deployment file](cmd/cri-resmgr-agent/agent-deployment.yaml).
 
-The communication between the node agent and the resource manager happens via
-gRPC APIs over local unix domain sockets.
+To run the agent manually or as a `systemd` service, set the environment variable
+`NODE_NAME` to the name of the cluster node the agent is running on. If necessary
+pass it the credentials for accessing the cluster using the the `-kubeconfig <file>`
+command line option.
 
-When starting the node agent, you need to provide the name of the Kubernetes
-Node via an environment variable, as well as a valid kubeconfig.  For example:
-
-```
-  NODE_NAME=<my node name> cri-resmgr-agent -kubeconfig <path to kubeconfig>
-```
-
-
-## Running the relay with policies enabled
-
-You can enable active policying of containers by using an appropriate ConfigMap
-or a configuration file and setting the `Active` field of the `policy` section
-to the desired policy implementation. Note however, that currently you cannot
-switch the active policy when you reconfigure cri-resmgr by updating its ConfigMap.
-
-For instance, you can use the following configuration to enable the `static`
-policy:
-
-```
-policy:
-  ReservedResources:
-    CPU: 1
-  Active: static
-```
-
-This will start the relay with the kubelet/CPU Manager-equivalent static policy
-enabled and running with 1 CPU reserved for system- and kube- tasks. Similarly,
-you can start the relay with the static+ policy using the following configuration:
-
-```
-policy:
-  ReservedResources:
-    CPU: 1
-  Active: static-plus
-```
-
-The list of available policies can be queried with the `--list-policies`
-option.
-
-**NOTE**: The currently available policies are work-in-progress.
-
-## Specifying Configuration
-
-### Static Configuration
-
-cri-resmgr can be configured statically using command line options or
-a configuration file. The configuration file accepts the same options,
-one option per line, as the command line without leading dashes (-).
-
-For a list of the available command line/configuration file options see
-`cri-resmgr -h`.
-
-**NOTE**: some of the policies can be configured with policy-specific
-configuration files as well. Those files are different from the one we
-refer to here. See to the documentation of the policies themselves for
-further details about such potential files and their syntax. The preferred way
-for providing these the policy configurations is through Kubernetes
-ConfigMap - see the [Dynamic Configuration](#dynamic-configuration) below
-for more details.
-
-### Dynamic Configuration
-
-`cri-resmgr` can be configured dynamically using `cri-resmgr-agent`, the
-CRI Resource Manager node agent, and Kubernetes ConfigMaps. To run the
-agent, set the environment variable NODE_NAME to the name of the node
-the agent is running on and pass credentials, if necessary, for accessing
-the Kubernetes using the the `-kubeconfig` command line option.
-
-The agent monitors two ConfigMaps for the node, the primary node-specific
-ConfigMap and the secondary group-specific or the default one, depending
-on whether the node belongs to a configuration group. The node-specific
-ConfigMap always takes precedence if it exists. Otherwise the secondary
-one is used to configure the node.
+The agent monitors two ConfigMaps for the node, a primary node-specific one, and
+a secondary group-specific or default one, depending on whether the node belongs
+to a configuration group. The node-specific ConfigMap always takes precedence over
+the others.
 
 The names of these ConfigMaps are
 
-1. cri-resmgr-config.node.$NODE_NAME: primary, node-specific configuration
-2. cri-resmgr-config.group.$GROUP_NAME: secondary, group-specific node configuration
-3. cri-resmgr-config.default: secondary, default node configuration
+1. `cri-resmgr-config.node.$NODE_NAME`: primary, node-specific configuration
+2. `cri-resmgr-config.group.$GROUP_NAME`: secondary group-specific node configuration
+3. `cri-resmgr-config.default`: secondary: secondary default node configuration
 
 You can assign a node to a configuration group by setting the
 `cri-resource-manager.intel.com/group` label on the node to the name of
-the configuration group. For instance, the command
-
-```
-kubectl label --overwrite nodes cl0-slave1 cri-resource-manager.intel.com/group=foo
-```
-
-assigns node `cl0-slave1` to the `foo` configuration group.
-
-You can remove a node from its group by deleting the node group label, for
-instance like this:
-
-```
-kubectl label nodes cl0-slave1 cri-resource-manager.intel.com/group-
-```
+the configuration group. You can remove a node from its group by deleting the node
+group label.
 
 There is a [sample ConfigMap spec](sample-configs/cri-resmgr-configmap.example.yaml)
-that contains a node-specific, a group-specific, and a default sample ConfigMap.
+that contains anode-specific, a group-specific, and a default ConfigMap examples.
 See [any available policy-specific documentation](docs) for more information on the
 policy configurations.
 
+
+## Using CRI Resource Manager as a Message Dumper
+
+You can use CRI Resource Manager to simply inspect all proxied CRI requests and
+responses without applying any policy. Run CRI Resource Manager with the
+provided [sample configuration](sample-configs/cri-full-message-dump.cfg]
+for doing this.
+
+
+## Using Docker as the Runtime
+
+If you must use `docker` as the runtime then the proxying setup is slightly more
+complex. Docker does not natively support the CRI API. Normally kubelet runs an
+internal protocol translator, `dockershim` to translate between CRI and the
+native docker API. To let CRI Resource Manager effectively proxy between kubelet
+and `docker` it needs to actually proxy between kubelet and `dockershim`. For this to
+be possible, you need to run two instances of kubelet:
+
+  1. real instance talking to CRI Resource Manager/CRI
+  2. dockershim instance, acting as a CRI-docker protocol translator
+
+The real kubelet instance you run as you would normally with any other real CRI
+runtime, but you specify the dockershim socket for the CRI Image Service:
+
+```
+   kubelet <other-kubelet-options> --container-runtime=remote \
+     --container-runtime-endpoint=unix:///var/run/cri-resmgr/cri-resmgr.sock \
+     --image-service-endpoint=unix:///var/run/dockershim.sock
+```
+
+The dockershim instance you run like this, picking the cgroupfs driver according
+to your real kubelet instance's configuration:
+
+```
+  kubelet --experimental-dockershim --port 11250 --cgroup-driver {systemd|cgroupfs}
+
+```
+
+
 ## Logging and Debugging
 
-You can control logging and debugging with the `--logger-*` commandline options.
-By default logging is globally enabled and debugging is globally disabled. You can
-turn on full debugging with the `--logger-debug '*'` commandline option.
-
+You can control logging and debugging with the `--logger-*` command line options. By
+default debug logs are globally disabled. You can turn on full debug logs with the
+`--logger-debug '*'` command line option.
