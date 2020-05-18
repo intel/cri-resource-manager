@@ -29,6 +29,7 @@ import (
 
 	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 	"github.com/intel/cri-resource-manager/pkg/dump"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
@@ -186,7 +187,7 @@ func (s *server) createGrpcServer() error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(s.options.Socket), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(s.options.Socket), sockets.DirPermissions); err != nil {
 		return serverError("failed to create directory for socket %s: %v",
 			s.options.Socket, err)
 	}
