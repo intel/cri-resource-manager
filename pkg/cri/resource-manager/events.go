@@ -54,14 +54,25 @@ func (m *resmgr) startEventProcessing() error {
 
 	stop := m.stop
 	go func() {
-		rebalanceTimer := time.NewTicker(opt.RebalanceTimer)
+		var rebalanceTimer *time.Ticker
+		var rebalanceChan <-chan time.Time
+
+		if opt.RebalanceTimer > 0 {
+			rebalanceTimer = time.NewTicker(opt.RebalanceTimer)
+			rebalanceChan = rebalanceTimer.C
+		} else {
+			m.Info("periodic rebalancing is disabled")
+		}
 		for {
 			select {
 			case _ = <-stop:
+				if rebalanceTimer != nil {
+					rebalanceTimer.Stop()
+				}
 				return
 			case event := <-m.events:
 				m.processEvent(event)
-			case _ = <-rebalanceTimer.C:
+			case _ = <-rebalanceChan:
 				if err := m.RebalanceContainers(); err != nil {
 					evtlog.Error("rebalancing failed: %v", err)
 				}

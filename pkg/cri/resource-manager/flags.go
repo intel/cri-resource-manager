@@ -65,7 +65,7 @@ func init() {
 
 	flag.DurationVar(&opt.MetricsTimer, "metrics-interval", 0,
 		"Interval for polling/gathering runtime metrics data. Use 'disable' for disabling.")
-	flag.DurationVar(&opt.RebalanceTimer, "rebalance-interval", 5*time.Minute,
+	flag.DurationVar(&opt.RebalanceTimer, "rebalance-interval", 0,
 		"Minimum interval between two container rebalancing attempts. Use 'disable' for disabling.")
 
 	flag.BoolVar(&opt.DisableUI, "disable-ui", false,
