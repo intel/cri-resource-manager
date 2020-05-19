@@ -100,13 +100,24 @@ func (m *Metrics) Start() error {
 
 	stop := make(chan interface{})
 	go func() {
-		pollTimer := time.NewTicker(m.opts.PollInterval)
+		var pollTimer *time.Ticker
+		var pollChan <-chan time.Time
+
+		if m.opts.PollInterval > 0 {
+			pollTimer = time.NewTicker(m.opts.PollInterval)
+			pollChan = pollTimer.C
+		} else {
+			log.Info("periodic collection of metrics is disabled")
+		}
+
 		for {
 			select {
 			case _ = <-stop:
-				pollTimer.Stop()
+				if pollTimer != nil {
+					pollTimer.Stop()
+				}
 				return
-			case _ = <-pollTimer.C:
+			case _ = <-pollChan:
 				if err := m.poll(); err != nil {
 					log.Error("failed to poll raw metrics: %v", err)
 					continue
