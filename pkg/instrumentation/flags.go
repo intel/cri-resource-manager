@@ -47,9 +47,9 @@ const (
 	// defaultJaegerAgent is the default Jaeger agent endpoint.
 	defaultJaegerAgent = ""
 	// defaultHTTPEndpoint is the default HTTP endpoint serving Prometheus /metrics.
-	defaultHTTPEndpoint = ":8888"
+	defaultHTTPEndpoint = ""
 	// defaultPrometheusExport is the default state for Prometheus exporting.
-	defaultPrometheusExport = "true"
+	defaultPrometheusExport = "false"
 )
 
 // options encapsulates our configurable instrumentation parameters.

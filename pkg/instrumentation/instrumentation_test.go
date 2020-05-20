@@ -18,6 +18,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -42,22 +43,31 @@ func TestSamplingIdempotency(t *testing.T) {
 func TestPrometheusConfiguration(t *testing.T) {
 	flag.Set("logger-debug", "all")
 
+	if opt.HTTPEndpoint == "" {
+		opt.HTTPEndpoint = ":0"
+	}
+
 	s := newService()
 	s.Start()
 
-	checkPrometheus(t, opt.HTTPEndpoint, !opt.PrometheusExport)
+	address := s.http.GetAddress()
+	if strings.HasSuffix(opt.HTTPEndpoint, ":0") {
+		opt.HTTPEndpoint = address
+	}
+
+	checkPrometheus(t, address, !opt.PrometheusExport)
 
 	opt.PrometheusExport = !opt.PrometheusExport
 	s.reconfigure()
-	checkPrometheus(t, opt.HTTPEndpoint, !opt.PrometheusExport)
+	checkPrometheus(t, address, !opt.PrometheusExport)
 
 	opt.PrometheusExport = !opt.PrometheusExport
 	s.reconfigure()
-	checkPrometheus(t, opt.HTTPEndpoint, !opt.PrometheusExport)
+	checkPrometheus(t, address, !opt.PrometheusExport)
 
 	opt.PrometheusExport = !opt.PrometheusExport
 	s.reconfigure()
-	checkPrometheus(t, opt.HTTPEndpoint, !opt.PrometheusExport)
+	checkPrometheus(t, address, !opt.PrometheusExport)
 
 	s.http.Shutdown(true)
 	s.Stop()
