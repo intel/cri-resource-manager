@@ -52,9 +52,13 @@ GO_PKG_SRC = $(shell find pkg -name \*.go)
 # List of visualizer collateral files to go generate.
 UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
         if [ -d "$$i" -a -e "$$i/assets_generate.go" ]; then \
-            echo $$i/assets_vfsdata.go; \
+            echo $$i/assets_gendata.go; \
         fi; \
     done)
+
+# Right now we don't depend on libexec/%.o on purpose so make sure the file
+# is always up-to-date when elf/avx512.c is changed.
+GEN_TARGETS := pkg/avx/programbytes_gendata.go
 
 # Git (tagged) version and revisions we'll use to linker-tag our binaries with.
 GIT_ID   = scripts/build/git-id
@@ -182,6 +186,9 @@ clean-%:
 	$(Q)bin=$(patsubst clean-%,%,$@); src=cmd/$$bin; \
 	echo "Cleaning up $$bin..."; \
 	rm -f bin/$$bin
+
+clean-gen:
+	$(Q)rm -f $(GEN_TARGETS)
 
 image-%:
 	$(Q)bin=$(patsubst image-%,%,$@); \
@@ -372,7 +379,7 @@ install-git-hooks:
 # go dependencies for our binaries (careful with that axe, Eugene...)
 #
 
-bin/cri-resmgr: $(wildcard cmd/cri-resmgr/*.go) $(UI_ASSETS) \
+bin/cri-resmgr: $(wildcard cmd/cri-resmgr/*.go) $(UI_ASSETS) $(GEN_TARGETS) \
     $(shell for dir in \
                   $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/cri-resmgr/... | \
                           grep cri-resource-manager/pkg/ | \
@@ -399,14 +406,6 @@ bin/webhook: $(wildcard cmd/cri-resmgr-webhook/*.go) \
 #
 # rules to run go generators
 #
-
-#
-# %_vfsdata.go should also depend on the collateral content.
-#
-# We'd need a correctly expanding/working equivalent of this:
-#    %_generate.go: $(shell find $(dir $@)/assets -type f)
-#
-
 clean-ui-assets:
 	$(Q)echo "Cleaning up generated UI assets..."; \
 	for i in $(UI_ASSETS); do \
@@ -414,7 +413,7 @@ clean-ui-assets:
 	    rm -f $$i; \
 	done
 
-%_vfsdata.go:: %_generate.go
+%_gendata.go::
 	$(Q)echo "Generating $@..."; \
 	cd $(dir $@) && \
 	    $(GO_GEN) || exit 1 && \
@@ -424,7 +423,7 @@ clean-ui-assets:
 # dependencies for UI assets baked in using vfsgendev (can't come up with a working pattern rule)
 #
 
-pkg/cri/resource-manager/visualizer/bubbles/assets_vfsdata.go:: \
+pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/*.html) \
 	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/js/*.js) \
 	$(wildcard pkg/cri/resource-manager/visualizer/bubbles/assets/css/*.css)

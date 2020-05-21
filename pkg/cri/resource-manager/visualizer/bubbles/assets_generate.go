@@ -32,6 +32,7 @@ func main() {
 		PackageName:  name,
 		BuildTags:    "!test",
 		VariableName: "Assets",
+		Filename:     "assets_gendata.go",
 	}
 	if err := vfsgen.Generate(visualizer.Assets, opts); err != nil {
 		log.Fatalln(fmt.Sprintf("failed to generate assets for %s UI:", name, err))
