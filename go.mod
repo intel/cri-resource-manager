@@ -20,7 +20,7 @@ require (
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
-	google.golang.org/grpc v1.23.1
+	google.golang.org/grpc v1.26.0
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v0.17.2
@@ -31,6 +31,8 @@ require (
 
 replace (
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0 => ./pkg/topology
+	google.golang.org/grpc => google.golang.org/grpc v1.26.0
+
 	k8s.io/api v0.0.0 => k8s.io/api v0.0.0-20200121193204-7ea599edc7fd
 	k8s.io/apiextensions-apiserver v0.0.0 => k8s.io/apiextensions-apiserver v0.0.0-20200121201129-111e9ba415da
 	k8s.io/apimachinery v0.0.0 => k8s.io/apimachinery v0.0.0-20191121175448-79c2a76c473a

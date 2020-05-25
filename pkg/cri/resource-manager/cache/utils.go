@@ -23,16 +23,7 @@ import (
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-)
-
-// Constants/variables needed for converting between milliCPU, CFS shares, quota and period.
-const (
-	// CFS CPU shares, quota and period to/from milliCPU conversion
-	minShares      = 2
-	sharesPerCPU   = 1024
-	milliCPUToCPU  = 1000
-	QuotaPeriod    = 100000
-	minQuotaPeriod = 1000
+	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 var memoryCapacity int64
@@ -82,34 +73,33 @@ func estimateComputeResources(lnx *cri.LinuxContainerResources, cgroupParent str
 
 // SharesToMilliCPU converts CFS CPU shares to milliCPU.
 func SharesToMilliCPU(shares int64) int64 {
-	if shares == minShares {
-		return 0
-	}
-
-	return int64((float64(shares*milliCPUToCPU) / float64(sharesPerCPU)) + 0.5)
-}
-
-// MilliCPUToShares converts milliCPU to CFS CPU shares.
-func MilliCPUToShares(milliCPU int) int64 {
-	if milliCPU == 0 {
-		return minShares
-	}
-
-	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
-	if shares < minShares {
-		return minShares
-	}
-
-	return int64(shares)
+	return sharesToMilliCPU(shares)
 }
 
 // QuotaToMilliCPU converts CFS quota and period to milliCPU.
 func QuotaToMilliCPU(quota, period int64) int64 {
+	return quotaToMilliCPU(quota, period)
+}
+
+// sharesToMilliCPU converts CFS CPU shares to milliCPU.
+func sharesToMilliCPU(shares int64) int64 {
+	if shares == kubecm.MinShares {
+		return 0
+	}
+	return int64(float64(shares*kubecm.MilliCPUToCPU)/float64(kubecm.SharesPerCPU) + 0.5)
+}
+
+// quotaToMilliCPU converts CFS quota and period to milliCPU.
+func quotaToMilliCPU(quota, period int64) int64 {
 	if quota == 0 || period == 0 {
 		return 0
 	}
+	return int64(float64(quota*kubecm.MilliCPUToCPU)/float64(period) + 0.5)
+}
 
-	return int64(float64(quota*milliCPUToCPU)/float64(period) + 0.5)
+// MilliCPUToShares converts milliCPU to CFS CPU shares.
+func MilliCPUToShares(milliCPU int) int64 {
+	return int64(kubecm.MilliCPUToShares(int64(milliCPU)))
 }
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
@@ -118,10 +108,10 @@ func MilliCPUToQuota(milliCPU int64) (int64, int64) {
 		return 0, 0
 	}
 
-	period := int64(QuotaPeriod)
-	quota := (milliCPU * period) / milliCPUToCPU
-	if quota < minQuotaPeriod {
-		quota = minQuotaPeriod
+	period := int64(kubecm.QuotaPeriod)
+	quota := (milliCPU * period) / kubecm.MilliCPUToCPU
+	if quota < kubecm.MinQuotaPeriod {
+		quota = kubecm.MinQuotaPeriod
 	}
 
 	return quota, period
