@@ -49,8 +49,36 @@ func GetContainerCgroupDir(subsystemDir, containerID string) string {
 	return containerDir
 }
 
-// GetProcessInContainer gets the IDs of all processes in the container.
-func GetProcessInContainer(cgroupParentDir, containerID string) ([]string, error) {
+// isProcess finds out whether the task is a process or a thread.
+func isProcess(processID string) bool {
+	file, err := os.Open("/proc/" + processID + "/status")
+	if err != nil {
+		return true
+	}
+	defer file.Close()
+
+	tgid := ""
+	pid := ""
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		entry := scanner.Text()
+		if strings.HasPrefix(entry, "Tgid:") {
+			tgid = strings.TrimSpace(entry[len("Tgid:"):])
+			if len(pid) > 0 {
+				return tgid == pid
+			}
+		} else if strings.HasPrefix(entry, "Pid:") {
+			pid = strings.TrimSpace(entry[len("Pid:"):])
+			if len(tgid) > 0 {
+				return tgid == pid
+			}
+		}
+	}
+	return true
+}
+
+func getTasksInContainer(cgroupParentDir, containerID string, onlyProcesses bool) ([]string, error) {
 	var entries []string
 
 	// Find Cpuset sub-cgroup directory of this container
@@ -92,7 +120,19 @@ func GetProcessInContainer(cgroupParentDir, containerID string) ([]string, error
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		entry := scanner.Text()
-		entries = append(entries, entry)
+		if !onlyProcesses || isProcess(entry) {
+			entries = append(entries, entry)
+		}
 	}
 	return entries, nil
+}
+
+// GetProcessesInContainer gets the IDs of all processes in the container.
+func GetProcessesInContainer(cgroupParentDir, containerID string) ([]string, error) {
+	return getTasksInContainer(cgroupParentDir, containerID, true)
+}
+
+// GetTasksInContainer gets the IDs of all tasks in the container.
+func GetTasksInContainer(cgroupParentDir, containerID string) ([]string, error) {
+	return getTasksInContainer(cgroupParentDir, containerID, false)
 }

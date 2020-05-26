@@ -120,7 +120,7 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 		return rdtError("failed to get pod of container %s", c.PrettyName())
 	}
 
-	pids, err := utils.GetProcessInContainer(pod.GetCgroupParentDir(), c.GetID())
+	pids, err := utils.GetTasksInContainer(pod.GetCgroupParentDir(), c.GetID())
 	if err != nil {
 		return rdtError("failed to get process list for container %s: %v", c.PrettyName(), err)
 	}
