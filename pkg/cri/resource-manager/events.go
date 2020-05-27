@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -92,7 +93,7 @@ func (m *resmgr) stopEventProcessing() {
 	}
 }
 
-// SendEvent injects the given event to the resource manaager's event processing loop.
+// SendEvent injects the given event to the resource manager's event processing loop.
 func (m *resmgr) SendEvent(event interface{}) error {
 	if m.events == nil {
 		return resmgrError("can't send event, no event channel")
@@ -109,24 +110,26 @@ func (m *resmgr) SendEvent(event interface{}) error {
 func (m *resmgr) processEvent(e interface{}) {
 	evtlog.Debug("received event of type %T...", e)
 
-	m.Lock()
-	defer m.Unlock()
-
 	switch event := e.(type) {
 	case string:
 		evtlog.Debug("'%s'...", event)
-	case *metrics.Event:
+	case *events.Metrics:
 		m.processAvx(event.Avx)
+	case *events.Policy:
+		m.DeliverPolicyEvent(event)
 	default:
 		evtlog.Warn("event of unexpected type %T...", e)
 	}
 }
 
 // processAvx processes AVX512 events.
-func (m *resmgr) processAvx(e *metrics.AvxEvent) bool {
+func (m *resmgr) processAvx(e *events.Avx) bool {
 	if e == nil {
 		return false
 	}
+
+	m.Lock()
+	defer m.Unlock()
 
 	changes := false
 	for cgroup, active := range e.Updates {

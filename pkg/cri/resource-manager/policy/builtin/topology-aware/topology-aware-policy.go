@@ -21,6 +21,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
@@ -207,6 +208,12 @@ func (p *policy) Rebalance() (bool, error) {
 	}
 
 	return true, errors
+}
+
+// HandleEvent handles policy-specific events.
+func (p *policy) HandleEvent(*events.Policy) (bool, error) {
+	log.Debug("(not) handling event...")
+	return false, nil
 }
 
 // ExportResourceData provides resource data to export for the container.

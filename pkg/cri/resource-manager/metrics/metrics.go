@@ -27,6 +27,7 @@ import (
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	"github.com/intel/cri-resource-manager/pkg/metrics"
 	// pull in all metrics collectors
@@ -37,11 +38,6 @@ const (
 	// DefaultAvxThreshold is the cutoff below which a cgroup/container is not an AVX user.
 	DefaultAvxThreshold = float64(0.1)
 )
-
-// Event is a set of metrics events we deliver to be acted upon.
-type Event struct {
-	Avx *AvxEvent // AVX512 container usage changes
-}
 
 // Options describes options for metrics collection and processing.
 type Options struct {
@@ -164,7 +160,7 @@ func (m *Metrics) process() error {
 		raw[*f.Name] = f
 	}
 
-	event := &Event{
+	event := &events.Metrics{
 		Avx: m.collectAvxEvents(raw),
 	}
 
@@ -172,7 +168,7 @@ func (m *Metrics) process() error {
 }
 
 // sendEvent sends a metrics-based event for processing.
-func (m *Metrics) sendEvent(e *Event) error {
+func (m *Metrics) sendEvent(e *events.Metrics) error {
 	select {
 	case m.opts.Events <- e:
 		return nil
