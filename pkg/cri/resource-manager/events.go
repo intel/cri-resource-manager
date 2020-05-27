@@ -17,6 +17,8 @@ package resmgr
 import (
 	"time"
 
+	criapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
@@ -113,6 +115,8 @@ func (m *resmgr) processEvent(e interface{}) {
 	switch event := e.(type) {
 	case string:
 		evtlog.Debug("'%s'...", event)
+	case []*criapi.ContainerStats:
+		m.processContainerStats(event)
 	case *events.Metrics:
 		m.processAvx(event.Avx)
 	case *events.Policy:
@@ -150,6 +154,19 @@ func (m *resmgr) processAvx(e *events.Avx) bool {
 		}
 	}
 	return changes
+}
+
+// processContainerStats processes collected CRI container statistics.
+func (m *resmgr) processContainerStats(e []*criapi.ContainerStats) bool {
+	if e == nil {
+		return false
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	evtlog.Info("* got CRI container statistics: %v", e)
+	return false
 }
 
 // resolveCgroupPath resolves a cgroup path to a container.
