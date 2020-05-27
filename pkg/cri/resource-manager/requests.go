@@ -37,6 +37,8 @@ func (m *resmgr) setupRequestProcessing() error {
 		"RemoveContainer": m.RemoveContainer,
 
 		"UpdateContainerResources": m.UpdateContainer,
+
+		"ListContainerStats": m.ListContainerStats,
 	}
 
 	if err := m.relay.Server().RegisterInterceptors(interceptors); err != nil {
@@ -457,6 +459,22 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 	m.updateIntrospection()
 
 	return &criapi.UpdateContainerResourcesResponse{}, nil
+}
+
+// ListContainerStats feeds CRI container statistics to metrics processing.
+func (m *resmgr) ListContainerStats(ctx context.Context, method string, request interface{},
+	handler server.Handler) (interface{}, error) {
+
+	reply, rqerr := handler(ctx, request)
+
+	filter := request.(*criapi.ListContainerStatsRequest).Filter
+	if filter.Id == "" && filter.PodSandboxId == "" && len(filter.LabelSelector) == 0 {
+		if err := m.SendEvent(reply.(*criapi.ListContainerStatsResponse).Stats); err != nil {
+			m.Error("failed to inject CRI ListContainerStats for event processing: %v", err)
+		}
+	}
+
+	return reply, rqerr
 }
 
 // RebalanceContainers tries to find a more optimal container resource allocation if necessary.
