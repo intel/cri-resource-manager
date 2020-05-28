@@ -1,0 +1,68 @@
+# bb-scanner continuously calculates checksums of files found
+# under /scan. Output reveals added, deleted, renamed and modified
+# files together with timestamps.
+#
+# bb-scanner is configured as a low-priority activity:
+# 1. CPU usage is limited to 10 %.
+# 2. Disk/SSD bandwidth is limited by SlowReader configuration.
+#
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: bb-scanner
+  labels:
+    app: bb-scanner
+spec:
+  selector:
+    matchLabels:
+      app: bb-scanner
+  template:
+    metadata:
+      name: bb-scanner
+      labels:
+        app: bb-scanner
+      annotations:
+        blockioclass.cri-resource-manager.intel.com/pod: SlowReader
+    spec:
+      terminationGracePeriodSeconds: 1
+      containers:
+      - image: busybox
+        command:
+          - sh
+          - -c
+          - while true; do
+              find /scan -type f -print0 | xargs -0 md5sum | sort > curr.md5;
+              date +%s >> /output/diffs.md5;
+              diff -U1 prev.md5 curr.md5 >> /output/diffs.md5;
+              cp curr.md5 /output/files.md5;
+              mv curr.md5 prev.md5;
+            done
+        imagePullPolicy: IfNotPresent
+        name: busybox
+        resources:
+          limits:
+            cpu: 100m
+        volumeMounts:
+          - mountPath: /scan/usr-bin
+            name: usr-bin
+            readOnly: true
+          - mountPath: /scan/usr-lib
+            name: usr-lib
+            readOnly: true
+          - mountPath: /output
+            name: output
+            readOnly: false
+      volumes:
+        - name: usr-bin
+          hostPath:
+            path: /usr/bin
+            type: DirectoryOrCreate
+        - name: usr-lib
+          hostPath:
+            path: /usr/lib
+            type: DirectoryOrCreate
+        - name: output
+          hostPath:
+            path: /var/cache/bb-scanner
+            type: DirectoryOrCreate
+      restartPolicy: Always
