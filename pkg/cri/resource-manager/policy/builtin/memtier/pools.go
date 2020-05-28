@@ -117,6 +117,11 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 			}
 		}
 
+		if len(pools) == 0 {
+			return nil, policyError("no suitable pool found for container %s",
+				container.PrettyName())
+		}
+
 		pool = pools[0]
 	}
 
