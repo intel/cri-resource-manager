@@ -14,7 +14,7 @@ jobs:
       - run: make format
       - run: make
       - run: make golangci-lint
-      - run: make test
+      - run: make GO_PARALLEL="-p 1" test
       - run:
           name: Codecov report
           command: bash <(curl -s https://codecov.io/bash)

@@ -1,16 +1,17 @@
 # Go compiler/toolchain and extra related binaries we ues/need.
-GO_CMD    := go
-GO_BUILD  := $(GO_CMD) build
-GO_GEN    := $(GO_CMD) generate -x
-GO_FMT    := gofmt
-GO_CYCLO  := gocyclo
-GO_LINT   := golint
-GO_CILINT := golangci-lint
+GO_PARALLEL :=
+GO_CMD      := go
+GO_BUILD    := $(GO_CMD) build $(GO_PARALLEL)
+GO_GEN      := $(GO_CMD) generate -x
+GO_FMT      := gofmt
+GO_CYCLO    := gocyclo
+GO_LINT     := golint
+GO_CILINT   := golangci-lint
 
 # TEST_TAGS is the set of extra build tags passed for tests.
 # We disable AVX collector for tests by default.
 TEST_TAGS := noavx,test
-GO_TEST   := $(GO_CMD) test -tags $(TEST_TAGS)
+GO_TEST   := $(GO_CMD) test $(GO_PARALLEL) -tags $(TEST_TAGS)
 GO_VET    := $(GO_CMD) vet -tags $(TEST_TAGS)
 
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
