@@ -28,9 +28,6 @@ import (
 )
 
 const (
-	// ConfigModuleName is the configuration section of blockio class definitions
-	ConfigModuleName = "resource-manager.blockio"
-
 	// BlockIOController is the name of the block I/O controller.
 	BlockIOController = cache.BlockIO
 )
@@ -77,29 +74,12 @@ func (ctl *blockioctl) PreStartHook(c cache.Container) error {
 
 // PostStartHook is the block I/O controller post-start hook.
 func (ctl *blockioctl) PostStartHook(c cache.Container) error {
-	// Notes:
-	//   Unlike in our PostUpdateHook, we don't bail out here if
-	//   there are no pending block I/O changes for the container.
-	//   We might be configured to fall back to assign the class
-	//   based on pod/container QoS class in which case there is
-	//   no pending marker on the container.
-	if err := ctl.assign(c, ctl.BlockIOClass(c)); err != nil {
-		return err
-	}
-	c.ClearPending(BlockIOController)
-	return nil
+	return ctl.assign(c)
 }
 
 // PostUpdateHook is the block I/O controller post-update hook.
 func (ctl *blockioctl) PostUpdateHook(c cache.Container) error {
-	if !c.HasPending(BlockIOController) {
-		return nil
-	}
-	if err := ctl.assign(c, ctl.BlockIOClass(c)); err != nil {
-		return err
-	}
-	c.ClearPending(BlockIOController)
-	return nil
+	return ctl.assign(c)
 }
 
 // PostStop is the block I/O controller post-stop hook.
@@ -108,34 +88,20 @@ func (ctl *blockioctl) PostStopHook(c cache.Container) error {
 }
 
 // assign assigns the container to the given block I/O class.
-func (ctl *blockioctl) assign(c cache.Container, class string) error {
-	if class == "" {
-		log.Debug("skip handling container %s: no matching block I/O class", c.PrettyName())
+func (ctl *blockioctl) assign(c cache.Container) error {
+	if !c.HasPending(BlockIOController) {
 		return nil
 	}
 
+	class := c.GetBlockIOClass()
 	if err := blockio.SetContainerClass(c, class); err != nil {
 		return blockioError("assigning container %v to class %#v failed: %w", c.PrettyName(), class, err)
 	}
-
 	log.Info("container %s assigned to class %s", c.PrettyName(), class)
+
+	c.ClearPending(BlockIOController)
+
 	return nil
-}
-
-// BlockIOClass determines the effective BlockIO class for a container.
-func (ctl *blockioctl) BlockIOClass(c cache.Container) string {
-	cclass := c.GetBlockIOClass()
-	if cclass == "" {
-		cclass = string(c.GetQOSClass())
-	}
-	blockioclass, ok := opt.Classes[cclass]
-	if !ok {
-		if blockioclass, ok = opt.Classes["*"]; !ok {
-			blockioclass = cclass
-		}
-	}
-
-	return blockioclass
 }
 
 // configNotify is blockio class mapping and class definition configuration callback
@@ -158,7 +124,7 @@ func (ctl *blockioctl) reconfigureRunningContainers() error {
 		return nil
 	}
 	for _, c := range ctl.cache.GetContainers() {
-		class := ctl.BlockIOClass(c)
+		class := c.GetBlockIOClass()
 		log.Debug("configure container %q blockio class %q", c.PrettyName(), class)
 		err := blockio.SetContainerClass(c, class)
 		if err != nil {

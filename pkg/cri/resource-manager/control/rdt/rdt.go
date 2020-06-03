@@ -78,13 +78,10 @@ func (ctl *rdtctl) PreStartHook(c cache.Container) error {
 
 // PostStartHook is the RDT controller post-start hook.
 func (ctl *rdtctl) PostStartHook(c cache.Container) error {
-	// Notes:
-	//   Unlike in our PostUpdateHook, we don't bail out here if
-	//   there are no pending RDT changes for the container. We
-	//   might be configured to fall back to assign RDT class
-	//   based on pod/container QoS class in which case there is
-	//   no pending marker on the container.
-	if err := ctl.assign(c, ctl.RDTClass(c)); err != nil {
+	if !c.HasPending(RDTController) {
+		return nil
+	}
+	if err := ctl.assign(c); err != nil {
 		return err
 	}
 	c.ClearPending(RDTController)
@@ -100,7 +97,7 @@ func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
 		log.Warn("failed to remove monitoring group of %q: %v", c.PrettyName(), err)
 	}
 
-	if err := ctl.assign(c, ctl.RDTClass(c)); err != nil {
+	if err := ctl.assign(c); err != nil {
 		return err
 	}
 	c.ClearPending(RDTController)
@@ -117,11 +114,7 @@ func (ctl *rdtctl) PostStopHook(c cache.Container) error {
 }
 
 // assign assigns the container to the given RDT class.
-func (ctl *rdtctl) assign(c cache.Container, class string) error {
-	if class == "" {
-		return nil
-	}
-
+func (ctl *rdtctl) assign(c cache.Container) error {
 	pod, ok := c.GetPod()
 	if !ok {
 		return rdtError("failed to get pod of container %s", c.PrettyName())
@@ -132,6 +125,7 @@ func (ctl *rdtctl) assign(c cache.Container, class string) error {
 		return rdtError("failed to get process list for container %s: %v", c.PrettyName(), err)
 	}
 
+	class := c.GetRDTClass()
 	if cls, ok := rdt.GetClass(class); ok {
 		if err := cls.AddPids(pids...); err != nil {
 			return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
@@ -165,24 +159,6 @@ func (ctl *rdtctl) deleteMonGroups(c cache.Container) error {
 		}
 	}
 	return nil
-}
-
-// RDTClass determines the effective RDT class for a container.
-func (ctl *rdtctl) RDTClass(c cache.Container) string {
-	cclass := c.GetRDTClass()
-	if cclass == "" {
-		cclass = string(c.GetQOSClass())
-	}
-	rdtclass, ok := opt.Classes[cclass]
-	if !ok {
-		if rdtclass, ok = opt.Classes["*"]; !ok {
-			rdtclass = cclass
-		}
-	}
-
-	log.Debug("RDT class for %s (%s): %q", c.PrettyName(), cclass, rdtclass)
-
-	return rdtclass
 }
 
 // configNotify is our runtime configuration notification callback.
