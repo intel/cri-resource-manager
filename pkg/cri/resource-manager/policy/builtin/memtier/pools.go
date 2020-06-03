@@ -508,6 +508,10 @@ func (p *policy) filterInsufficientResources(req Request, originals []Node) []No
 				bitsToFit -= supply.MemoryLimit()[memoryPMEM] - supply.ExtraMemoryReservation(memoryPMEM)
 			}
 		}
+		if req.ColdStart() > 0 {
+			// For a "cold start" request, the memory request must fit completely in the PMEM. So reject the node.
+			continue
+		}
 		if memType&memoryDRAM != 0 {
 			if supply.MemoryLimit()[memoryDRAM]-supply.ExtraMemoryReservation(memoryDRAM) >= bitsToFit {
 				filtered = append(filtered, node)

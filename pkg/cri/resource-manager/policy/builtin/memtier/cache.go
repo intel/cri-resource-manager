@@ -16,6 +16,7 @@ package memtier
 
 import (
 	"encoding/json"
+	"time"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
@@ -91,6 +92,7 @@ type cachedGrant struct {
 	MemType     memoryType
 	Memset      system.IDSet
 	MemoryLimit memoryMap
+	ColdStart   time.Duration
 }
 
 func newCachedGrant(cg Grant) *cachedGrant {
@@ -107,6 +109,8 @@ func newCachedGrant(cg Grant) *cachedGrant {
 	for key, value := range cg.MemLimit() {
 		ccg.MemoryLimit[key] = value
 	}
+
+	ccg.ColdStart = cg.ColdStart()
 
 	return ccg
 }
@@ -127,7 +131,9 @@ func (ccg *cachedGrant) ToGrant(policy *policy) (Grant, error) {
 		cpuset.MustParse(ccg.Exclusive),
 		ccg.Part,
 		ccg.MemType,
+		ccg.MemType,
 		ccg.MemoryLimit,
+		ccg.ColdStart,
 	)
 
 	if g.Memset().String() != ccg.Memset.String() {

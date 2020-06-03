@@ -36,6 +36,9 @@ const (
 	PolicyDescription = "A policy for prototyping memory tiering."
 	// PolicyPath is the path of this policy in the configuration hierarchy.
 	PolicyPath = "policy." + PolicyName
+
+	// ColdStartDone is the event generated for the end of a container cold start period.
+	ColdStartDone = "cold-start-done"
 )
 
 // allocations is our cache.Cachable for saving resource allocations in the cache.
@@ -65,8 +68,8 @@ type policy struct {
 // Make sure policy implements the policy.Backend interface.
 var _ policyapi.Backend = &policy{}
 
-// CreateTopologyAwarePolicy creates a new policy instance.
-func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
+// CreateMemtierPolicy creates a new policy instance.
+func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 	p := &policy{
 		cache:        opts.Cache,
 		sys:          opts.System,
@@ -211,8 +214,32 @@ func (p *policy) Rebalance() (bool, error) {
 }
 
 // HandleEvent handles policy-specific events.
-func (p *policy) HandleEvent(*events.Policy) (bool, error) {
-	log.Debug("should handle policy event %v...")
+func (p *policy) HandleEvent(e *events.Policy) (bool, error) {
+	log.Debug("received policy event %s.%s with data %v...", e.Source, e.Type, e.Data)
+
+	switch e.Type {
+	case events.ContainerStarted:
+		c, ok := e.Data.(cache.Container)
+		if !ok {
+			return false, policyError("%s event: expecting cache.Container Data, got %T",
+				e.Type, e.Data)
+		}
+		log.Info("triggering coldstart period (if necessary) for %s", c.PrettyName())
+		return false, p.triggerColdStart(c)
+	case ColdStartDone:
+		id, ok := e.Data.(string)
+		if !ok {
+			return false, policyError("%s event: expecting container ID Data, got %T",
+				e.Type, e.Data)
+		}
+		c, ok := p.cache.LookupContainer(id)
+		if !ok {
+			// TODO: This is probably a race condition. Should we return nil error here?
+			return false, policyError("%s event: failed to lookup container %s", id)
+		}
+		log.Info("finishing coldstart period for %s", c.PrettyName())
+		return p.finishColdStart(c)
+	}
 	return false, nil
 }
 
@@ -381,5 +408,5 @@ func (p *policy) restoreCache() error {
 
 // Register us as a policy implementation.
 func init() {
-	policyapi.Register(PolicyName, PolicyDescription, CreateTopologyAwarePolicy)
+	policyapi.Register(PolicyName, PolicyDescription, CreateMemtierPolicy)
 }

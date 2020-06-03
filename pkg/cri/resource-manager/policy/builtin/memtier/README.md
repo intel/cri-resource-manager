@@ -55,6 +55,28 @@ metadata:
 The `memtier` policy will then aim to allocate resources from a topology
 node which can satisfy the memory requirements.
 
+The `memtier` policy supports "cold start" functionality. When cold start is
+enabled and the workload is allocated to a topology node with both DRAM and
+PMEM memory, the initial memory controller is only the PMEM controller. DRAM
+controller is added to the workload only after the cold start timeout is
+done. The effect of this is that allocated large unused memory areas of
+memory don't need to be migrated to PMEM, because it was allocated there to
+begin with. Cold start is configured like this in the pod metadata:
+
+```
+metadata:
+  annotations:
+    cri-resource-manager.intel.com/memory-type: |
+      container1: dram,pmem
+    cri-resource-manager.intel.com/cold-start: |
+      container1:
+        duration: 60s
+```
+
+In the above example, `container1` would be initially granted only PMEM
+memory controller, but after 60 seconds the DRAM controller would be
+added to the container memset.
+
 ## Container memory requests and limits
 
 Due to inaccuracies in how `cri-resmgr` calculates memory requests for

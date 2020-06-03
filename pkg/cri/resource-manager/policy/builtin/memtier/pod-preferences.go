@@ -16,8 +16,10 @@ package memtier
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"sigs.k8s.io/yaml"
 
@@ -34,6 +36,8 @@ const (
 	keySharedCPUPreference = "prefer-shared-cpus"
 	// annotation key for type of memory to allocate
 	keyMemoryTypePreference = "memory-type"
+	// annotation key for type "cold start" of workloads
+	keyColdStartPreference = "cold-start"
 )
 
 // types by memory type name
@@ -141,6 +145,56 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int
 	}
 
 	return true, int(elevate)
+}
+
+// ColdStartPreference lists the various ways the container can be configured to trigger
+// cold start. Currently, only timer is supported. If the "duration" is set to a duration
+// greater than 0, cold start is enabled and the DRAM controller is added to the container
+// after the duration has passed.
+type ColdStartPreference struct {
+	duration time.Duration
+}
+
+type coldStartPreferenceYaml struct {
+	Duration string // `yaml:"duration,omitempty"`
+}
+
+// coldStartPreference figures out if the container memory should be first allocated from PMEM.
+// It returns the time (in milliseconds) after which DRAM controller should be added to the mix.
+func coldStartPreference(pod cache.Pod, container cache.Container) (ColdStartPreference, error) {
+	value, ok := pod.GetResmgrAnnotation(keyColdStartPreference)
+	if !ok {
+		return ColdStartPreference{}, nil
+	}
+	preferences := map[string]coldStartPreferenceYaml{}
+	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
+		log.Error("failed to parse cold start preference %s = '%s': %v",
+			keyColdStartPreference, value, err)
+		return ColdStartPreference{}, err
+	}
+	name := container.GetName()
+	coldStartPreference, ok := preferences[name]
+	if !ok {
+		log.Debug("container %s has no entry among cold start preferences", container.PrettyName())
+		return ColdStartPreference{}, nil
+	}
+
+	// Parse the cold start data.
+	duration, err := time.ParseDuration(coldStartPreference.Duration)
+	if err != nil {
+		log.Error("failed to parse cold start timeout %s: %v",
+			coldStartPreference.Duration, err)
+		return ColdStartPreference{}, err
+	}
+
+	if duration < 0 || duration > time.Hour {
+		// Duration can't be negative. We also reject durations which are longer than one hour.
+		return ColdStartPreference{}, fmt.Errorf("failed to validate cold start timeout %s: value out of scope", duration.String())
+	}
+
+	return ColdStartPreference{
+		duration: duration,
+	}, nil
 }
 
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.
