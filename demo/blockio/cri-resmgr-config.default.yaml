@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cri-resmgr-config.default
+  namespace: kube-system
+data:
+  policy: |+
+    Active: none
+  logger: |+
+    Debug: blockio,cgroupblkio
+  blockio: |+
+    Classes:
+      SlowReader:
+        - Devices:
+            - /dev/vda
+          ThrottleReadBps: 512k
