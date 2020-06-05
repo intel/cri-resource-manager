@@ -80,8 +80,10 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, err
 	}
 
-	if err := m.setupConfigAgent(); err != nil {
-		return nil, err
+	if opt.ForceConfig == "" {
+		if err := m.setupConfigAgent(); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := m.loadConfig(); err != nil {
