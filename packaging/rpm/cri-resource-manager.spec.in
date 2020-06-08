@@ -5,7 +5,13 @@ Summary: CRI Resource Manager, a CRI proxy with various in-node workload placeme
 License: ASL 2.0 
 URL:     https://github.com/intel/cri-resource-manager
 Source0: https://github.com/intel/cri-resource-manager/archive/cri-resource-manager-__TARVERSION__.tar.bz2
-BuildRequires: go >= 1.12, /usr/bin/make, /usr/bin/install
+BuildRequires: /usr/bin/make, /usr/bin/install
+BuildRequires: /usr/bin/mkdir, /usr/bin/find, /usr/bin/touch, /usr/bin/grep, /usr/bin/sed
+BuildRequires: /usr/bin/tr, /usr/bin/sort, /usr/bin/uniq
+BuildRequires: kernel-devel
+
+# Disable the building of debug package(s).
+%define debug_package %{nil}
 
 %package doc
 Summary: Documentation el al. collateral for Resource Manager Cluster/Node Agent
@@ -38,4 +44,4 @@ install -m 0700 -d %{?buildroot}%{_sharedstatedir}/cri-resmgr
 
 %files doc
 %defattr(-,root,root,-)
-%doc CONTRIBUTING.md LICENSE README.md SECURITY.md TODO.md
+%doc CONTRIBUTING.md LICENSE README.md SECURITY.md
