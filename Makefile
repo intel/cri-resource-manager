@@ -32,6 +32,7 @@ PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 UNITDIR    ?= $(PREFIX)/lib/systemd/system
 SYSCONFDIR ?= /etc
+CONFIGDIR  ?= /etc/cri-resmgr
 INSTALL    := install
 
 # Directories (in cmd) with go code we'll want to build and install.
@@ -122,7 +123,9 @@ build: $(BUILD_BINS)
 
 install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-systemd-$(dir)) \
-    $(foreach dir,$(BUILD_DIRS),install-sysconf-$(dir))
+    $(foreach dir,$(BUILD_DIRS),install-sysconf-$(dir)) \
+    $(foreach dir,$(BUILD_DIRS),install-config-$(dir))
+
 
 clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-ui-assets
 
@@ -180,6 +183,16 @@ install-sysconf-%:
 	    echo "  $$f in $(DESTDIR)$(SYSCONFDIR)/sysconfig..."; \
 	    df=$${f##*/}; df=$${df%.sysconf}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(SYSCONFDIR)/sysconfig/$$df; \
+	done
+
+install-config-%:
+	$(Q)bin=$(patsubst install-config-%,%,$@); dir=cmd/$$bin; \
+	echo "Installing sample configuration collateral for $$bin..."; \
+	$(INSTALL) -d $(DESTDIR)$(CONFIGDIR) && \
+	for f in $$(find $$dir -name \*.cfg.sample); do \
+	    echo "  $$f in $(DESTDIR)$(CONFIGDIR)..."; \
+	    df=$${f##*/}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df%.sample}; \
 	done
 
 clean-%:
