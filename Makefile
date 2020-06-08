@@ -106,6 +106,12 @@ DOCKER_DEB_BUILD := mkdir -p /build && cd /build && \
     git clone /input/cri-resource-manager && cd /build/cri-resource-manager && \
     make BUILD_DIRS=cri-resmgr deb
 
+# Docker boilerplate/commands to build rpm packages.
+DOCKER_RPM_BUILD := mkdir -p /build && cd /build && \
+    git clone /input/cri-resource-manager && cd /build/cri-resource-manager && \
+    make BUILD_DIRS=cri-resmgr rpm && \
+    cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
+
 # Where to leave built packages, if/when we build them in containers.
 PACKAGES_DIR = packages
 
@@ -303,6 +309,22 @@ src.rpm source-rpm: spec dist
 	cp packaging/rpm/cri-resource-manager.spec ~/rpmbuild/SPECS && \
 	cp cri-resource-manager*.tar.bz2 ~/rpmbuild/SOURCES && \
 	rpmbuild -bs ~/rpmbuild/SPECS/cri-resource-manager.spec
+
+rpm-docker.%: docker/%-build
+	$(Q)distro=$(patsubst rpm-docker.%,%,$@); \
+	builddir=build/docker/$$distro; \
+	outdir=$(PACKAGES_DIR)/$$distro; \
+	echo "Docker cross-building $$distro packages..."; \
+	mkdir -p $(PACKAGES_DIR)/$$distro && \
+	rm -fr $$builddir && mkdir -p $$builddir && \
+	docker run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
+	    -v $$(pwd):/input/cri-resource-manager \
+	    -v $$(pwd)/$$builddir:/build \
+	    -v $$(pwd)/$$outdir:/output \
+	    $$distro-build /bin/bash -c "export RPM_DISTRO=$$distro; $(DOCKER_RPM_BUILD)" && \
+	rm -fr $$builddir
+
 
 debian/%: packaging/deb.in/%
 	$(Q)echo "Generating debian packaging file $@..."; \
