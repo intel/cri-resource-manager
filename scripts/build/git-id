@@ -24,18 +24,18 @@ get_gitids () {
         version=$(git describe --tags --long --dirty 2>/dev/null || unknown_version)
         buildid=$(git rev-parse --short HEAD || echo unknown)
         if [ -n "$DIR" ]; then
-            if [ "$version" != "$(cat $DIR/git-version 2>/dev/null)" ]; then
-                echo "$version" > $DIR/git-version
+            if [ "$version" != "$(cat "$DIR"/git-version 2>/dev/null)" ]; then
+                echo "$version" > "$DIR"/git-version
             fi
-            if [ "$buildid" != "$(cat $DIR/git-buildid 2>/dev/null)" ]; then
-                echo "$buildid" > $DIR/git-buildid
+            if [ "$buildid" != "$(cat "$DIR"/git-buildid 2>/dev/null)" ]; then
+                echo "$buildid" > "$DIR"/git-buildid
             fi
         fi
     else
         DIR=${DIR:-$(pwd)}
-        if [ -f $DIR/git-version -a -f $DIR/git-buildid ]; then
-            version=$(cat $DIR/git-version || echo unknown_version)
-            buildid=$(cat $DIR/git-buildid || echo unknown)
+        if [ -f "$DIR"/git-version ] && [ -f "$DIR"/git-buildid ]; then
+            version=$(cat "$DIR"/git-version || echo unknown_version)
+            buildid=$(cat "$DIR"/git-buildid || echo unknown)
         else
             case $DIR in
                 */cri-resource-manager-*)
@@ -62,7 +62,7 @@ print_gitids () {
             clean_dirty
             version=$numver$prerel$commits$dirty
             buildid=$buildid
-            rpmversion=$(echo $numver$prerel$commits$dirty | tr '+-' '_')
+            rpmversion=$(echo "$numver$prerel$commits$dirty" | tr '+-' '_')
             debversion=$numver$prerel$commits$dirty
             ;;
         [0-9]*)
@@ -87,9 +87,9 @@ DIR=""
 
 case $# in
     0) ;;
-    1) DIR=$1; mkdir -p $DIR;;
+    1) DIR=$1; mkdir -p "$DIR";;
     *)
-        echo "$0: unknown options/arguments: $@" 1>&2
+        echo "$0: unknown options/arguments: $*" 1>&2
         echo "usage: $0 [dir-to-save/read-ids]" 1>&2
         exit 1;;
 esac
