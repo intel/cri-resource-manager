@@ -1,0 +1,20 @@
+#
+# If you pass this file to cri-resmgr using the --fallback-config
+# command line option, it will be used if configuration cannot be
+# acquired from any other source (agent, or last configuration
+# stored in the cache).
+#
+# Warning:
+#   Currently cri-resmgr will refuse to change the active policy
+#   once it has been stored in the cache. Therefore, if you also
+#   use the agent to configure cri-resmgr, be careful to set the
+#   same policy here as you plan to configure via the agent.
+#
+policy:
+  Active: memtier
+  ReservedResources:
+    CPU: 750m
+logger:
+  Debug: policy,static
+dump:
+  Config: off:.*,full:((Create)|(Remove)|(Run)|(Update)|(Start)|(Stop)).*
