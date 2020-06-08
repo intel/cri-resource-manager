@@ -10,16 +10,9 @@ BuildRequires: coreutils, make, kernel-devel
 # Disable the building of debug package(s).
 %define debug_package %{nil}
 
-%package doc
-Summary: Documentation el al. collateral for Resource Manager Cluster/Node Agent
-Requires: %{name} = %{version}
-
 %description
 Kubernetes Container Runtime Interface proxy service with hardware resource aware workload
 placement policies.
-
-%description doc
-LICENSE, README, and any other potential documentation.
 
 %prep
 %setup -q -n cri-resource-manager-__TARVERSION__
@@ -37,7 +30,6 @@ install -m 0700 -d %{?buildroot}%{_sharedstatedir}/cri-resmgr
 %{_sysconfdir}/sysconfig/*
 %{_unitdir}/*
 %dir %attr(0700,root,root) %{_sharedstatedir}/cri-resmgr
-
-%files doc
-%defattr(-,root,root,-)
-%doc CONTRIBUTING.md LICENSE README.md SECURITY.md cmd/cri-resmgr/*.sample
+%dir %attr(0700,root,root) %{_sysconfdir}/cri-resmgr
+%config(noreplace) %{_sysconfdir}/cri-resmgr/*
+%doc CONTRIBUTING.md LICENSE README.md SECURITY.md cmd/*/*.sample
