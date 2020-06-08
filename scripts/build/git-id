@@ -32,9 +32,17 @@ get_gitids () {
             fi
         fi
     else
-        DIR=${DIR:-.}
-        version=$(cat $DIR/git-version || unknown_version)
-        buildid=$(cat $DIR/git-buildid || echo unknown)
+        DIR=${DIR:-$(pwd)}
+        if [ -f $DIR/git-version -a -f $DIR/git-buildid ]; then
+            version=$(cat $DIR/git-version || echo unknown_version)
+            buildid=$(cat $DIR/git-buildid || echo unknown)
+        else
+            case $DIR in
+                */cri-resource-manager-*)
+                    version=${DIR##*cri-resource-manager-}
+                    ;;
+            esac
+        fi
     fi
 }
 
@@ -54,6 +62,13 @@ print_gitids () {
             clean_dirty
             version=$numver$prerel$commits$dirty
             buildid=$buildid
+            rpmversion=$(echo $numver$prerel$commits$dirty | tr '+-' '_')
+            debversion=$numver$prerel$commits$dirty
+            ;;
+        [0-9]*)
+            buildid="assumed-v$version"
+            rpmversion=$version
+            debversion=$version
             ;;
         *)
             version="$(unknown_version)"
@@ -61,8 +76,6 @@ print_gitids () {
     esac
     echo "gitbuildid=$buildid"
     echo "gitversion=$version"
-    rpmversion=$(echo $numver$prerel$commits$dirty | tr '+-' '_')
-    debversion=$numver$prerel$commits$dirty
     echo "rpmversion=$rpmversion"
     echo "debversion=$debversion"
 }
