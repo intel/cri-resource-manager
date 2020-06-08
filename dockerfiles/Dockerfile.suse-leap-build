@@ -1,0 +1,27 @@
+# pull in base + a minimal set of useful packages
+FROM opensuse/leap as suse-leap-build
+
+ARG GOLANG_VERSION=1.13.3
+ARG GOLANG_URLDIR=https://dl.google.com/go
+ARG CREATE_USER="build"
+ARG USER_OPTIONS=""
+ENV PATH /go/bin:/usr/local/go/bin:$PATH
+
+RUN zypper install -y bash git make grep \
+    sed findutils coreutils \
+    tar bzip2 wget \
+    clang gcc \
+    kernel-devel \
+    rpm-build
+
+RUN goarch=linux-amd64; \
+    \
+    wget $GOLANG_URLDIR/go$GOLANG_VERSION.$goarch.tar.gz -O go.tgz && \
+    tar -C /usr/local -xvzf go.tgz && rm go.tgz && \
+    \
+    export PATH="/usr/local/go/bin:$PATH" && \
+    echo "PATH=/usr/local/go/bin:$PATH" > /etc/profile.d/go.sh && \
+    go version
+
+RUN [ -n "$CREATE_USER" ] && \
+    useradd -m -s /bin/bash $CREATE_USER $(echo $USER_OPTIONS | sed 's/__/ /g')
