@@ -41,6 +41,8 @@ install -m 0700 -d %{?buildroot}%{_sharedstatedir}/cri-resmgr
 %{_sysconfdir}/sysconfig/*
 %{_unitdir}/*
 %dir %attr(0700,root,root) %{_sharedstatedir}/cri-resmgr
+%dir %attr(0700,root,root) %{_sysconfdir}/cri-resmgr
+%{_sysconfdir}/cri-resmgr/*.sample
 
 %files doc
 %defattr(-,root,root,-)
