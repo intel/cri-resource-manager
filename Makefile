@@ -167,7 +167,7 @@ install-systemd-%:
 	$(Q)bin=$(patsubst install-systemd-%,%,$@); dir=cmd/$$bin; \
 	echo "Installing systemd collateral for $$bin..."; \
 	$(INSTALL) -d $(DESTDIR)$(UNITDIR) && \
-	for f in $(shell find $(dir) -name \*.service -o -name \*.socket); do \
+	for f in $$(find $$dir -name \*.service -o -name \*.socket); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f; \
 	done
@@ -176,7 +176,7 @@ install-sysconf-%:
 	$(Q)bin=$(patsubst install-sysconf-%,%,$@); dir=cmd/$$bin; \
 	echo "Installing sysconf collateral for $$bin..."; \
 	$(INSTALL) -d $(DESTDIR)$(SYSCONFDIR)/sysconfig && \
-	for f in $(shell find $(dir) -name \*.sysconf); do \
+	for f in $$(find $$dir -name \*.sysconf); do \
 	    echo "  $$f in $(DESTDIR)$(SYSCONFDIR)/sysconfig..."; \
 	    df=$${f##*/}; df=$${df%.sysconf}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(SYSCONFDIR)/sysconfig/$$df; \
