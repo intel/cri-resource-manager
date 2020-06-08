@@ -1,11 +1,12 @@
 [Unit]
 Description=A CRI proxy with (hardware) resource aware container placement policies.
 Documentation=https://github.com/intel/cri-resource-manager
+Before=kubelet.service
 
 [Service]
 Type=simple
 EnvironmentFile=/etc/sysconfig/cri-resource-manager
-ExecStart=/usr/bin/cri-resmgr --policy $POLICY $POLICY_OPTIONS $DEBUG_OPTIONS
+ExecStart=/usr/bin/cri-resmgr $CONFIG_OPTIONS $POLICY_OPTIONS
 Restart=always
 
 [Install]
