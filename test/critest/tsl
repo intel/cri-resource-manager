@@ -1,0 +1,101 @@
+#!/usr/bin/python3
+#
+# Copyright 2020 Intel Corporation. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""tsl - timestamp lines
+
+Usage: tsl [options]
+
+Options:
+  -h, --help      print help.
+  -f TIMEFORMAT   use TIMEFORMAT as output timeformat (man strftime).
+                  The default format is "%s.%f".
+  -F LINEFORMAT   use LINEFORMAT as line output format:
+                  - %(ts)s: timestamp
+                  - %(line)s: original line
+                  The default is "%(ts)s %(line)s".
+  -o OUTFILE      write output lines to OUTFILE. Supports many -o's.
+                  Special outfiles:
+                  - stdout: standard output
+                  - stderr: standard error
+  -u              unbuffered input: more accurate timestamps, slower throughput.
+  -U              unbuffered output: flush after every line, slower throughput.
+
+Examples:
+  cmd1 | tsl -u -F "%(ts)s cmd1: %(line)s" > cmd1.tsl &
+  cmd2 | tsl -u -F "%(ts)s cmd2: %(line)s" > cmd2.tsl &
+  wait
+  cat cmd1.tsl cmd2.tsl | sort -n > cmd1_cmd2.output
+"""
+
+import getopt
+import sys
+import datetime
+
+def unbuffered_xreadlines(fileobj):
+    """like fileobj.xreadlines() but unbuffered"""
+    ln = []
+    while True:
+        c = fileobj.read(1)
+        if not c:
+            if ln:
+                yield "".join(ln)
+            break
+        ln.append(c)
+        if c == "\n":
+            yield "".join(ln)
+            ln = []
+
+if __name__ == "__main__":
+    opt_timeformat = "%s.%f" #"%Y-%m-%d %H:%M:%S"
+    opt_lineformat = "%(ts)s %(line)s"
+    opt_unbuffered_in = False
+    opt_unbuffered_out = False
+    opt_outfiles = []
+    opts, remainder = getopt.gnu_getopt(
+        sys.argv[1:], 'hf:F:o:uU',
+        ['help', 'format='])
+    for opt, arg in opts:
+        if opt in ["-h", "--help"]:
+            print(__doc__)
+            sys.exit(0)
+        elif opt in ["-f", "--format"]:
+            opt_timeformat = arg
+        elif opt in ["-F"]:
+            opt_lineformat = arg
+        elif opt in ["-o"]:
+            if arg == "stdout":
+                opt_outfiles.append(sys.stdout)
+            elif arg == "stderr":
+                opt_outfiles.append(sys.stderr)
+            else:
+                opt_outfiles.append(open(arg, "w"))
+        elif opt in ["-u"]:
+            opt_unbuffered_in = True
+        elif opt in ["-U"]:
+            opt_unbuffered_out = True
+    if not opt_outfiles:
+        opt_outfiles.append(sys.stdout)
+    if opt_unbuffered_in:
+        line_iter = unbuffered_xreadlines(sys.stdin)
+    else:
+        line_iter = sys.stdin
+    for line in line_iter:
+        ts = datetime.datetime.now().strftime(opt_timeformat)
+        out_line = opt_lineformat % {'ts': ts, 'line': line}
+        for outfile in opt_outfiles:
+            outfile.write(out_line)
+            if opt_unbuffered_out:
+                outfile.flush()
