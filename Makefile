@@ -61,12 +61,19 @@ UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
 # is always up-to-date when elf/avx512.c is changed.
 GEN_TARGETS := pkg/avx/programbytes_gendata.go
 
+# Determine binary version and buildid, and versions for rpm, deb, and tar packages.
+BUILD_VERSION := $(shell scripts/build/get-buildid --version --shell=no)
+BUILD_BUILDID := $(shell scripts/build/get-buildid --buildid --shell=no)
+RPM_VERSION   := $(shell scripts/build/get-buildid --rpm --shell=no)
+DEB_VERSION   := $(shell scripts/build/get-buildid --deb --shell=no)
+TAR_VERSION   := $(shell scripts/build/get-buildid --tar --shell=no)
+
 # Git (tagged) version and revisions we'll use to linker-tag our binaries with.
-GIT_ID   = scripts/build/git-id
-BUILD_ID = "$(shell head -c20 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-LDFLAGS  = -ldflags "-X=github.com/intel/cri-resource-manager/pkg/version.Version=$$gitversion \
-                     -X=github.com/intel/cri-resource-manager/pkg/version.Build=$$gitbuildid \
-                     -B 0x$(BUILD_ID)"
+RANDOM_ID := "$(shell head -c20 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+LDFLAGS    = \
+    -ldflags "-X=github.com/intel/cri-resource-manager/pkg/version.Version=$(BUILD_VERSION) \
+             -X=github.com/intel/cri-resource-manager/pkg/version.Build=$(BUILD_BUILDID) \
+             -B 0x$(RANDOM_ID)"
 
 # Build non-optimized version for debugging on make DEBUG=1.
 DEBUG ?= 0
@@ -154,8 +161,7 @@ libexec/%.o: elf/%.c
 
 bin/%:
 	$(Q)bin=$(notdir $@); src=cmd/$$bin; \
-	eval `$(GIT_ID)`; \
-	echo "Building $@ (version $$gitversion, build $$gitbuildid)..."; \
+	echo "Building $@ (version $(BUILD_VERSION), build $(BUILD_BUILDID))..."; \
 	mkdir -p bin && \
 	cd $$src && \
 	    $(GO_BUILD) $(BUILD_TAGS) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
@@ -280,13 +286,14 @@ endif
 #
 
 dist:
-	$(Q)eval `$(GIT_ID) .` && \
-	tardir=cri-resource-manager-$$gitversion; \
-	tarball=cri-resource-manager-$$gitversion.tar; \
+	$(Q)tardir=cri-resource-manager-$(TAR_VERSION); \
+	tarball=cri-resource-manager-$(TAR_VERSION).tar; \
 	echo "Creating $$tarball.$(TAR_SUFFIX)..."; \
 	rm -fr $$tardir $$tarball* && \
 	git archive --format=tar --prefix=$$tardir/ HEAD > $$tarball && \
-	mkdir -p $$tardir && cp git-version git-buildid $$tardir && \
+	mkdir -p $$tardir && \
+	    echo $(BUILD_VERSION) > $$tardir/version && \
+	    echo $(BUILD_BUILDID) > $$tardir/buildid && \
 	$(TAR_UPDATE) $$tarball $$tardir && \
 	$(TAR_COMPRESS) $$tarball && \
 	rm -fr $$tardir
@@ -295,11 +302,10 @@ spec: clean-spec $(SPEC_FILES)
 
 %.spec:
 	$(Q)echo "Generating RPM spec file $@..."; \
-	eval `$(GIT_ID) .` && \
 	cp $@.in $@ && \
-	sed -E -i -e "s/__VERSION__/$$rpmversion/g"    \
-	          -e "s/__TARVERSION__/$$gitversion/g" \
-	          -e "s/__BUILDID__/$$gitbuildid/g" $@
+	sed -E -i -e "s/__VERSION__/$(RPM_VERSION)/g"    \
+	          -e "s/__TARVERSION__/$(TAR_VERSION)/g" \
+	          -e "s/__BUILDID__/$(BUILD_BUILDID)/g" $@
 
 clean-spec:
 	$(Q)rm -f $(SPEC_FILES)
@@ -318,13 +324,13 @@ src.rpm source-rpm: spec dist
 
 debian/%: packaging/deb.in/%
 	$(Q)echo "Generating debian packaging file $@..."; \
+	tardir=cri-resource-manager-$(TAR_VERSION) && \
+	tarball=cri-resource-manager-$(TAR_VERSION).tar && \
 	mkdir -p debian; \
-	eval `$(GIT_ID) .` && \
-	tarball=cri-resource-manager-$$gitversion.tar && \
 	cp $< $@ && \
 	sed -E -i -e "s/__PACKAGE__/cri-resource-manager/g" \
 	          -e "s/__TARBALL__/$$tarball/g"            \
-	          -e "s/__VERSION__/$$debversion/g"         \
+	          -e "s/__VERSION__/$(DEB_VERSION)/g"       \
 	          -e "s/__AUTHOR__/$(USER_NAME)/g"          \
 	          -e "s/__EMAIL__/$(USER_EMAIL)/g"          \
 	          -e "s/__DATE__/$(BUILD_DATE)/g"           \
@@ -444,5 +450,4 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 
 # phony targets
 .PHONY: all build install clean test images images-push\
-	format vet cyclomatic-check lint golangci-lint \
-	git-version git-buildid
+	format vet cyclomatic-check lint golangci-lint
