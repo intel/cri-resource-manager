@@ -2,7 +2,7 @@
 
 VOLUMES="-v /sys:/sys -v /home:/mnt/host/home"
 IMAGE=$1
-DOCKERFILE=$IMAGE
+DOCKERFILE=dockerfiles/cross-build/Dockerfile.${IMAGE%-build}
 shift
 
 while [ -n "$1" ]; do
@@ -20,20 +20,12 @@ while [ -n "$1" ]; do
             fi
             shift
             ;;
-        --dockerfile|-df)
-            DOCKERFILE=$2
-            shift 2
-            ;;
         *)
             PASSTHROUGH="$PASSTHROUGH $1"
             shift
             ;;
     esac
 done
-
-if [ ! -f $DOCKERFILE ]; then
-    DOCKERFILE=dockerfiles/Dockerfile.$DOCKERFILE
-fi
 
 echo "* Building docker images with"
 echo "  - Dockerfile: $DOCKERFILE"
@@ -48,4 +40,6 @@ docker build . \
        --build-arg USER_OPTIONS="-u__$(id -u)" \
        $PASSTHROUGH || exit 1
 
-docker create --name $CONTAINER $VOLUMES $IMAGE
+if [ -n "$CONTAINER" ]; then
+    docker create --name $CONTAINER $VOLUMES $IMAGE
+fi
