@@ -370,7 +370,7 @@ debian-packages:
 	$(MAKE) DEB_DISTRO=debian deb
 
 # Build a docker image (for distro cross-building).
-docker/%: dockerfiles/Dockerfile.%
+docker/%: dockerfiles/cross-build/Dockerfile.%
 	$(Q)img=$(patsubst docker/%,%,$@); \
 	docker rm $$img || : && \
 	echo "Building cross-build docker image $$img..."; \
