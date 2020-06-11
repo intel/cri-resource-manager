@@ -32,6 +32,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/metricsring"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 )
 
@@ -467,6 +468,8 @@ type Cache interface {
 	GetContainerCacheIds() []string
 	// GetContaineIds return the ids of all containers.
 	GetContainerIds() []string
+	GetMetrics() *Metricsdata
+	SetMetrics(m *Metricsdata)
 
 	// FilterScope returns the containers selected by the scope expression.
 	FilterScope(*Expression) []Container
@@ -518,6 +521,12 @@ type permissions struct {
 	reject os.FileMode // bits that cause rejection to use an existing entry
 }
 
+type MetricsEntry map[string]metricsring.SampleBuffer
+
+type Metricsdata struct {
+	Containers map[string]MetricsEntry
+}
+
 // permissions to create with/check against
 var (
 	cacheDirPerm  = &permissions{prefer: 0710, reject: 0022}
@@ -535,6 +544,7 @@ type cache struct {
 
 	Pods       map[string]*pod       // known/cached pods
 	Containers map[string]*container // known/cache containers
+	Metrics    *Metricsdata          // known/cached metrics for containers
 	NextID     uint64                // next container cache id to use
 
 	Cfg        *config.RawConfig      // cached/current configuration
@@ -564,6 +574,7 @@ func NewCache(options Options) (Cache, error) {
 		Logger:     logger.NewLogger("cache"),
 		Pods:       make(map[string]*pod),
 		Containers: make(map[string]*container),
+		Metrics:    &Metricsdata{Containers: make(map[string]MetricsEntry)},
 		NextID:     1,
 		policyData: make(map[string]interface{}),
 		PolicyJSON: make(map[string]string),
@@ -584,6 +595,14 @@ func NewCache(options Options) (Cache, error) {
 	}
 
 	return cch, nil
+}
+
+func (cch *cache) GetMetrics() *Metricsdata {
+	return cch.Metrics
+}
+
+func (cch *cache) SetMetrics(m *Metricsdata) {
+	cch.Metrics = m
 }
 
 // GetActivePolicy returns the name of the active policy stored in the cache.
@@ -758,6 +777,7 @@ func (cch *cache) DeleteContainer(id string) Container {
 	cch.removeContainerDirectory(c.CacheID)
 	delete(cch.Containers, c.ID)
 	delete(cch.Containers, c.CacheID)
+	delete(cch.Metrics.Containers, c.ID)
 
 	cch.Save()
 

@@ -592,3 +592,9 @@ func (m *mockCache) OpenFile(string, string, os.FileMode) (*os.File, error) {
 func (m *mockCache) WriteFile(string, string, os.FileMode, []byte) error {
 	panic("unimplemented")
 }
+func (m *mockCache) GetMetrics() *cache.Metricsdata {
+	panic("unimplemented")
+}
+func (m *mockCache) SetMetrics(*cache.Metricsdata) {
+	panic("unimplemented")
+}
