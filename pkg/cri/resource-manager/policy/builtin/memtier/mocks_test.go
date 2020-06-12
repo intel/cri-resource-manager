@@ -621,6 +621,9 @@ func (m *mockCache) GetActivePolicy() string {
 func (m *mockCache) SetActivePolicy(string) error {
 	panic("unimplemented")
 }
+func (m *mockCache) ResetActivePolicy() error {
+	panic("unimplemented")
+}
 func (m *mockCache) SetPolicyEntry(string, interface{}) {
 }
 func (m *mockCache) GetPolicyEntry(string, interface{}) bool {

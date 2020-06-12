@@ -480,6 +480,9 @@ type Cache interface {
 	// SetActivePolicy updates the name of the active policy stored in the cache.
 	SetActivePolicy(string) error
 
+	// ResetActivePolicy clears the active policy any any policy-specific data from the cache.
+	ResetActivePolicy() error
+
 	// SetPolicyEntry sets the policy entry for a key.
 	SetPolicyEntry(string, interface{})
 	// GetPolicyEntry gets the policy entry for a key.
@@ -591,6 +594,18 @@ func (cch *cache) GetActivePolicy() string {
 // SetActivePolicy updaes the name of the active policy stored in the cache.
 func (cch *cache) SetActivePolicy(policy string) error {
 	cch.PolicyName = policy
+	return cch.Save()
+}
+
+// ResetActivePolicy clears the active policy any any policy-specific data from the cache.
+func (cch *cache) ResetActivePolicy() error {
+	cch.Warn("clearing all data for active policy (%q) from cache...",
+		cch.PolicyName)
+
+	cch.PolicyName = ""
+	cch.policyData = make(map[string]interface{})
+	cch.PolicyJSON = make(map[string]string)
+
 	return cch.Save()
 }
 
