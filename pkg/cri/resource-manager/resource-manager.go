@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/visualizer"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 // ResourceManager is the interface we expose for controlling the CRI resource manager.
@@ -74,6 +76,10 @@ func NewResourceManager() (ResourceManager, error) {
 
 	if err := m.setupCache(); err != nil {
 		return nil, err
+	}
+
+	if opt.ResetPolicy {
+		os.Exit(m.resetCachedPolicy())
 	}
 
 	if err := m.checkOpts(); err != nil {
@@ -239,6 +245,24 @@ func (m *resmgr) setConfig(src interface{}) error {
 	return nil
 }
 
+// resetCachedPolicy resets the cached active policy and all of its data.
+func (m *resmgr) resetCachedPolicy() int {
+	defer logger.Flush()
+
+	if utils.ServerActiveAt(opt.RelaySocket) {
+		m.Error("Refusing to reset active policy from cache.")
+		m.Error("Looks like an instance of %q is active at socket %q...",
+			filepath.Base(os.Args[0]), opt.RelaySocket)
+		return 1
+	}
+
+	if err := m.cache.ResetActivePolicy(); err != nil {
+		m.Error("failed to reset active policy: %v", err)
+		return 1
+	}
+	return 0
+}
+
 // setupCache creates a cache and reloads its last saved state if found.
 func (m *resmgr) setupCache() error {
 	var err error
@@ -390,8 +414,13 @@ func (m *resmgr) setupPolicy() error {
 
 	if active != cached {
 		if cached != "" {
-			return resmgrError("cannot load cache with policy %s for active policy %s",
-				cached, active)
+			if !opt.AllowPolicySwitch {
+				return resmgrError("cannot load cache with policy %s for active policy %s",
+					cached, active)
+			}
+			if err := m.cache.ResetActivePolicy(); err != nil {
+				return resmgrError("failed to reset cached policy %q: %v", cached, err)
+			}
 		}
 		m.cache.SetActivePolicy(active)
 	}
