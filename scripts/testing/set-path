@@ -1,6 +1,6 @@
 #!/bin/sh
 
- #set -x
+# set -x
 
 dirpart=packages/src/github.com/intel/cri-interceptor
 
@@ -8,7 +8,7 @@ case $(pwd) in
     */$dirpart*)
         ;;
     *)
-        echo "Don't know how: I don't see $DIRPART in $(pwd)..."
+        echo "Don't know how: I don't see $dirpart in $(pwd)..."
         return 1
         ;;
 esac
@@ -17,14 +17,14 @@ dir=$(pwd)
 kubedir=${dir%%/github.com*}/k8s.io/kubernetes
 kubebin=$kubedir/_output/local/bin/linux/amd64
 
-if [ ! -d $kubebin ]; then
+if [ ! -d "$kubebin" ]; then
     echo "*** You don't seem to have a $kubebin directory."
     return 1
 fi
 
-if [ ! -x $kubebin/kubelet ]; then
+if [ ! -x "$kubebin"/kubelet ]; then
     echo "*** You don't seem to have kubelet in $kubebin (done a make WHAT=cmd/kubelet ?)"
-    ls -ls $kubebin
+    ls -ls "$kubebin"
     return 1
 fi
 
