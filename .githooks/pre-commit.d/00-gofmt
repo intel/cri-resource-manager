@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Copyright 2012 The Go Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file.
@@ -10,7 +10,7 @@
 #
 # This script does not handle file names that contain spaces.
 
-if [ -z "$(type -p gofmt)" ]; then
+if [ -z "$(command -v gofmt)" ]; then
     echo >&2 "WARNING: Cannot check/enforce Go code formatting: can't find gofmt."
     echo >&2 "WARNING: Please consider installing gofmt."
     exit 0
@@ -19,6 +19,7 @@ fi
 gofiles=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$')
 [ -z "$gofiles" ] && exit 0
 
+# shellcheck disable=SC2086
 unformatted=$(gofmt -l $gofiles)
 [ -z "$unformatted" ] && exit 0
 
