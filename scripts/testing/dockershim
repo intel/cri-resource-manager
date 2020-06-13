@@ -1,24 +1,23 @@
 #!/bin/bash
 
 case $1 in
-    -n|--dry-run) xeq=echo; shift;;
-    *)            xeq=""
+    -n|--dry-run) xeq='echo'; shift;;
+    *)            xeq='';;
 esac
 
-SCRIPT=$(realpath ${0%/*})
+SCRIPT=$(realpath "${0%/*}")
 
 if [ -z "$KUBELET" ]; then
     case $SCRIPT in
         */go/packages/src/*)
             GOPKGS=${SCRIPT%%/packages/src*}/packages/src
-            if [ -d $GOPKGS/k8s.io/kubernetes ]; then
+            if [ -d "$GOPKGS"/k8s.io/kubernetes ]; then
                 export PATH="$GOPKGS/k8s.io/kubernetes/_output/local/bin/linux/amd64:$PATH"
             fi
             ;;
     esac
-    if [ -n "$(which kubelet)" ]; then
-        KUBELET=$(which kubelet)
-    else
+    KUBELET="$(command -v kubelet)"
+    if [ -z "$KUBELET" ]; then
         KUBELET=kubelet
     fi
 fi
@@ -61,8 +60,9 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-set - $EXTRA_ARGUMENTS
+set - "$EXTRA_ARGUMENTS"
 
 $xeq $SUDO $KUBELET --experimental-dockershim --port 11250 \
-     ${CGROUP_DRIVER:---cgroup-driver systemd} \
-     ${VERBOSITY:--v 99} $@
+     "${CGROUP_DRIVER:---cgroup-driver systemd}" \
+     "${VERBOSITY:--v 99}" \
+     "$@"
