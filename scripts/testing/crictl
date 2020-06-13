@@ -6,4 +6,4 @@ if [ -z "$CRICTL" ]; then
     CRICTL=crictl
 fi
 
-sudo $CRICTL -i $RELAY_SOCKET -r $RELAY_SOCKET $@
+sudo $CRICTL -i $RELAY_SOCKET -r $RELAY_SOCKET "$@"
