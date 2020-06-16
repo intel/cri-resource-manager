@@ -1,5 +1,5 @@
 # pull in base + a minimal set of useful packages
-FROM debian:stretch as debian-build
+FROM ubuntu:18.04 as ubuntu-18.04-build
 
 ARG GOLANG_VERSION=1.13.3
 ARG GOLANG_URLDIR=https://dl.google.com/go
@@ -20,7 +20,7 @@ RUN arch="$(dpkg --print-architecture)"; \
         i386) goarch=linux-386;; \
         armhf) goarch=linux-armv6l;; \
         ppc64el) goarch=linux-ppc64le;; \
-        s390x) goaach=linux-s390x;; \
+        s390x) goarch=linux-s390x;; \
     esac; \
     \
     wget $GOLANG_URLDIR/go$GOLANG_VERSION.$goarch.tar.gz -O go.tgz && \
@@ -30,5 +30,5 @@ RUN arch="$(dpkg --print-architecture)"; \
     echo "PATH=/usr/local/go/bin:$PATH" > /etc/profile.d/go.sh && \
     go version
 
-RUN [ -n "$CREATE_USER" ] && \
-    useradd -m -s /bin/bash $CREATE_USER $(echo $USER_OPTIONS | sed 's/__/ /g')
+RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
+    useradd -m -s /bin/bash $CREATE_USER $(echo $USER_OPTIONS | sed 's/__/ /g') || :

@@ -1,6 +1,7 @@
-# Name of the policy to activate.
-POLICY=topology-aware
-# Any extra options for the active policy.
-POLICY_OPTIONS="--reserved-resources=cpu=750m"
-# Debug flags to enable.
-DEBUG_OPTIONS="--logger-debug resource-manager,policy,cache"
+# Configuration options to pass to cri-resmgr when started via systemd.
+
+# Use a fallback file for configuration if/when we can't acquire one from the agent.
+CONFIG_OPTIONS="--fallback-config /etc/cri-resmgr/fallback.cfg"
+
+# Enable this for allowing the active policy to be changed during startup.
+#POLICY_OPTIONS="--allow-policy-switch"
