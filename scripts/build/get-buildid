@@ -1,0 +1,276 @@
+#!/bin/bash
+
+#
+# Script to determine a version string, a buildid as well as related RPM
+# and debian package versions. These are determined using the following
+# sources in decreasing order of preference:
+#
+#  1. git metadata:
+#    - version: git describe --tags --long --dirty
+#    - buildid: git rev-parse --short HEAD
+#  2. stored git metadata:
+#    - version: git-version
+#    - buildid: git-buildid
+#  3. directory name:
+#    - version: cri-resource-manager-(.*):
+#    - buildid: unknown
+#  4. date:
+#    - version: 0.0.0-$(date +%Y%m%d%H%M)
+#    - buildid: unknown
+#
+
+PARENT_DIRNAME=cri-resource-manager
+VERSION_FILE=version
+BUILDID_FILE=buildid
+VERSION=""
+BUILDID=""
+RPM=""
+DEB=""
+
+fail() {
+    echo "$*" 2>&1
+    exit 1
+}
+
+log() {
+    echo "$*" 1>&2
+}
+
+print_usage() {
+    local _status=0
+    if [ -n "$*" ]; then
+        echo "$*"
+        _status=1
+    fi
+    echo "usage $0 [--store[=<dir>]] [--version] [--buildid] [--rpm] [--deb] [--tar] [--all]"
+    exit $_status
+}
+
+dotgit_hasrepo() {
+    git status >& /dev/null
+}
+
+dotgit_version() {
+    local _v _id _dirty _count
+
+    if  [ -z "$TEST_DESCRIBE" ]; then
+        if ! dotgit_hasrepo; then
+            return 1
+        fi
+        _id=$(git rev-parse --short HEAD)
+        _dirty=$(git diff --quiet -- ':!go.mod' ':!go.sum' || echo '-dirty')
+        _v=$(git describe --tags --long --dirty 2>/dev/null)
+    else
+        _v="$TEST_DESCRIBE"
+        _id="$TEST_REV"
+        _dirty=""
+    fi
+
+    case "$_v" in
+        v*) _v="${_v#v}"
+            ;;
+        *)
+            _count=$(git rev-list --count HEAD)
+            _v="0.0.0-$_count-g$_id$_dirty"
+            ;;
+    esac
+
+    VERSION="$_v"
+    BUILDID="$_id$_dirty"
+}
+
+stored_hasdata() {
+    if [ ! -f "$OUTDIR/$VERSION_FILE" ] || [ ! -f "$OUTDIR/$BUILDID_FILE" ]; then
+        return 1
+    fi
+    STORED_VERSION=$(cat "$OUTDIR/$VERSION_FILE") && \
+        STORED_BUILDID=$(cat "$OUTDIR/$BUILDID_FILE")
+}
+
+stored_version() {
+    if ! stored_hasdata; then
+        return 1
+    fi
+    VERSION="$STORED_VERSION"
+    BUILDID="$STORED_BUILDID"
+}
+
+stored_update() {
+    if stored_hasdata; then
+        if [ "$STORED_VERSION" = "$VERSION" ] && [ "$STORED_BUILDID" = "$BUILDID" ]; then
+            return 0
+        fi
+    fi
+    mkdir -p "$OUTDIR" || fail "failed to create $OUTDIR"
+    echo "$VERSION" > "$OUTDIR/$VERSION_FILE"
+    echo "$BUILDID" > "$OUTDIR/$BUILDID_FILE"
+}
+
+parent_version() {
+    local _dir
+
+    _dir=$(basename "$(realpath .)")
+    case "$_dir" in
+        "${PARENT_DIRNAME}"-*)
+            VERSION="${_dir##${PARENT_DIRNAME}-}"
+            BUILDID=unknown
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+unknown_version() {
+    VERSION="0.0.0-$(date +%Y%m%d%H%M)"
+    BUILDID=unknown
+}
+
+package_versions() {
+    case "$VERSION" in
+        [0-9.]**-g[0-9a-f]*)
+            local _full="$VERSION"
+            local _numeric=${_full%%-*}
+            local _cntsha1=${_full#*-}
+            local _clean=${_cntsha1%-dirty}
+            local _dirty=${_cntsha1#$_clean}; _cntsha1="$_clean"
+            local _sha1=${_cntsha1##*-g}
+            local _cnt=${_cntsha1%-g*}
+            VERSION=$_numeric
+            if [ -n "$_cnt" ] && [ "$_cnt" != "0" ]; then
+                VERSION="$VERSION-$_cnt-g$_sha1"
+            fi
+            VERSION=$VERSION$_dirty
+            RPM=$(echo "$VERSION" | tr '+-' '_')
+            DEB=$VERSION
+            ;;
+        [0-9.]*)
+            RPM=$VERSION
+            DEB=$VERSION
+            ;;
+        *)
+            fail "can't parse version $VERSION"
+            ;;
+    esac
+}
+
+print_variables() {
+    local _what _var _val
+
+    for _what in $PRINT; do
+        case $_what in
+            version)
+                [ -n "$SHVAR" ] && _var='gitversion='
+                _val="$VERSION"
+                ;;
+            buildid)
+                [ -n "$SHVAR" ] && _var='gitbuildid='
+                _val="$BUILDID"
+                ;;
+            rpm)
+                [ -n "$SHVAR" ] && _var='rpmversion='
+                _val="$RPM"
+                ;;
+            deb)
+                [ -n "$SHVAR" ] && _var='debversion='
+                _val="$DEB"
+                ;;
+            tar)
+                [ -n "$SHVAR" ] && _var='tarversion='
+                _val="$VERSION"
+                ;;
+            *)
+                print_usage "unknown version/buildid-related tag \"$_what\""
+                ;;
+        esac
+        echo "$_var$_val"
+    done
+}
+
+#########################
+# main script
+#
+
+OUTDIR="."
+STORE=""
+PRINT=""
+SHVAR=y
+TEST_DESCRIBE=""
+TEST_REV=""
+
+while [ "$#" != "0" ]; do
+    case $1 in
+        --help|-h)
+            print_usage
+            ;;
+        --debug)
+            set -x
+            ;;
+        --store=*|-s*)
+            STORE=y
+            out="${1##*=}"
+            if [ "$out" != "$1" ]; then
+                OUTDIR="$out"
+            fi
+            ;;
+        --version|-v)
+            PRINT="$PRINT version"
+            ;;
+        --buildid|-b)
+            PRINT="$PRINT buildid"
+            ;;
+        --rpm)
+            PRINT="$PRINT rpm"
+            ;;
+        --deb)
+            PRINT="$PRINT deb"
+            ;;
+        --tar)
+            PRINT="$PRINT tar"
+            ;;
+        --all)
+            PRINT="version buildid rpm deb tar"
+            ;;
+        --shell*|--sh-syntax*)
+            val="${1##*=}"
+            if [ "$val" != "$1" ]; then
+                case $val in
+                    y*|t*) SHVAR=y;;
+                    n*|f*) SHVAR="";;
+                esac
+            else
+                SHVAR=y
+            fi
+            ;;
+        --no-shell|--no-sh-syntax)
+            SHVAR=""
+            ;;
+        --test)
+            TEST_DESCRIBE="$2"
+            TEST_REV="$3"
+            shift 2
+            ;;
+        *)
+            print_usage "unknown option \"$1\""
+            ;;
+    esac
+    shift
+done
+
+if ! dotgit_version; then
+    if ! stored_version; then
+        if ! parent_version; then
+            fail "failed to determine version from any source"
+        fi
+    fi
+fi
+
+if [ -z "$STORE" ] && [ -z "$PRINT" ]; then
+    PRINT="version buildid"
+fi
+
+package_versions
+print_variables
+
+if [ -n "$STORE" ]; then
+    stored_update
+fi

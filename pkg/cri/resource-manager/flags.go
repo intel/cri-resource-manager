@@ -33,6 +33,8 @@ type options struct {
 	FallbackConfig    string
 	ForceConfig       string
 	ForceConfigSignal string
+	AllowPolicySwitch bool
+	ResetPolicy       bool
 	MetricsTimer      time.Duration
 	RebalanceTimer    time.Duration
 	DisableUI         bool
@@ -62,6 +64,10 @@ func init() {
 		"Configuration used to override the one stored in the cache. Does not override the agent.")
 	flag.StringVar(&opt.ForceConfigSignal, "force-config-signal", "SIGHUP",
 		"Signal used to reload forced configuration.")
+	flag.BoolVar(&opt.ResetPolicy, "reset-policy", false,
+		"Reset policy data stored in the cache, then exit.")
+	flag.BoolVar(&opt.AllowPolicySwitch, "allow-policy-switch", false,
+		"Allow switching policies (only during startup for now)")
 
 	flag.DurationVar(&opt.MetricsTimer, "metrics-interval", 0,
 		"Interval for polling/gathering runtime metrics data. Use 'disable' for disabling.")

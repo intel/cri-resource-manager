@@ -647,29 +647,36 @@ func (sys *system) discoverNodes() error {
 		return nil
 	}
 
-	cpuNodes, err := readCPUsetFile(filepath.Join(sys.path, sysfsNumaNodePath), "has_cpu")
-	if err != nil {
-		return err
-	}
-	memoryNodes, err := readCPUsetFile(filepath.Join(sys.path, sysfsNumaNodePath), "has_memory")
-	if err != nil {
-		return err
-	}
-
-	dramNodes := memoryNodes.Intersection(cpuNodes)
-	pmemOrHbmNodes := memoryNodes.Difference(dramNodes)
-
-	dramNodeIds := FromCPUSet(dramNodes)
-	pmemOrHbmNodeIds := FromCPUSet(pmemOrHbmNodes)
-
 	sys.nodes = make(map[ID]*node)
-
 	entries, _ := filepath.Glob(filepath.Join(sys.path, sysfsNumaNodePath, "node[0-9]*"))
 	for _, entry := range entries {
 		if err := sys.discoverNode(entry); err != nil {
 			return fmt.Errorf("failed to discover node for entry %s: %v", entry, err)
 		}
 	}
+
+	cpuNodesBuilder := cpuset.NewBuilder()
+	memoryNodesBuilder := cpuset.NewBuilder()
+	for _, node := range sys.nodes {
+		if node.cpus.Size() > 0 {
+			cpuNodesBuilder.Add(int(node.id))
+		}
+		mem, _ := filepath.Glob(filepath.Join(node.path, "memory[0-9]*"))
+		if len(mem) > 0 {
+			memoryNodesBuilder.Add(int(node.id))
+		}
+	}
+	cpuNodes := cpuNodesBuilder.Result()
+	memoryNodes := memoryNodesBuilder.Result()
+
+	sys.Logger.Info("NUMA nodes with CPUs: %s", cpuNodes.String())
+	sys.Logger.Info("NUMA nodes with memory: %s", memoryNodes.String())
+
+	dramNodes := memoryNodes.Intersection(cpuNodes)
+	pmemOrHbmNodes := memoryNodes.Difference(dramNodes)
+
+	dramNodeIds := FromCPUSet(dramNodes)
+	pmemOrHbmNodeIds := FromCPUSet(pmemOrHbmNodes)
 
 	infos := make(map[ID]*MemInfo)
 	dramAvg := uint64(0)

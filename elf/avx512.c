@@ -35,14 +35,6 @@ static int (*bpf_map_update_elem)(void *map, void *key, void *value,
 static void *(*bpf_map_lookup_elem)(void *map, void *key) = (void *)
 	BPF_FUNC_map_lookup_elem;
 
-#define bpf_printk(fmt, ...)                                                   \
-	({                                                                     \
-		char ____fmt[] = fmt;                                          \
-		bpf_trace_printk(____fmt, sizeof(____fmt), ##__VA_ARGS__);     \
-	})
-static int (*bpf_trace_printk)(const char *fmt, int fmt_size,
-			       ...) = (void *)BPF_FUNC_trace_printk;
-
 struct bpf_map_def
 	SEC("maps/all_context_switch_count") all_context_switch_count_hash = {
 		.type = BPF_MAP_TYPE_HASH,
@@ -53,7 +45,7 @@ struct bpf_map_def
 
 struct bpf_map_def
 	SEC("maps/avx_context_switch_count") avx_context_switch_count_hash = {
-		.type = BPF_MAP_TYPE_HASH,
+		.type = BPF_MAP_TYPE_PERCPU_HASH,
 		.key_size = sizeof(u64),
 		.value_size = sizeof(u32),
 		.max_entries = 1024,
@@ -74,13 +66,6 @@ struct bpf_map_def
 		.value_size = sizeof(u64),
 		.max_entries = 1024,
 	};
-
-struct bpf_map_def SEC("maps/cpu") cpu_hash = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(unsigned int),
-	.value_size = sizeof(u32),
-	.max_entries = 128,
-};
 
 SEC("tracepoint/sched/sched_switch")
 int tracepoint__sched_switch(void *args)
@@ -138,18 +123,7 @@ int tracepoint__x86_fpu_regs_deactivated(struct x86_fpu_args *args)
 	}
 	bpf_map_update_elem(&avx_timestamp_hash, &cgroup_id, &ts, BPF_ANY);
 
-	unsigned int last_cpu;
-	bpf_probe_read(&last_cpu, sizeof(last_cpu),
-		       (void *)&args->fpu->last_cpu);
-
 	u32 count = 1;
-	counter = bpf_map_lookup_elem(&cpu_hash, &last_cpu);
-	if (counter) {
-		__sync_fetch_and_add(counter, 1);
-	} else {
-		bpf_map_update_elem(&cpu_hash, &last_cpu, &count, BPF_ANY);
-	}
-
 	counter = bpf_map_lookup_elem(&avx_context_switch_count_hash, &cgroup_id);
 	if (counter) {
 		__sync_fetch_and_add(counter, 1);
@@ -161,7 +135,6 @@ int tracepoint__x86_fpu_regs_deactivated(struct x86_fpu_args *args)
 	u64 last = bpf_ktime_get_ns();
 	bpf_map_update_elem(&last_update_ns_hash, &cgroup_id, &last, BPF_ANY);
 
-	bpf_printk("AVX512 detected in cgroup %llu\n", cgroup_id);
 	return 0;
 }
 
