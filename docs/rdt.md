@@ -48,5 +48,5 @@ CRI-RM has a built-in default configuration containing three classes
 corresponding to the Pod QOS classes of Kubernetes. These are utilized by the
 `static` policy.
 
-See `rdt` in the [example ConfigMap spec](../sample-configs/cri-resmgr-configmap.example.yaml)
+See `rdt` in the [example ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
 for an example configuration.

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-CRI Resource Manager is a Container Runtime Interface Proxy. It sits between 
+CRI Resource Manager is a Container Runtime Interface Proxy. It sits between
 clients and the actual Container Runtime implementation (containerd, cri-o,
 dockershim+docker), relaying requests and responses back and forth. The main
 purpose of the proxy is to apply hardware-aware resource allocation policies
@@ -180,7 +180,7 @@ policy configurations.
 
 You can use CRI Resource Manager to simply inspect all proxied CRI requests and
 responses without applying any policy. Run CRI Resource Manager with the
-provided [sample configuration](sample-configs/cri-full-message-dump.cfg]
+provided [sample configuration](sample-configs/cri-full-message-dump.cfg)
 for doing this.
 
 
@@ -212,7 +212,6 @@ to your real kubelet instance's configuration:
   kubelet --experimental-dockershim --port 11250 --cgroup-driver {systemd|cgroupfs}
 
 ```
-
 
 ## Logging and Debugging
 
