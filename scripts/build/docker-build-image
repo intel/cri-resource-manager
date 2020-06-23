@@ -12,7 +12,7 @@ while [ -n "$1" ]; do
             shift 2
             ;;
         --container|-c)
-            if [ -n "$2" -a "${2#-}" = "$2" ]; then
+            if [ -n "$2" ] && [ "${2#-}" = "$2" ]; then
                 CONTAINER="$2"
                 shift
             else
@@ -35,11 +35,11 @@ echo "  - volumes   : $VOLUMES"
 echo "  - options   : $PASSTHROUGH"
 
 docker build . \
-       -f $DOCKERFILE -t $IMAGE \
-       --build-arg CREATE_USER=$USER \
+       -f "$DOCKERFILE" -t "$IMAGE" \
+       --build-arg "CREATE_USER=$USER" \
        --build-arg USER_OPTIONS="-u__$(id -u)" \
-       $PASSTHROUGH || exit 1
+       "$PASSTHROUGH" || exit 1
 
 if [ -n "$CONTAINER" ]; then
-    docker create --name $CONTAINER $VOLUMES $IMAGE
+    docker create --name "$CONTAINER" "$VOLUMES" "$IMAGE"
 fi

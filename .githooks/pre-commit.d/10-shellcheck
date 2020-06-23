@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# git shellcheck pre-commit hook
+#
+# To use, store as .git/hooks/pre-commit/shellcheck inside your repository
+# and make sure it has execute permissions.
+#
+# This script does not handle file names that contain spaces.
+#
+
+if [ -z "$(command -v shellcheck)" ]; then
+    echo >&2 "WARNING: Cannot shellcheck scripts: can't find shellcheck."
+    echo >&2 "WARNING: Please consider installing shellcheck."
+    exit 0
+fi
+
+shfiles=$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' '*.bash')
+#echo >&2 "[$0: shfiles: $shfiles]"
+
+for f in $(git diff --cached --name-only --diff-filter=ACM); do
+    if grep -EHn '^#!/bin/.*sh *' "$f" | grep -q ':1:#!'; then
+        shfiles="$shfiles $f"
+    fi
+done
+shfiles="$(echo "$shfiles" | tr -s '\t ' '\n' | sort | uniq)"
+#echo >&2 "[$0: shfiles: $shfiles]"
+
+# shellcheck disable=SC2086
+if  [ -z "$shfiles" ] || shellcheck $shfiles; then
+    exit 0
+fi
+
+# Some files do not pass ShellCheck. Print message and fail.
+echo >&2 "shell scripts must pass ShellCheck. Please fix them."
+exit 1

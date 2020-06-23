@@ -26,6 +26,9 @@ PROTOC    := $(shell command -v protoc;)
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
 
+# ShellCheck for checking shell scripts.
+SHELLCHECK := shellcheck
+
 CLANG := clang
 KERNEL_VERSION ?= $(shell uname -r)
 KERNEL_SRC_DIR ?= /lib/modules/$(KERNEL_VERSION)/source
@@ -290,6 +293,12 @@ lint:
 
 golangci-lint:
 	$(Q)$(GO_CILINT) run $(GO_CILINT_RUNFLAGS) $(GO_CILINT_CHECKERS)
+
+shellcheck:
+	$(Q)for f in $$(git grep -n '^#!/bin/.*sh *' | grep ':1:#!' | sed 's/:1:.*//'); do \
+	    echo "shellchecking $$f..."; \
+	    $(SHELLCHECK) $$f; \
+	done
 
 
 #

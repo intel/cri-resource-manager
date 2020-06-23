@@ -1,10 +1,10 @@
 #!/bin/sh -e
 
-this=`realpath "$0"`
-this_dir=`dirname "$this"`
-template_dir=`realpath "$this_dir/../../cmd/webhook/"`
+this=$(realpath "$0")
+this_dir=$(dirname "$this")
+template_dir=$(realpath "$this_dir/../../cmd/cri-resmgr-webhook/")
 outdir="deploy/cri-resmgr-webhook"
-outdir_abs="`pwd`/$outdir"
+outdir_abs="$(pwd)/$outdir"
 
 cat << EOF
 ***                                 ***
@@ -22,10 +22,10 @@ info "Generating x509 keys..."
 mkdir -p "$outdir"
 
 # Create temp workdir and remove it on exit
-tmpdir=`mktemp -d --suffix=.cri-resmgr`
-trap "rm -rf '$tmpdir'" EXIT
+tmpdir=$(mktemp -d --suffix=.cri-resmgr)
+trap 'rm -rf $tmpdir' EXIT
 
-cd $tmpdir
+cd "$tmpdir"
 
 # Create a self-signed CA certificate
 openssl req -batch -new -newkey rsa:2048 -x509 -sha256 -nodes -days=30 -out ca.crt -keyout ca.key
@@ -41,7 +41,7 @@ info "Done"
 info "Sample cert and key files successfully generated under '$outdir'"
 
 info "Creating MutatingWebhookConfiguration template"
-sed s"/CA_BUNDLE_PLACEHOLDER/`cat ca.crt | base64 -w0`/" "$template_dir/mutating-webhook-config.yaml" > "$outdir_abs/mutating-webhook-config.yaml"
+sed "s/CA_BUNDLE_PLACEHOLDER/$(base64 -w0 < ca.crt)/" "$template_dir/mutating-webhook-config.yaml" > "$outdir_abs/mutating-webhook-config.yaml"
 
 # Print instructions
 cat << EOF
