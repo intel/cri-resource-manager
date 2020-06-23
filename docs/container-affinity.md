@@ -120,7 +120,7 @@ Both of them are *expressions*. An expression consists of three parts:
 
 Essentially an expression defines a logical operation of the form (key op values).
 Evaluating this logical expression will take the value of the key in  which
-either evaluates to true or false. 
+either evaluates to true or false.
 a boolean true/false result. Currently the following operations are supported:
 
   - `Equals`: equality, true if the *value of key* equals the single item in *values*

@@ -45,7 +45,7 @@ the original CMK. It tries to read the configuration from a location specified
 with `-static-pools-conf-dir` (`/etc/cmk` by default).
 Alternatively, you can provide a configuration file (YAML) by using the
 `-static-pools-conf-file` flag.
-See the [example config](../sample-configs/static-pools-policy.conf.example) for a
+See the [example config](/sample-configs/static-pools-policy.conf.example) for a
 starting point.  However, if `cri-resmgr` at a later time receives a valid
 configuration from the `cri-resmr-agent` this will override the fallback
 configuration read from the directory or file.
