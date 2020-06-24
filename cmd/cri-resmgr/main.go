@@ -27,6 +27,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
+	"github.com/intel/cri-resource-manager/pkg/grpclog"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	version "github.com/intel/cri-resource-manager/pkg/version"
 )
@@ -72,6 +73,8 @@ func main() {
 		log.Fatal("failed to set up instrumentation: %v", err)
 	}
 	defer instrumentation.Stop()
+
+	grpclog.SetLogger()
 
 	m, err := resmgr.NewResourceManager()
 	if err != nil {
