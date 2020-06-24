@@ -55,6 +55,8 @@ metadata:
 The `memtier` policy will then aim to allocate resources from a topology
 node which can satisfy the memory requirements.
 
+### Cold Start
+
 The `memtier` policy supports "cold start" functionality. When cold start is
 enabled and the workload is allocated to a topology node with both DRAM and
 PMEM memory, the initial memory controller is only the PMEM controller. DRAM
@@ -76,6 +78,32 @@ metadata:
 In the above example, `container1` would be initially granted only PMEM
 memory controller, but after 60 seconds the DRAM controller would be
 added to the container memset.
+
+### Dynamic Page Demotion
+
+The `memtier` policy also supports dynamic page demotion. The idea is to move
+rarely-used pages from DRAM to PMEM for those workloads for which both DRAM
+and PMEM memory types have been assigned. The configuration for this feature
+is done on the memtier policy configuration using three configuration keys:
+`DirtyBitScanPeriod`, `PageMovePeriod`, and `PageMoveCount`. All of the three
+parameters need to be set to non-zero values in order for the dynamic page
+demotion feature to be enabled. See this configuration file fragment as an
+example:
+
+```
+policy:
+  Active: memtier
+  memtier:
+    DirtyBitScanPeriod: 10s
+    PageMovePeriod: 2s
+    PageMoveCount: 1000
+```
+
+In this setup, every pid in every container in every non-system pod
+fulfilling the memory container requirements would have their page ranges
+scanned for non-accessed pages every ten seconds. The result of the scan
+would be fed to a page-moving loop, which would attempt to move 1000 pages
+every two seconds from DRAM to PMEM.
 
 ## Container memory requests and limits
 
