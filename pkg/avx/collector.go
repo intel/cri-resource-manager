@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -74,22 +75,21 @@ var descriptors = [numDescriptors]*prometheus.Desc{
 		AVXSwitchCountName,
 		"Number of task switches where AVX512 instructions were used in a particular cgroup.",
 		[]string{
-			"cgroup",
-			"cgroup_id",
+			"container_id",
 		}, nil,
 	),
 	allSwitchCountDesc: prometheus.NewDesc(
 		AllSwitchCountName,
 		"Total number of task switches in a particular cgroup.",
 		[]string{
-			"cgroup",
+			"container_id",
 		}, nil,
 	),
 	lastUpdateNsDesc: prometheus.NewDesc(
 		"last_update_ns",
 		"Time since last AVX512 activity in a particular cgroup.",
 		[]string{
-			"cgroup",
+			"container_id",
 		}, nil,
 	),
 }
@@ -305,12 +305,13 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 				return
 			}
 
+			re := regexp.MustCompile(`[a-z0-9]{64}`)
+
 			ch <- prometheus.MustNewConstMetric(
 				descriptors[avxSwitchCountDesc],
 				prometheus.GaugeValue,
 				float64(counter_),
-				path,
-				fmt.Sprintf("%d", cgroupid_))
+				re.FindStringSubmatch(filepath.Base(path))[0])
 
 			if err := c.ebpf.Maps["all_context_switch_count_hash"].Lookup(uint64(cgroupid_), &allCount); err != nil {
 				log.Error("unable to find 'all' context switch count: %+v", err)
@@ -328,13 +329,13 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 				descriptors[allSwitchCountDesc],
 				prometheus.GaugeValue,
 				float64(allCount),
-				path)
+				re.FindStringSubmatch(filepath.Base(path))[0])
 
 			ch <- prometheus.MustNewConstMetric(
 				descriptors[lastUpdateNsDesc],
 				prometheus.GaugeValue,
 				float64(nowNanoseconds()-lastUpdate),
-				path)
+				re.FindStringSubmatch(filepath.Base(path))[0])
 
 		}(cgroupid, counter)
 	}

@@ -18,6 +18,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,7 +46,7 @@ var descriptors = [numDescriptors]*prometheus.Desc{
 		"NUMA statistics for a given container and pod.",
 		[]string{
 			// cgroup path
-			"cgroup_path",
+			"container_id",
 			// NUMA node ID
 			"numa_node_id",
 			// NUMA memory type
@@ -56,7 +57,7 @@ var descriptors = [numDescriptors]*prometheus.Desc{
 		"cgroup_memory_usage",
 		"Memory usage statistics for a given container and pod.",
 		[]string{
-			"cgroup_path",
+			"container_id",
 			"type",
 		}, nil,
 	),
@@ -64,14 +65,14 @@ var descriptors = [numDescriptors]*prometheus.Desc{
 		"cgroup_memory_migrate",
 		"Memory migrate status for a given container and pod.",
 		[]string{
-			"cgroup_path",
+			"container_id",
 		}, nil,
 	),
 	cpuAcctUsageDesc: prometheus.NewDesc(
 		"cgroup_cpu_acct",
 		"CPU accounting for a given container and pod.",
 		[]string{
-			"cgroup_path",
+			"container_id",
 			// CPU ID
 			"cpu",
 			"type",
@@ -81,7 +82,7 @@ var descriptors = [numDescriptors]*prometheus.Desc{
 		"cgroup_hugetlb_usage",
 		"Hugepages usage for a given container and pod.",
 		[]string{
-			"cgroup_path",
+			"container_id",
 			"size",
 			"type",
 		}, nil,
@@ -90,7 +91,7 @@ var descriptors = [numDescriptors]*prometheus.Desc{
 		"cgroup_blkio_device_usage",
 		"Blkio Device bytes usage for a given container and pod.",
 		[]string{
-			"cgroup_path",
+			"container_id",
 			"major",
 			"minor",
 			"operation",
@@ -331,67 +332,69 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 	// the destruction of a container and us getting to read the cgroup data. We just don't report
 	// the values we don't get.
 
-	collectors := []func(string){
-		func(path string) {
+	collectors := []func(string, *regexp.Regexp){
+		func(path string, re *regexp.Regexp) {
 			defer wg.Done()
 			numa, err := cgroups.GetNumaStats(cgroupPath("memory", path))
 			if err == nil {
-				updateNumaStatMetric(ch, path, numa)
+				updateNumaStatMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], numa)
 			} else {
 				log.Error("failed to collect NUMA stats for %s: %v", path, err)
 			}
 		},
-		func(path string) {
+		func(path string, re *regexp.Regexp) {
 			defer wg.Done()
 			memory, err := cgroups.GetMemoryUsage(cgroupPath("memory", path))
 			if err == nil {
-				updateMemoryUsageMetric(ch, path, memory)
+				updateMemoryUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], memory)
 			} else {
 				log.Error("failed to collect memory usage stats for %s: %v", path, err)
 			}
 		},
-		func(path string) {
+		func(path string, re *regexp.Regexp) {
 			defer wg.Done()
 			migrate, err := cgroups.GetCPUSetMemoryMigrate(cgroupPath("cpuset", path))
 			if err == nil {
-				updateMemoryMigrateMetric(ch, path, migrate)
+				updateMemoryMigrateMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], migrate)
 			} else {
 				log.Error("failed to collect memory migration stats for %s: %v", path, err)
 			}
 		},
-		func(path string) {
+		func(path string, re *regexp.Regexp) {
 			defer wg.Done()
 			cpuAcctUsage, err := cgroups.GetCPUAcctStats(cgroupPath("cpuacct", path))
 			if err == nil {
-				updateCPUAcctUsageMetric(ch, path, cpuAcctUsage)
+				updateCPUAcctUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], cpuAcctUsage)
 			} else {
 				log.Error("failed to collect CPU accounting stats for %s: %v", path, err)
 			}
 		},
-		func(path string) {
+		func(path string, re *regexp.Regexp) {
 			defer wg.Done()
 			hugeTlbUsage, err := cgroups.GetHugetlbUsage(cgroupPath("hugetlb", path))
 			if err == nil {
-				updateHugeTlbUsageMetric(ch, path, hugeTlbUsage)
+				updateHugeTlbUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], hugeTlbUsage)
 			} else {
 				log.Error("failed to collect hugetlb stats for %s: %v", path, err)
 			}
 		},
-		func(path string) {
+		func(path string, re *regexp.Regexp) {
 			defer wg.Done()
 			blkioDeviceUsage, err := cgroups.GetBlkioThrottleBytes(cgroupPath("blkio", path))
 			if err == nil {
-				updateBlkioDeviceUsageMetric(ch, path, blkioDeviceUsage)
+				updateBlkioDeviceUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], blkioDeviceUsage)
 			} else {
 				log.Error("failed to collect blkio stats for %s: %v", path, err)
 			}
 		},
 	}
 
+	containerIDRegexp := regexp.MustCompile(`[a-z0-9]{64}`)
+
 	for _, path := range walkCgroups() {
 		wg.Add(len(collectors))
 		for _, fn := range collectors {
-			go fn(path)
+			go fn(path, containerIDRegexp)
 		}
 	}
 
