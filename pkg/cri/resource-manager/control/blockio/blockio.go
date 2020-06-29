@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/blockio"
 	"github.com/intel/cri-resource-manager/pkg/config"
@@ -34,7 +35,8 @@ const (
 
 // blockio encapsulates the runtime state of our block I/O enforcement/controller.
 type blockioctl struct {
-	cache cache.Cache // resource manager cache
+	cache  cache.Cache // resource manager cache
+	active int         // 0 if in dormant mode, no classes configured
 }
 
 // Our logger instance.
@@ -54,6 +56,7 @@ func getBlockIOController() *blockioctl {
 // Start initializes the controller for enforcing decisions.
 func (ctl *blockioctl) Start(cache cache.Cache, client client.Client) error {
 	ctl.cache = cache
+	ctl.active = -1
 	ctl.reconfigureRunningContainers()
 	return nil
 }
@@ -87,6 +90,26 @@ func (ctl *blockioctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+// suppressDormant checks if assignments/errors should be suppressed due to dormant mode.
+func (ctl *blockioctl) suppressDormant(class string) bool {
+	if ctl.active < 0 {
+		if ctl.active = len(blockio.GetClasses()); ctl.active == 0 {
+			log.Warn("Block I/O controller is in dormant mode (no classes configured).")
+		}
+	}
+
+	dormant := ctl.active == 0
+	switch corev1.PodQOSClass(class) {
+	case corev1.PodQOSBestEffort:
+		return dormant
+	case corev1.PodQOSBurstable:
+		return dormant
+	case corev1.PodQOSGuaranteed:
+		return dormant
+	}
+	return false
+}
+
 // assign assigns the container to the given block I/O class.
 func (ctl *blockioctl) assign(c cache.Container) error {
 	if !c.HasPending(BlockIOController) {
@@ -94,6 +117,26 @@ func (ctl *blockioctl) assign(c cache.Container) error {
 	}
 
 	class := c.GetBlockIOClass()
+
+	//
+	// TODO:
+	//   Maybe we should move clearing pending flags to runhook() in the main controller.
+	//
+	//   That would probably involve
+	//     - changing the controller hook function signature to
+	//         func hookfn(cache.Container) (retry bool, err error),
+	//     - leaving pending flags untouched in controller hook functions, and
+	//     - letting runhook() clear those flags based on
+	//         o whether the corresponding controller is enabled,
+	//         o the controller hook succeeded, or
+	//         o the controller hook requested retry in case of an error
+	//
+
+	if ctl.suppressDormant(class) {
+		c.ClearPending(BlockIOController)
+		return nil
+	}
+
 	if err := blockio.SetContainerClass(c, class); err != nil {
 		return blockioError("assigning container %v to class %#v failed: %w", c.PrettyName(), class, err)
 	}
@@ -114,6 +157,10 @@ func (ctl *blockioctl) configNotify(event config.Event, source config.Source) er
 	// Possible errors in reconfiguring running containers are not errors in
 	// the updated configuration, therefore silently ignored.
 	ctl.reconfigureRunningContainers()
+
+	// We'll recheck dormancy at next operation/request.
+	ctl.active = -1
+
 	return nil
 }
 
