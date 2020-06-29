@@ -307,7 +307,7 @@ func GetHugetlbUsage(cgroupPath string) ([]HugetlbUsage, error) {
 	result := make([]HugetlbUsage, 0, len(usageFiles))
 
 	for _, file := range usageFiles {
-		size := strings.TrimSuffix(strings.TrimPrefix(file, prefix), usageSuffix)
+		size := strings.SplitN(filepath.Base(file), ".", 3)[1]
 		bytes, err := readCgroupSingleNumber(file)
 		if err != nil {
 			return nil, err
