@@ -64,11 +64,12 @@ func (ctl *crictl) Stop() {
 
 // PreCreateHook is the CRI controller pre-create hook.
 func (ctl *crictl) PreCreateHook(c cache.Container) error {
-	log.Debug("running pre-create hook for %s...", c.PrettyName())
-
 	if !c.HasPending(CRIController) {
+		log.Debug("pre-create hook: no pending changes for %s", c.PrettyName())
 		return nil
 	}
+
+	log.Debug("pre-create hook: updating %s", c.PrettyName())
 
 	request, ok := c.GetCRIRequest()
 	if !ok {
@@ -110,11 +111,12 @@ func (ctl *crictl) PostStartHook(c cache.Container) error {
 func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 	var update *criapi.UpdateContainerResourcesRequest
 
-	log.Debug("running post-update hook for %s...", c.PrettyName())
-
 	if !c.HasPending(CRIController) {
+		log.Debug("post-update hook: no changes for %s", c.PrettyName())
 		return nil
 	}
+
+	log.Debug("post-update hook: updating %s", c.PrettyName())
 
 	resources := c.GetLinuxResources()
 	if resources == nil {
@@ -125,9 +127,10 @@ func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 		update = &criapi.UpdateContainerResourcesRequest{
 			ContainerId: c.GetID(),
 		}
+		c.SetCRIRequest(update)
 	} else {
 		if update, ok = request.(*criapi.UpdateContainerResourcesRequest); !ok {
-			return criError("post-update hook: update request of wrong type (%T)", request)
+			return criError("post-update hook: CRI request of wrong type (%T)", request)
 		}
 	}
 	update.Linux = resources
