@@ -35,8 +35,10 @@ jobs:
         done
         touch .nojekyll
         git add .nojekyll
-        git config --global user.name "${GITHUB_ACTOR}"
-        git config --global user.email "${GITHUB_ACTOR}@github.com"
+        author=$(git log --merges --pretty=format:%an -n 1)
+        email=$(git log --merges --pretty=format:%ae -n 1)
+        git config --global user.name "$author"
+        git config --global user.email "$email"
         git commit -m "publish-docs.yml: generated latest html output." .
     - name: Publish/force-push to gh-pages
       shell: bash
