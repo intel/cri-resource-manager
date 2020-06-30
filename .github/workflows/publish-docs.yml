@@ -4,6 +4,7 @@ on:
   push:
     branches:
         - master
+        - documentation/test
 
 jobs:
   update-gh-pages:
