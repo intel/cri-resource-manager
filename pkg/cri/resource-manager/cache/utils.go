@@ -28,6 +28,15 @@ import (
 
 var memoryCapacity int64
 
+// IsPodQOSClassName returns true if the given class is one of the Pod QOS classes.
+func IsPodQOSClassName(class string) bool {
+	switch corev1.PodQOSClass(class) {
+	case corev1.PodQOSBestEffort, corev1.PodQOSBurstable, corev1.PodQOSGuaranteed:
+		return true
+	}
+	return false
+}
+
 // estimateComputeResources calculates resource requests/limits from a CRI request.
 func estimateComputeResources(lnx *cri.LinuxContainerResources, cgroupParent string) corev1.ResourceRequirements {
 	var qos corev1.PodQOSClass
