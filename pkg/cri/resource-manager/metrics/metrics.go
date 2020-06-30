@@ -90,7 +90,7 @@ func NewMetrics(opts Options) (*Metrics, error) {
 
 // Start starts metrics collection and processing.
 func (m *Metrics) Start() error {
-	if m.stop != nil {
+	if m.stop != nil || m.opts.PollInterval == 0 {
 		return nil
 	}
 
@@ -136,6 +136,68 @@ func (m *Metrics) Stop() {
 		close(m.stop)
 		m.stop = nil
 	}
+}
+
+type PrometheusMetric map[string]float64
+
+func (m *Metrics) GetPrometheusContainerMetrics() (map[string]PrometheusMetric, error) {
+
+	if m.opts.PollInterval != 0 {
+		return nil, fmt.Errorf("manual polling is not possible when poll timer is active")
+	}
+
+	metrics := make(map[string]PrometheusMetric)
+
+	if err := m.poll(); err != nil {
+		log.Error("failed to poll raw metrics: %v", err)
+		return nil, err
+	}
+
+	for _, f := range m.raw {
+		for _, metric := range f.GetMetric() {
+			var containerID string
+			metricName := make([]string, 0)
+
+			metricName = append(metricName, f.GetName())
+
+			for _, label := range metric.GetLabel() {
+				if label.GetName() == "container_id" {
+					containerID = label.GetValue()
+				} else {
+					metricName = append(metricName, label.GetValue())
+				}
+
+				if containerID == "" {
+					log.Info("%s: missing container_id label.", f.GetName())
+					continue
+				}
+
+				var pm PrometheusMetric
+
+				if _, ok := metrics[containerID]; !ok {
+					pm = make(PrometheusMetric)
+				} else {
+					pm = metrics[containerID]
+
+				}
+
+				g := metric.GetGauge()
+				if g == nil {
+					g := metric.GetCounter()
+					if g == nil {
+						log.Info("%s: missing Gauge or Counter values.", f.GetName())
+						continue
+					}
+				}
+
+				pm[strings.Join(metricName, "_")] = g.GetValue()
+
+				metrics[containerID] = pm
+			}
+		}
+	}
+	return metrics, nil
+
 }
 
 // poll does a single round of raw metrics collection.

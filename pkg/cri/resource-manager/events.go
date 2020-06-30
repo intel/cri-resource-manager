@@ -23,6 +23,13 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/metrics"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/metricsring"
+
+	"gonum.org/v1/gonum/stat"
+)
+
+const (
+	DefaultMetricsBufferLen = 20
 )
 
 // Our logger instance for events.
@@ -117,6 +124,7 @@ func (m *resmgr) processEvent(e interface{}) {
 		evtlog.Debug("'%s'...", event)
 	case []*criapi.ContainerStats:
 		m.processContainerStats(event)
+		m.checkActions()
 	case *events.Metrics:
 		m.processAvx(event.Avx)
 	case *events.Policy:
@@ -132,28 +140,67 @@ func (m *resmgr) processAvx(e *events.Avx) bool {
 		return false
 	}
 
+	evtlog.Info("* got AVX Metrics: %T (nothing to process)", e)
+
+	return true
+}
+
+func (m *resmgr) checkActions() bool {
 	m.Lock()
 	defer m.Unlock()
 
-	changes := false
-	for cgroup, active := range e.Updates {
-		c, ok := m.resolveCgroupPath(cgroup)
-		if !ok {
+	metrics := m.cache.GetMetrics()
+
+	for k, v := range metrics.Containers {
+
+		c, exists := m.cache.LookupContainer(k)
+		if !exists {
 			continue
 		}
-		// XXX This is just for testing, we should effectively drive state transitions
-		//     through a low-pass filter.
-		if active {
+
+		evtlog.Debug("checking container %s", c.PrettyName())
+
+		mr, found := v["avx_switch_count_per_cgroup"]
+		if !found {
+			continue
+		}
+
+		data := mr.GetLastNSamples(mr.GetSize())
+		if len(data) != mr.GetSize() {
+			evtlog.Debug("need more data...waiting.")
+			continue
+		}
+
+		ts, found := v["last_update_ns"]
+		if !found {
+			continue
+		}
+
+		lastSeen := ts.GetLastNSamples(1)[0] / 1e9
+		evtlog.Debug("Container last seen using AVX %fs ago", lastSeen)
+
+		// POC
+		wss, found := v["memory_wss"]
+		if found {
+			evtlog.Debug("Container Memory WSS: %f", wss.EWMA())
+		}
+
+		// We can experiment with Gonum stats easily as the data can be fed
+		// to stat.* methods directly. Try with stat.MeansStdDev first.
+		if mean, stdDev := stat.MeanStdDev(data, nil); mean > 300 && stdDev < 100 && lastSeen < 10 {
+			evtlog.Debug("Mean and stdDev of the samples are %.4f and %.4f, respectively", mean, stdDev)
 			if _, wasTagged := c.SetTag(cache.TagAVX512, "true"); !wasTagged {
 				evtlog.Info("container %s STARTED using AVX512 instructions", c.PrettyName())
 			}
+
 		} else {
 			if _, wasTagged := c.DeleteTag(cache.TagAVX512); wasTagged {
 				evtlog.Info("container %s STOPPED using AVX512 instructions", c.PrettyName())
 			}
 		}
 	}
-	return changes
+
+	return true
 }
 
 // processContainerStats processes collected CRI container statistics.
@@ -162,14 +209,50 @@ func (m *resmgr) processContainerStats(e []*criapi.ContainerStats) bool {
 		return false
 	}
 
+	evtlog.Info("* processing CRI container statistics: %T", e)
+
+	pcm, err := m.metrics.GetPrometheusContainerMetrics()
+	if err != nil {
+		evtlog.Error("failed to get prometheus container metrics: %v", err)
+		return false
+	}
+
+	// copy to data struct from prometheus
+	for _, c := range e {
+		cid := c.GetAttributes().GetId()
+
+		// Is it possible ContainerStats has containers that cgroupstats could not find?
+		if _, ok := pcm[cid]; !ok {
+			continue
+		}
+		pcm[cid]["core_ns"] = float64(c.GetCpu().GetUsageCoreNanoSeconds().GetValue())
+		pcm[cid]["memory_wss"] = float64(c.GetMemory().GetWorkingSetBytes().GetValue())
+	}
+
 	m.Lock()
 	defer m.Unlock()
 
-	evtlog.Info("* got CRI container statistics: %v", e)
-	return false
-}
+	data := m.cache.GetMetrics()
 
-// resolveCgroupPath resolves a cgroup path to a container.
-func (m *resmgr) resolveCgroupPath(path string) (cache.Container, bool) {
-	return m.cache.LookupContainerByCgroup(path)
+	for cid, val := range pcm {
+		var me cache.MetricsEntry
+		if _, ok := data.Containers[cid]; !ok {
+			me = make(cache.MetricsEntry)
+		} else {
+			me = data.Containers[cid]
+		}
+		for k, v := range val {
+			// TODO(mythi): add filtering to pick only desired metrics
+			if _, ok := me[k]; !ok {
+				// TODO(mythi): add flag to set size configurable
+				me[k] = metricsring.NewMetricsRing(DefaultMetricsBufferLen)
+			}
+			me[k].Push(v)
+		}
+		data.Containers[cid] = me
+	}
+
+	m.cache.SetMetrics(data)
+
+	return false
 }
