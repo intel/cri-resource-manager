@@ -5,6 +5,7 @@ go 1.13
 require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.1-0.20191218042359-6151c48ac7fa
+	github.com/VividCortex/ewma v1.1.1
 	github.com/cilium/ebpf v0.0.0-20200317182658-6f632cc9ee38
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1
@@ -20,6 +21,7 @@ require (
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5
 	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
+	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	google.golang.org/grpc v1.26.0
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
