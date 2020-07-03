@@ -635,6 +635,9 @@ func (m *mockCache) SetConfig(*config.RawConfig) error {
 func (m *mockCache) GetConfig() *config.RawConfig {
 	panic("unimplemented")
 }
+func (m *mockCache) ResetConfig() error {
+	panic("unimplemented")
+}
 func (m *mockCache) Save() error {
 	return nil
 }
