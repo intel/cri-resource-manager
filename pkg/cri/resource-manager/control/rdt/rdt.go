@@ -35,6 +35,7 @@ const (
 // rdtctl encapsulates the runtime state of our RTD enforcement/controller.
 type rdtctl struct {
 	cache cache.Cache // resource manager cache
+	idle  *bool       // true if we run without any classes configured
 }
 
 // Our logger instance.
@@ -44,7 +45,7 @@ var log logger.Logger = logger.NewLogger(RDTController)
 var singleton *rdtctl
 
 // getRDTController returns our singleton RDT controller instance.
-func getRDTController() control.Controller {
+func getRDTController() *rdtctl {
 	if singleton == nil {
 		singleton = &rdtctl{}
 	}
@@ -81,10 +82,13 @@ func (ctl *rdtctl) PostStartHook(c cache.Container) error {
 	if !c.HasPending(RDTController) {
 		return nil
 	}
+
 	if err := ctl.assign(c); err != nil {
 		return err
 	}
+
 	c.ClearPending(RDTController)
+
 	return nil
 }
 
@@ -93,69 +97,112 @@ func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
 	if !c.HasPending(RDTController) {
 		return nil
 	}
-	if err := ctl.deleteMonGroups(c); err != nil {
-		log.Warn("failed to remove monitoring group of %q: %v", c.PrettyName(), err)
-	}
 
+	if err := ctl.stopMonitor(c); err != nil {
+		log.Warn("%q: failed to remove monitoring group: %v", c.PrettyName(), err)
+	}
 	if err := ctl.assign(c); err != nil {
 		return err
 	}
+
 	c.ClearPending(RDTController)
+
 	return nil
 }
 
 // PostStop is the RDT controller post-stop hook.
 func (ctl *rdtctl) PostStopHook(c cache.Container) error {
-	if err := ctl.deleteMonGroups(c); err != nil {
-		return rdtError("failed to remove monitoring group of %q: %v", c.PrettyName(), err)
+	if err := ctl.stopMonitor(c); err != nil {
+		return rdtError("%q: failed to remove monitoring group: %v", c.PrettyName(), err)
 	}
-
 	return nil
 }
 
-// assign assigns the container to the given RDT class.
+// isImplicitlyDisabled checks if we run without any classes confiured
+func (ctl *rdtctl) isImplicitlyDisabled() bool {
+	if ctl.idle != nil {
+		return *ctl.idle
+	}
+
+	idle := len(rdt.GetClasses()) == 0
+	if idle {
+		log.Warn("controller implictly disabled (no classes configured)")
+	}
+	ctl.idle = &idle
+
+	return *ctl.idle
+}
+
+// assign assigns all processes/threads in a container to an RDT class.
 func (ctl *rdtctl) assign(c cache.Container) error {
+	class := c.GetRDTClass()
+	if class == "" {
+		return nil
+	}
+
+	if ctl.isImplicitlyDisabled() && cache.IsPodQOSClassName(class) {
+		return nil
+	}
+
+	cls, ok := rdt.GetClass(class)
+	if !ok {
+		return rdtError("%q: unknown RDT class %q", c.PrettyName(), class)
+	}
+
 	pod, ok := c.GetPod()
 	if !ok {
-		return rdtError("failed to get pod of container %s", c.PrettyName())
+		return rdtError("%q: failed to get pod", c.PrettyName())
 	}
 
 	pids, err := utils.GetTasksInContainer(pod.GetCgroupParentDir(), c.GetID())
 	if err != nil {
-		return rdtError("failed to get process list for container %s: %v", c.PrettyName(), err)
+		return rdtError("%q: failed to get process list: %v", c.PrettyName(), err)
 	}
 
-	class := c.GetRDTClass()
-	if cls, ok := rdt.GetClass(class); ok {
-		if err := cls.AddPids(pids...); err != nil {
-			return rdtError("failed assign container %s to class %s: %v", c.PrettyName(), class, err)
-		}
-		if rdt.MonSupported() {
-			mgAnnotations := map[string]string{"pod_name": pod.GetName(), "container_name": c.GetName()}
-			if mg, err := cls.CreateMonGroup(c.GetID(), mgAnnotations); err != nil {
-				log.Warn("failed to create monitoring group for %q: %v", c.PrettyName(), err)
-			} else {
-				if err := mg.AddPids(pids...); err != nil {
-					return rdtError("failed assign container %s to monitoring group %s/%s: %v", c.PrettyName(), class, mg.Name(), err)
-				}
-			}
-		}
-	} else {
-		return rdtError("unknown RDT class %q", class)
+	if err := cls.AddPids(pids...); err != nil {
+		return rdtError("%q: failed to assign to class %q: %v", c.PrettyName(), class, err)
 	}
 
-	log.Info("container %s assigned to class %s", c.PrettyName(), class)
+	pname, name, id, pretty := pod.GetName(), c.GetName(), c.GetID(), c.PrettyName()
+	if err := ctl.monitor(cls, pname, name, id, pretty, pids); err != nil {
+		return err
+	}
+
+	log.Info("%q: assigned to class %q", pretty, class)
 
 	return nil
 }
 
-func (ctl *rdtctl) deleteMonGroups(c cache.Container) error {
+// monitor starts monitoring a container.
+func (ctl *rdtctl) monitor(cls rdt.CtrlGroup, pod, name, id, pretty string, pids []string) error {
+	if !rdt.MonSupported() {
+		return nil
+	}
+
+	annotations := map[string]string{"pod_name": pod, "container_name": name}
+	if mg, err := cls.CreateMonGroup(id, annotations); err != nil {
+		log.Warn("%q: failed to create monitoring group: %v", pretty, err)
+	} else {
+		if err := mg.AddPids(pids...); err != nil {
+			return rdtError("%q: failed to assign to monitoring group %q: %v",
+				pretty, cls.Name()+"/"+mg.Name(), err)
+		}
+		log.Info("%q: assigned to monitoring group %q", pretty, cls.Name()+"/"+mg.Name())
+	}
+	return nil
+}
+
+// stopMonitor stops monitoring a container.
+func (ctl *rdtctl) stopMonitor(c cache.Container) error {
 	name := c.PrettyName()
 	for _, cls := range rdt.GetClasses() {
-		if _, ok := cls.GetMonGroup(name); ok {
+		if mg, ok := cls.GetMonGroup(name); ok {
 			if err := cls.DeleteMonGroup(name); err != nil {
 				return err
 			}
+		} else {
+			log.Info("%q: removed monitoring group %q",
+				c.PrettyName(), cls.Name()+"/"+mg.Name())
 		}
 	}
 	return nil
@@ -164,6 +211,8 @@ func (ctl *rdtctl) deleteMonGroups(c cache.Container) error {
 // configNotify is our runtime configuration notification callback.
 func (ctl *rdtctl) configNotify(event config.Event, source config.Source) error {
 	log.Info("configuration updated")
+	// We'll re-check idleness at next operation/request.
+	ctl.idle = nil
 	return nil
 }
 
@@ -175,5 +224,6 @@ func rdtError(format string, args ...interface{}) error {
 // Register us as a controller.
 func init() {
 	control.Register(RDTController, "RDT controller", getRDTController())
+	config.GetModule(rdt.ConfigModuleName).AddNotify(getRDTController().configNotify)
 	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
 }

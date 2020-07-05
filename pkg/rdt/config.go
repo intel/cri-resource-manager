@@ -971,5 +971,5 @@ func defaultOptions() interface{} {
 
 // Register us for configuration handling.
 func init() {
-	pkgcfg.Register("rdt", "RDT control", opt, defaultOptions)
+	pkgcfg.Register(ConfigModuleName, "RDT control", opt, defaultOptions)
 }

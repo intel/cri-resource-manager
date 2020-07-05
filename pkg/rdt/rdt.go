@@ -33,6 +33,9 @@ import (
 )
 
 const (
+	// ConfigModuleName is the configuration section of blockio class definitions
+	ConfigModuleName = "rdt"
+
 	resctrlGroupPrefix = "cri-resmgr."
 	// RootClassName is the name we use in our config for the special class
 	// that configures the "root" resctrl group of the system

@@ -35,6 +35,7 @@ const (
 // blockio encapsulates the runtime state of our block I/O enforcement/controller.
 type blockioctl struct {
 	cache cache.Cache // resource manager cache
+	idle  *bool       // true if we run without any classes configured
 }
 
 // Our logger instance.
@@ -74,12 +75,32 @@ func (ctl *blockioctl) PreStartHook(c cache.Container) error {
 
 // PostStartHook is the block I/O controller post-start hook.
 func (ctl *blockioctl) PostStartHook(c cache.Container) error {
-	return ctl.assign(c)
+	if !c.HasPending(BlockIOController) {
+		return nil
+	}
+
+	if err := ctl.assign(c); err != nil {
+		return err
+	}
+
+	c.ClearPending(BlockIOController)
+
+	return nil
 }
 
 // PostUpdateHook is the block I/O controller post-update hook.
 func (ctl *blockioctl) PostUpdateHook(c cache.Container) error {
-	return ctl.assign(c)
+	if !c.HasPending(BlockIOController) {
+		return nil
+	}
+
+	if err := ctl.assign(c); err != nil {
+		return err
+	}
+
+	c.ClearPending(BlockIOController)
+
+	return nil
 }
 
 // PostStop is the block I/O controller post-stop hook.
@@ -87,19 +108,37 @@ func (ctl *blockioctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+// isImplicitlyDisabled checks if we run without any classes confiured
+func (ctl *blockioctl) isImplicitlyDisabled() bool {
+	if ctl.idle != nil {
+		return *ctl.idle
+	}
+
+	idle := len(blockio.GetClasses()) == 0
+	if idle {
+		log.Warn("controller implictly disabled (no configured classes)")
+	}
+	ctl.idle = &idle
+
+	return *ctl.idle
+}
+
 // assign assigns the container to the given block I/O class.
 func (ctl *blockioctl) assign(c cache.Container) error {
-	if !c.HasPending(BlockIOController) {
+	class := c.GetBlockIOClass()
+	if class == "" {
 		return nil
 	}
 
-	class := c.GetBlockIOClass()
-	if err := blockio.SetContainerClass(c, class); err != nil {
-		return blockioError("assigning container %v to class %#v failed: %w", c.PrettyName(), class, err)
+	if ctl.isImplicitlyDisabled() && cache.IsPodQOSClassName(class) {
+		return nil
 	}
-	log.Info("container %s assigned to class %s", c.PrettyName(), class)
 
-	c.ClearPending(BlockIOController)
+	if err := blockio.SetContainerClass(c, class); err != nil {
+		return blockioError("%q: failed to assign to class %q: %w", c.PrettyName(), class, err)
+	}
+
+	log.Info("%q: assigned to class %q", c.PrettyName(), class)
 
 	return nil
 }
@@ -114,6 +153,10 @@ func (ctl *blockioctl) configNotify(event config.Event, source config.Source) er
 	// Possible errors in reconfiguring running containers are not errors in
 	// the updated configuration, therefore silently ignored.
 	ctl.reconfigureRunningContainers()
+
+	// We'll re-check idleness at next operation/request.
+	ctl.idle = nil
+
 	return nil
 }
 
@@ -125,7 +168,7 @@ func (ctl *blockioctl) reconfigureRunningContainers() error {
 	}
 	for _, c := range ctl.cache.GetContainers() {
 		class := c.GetBlockIOClass()
-		log.Debug("configure container %q blockio class %q", c.PrettyName(), class)
+		log.Debug("%q: configure blockio class %q", c.PrettyName(), class)
 		err := blockio.SetContainerClass(c, class)
 		if err != nil {
 			errors = multierror.Append(errors, err)
