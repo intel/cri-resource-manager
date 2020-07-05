@@ -27,6 +27,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	extapi "github.com/intel/cri-resource-manager/pkg/apis/resmgr/v1alpha1"
 )
 
 // Create a container for a create request.
@@ -453,6 +455,11 @@ func (c *container) GetDeviceByContainer(path string) *Device {
 }
 
 func (c *container) GetResourceRequirements() v1.ResourceRequirements {
+	if adjust, _ := c.getEffectiveAdjustment(); adjust != nil {
+		if resources, ok := adjust.GetResourceRequirements(); ok {
+			return resources
+		}
+	}
 	return c.Resources
 }
 
@@ -462,6 +469,22 @@ func (c *container) GetLinuxResources() *cri.LinuxContainerResources {
 	}
 
 	return &(*c.LinuxReq)
+}
+
+func (c *container) setEffectiveAdjustment(name string) string {
+	previous := c.Adjustment
+	c.Adjustment = name
+	return previous
+}
+
+func (c *container) getEffectiveAdjustment() (*extapi.AdjustmentSpec, string) {
+	if c.Adjustment == "" {
+		return nil, ""
+	}
+	if c.cache.External != nil {
+		return c.cache.External.Adjustments[c.Adjustment], c.Adjustment
+	}
+	return nil, c.Adjustment
 }
 
 func (c *container) SetCommand(value []string) {
@@ -734,6 +757,11 @@ func (c *container) SetRDTClass(class string) {
 }
 
 func (c *container) GetRDTClass() string {
+	if adjust, _ := c.getEffectiveAdjustment(); adjust != nil {
+		if class, ok := adjust.GetRDTClass(); ok {
+			return class
+		}
+	}
 	return c.RDTClass
 }
 
@@ -743,6 +771,11 @@ func (c *container) SetBlockIOClass(class string) {
 }
 
 func (c *container) GetBlockIOClass() string {
+	if adjust, _ := c.getEffectiveAdjustment(); adjust != nil {
+		if class, ok := adjust.GetBlockIOClass(); ok {
+			return class
+		}
+	}
 	return c.BlockIOClass
 }
 
@@ -752,6 +785,11 @@ func (c *container) SetToptierLimit(limit int64) {
 }
 
 func (c *container) GetToptierLimit() int64 {
+	if adjust, _ := c.getEffectiveAdjustment(); adjust != nil {
+		if adjust.ToptierLimit != nil {
+			return adjust.ToptierLimit.Value()
+		}
+	}
 	return c.ToptierLimit
 }
 
@@ -826,12 +864,14 @@ func (c *container) GetCRIDevices() []*cri.Device {
 	return devices
 }
 
-func (c *container) markPending(controller string) {
+func (c *container) markPending(controllers ...string) {
 	if c.pending == nil {
 		c.pending = make(map[string]struct{})
 	}
-	c.pending[controller] = struct{}{}
-	c.cache.markPending(c)
+	for _, ctrl := range controllers {
+		c.pending[ctrl] = struct{}{}
+		c.cache.markPending(c)
+	}
 }
 
 func (c *container) ClearPending(controller string) {

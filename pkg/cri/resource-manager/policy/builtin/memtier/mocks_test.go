@@ -657,6 +657,9 @@ func (m *mockCache) GetConfig() *config.RawConfig {
 func (m *mockCache) ResetConfig() error {
 	panic("unimplemented")
 }
+func (m *mockCache) SetAdjustment(*config.Adjustment) (bool, map[string]error) {
+	panic("unimplemented")
+}
 func (m *mockCache) Save() error {
 	return nil
 }
