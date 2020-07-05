@@ -75,6 +75,9 @@ RPM_VERSION   := $(shell scripts/build/get-buildid --rpm --shell=no)
 DEB_VERSION   := $(shell scripts/build/get-buildid --deb --shell=no)
 TAR_VERSION   := $(shell scripts/build/get-buildid --tar --shell=no)
 
+# Kubernetes version we pull in as modules.
+KUBERNETES_VERSION := $(shell grep 'k8s.io/kubernetes ' go.mod | sed 's/^.* //')
+
 # Git (tagged) version and revisions we'll use to linker-tag our binaries with.
 RANDOM_ID := "$(shell head -c20 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 LDFLAGS    = \
@@ -516,6 +519,21 @@ clean-ui-assets:
 	cd $(dir $@) && \
 	    $(GO_GEN) || exit 1 && \
 	cd - > /dev/null
+
+#
+# API generation
+#
+
+# macro to generate code for api $(1), version $(2)
+generate-api = \
+	echo "Generating '$(1)' api, version $(2)..." && \
+	    KUBERNETES_VERSION=$(KUBERNETES_VERSION) \
+	    ./scripts/code-generator/generate-groups.sh all \
+	        github.com/intel/cri-resource-manager/pkg/apis/$(1)/generated \
+	        github.com/intel/cri-resource-manager/pkg/apis $(1):$(2) \
+	        --output-base $(shell pwd)/generate && \
+	    cp -r generate/github.com/intel/cri-resource-manager/pkg/apis/$(1) pkg/apis && \
+	        rm -fr generate/github.com/intel/cri-resource-manager/pkg/apis/$(1)
 
 #
 # dependencies for UI assets baked in using vfsgendev (can't come up with a working pattern rule)
