@@ -466,15 +466,16 @@ func (m *resmgr) RebalanceContainers() error {
 
 	m.Info("rebalancing (reallocating) containers...")
 
-	method := "Rebalance"
-	changes := false
-	var err error
+	return m.rebalance("Rebalance")
+}
 
+// rebalance triggers a policy-specific rebalancing cycle of containers.
+func (m *resmgr) rebalance(method string) error {
 	if m.policy == nil {
-		err = resmgrError("policy is nil")
-	} else {
-		changes, err = m.policy.Rebalance()
+		return nil
 	}
+
+	changes, err := m.policy.Rebalance()
 
 	if err != nil {
 		m.Error("%s: rebalancing of containers failed: %v", method, err)
@@ -487,8 +488,7 @@ func (m *resmgr) RebalanceContainers() error {
 		}
 	}
 
-	m.cache.Save()
-	return nil
+	return m.cache.Save()
 }
 
 // DeliverPolicyEvent delivers a policy-specific event to the active policy.

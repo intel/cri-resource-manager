@@ -28,10 +28,16 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config/api/v1"
 	"github.com/intel/cri-resource-manager/pkg/log"
+
+	"encoding/json"
+	extapi "github.com/intel/cri-resource-manager/pkg/apis/resmgr/v1alpha1"
 )
 
-// SetConfigCb is a callback function for SetConfig request
+// SetConfigCb is a callback function for a SetConfig request.
 type SetConfigCb func(*RawConfig) error
+
+// SetAdjustmentCb is a callback function for a SetAdjustment request.
+type SetAdjustmentCb func(*Adjustment) map[string]error
 
 // Server is the interface for our gRPC server.
 type Server interface {
@@ -42,16 +48,18 @@ type Server interface {
 // server implements Server.
 type server struct {
 	log.Logger
-	sync.Mutex               // lock for gRPC server against concurrent per-request goroutines.
-	server      *grpc.Server // gRPC server instance
-	setConfigCb SetConfigCb
+	sync.Mutex                      // lock for concurrent per-request goroutines.
+	server          *grpc.Server    // gRPC server instance
+	setConfigCb     SetConfigCb     // configuration update notification callback
+	setAdjustmentCb SetAdjustmentCb // extneral adjustment update notification callback
 }
 
 // NewConfigServer creates new Server instance.
-func NewConfigServer(cb SetConfigCb) (Server, error) {
+func NewConfigServer(configCb SetConfigCb, adjustmentCb SetAdjustmentCb) (Server, error) {
 	s := &server{
-		Logger:      log.NewLogger("config-server"),
-		setConfigCb: cb,
+		Logger:          log.NewLogger("config-server"),
+		setConfigCb:     configCb,
+		setAdjustmentCb: adjustmentCb,
 	}
 	return s, nil
 }
@@ -99,12 +107,12 @@ func (s *server) Stop() {
 	}
 }
 
-// GetNode gets K8s node object.
+// SetConfig pushes a configuration update to the server.
 func (s *server) SetConfig(ctx context.Context, req *v1.SetConfigRequest) (*v1.SetConfigReply, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	s.Debug("REQUEST: %s", req)
+	s.Debug("SetConfig request: %+v", req)
 
 	reply := &v1.SetConfigReply{}
 	err := s.setConfigCb(&RawConfig{NodeName: req.NodeName, Data: req.Config})
@@ -112,6 +120,37 @@ func (s *server) SetConfig(ctx context.Context, req *v1.SetConfigRequest) (*v1.S
 		reply.Error = fmt.Sprintf("failed to apply configuration: %v", err)
 	}
 
+	return reply, nil
+}
+
+// SetAdjustment pushes updated external policies to the server.
+func (s *server) SetAdjustment(ctx context.Context, req *v1.SetAdjustmentRequest) (*v1.SetAdjustmentReply, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.Debug("SetAdjustment request: %+v", req)
+
+	errors := map[string]error{}
+	specs := map[string]*extapi.AdjustmentSpec{}
+
+	if err := json.Unmarshal([]byte(req.Adjustment), &specs); err != nil {
+		return nil, serverError("failed to decode SetAdjustment request: %v", err)
+	}
+
+	for name, spec := range specs {
+		if err := spec.Verify(); err != nil {
+			errors[name] = err
+		}
+	}
+
+	if len(errors) == 0 {
+		errors = s.setAdjustmentCb(&Adjustment{Adjustments: specs})
+	}
+
+	reply := &v1.SetAdjustmentReply{Errors: make(map[string]string)}
+	for str, err := range errors {
+		reply.Errors[str] = err.Error()
+	}
 	return reply, nil
 }
 

@@ -21,16 +21,29 @@ option go_package = "v1";
 
 service Config{
     rpc SetConfig(SetConfigRequest) returns (SetConfigReply) {}
+    rpc SetAdjustment(SetAdjustmentRequest) returns (SetAdjustmentReply) {}
 }
 
 message SetConfigRequest {
-    // Name
-    string  node_name = 1;
-    // Key-value map of ConfigMap data
+    // node_name is node name used to acquire this configuration.
+    string node_name = 1;
+    // config is the ConfigMap data.
     map<string, string> config = 2;
 }
 
 message SetConfigReply {
      // If not empty, indicate an error that happened while trying to apply new configuration.
     string error = 1;
+}
+
+message SetAdjustmentRequest {
+    // node_name is node name used to acquire this configuration.
+    string node_name = 1;
+    // Serialized map of all adjustment CRDs, name as key, CRD as value.
+    string adjustment = 2;
+}
+
+message SetAdjustmentReply {
+    // If not empty, indicates that errors happened while trying to apply the adjustments.
+    map<string, string> errors = 1;
 }

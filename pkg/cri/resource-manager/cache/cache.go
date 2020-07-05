@@ -746,14 +746,9 @@ func (cch *cache) getApplicableAdjustments(ext *config.Adjustment, c *container)
 	if ext == nil {
 		return []string{}
 	}
-	pod, ok := c.GetPod()
-	if !ok {
-		return []string{}
-	}
-
 	applicable := []string{}
 	for name, adjust := range ext.Adjustments {
-		if adjust.IsContainerInScope(pod.GetName(), c.GetName()) {
+		if adjust.IsContainerInScope(c) {
 			applicable = append(applicable, name)
 		}
 	}
