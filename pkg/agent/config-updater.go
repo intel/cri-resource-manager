@@ -17,13 +17,16 @@ limitations under the License.
 package agent
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"time"
 
+	"context"
+	"encoding/json"
+
 	"google.golang.org/grpc"
 
+	resmgr "github.com/intel/cri-resource-manager/pkg/apis/resmgr/v1alpha1"
 	resmgr_v1 "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config/api/v1"
 	"github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -41,14 +44,18 @@ const (
 type configUpdater interface {
 	Start() error
 	Stop()
-	Update(*resmgrConfig)
+	UpdateConfig(*resmgrConfig)
+	UpdateAdjustment(*resmgrAdjustment)
+	StatusChan() chan *resmgrStatus
 }
 
 // updater implements configUpdater
 type updater struct {
 	log.Logger
-	resmgrCli resmgr_v1.ConfigClient
-	newConfig chan *resmgrConfig
+	resmgrCli     resmgr_v1.ConfigClient
+	newConfig     chan *resmgrConfig
+	newAdjustment chan *resmgrAdjustment
+	newStatus     chan *resmgrStatus
 }
 
 func newConfigUpdater(socket string) (configUpdater, error) {
@@ -61,34 +68,62 @@ func newConfigUpdater(socket string) (configUpdater, error) {
 	u.resmgrCli = c
 
 	u.newConfig = make(chan *resmgrConfig)
+	u.newAdjustment = make(chan *resmgrAdjustment)
+	u.newStatus = make(chan *resmgrStatus)
 
 	return u, nil
-
 }
 
 func (u *updater) Start() error {
 	u.Info("Starting config-updater")
 	go func() {
-		var pending *resmgrConfig
+		var pendingConfig *resmgrConfig
+		var pendingAdjustment *resmgrAdjustment
+
 		var ratelimit <-chan time.Time
 
 		for {
 			select {
 			case cfg := <-u.newConfig:
 				u.Info("scheduling update after %v rate-limiting timeout...", rateLimitTimeout)
-				pending = cfg
+				pendingConfig = cfg
+				ratelimit = time.After(rateLimitTimeout)
+
+			case adjust := <-u.newAdjustment:
+				u.Info("scheduling update after %v rate-limiting timeout...", rateLimitTimeout)
+				pendingAdjustment = adjust
 				ratelimit = time.After(rateLimitTimeout)
 
 			case _ = <-ratelimit:
-				mgrErr, err := u.setConfig(pending)
-				if err != nil {
-					u.Error("failed to send configuration update: %v", err)
-					ratelimit = time.After(retryTimeout)
-				} else {
-					if mgrErr != nil {
-						u.Error("cri-resmgr error: %v", mgrErr)
+				if pendingConfig != nil {
+					mgrErr, err := u.setConfig(pendingConfig)
+					if err != nil {
+						u.Error("failed to send configuration update: %v", err)
+						ratelimit = time.After(retryTimeout)
+					} else {
+						if mgrErr != nil {
+							u.Error("cri-resmgr configuration error: %v", mgrErr)
+						}
+						pendingConfig = nil
+						ratelimit = nil
 					}
-					pending = nil
+				}
+				if pendingAdjustment != nil {
+					errors, err := u.setAdjustment(pendingAdjustment)
+
+					if err != nil {
+						u.Error("failed to update adjustments: %+v", err)
+					}
+					if len(errors) > 0 {
+						u.Error("some adjustment updates failed: %+v", errors)
+					}
+
+					u.newStatus <- &resmgrStatus{
+						request: err,
+						errors:  errors,
+					}
+
+					pendingAdjustment = nil
 					ratelimit = nil
 				}
 			}
@@ -101,8 +136,16 @@ func (u *updater) Start() error {
 func (u *updater) Stop() {
 }
 
-func (u *updater) Update(c *resmgrConfig) {
+func (u *updater) UpdateConfig(c *resmgrConfig) {
 	u.newConfig <- c
+}
+
+func (u *updater) UpdateAdjustment(c *resmgrAdjustment) {
+	u.newAdjustment <- c
+}
+
+func (u *updater) StatusChan() chan *resmgrStatus {
+	return u.newStatus
 }
 
 func (u *updater) setConfig(cfg *resmgrConfig) (error, error) {
@@ -122,6 +165,35 @@ func (u *updater) setConfig(cfg *resmgrConfig) (error, error) {
 	default:
 		return nil, nil
 	}
+}
+
+func (u *updater) setAdjustment(adjust *resmgrAdjustment) (map[string]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), setConfigTimeout)
+	defer cancel()
+
+	specs := map[string]*resmgr.AdjustmentSpec{}
+	for name, p := range *adjust {
+		specs[name] = &resmgr.AdjustmentSpec{
+			Scope:        p.Spec.NodeScope(nodeName),
+			Resources:    p.Spec.Resources,
+			Classes:      p.Spec.Classes,
+			ToptierLimit: p.Spec.ToptierLimit,
+		}
+	}
+	encoded, err := json.Marshal(specs)
+	if err != nil {
+		return nil, agentError("setAdjustment: failed to encode AdjustmentSpec: %v", err)
+	}
+
+	req := &resmgr_v1.SetAdjustmentRequest{NodeName: nodeName, Adjustment: string(encoded)}
+	u.Debug("sending SetAdjustment request to cri-resmgr")
+
+	reply, err := u.resmgrCli.SetAdjustment(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
+
+	if err != nil {
+		return nil, err
+	}
+	return reply.Errors, nil
 }
 
 func newResmgrCli(socket string) (resmgr_v1.ConfigClient, error) {
