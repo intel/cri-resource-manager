@@ -75,8 +75,9 @@ RPM_VERSION   := $(shell scripts/build/get-buildid --rpm --shell=no)
 DEB_VERSION   := $(shell scripts/build/get-buildid --deb --shell=no)
 TAR_VERSION   := $(shell scripts/build/get-buildid --tar --shell=no)
 
-# Kubernetes version we pull in as modules.
+# Kubernetes version we pull in as modules and our external API versions.
 KUBERNETES_VERSION := $(shell grep 'k8s.io/kubernetes ' go.mod | sed 's/^.* //')
+RESMGR_API_VERSION := $(shell ls pkg/apis/resmgr | grep '^v[0-9]*')
 
 # Git (tagged) version and revisions we'll use to linker-tag our binaries with.
 RANDOM_ID := "$(shell head -c20 /dev/urandom | od -An -tx1 | tr -d ' \n')"
@@ -524,6 +525,18 @@ clean-ui-assets:
 # API generation
 #
 
+# unconditionally generate all apis
+generate-apis: generate-resmgr-api
+
+# unconditionally generate (external) resmgr api
+generate-resmgr-api:
+	$(Q)$(call generate-api,resmgr,$(RESMGR_API_VERSION))
+
+# automatic update of generated code for resource-manager external api
+pkg/apis/resmgr/$(RESMGR_API_VERSION)/zz_generated.deepcopy.go: \
+    pkg/apis/resmgr/$(RESMGR_API_VERSION)/types.go
+	$(Q)$(call generate-api,resmgr,$(RESMGR_API_VERSION))
+
 # macro to generate code for api $(1), version $(2)
 generate-api = \
 	echo "Generating '$(1)' api, version $(2)..." && \
@@ -534,6 +547,7 @@ generate-api = \
 	        --output-base $(shell pwd)/generate && \
 	    cp -r generate/github.com/intel/cri-resource-manager/pkg/apis/$(1) pkg/apis && \
 	        rm -fr generate/github.com/intel/cri-resource-manager/pkg/apis/$(1)
+
 
 #
 # dependencies for UI assets baked in using vfsgendev (can't come up with a working pattern rule)
