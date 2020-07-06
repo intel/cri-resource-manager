@@ -24,6 +24,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/topology"
 
 	v1 "k8s.io/api/core/v1"
+	resapi "k8s.io/apimachinery/pkg/api/resource"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
@@ -111,7 +112,9 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 
 	c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
 
-	c.setDefaultClasses()
+	if err := c.setDefaults(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -151,12 +154,14 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 		c.Resources = estimateComputeResources(c.LinuxReq, pod.CgroupParent)
 	}
 
-	c.setDefaultClasses()
+	if err := c.setDefaults(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (c *container) setDefaultClasses() {
+func (c *container) setDefaults() error {
 	class, ok := c.GetEffectiveAnnotation(RDTClassKey)
 	if !ok {
 		class = string(c.GetQOSClass())
@@ -168,6 +173,20 @@ func (c *container) setDefaultClasses() {
 		class = string(c.GetQOSClass())
 	}
 	c.SetBlockIOClass(class)
+
+	limit, ok := c.GetEffectiveAnnotation(ToptierLimitKey)
+	if !ok {
+		c.ToptierLimit = ToptierLimitUnset
+	} else {
+		qty, err := resapi.ParseQuantity(limit)
+		if err != nil {
+			return cacheError("%q: failed to parse top tier limit annotation %q (%q): %v",
+				c.PrettyName(), ToptierLimitKey, limit, err)
+		}
+		c.SetToptierLimit(qty.Value())
+	}
+
+	return nil
 }
 
 func (c *container) PrettyName() string {
@@ -720,6 +739,15 @@ func (c *container) SetBlockIOClass(class string) {
 
 func (c *container) GetBlockIOClass() string {
 	return c.BlockIOClass
+}
+
+func (c *container) SetToptierLimit(limit int64) {
+	c.ToptierLimit = limit
+	c.markPending(Memory)
+}
+
+func (c *container) GetToptierLimit() int64 {
+	return c.ToptierLimit
 }
 
 func (c *container) SetCRIRequest(req interface{}) error {

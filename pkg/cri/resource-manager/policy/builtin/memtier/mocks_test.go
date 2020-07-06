@@ -437,6 +437,12 @@ func (m *mockContainer) SetBlockIOClass(string) {
 func (m *mockContainer) GetBlockIOClass() string {
 	panic("unimplemented")
 }
+func (m *mockContainer) SetToptierLimit(int64) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetToptierLimit() int64 {
+	panic("unimplemented")
+}
 func (m *mockContainer) SetCRIRequest(req interface{}) error {
 	panic("unimplemented")
 }

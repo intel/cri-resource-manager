@@ -42,6 +42,8 @@ const (
 	RDT = "rdt"
 	// BlockIO marks changes that can be applied by the BlockIO controller.
 	BlockIO = "blockio"
+	// Memory marks changes that can be applied by the Memory controller.
+	Memory = "memory"
 
 	// TagAVX512 tags containers that use AVX512 instructions.
 	TagAVX512 = "AVX512"
@@ -50,6 +52,11 @@ const (
 	RDTClassKey = "rdtclass" + "." + kubernetes.ResmgrKeyNamespace
 	// BlockIOClassKey is the pod annotation key for specifying a container Block I/O class.
 	BlockIOClassKey = "blockioclass" + "." + kubernetes.ResmgrKeyNamespace
+	// ToptierLimitKey is the pod annotation key for specifying container top tier memory limits.
+	ToptierLimitKey = "toptierlimit" + "." + kubernetes.ResmgrKeyNamespace
+
+	// ToptierLimitUnset is the reserved value for indicating unset top tier limits.
+	ToptierLimitUnset int64 = -1
 )
 
 // PodState is the pod state in the runtime.
@@ -324,6 +331,11 @@ type Container interface {
 	// GetBlockIOClass returns the BlockIO class for this container.
 	GetBlockIOClass() string
 
+	// SetToptierLimit sets the tier memory limit for the container.
+	SetToptierLimit(int64)
+	// GetToptierLimit returns the top tier memory limit for the container.
+	GetToptierLimit() int64
+
 	// SetCRIRequest sets the current pending CRI request of the container.
 	SetCRIRequest(req interface{}) error
 	// GetCRIRequest returns the current pending CRI request of the container.
@@ -378,9 +390,11 @@ type container struct {
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 	req       *interface{}                 // pending CRI request
 
-	RDTClass     string              // RDT class this container is assigned to.
-	BlockIOClass string              // Block I/O class this container is assigned to.
-	pending      map[string]struct{} // controllers with pending changes for this container
+	RDTClass     string // RDT class this container is assigned to.
+	BlockIOClass string // Block I/O class this container is assigned to.
+	ToptierLimit int64  // Top tier memory limit.
+
+	pending map[string]struct{} // controllers with pending changes for this container
 
 	prettyName string // cached PrettyName()
 }
