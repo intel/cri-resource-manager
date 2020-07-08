@@ -754,6 +754,11 @@ func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) (Container,
 	}
 
 	cch.Containers[c.ID] = c
+	if pod, ok := cch.Pods[c.PodID]; ok {
+		if pod.CgroupParent == "" {
+			pod.discoverCgroupParentDir(c.ID)
+		}
+	}
 
 	cch.Save()
 
@@ -1321,6 +1326,9 @@ func (cch *cache) Restore(data []byte) error {
 		cch.Containers[c.CacheID] = c
 		if c.ID != "" {
 			cch.Containers[c.ID] = c
+			if p, ok := c.GetPod(); ok && p.GetCgroupParentDir() == "" {
+				p.(*pod).discoverCgroupParentDir(c.ID)
+			}
 		}
 	}
 
