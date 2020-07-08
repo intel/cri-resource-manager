@@ -28,24 +28,26 @@ const (
 	cpusetCgroupDir = "/sys/fs/cgroup/cpuset/"
 )
 
-// GetContainerCgroupDir finds container path in one specified subsystem directory
-func GetContainerCgroupDir(subsystemDir, containerID string) string {
+// GetContainerCgroupDir brute-force searches for a container directory under parentDir.
+func GetContainerCgroupDir(parentDir, containerID string) string {
 	var containerDir string
 
-	filepath.Walk(subsystemDir, func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(parentDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
 		if !info.IsDir() {
 			return nil
 		}
-		// Assume directory name contains containerID is what we want
+		if containerDir != "" {
+			return filepath.SkipDir
+		}
+		// Assume any directory that contains containerID is the one we look for.
 		if strings.Contains(filepath.Base(path), containerID) {
 			containerDir = path
 		}
 		return nil
 	})
-
 	return containerDir
 }
 
