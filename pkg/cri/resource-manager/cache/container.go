@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 
@@ -886,4 +887,33 @@ func (c *container) implicitAffinities() []*Affinity {
 		}
 	}
 	return implicit
+}
+
+func (c *container) String() string {
+	return c.PrettyName()
+}
+
+func (c *container) Eval(key string) interface{} {
+	switch key {
+	case resmgr.KeyPod:
+		pod, ok := c.GetPod()
+		if !ok {
+			return cacheError("%s: failed to find pod %s", c.PrettyName(), c.PodID)
+		}
+		return pod
+	case resmgr.KeyName:
+		return c.Name
+	case resmgr.KeyNamespace:
+		return c.Namespace
+	case resmgr.KeyQOSClass:
+		return c.GetQOSClass()
+	case resmgr.KeyLabels:
+		return c.Labels
+	case resmgr.KeyTags:
+		return c.Tags
+	case resmgr.KeyID:
+		return c.ID
+	default:
+		return cacheError("%s: Container cannot evaluate of %q", c.PrettyName(), key)
+	}
 }

@@ -29,6 +29,7 @@ import (
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
+	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
@@ -81,6 +82,8 @@ type PodResourceRequirements struct {
 
 // Pod is the exposed interface from a cached pod.
 type Pod interface {
+	resmgr.Evaluable
+	fmt.Stringer
 	// GetInitContainers returns the init containers of the pod.
 	GetInitContainers() []Container
 	// GetContainers returns the (non-init) containers of the pod.
@@ -143,7 +146,7 @@ type Pod interface {
 	// GetContainerAffinity returns the affinity expressions for the named container.
 	GetContainerAffinity(string) []*Affinity
 	// ScopeExpression returns an affinity expression for defining this pod as the scope.
-	ScopeExpression() *Expression
+	ScopeExpression() *resmgr.Expression
 }
 
 // A cached pod.
@@ -184,6 +187,8 @@ const (
 
 // Container is the exposed interface from a cached container.
 type Container interface {
+	resmgr.Evaluable
+	fmt.Stringer
 	// PrettyName returns the user-friendly <podname>:<containername> for the container.
 	PrettyName() string
 	// GetPod returns the pod of the container and a boolean indicating if there was one.
@@ -482,7 +487,7 @@ type Cache interface {
 	GetContainerIds() []string
 
 	// FilterScope returns the containers selected by the scope expression.
-	FilterScope(*Expression) []Container
+	FilterScope(*resmgr.Expression) []Container
 	// EvaluateAffinity evaluates the given affinity against all known in-scope containers
 	EvaluateAffinity(*Affinity) map[string]int32
 	// AddImplicitAffinities adds a set of implicit affinities (added to all containers).

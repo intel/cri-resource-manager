@@ -17,6 +17,7 @@ package topologyaware
 import (
 	"os"
 
+	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -426,6 +427,12 @@ func (m *mockContainer) SetTag(string, string) (string, bool) {
 func (m *mockContainer) DeleteTag(string) (string, bool) {
 	panic("unimplemented")
 }
+func (m *mockContainer) String() string {
+	return "mockContainer"
+}
+func (m *mockContainer) Eval(string) interface{} {
+	panic("unimplemented")
+}
 
 type mockPod struct {
 	name                               string
@@ -503,7 +510,13 @@ func (m *mockPod) GetPodResourceRequirements() cache.PodResourceRequirements {
 func (m *mockPod) GetContainerAffinity(string) []*cache.Affinity {
 	panic("unimplemented")
 }
-func (m *mockPod) ScopeExpression() *cache.Expression {
+func (m *mockPod) ScopeExpression() *resmgr.Expression {
+	panic("unimplemented")
+}
+func (m *mockPod) String() string {
+	return "mockPod"
+}
+func (m *mockPod) Eval(string) interface{} {
 	panic("unimplemented")
 }
 
@@ -552,7 +565,7 @@ func (m *mockCache) GetContainerCacheIds() []string {
 func (m *mockCache) GetContainerIds() []string {
 	panic("unimplemented")
 }
-func (m *mockCache) FilterScope(*cache.Expression) []cache.Container {
+func (m *mockCache) FilterScope(*resmgr.Expression) []cache.Container {
 	panic("unimplemented")
 }
 func (m *mockCache) EvaluateAffinity(*cache.Affinity) map[string]int32 {
