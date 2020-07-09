@@ -362,7 +362,6 @@ type container struct {
 	Name          string             // container name
 	Namespace     string             // container namespace
 	State         ContainerState     // created/running/exited/unknown
-	QOSClass      v1.PodQOSClass     // QoS class, if the container had one
 	Image         string             // containers image
 	Command       []string           // command to run in container
 	Args          []string           // arguments for command
