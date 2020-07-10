@@ -183,6 +183,161 @@ See [any available policy-specific documentation](docs) for more information on 
 policy configurations.
 
 
+### Container Adjustments
+
+When the agent is in use, it is also possible to `adjust` container `resource
+assignments` externally, using dedicated `Adjustment` `Custom Resources` in
+the `adjustments.criresmgr.intel.com` group. You can use the
+[provided schema](pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml) to define
+the `Adjustment` resource. Then you can copy and modify the
+[sample adjustment CR](sample-configs/external-adjustment.yaml) as a starting
+point to test some overrides.
+
+An `Adjustment` consists of a
+- `scope`:
+  - the nodes and containers to which the adjustment applies to
+- adjustment data:
+  - updated native/compute resources (`cpu`/`memory` `requests` and `limits`)
+  - updated `RDT` and/or `Block I/O` class
+  - updated top tier (practically now DRAM) memory limit
+
+All adjustment data is optional. An adjustment can choose to set any or all of
+them as necessary. The current handling of adjustment udpate updates the resource
+assignments of containers, arks all existing containers as having pending changes
+in all controller domains, then triggers a rebalancing in the active policy. This
+will cause all containers to be updated.
+
+The scope defines which containers on what nodes the adjustment applies to. Nodes
+are currently matched/picked by name, but a trailing wildcard (`*`) is allowed and
+matches all nodes with the given prefix in their names.
+
+Containers are matched by expressions. These are exactly the same as the expressions
+for defining [affinity scopes](docs/container-affinity.md]. A single adjustment can
+specify multipe node/container match pairs. An adjustment will apply to all containers
+in its scope. If an adjustment/update results in conflicts for some container, IOW
+at least one container being in the scope of multiple adjustments, the adjustment is
+rejected and the whole update ignored.
+
+#### Commands for Declaring, Creating, Deleting, and Examining Adjustments
+
+You can declare the custom resource for adjustments with this command:
+
+```
+kubectl apply -f pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml
+```
+
+You can then add adjustments with a command like this:
+
+```
+kubectl apply -f sample-configs/external-adjustment.yaml
+```
+
+You can list existing adjustments with the following command. Use the right
+`-n namespace` option according to the namespace you use for the agent, for
+the configuration and in your adjustment specifications.
+
+```
+kubectl get adjustments.criresmgr.intel.com -n kube-system
+```
+
+You can examine the contents of a single adjustments with this command:
+
+```
+kubectl get adjustments.criresmgr.intel.com/<adjustment-name> -n kube-system -oyaml
+```
+
+Or you can examine the contents of all adjustments like this:
+
+```
+kubectl get adjustments.criresmgr.intel.com -n kube-system -oyaml
+```
+
+Finally, you can delete and adjustment with commands like these:
+
+```
+kubectl delete -f sample-configs/external-adjustment.yaml
+kubectl delete adjustments.criresmgr.intel.com/<adjustment-name> -n kube-system
+```
+
+The status of adjustment updates is propagated back to the `Adjustment` `Custom Resources`,
+more specifically into their `Status` fields. With the help of `jq`, you can easily
+examine the status of external adjustments using a command like this:
+
+```
+kli@r640-1:~> kubectl get -n kube-system adjustments.criresmgr.intel.com -ojson | jq '.items[].status'
+{
+  "nodes": {
+    "r640-1": {
+      "errors": {}
+    }
+  }
+}
+{
+  "nodes": {
+    "r640-1": {
+      "errors": {}
+    }
+  }
+}
+```
+
+The above response is what you get for adjustments that applied without conflicts or
+errors. You can see here that only node *r640-1* is in the scope of both of your
+existing adjustments and those applied without errors.
+
+If your adjustments resulted in errors, the output will look something like this:
+
+```
+klitkey1@r640-1:~> kubectl get -n kube-system adjustments.criresmgr.intel.com -ojson | jq '.items[].status'
+{
+  "nodes": {
+    "r640-1": {
+      "errors": {
+        "b71a93523e58cb4ba0310aa225b2e2a329cef895ca4b96fcd9d12b375337ea35": "cache: conflicting adjustments for my-pod-r640-1:my-container: adjustment-1,adjustment-2"
+      }
+    }
+  }
+}
+{
+  "nodes": {
+    "r640-1": {
+      "errors": {
+        "b71a93523e58cb4ba0310aa225b2e2a329cef895ca4b96fcd9d12b375337ea35": "cache: conflicting adjustments for my-pod-r640-1:my-container: adjustment-1,adjustment-2"
+      }
+    }
+  }
+}
+```
+
+Above you can see that on node *r640-1* the container with `ID`
+*b71a93523e58cb4ba0310aa225b2e2a329cef895ca4b96fcd9d12b375337ea35*, or *my-container* of
+*my-pod-r640-1*, had a conflict. Moreover you can see that the reason of the conflict is
+that the container is in the scope of both *adjustment-1* and *adjustment-2*.
+
+You can now fix those adjustments to resolve/remove the conflict then reapply the
+adjustments, and then verify that the conflicts are gone.
+
+```
+kli@r640-1:~> $EDITOR adjustment-1.yaml adjustment-2.yaml
+kli@r640-1:~> kubectl apply -f adjustment-1.yaml && kubectl apply -f adjustment-1.yaml && sleep 2
+kli@r640-1:~> kubectl get -n kube-system adjustments.criresmgr.intel.com -ojson | jq '.items[].status'
+{
+  "nodes": {
+    "r640-1": {
+      "errors": {}
+    }
+  }
+}
+{
+  "nodes": {
+    "r640-1": {
+      "errors": {}
+    }
+  }
+}
+```
+
+
 ## Using CRI Resource Manager as a Message Dumper
 
 You can use CRI Resource Manager to simply inspect all proxied CRI requests and
