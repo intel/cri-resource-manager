@@ -223,7 +223,7 @@ func (c *container) resolveRef(path string) (string, bool, error) {
 			case "namespace":
 				obj = v.Namespace
 			case "qosclass":
-				obj = string(v.QOSClass)
+				obj = string(v.GetQOSClass())
 			}
 		case *pod:
 			switch strings.ToLower(key) {

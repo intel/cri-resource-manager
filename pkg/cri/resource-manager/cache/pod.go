@@ -16,13 +16,16 @@ package cache
 
 import (
 	"encoding/json"
+	"path"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
@@ -292,6 +295,25 @@ func (p *pod) GetCgroupParentDir() string {
 	return p.CgroupParent
 }
 
+// Discover the cgroup parent of a pod using one of its containers ID.
+func (p *pod) discoverCgroupParentDir(containerID string) string {
+	//
+	// Notes:
+	//   This is a bit of a brute force kludge. But it will have to do
+	//   for now, until we have proper support for both kubelet cgroup
+	//   drivers.
+	//
+	dir := utils.GetContainerCgroupDir(utils.CpusetCgroupDir, containerID)
+	if dir != "" {
+		dir = strings.TrimPrefix(path.Dir(dir), utils.CpusetCgroupDir)
+		p.CgroupParent = dir
+		p.QOSClass = ""
+		qos := p.GetQOSClass()
+		p.cache.Warn("discovered CgroupParent: %q, QOSClass: %v", dir, qos)
+	}
+	return dir
+}
+
 // Get the resource requirements of a pod.
 func (p *pod) GetPodResourceRequirements() PodResourceRequirements {
 	if p.Resources == nil {
@@ -320,12 +342,10 @@ func (p *pod) parseResourceAnnotations() {
 func (p *pod) GetQOSClass() v1.PodQOSClass {
 	if p.QOSClass == "" {
 		p.QOSClass = cgroupParentToQOS(p.CgroupParent)
+		if p.QOSClass == "" {
+			p.QOSClass = resourcesToQOS(p.Resources)
+		}
 	}
-
-	if p.QOSClass == "" {
-		p.QOSClass = resourcesToQOS(p.Resources)
-	}
-
 	return p.QOSClass
 }
 
