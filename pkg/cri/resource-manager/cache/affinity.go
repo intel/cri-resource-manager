@@ -66,6 +66,10 @@ const (
 	NotExist Operator = "NotExist"
 	// AlwaysTrue always evaluates to true.
 	AlwaysTrue = "AlwaysTrue"
+	// UserWeightCutoff is the cutoff we clamp user-provided weights to.
+	UserWeightCutoff = 1000
+	// DefaultWeight is the default assigned weight if omitted in annotations.
+	DefaultWeight int32 = 1
 )
 
 // ImplicitAffinity is an affinity that gets implicitly added to all eligible containers.
@@ -82,6 +86,13 @@ func (a *Affinity) Validate() error {
 
 	if err := a.Match.Validate(); err != nil {
 		return cacheError("invalid affinity match: %v", err)
+	}
+
+	switch {
+	case a.Weight > UserWeightCutoff:
+		a.Weight = UserWeightCutoff
+	case a.Weight < -UserWeightCutoff:
+		a.Weight = -UserWeightCutoff
 	}
 
 	return nil

@@ -339,7 +339,7 @@ func (p *pod) GetContainerAffinity(name string) []*Affinity {
 
 	value, ok := p.GetResmgrAnnotation(keyAffinity)
 	if ok {
-		weight := int32(1)
+		weight := DefaultWeight
 		if !p.Affinity.parseSimple(p, value, weight) {
 			if err := p.Affinity.parseFull(p, value, weight); err != nil {
 				p.cache.Error("%v", err)
@@ -348,7 +348,7 @@ func (p *pod) GetContainerAffinity(name string) []*Affinity {
 	}
 	value, ok = p.GetResmgrAnnotation(keyAntiAffinity)
 	if ok {
-		weight := int32(-1)
+		weight := -DefaultWeight
 		if !p.Affinity.parseSimple(p, value, weight) {
 			if err := p.Affinity.parseFull(p, value, weight); err != nil {
 				p.cache.Error("%v", err)
