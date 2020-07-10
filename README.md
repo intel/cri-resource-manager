@@ -112,6 +112,13 @@ configuration using the `--fallback-config <config-file>`. This file will be
 use before the very first configuration is successfully acquired from the
 agent.
 
+Whenever a new configuration is acquired from the agent and successfully
+taken into use, this configuration is stored in the cache and will become
+the default configuration to take into use the next time CRI Resource
+Manager is restarted (unless that time the --force-config option is used).
+While CRI Resource Manager is shut down, any cached configuration can be
+cleared from the cache using the --reset-config command line option.
+
 See the [later chapter](#cri-resource-manager-node-agent) about how to set
 up and configure the agent.
 
