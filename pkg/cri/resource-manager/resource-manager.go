@@ -439,7 +439,9 @@ func (m *resmgr) setupPolicy() error {
 
 	if active != cached {
 		if cached != "" {
-			if !opt.AllowPolicySwitch {
+			if opt.DisablePolicySwitch {
+				m.Error("can't switch policy from %q to %q: policy switching disabled",
+					cached, active)
 				return resmgrError("cannot load cache with policy %s for active policy %s",
 					cached, active)
 			}
