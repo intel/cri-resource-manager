@@ -35,6 +35,7 @@ type options struct {
 	ForceConfigSignal string
 	AllowPolicySwitch bool
 	ResetPolicy       bool
+	ResetConfig       bool
 	MetricsTimer      time.Duration
 	RebalanceTimer    time.Duration
 	DisableUI         bool
@@ -64,6 +65,9 @@ func init() {
 		"Configuration used to override the one stored in the cache. Does not override the agent.")
 	flag.StringVar(&opt.ForceConfigSignal, "force-config-signal", "SIGHUP",
 		"Signal used to reload forced configuration.")
+	flag.BoolVar(&opt.ResetConfig, "reset-config", false,
+		"Remove configuration (from the agent) stored in the cache, then exit.")
+
 	flag.BoolVar(&opt.ResetPolicy, "reset-policy", false,
 		"Reset policy data stored in the cache, then exit.")
 	flag.BoolVar(&opt.AllowPolicySwitch, "allow-policy-switch", false,

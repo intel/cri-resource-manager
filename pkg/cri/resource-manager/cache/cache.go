@@ -505,6 +505,8 @@ type Cache interface {
 	SetConfig(*config.RawConfig) error
 	// GetConfig returns the current/cached configuration.
 	GetConfig() *config.RawConfig
+	// ResetConfig clears any stored configuration from the cache.
+	ResetConfig() error
 
 	// Save requests a cache save.
 	Save() error
@@ -638,6 +640,19 @@ func (cch *cache) SetConfig(cfg *config.RawConfig) error {
 // GetConfig returns the current/cached configuration.
 func (cch *cache) GetConfig() *config.RawConfig {
 	return cch.Cfg
+}
+
+// ResetConfig clears any stored configuration from the cache.
+func (cch *cache) ResetConfig() error {
+	old := cch.Cfg
+	cch.Cfg = nil
+
+	if err := cch.Save(); err != nil {
+		cch.Cfg = old
+		return err
+	}
+
+	return nil
 }
 
 // Derive cache id using pod uid, or allocate a new unused local cache id.
