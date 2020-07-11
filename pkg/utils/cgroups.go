@@ -25,27 +25,29 @@ import (
 
 const (
 	cgroupTasks     = "tasks"
-	cpusetCgroupDir = "/sys/fs/cgroup/cpuset/"
+	CpusetCgroupDir = "/sys/fs/cgroup/cpuset"
 )
 
-// GetContainerCgroupDir finds container path in one specified subsystem directory
-func GetContainerCgroupDir(subsystemDir, containerID string) string {
+// GetContainerCgroupDir brute-force searches for a container directory under parentDir.
+func GetContainerCgroupDir(parentDir, containerID string) string {
 	var containerDir string
 
-	filepath.Walk(subsystemDir, func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(parentDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
 		if !info.IsDir() {
 			return nil
 		}
-		// Assume directory name contains containerID is what we want
+		if containerDir != "" {
+			return filepath.SkipDir
+		}
+		// Assume any directory that contains containerID is the one we look for.
 		if strings.Contains(filepath.Base(path), containerID) {
 			containerDir = path
 		}
 		return nil
 	})
-
 	return containerDir
 }
 
@@ -58,10 +60,10 @@ func GetProcessInContainer(cgroupParentDir, containerID string) ([]string, error
 	// Probe known per-container directories
 	if cgroupParentDir != "" {
 		dirs := []string{
-			filepath.Join(cpusetCgroupDir, cgroupParentDir, "cri-containerd-"+containerID+".scope"),
-			filepath.Join(cpusetCgroupDir, cgroupParentDir, "crio-"+containerID+".scope"),
-			filepath.Join(cpusetCgroupDir, cgroupParentDir, "docker-"+containerID+".scope"),
-			filepath.Join(cpusetCgroupDir, cgroupParentDir, containerID),
+			filepath.Join(CpusetCgroupDir, cgroupParentDir, "cri-containerd-"+containerID+".scope"),
+			filepath.Join(CpusetCgroupDir, cgroupParentDir, "crio-"+containerID+".scope"),
+			filepath.Join(CpusetCgroupDir, cgroupParentDir, "docker-"+containerID+".scope"),
+			filepath.Join(CpusetCgroupDir, cgroupParentDir, containerID),
 		}
 		for _, d := range dirs {
 			info, err := os.Stat(d)
@@ -74,7 +76,7 @@ func GetProcessInContainer(cgroupParentDir, containerID string) ([]string, error
 
 	// Try generic way to search container directory under one cgroups subsytem directory
 	if containerDir == "" {
-		containerDir = GetContainerCgroupDir(cpusetCgroupDir, containerID)
+		containerDir = GetContainerCgroupDir(CpusetCgroupDir, containerID)
 		if containerDir == "" {
 			return nil, fmt.Errorf("failed to find corresponding cgroups directory for container %s", containerID)
 		}
