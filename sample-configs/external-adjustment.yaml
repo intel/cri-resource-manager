@@ -1,0 +1,34 @@
+apiVersion: criresmgr.intel.com/v1alpha1
+kind: Adjustment
+metadata:
+  name: external-adjustment
+  namespace: kube-system
+spec:
+  scope:
+    - nodes: [ node-1 ]
+      containers:
+        - key: ":,:pod/name,name"
+          operator: Matches
+          values: [ "*:container" ]
+    - nodes: [ node-2 ]
+      containers:
+        - key: ":,:pod/name,name"
+          operator: Matches
+          values: [ "pod:*" ]
+    - nodes: [ node-3, node-4 ]
+      containers:
+        - key: ":,:pod/name,name"
+          operator: Equals
+          values: [ "anotherpod:container" ]
+  resources:
+    requirements:
+      requests:
+        cpu: 750m
+        memory: 500Mi
+      limits:
+        cpu: 1500m
+        memory: 750Mi
+    toptierLimit: 500Mi
+  classes:
+    rdt: rdt-class-1
+    blockio: blockio-class-1

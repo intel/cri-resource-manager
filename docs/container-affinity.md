@@ -39,14 +39,14 @@ metadata:
     cri-resource-manager.intel.com/affinity: |
       container1:
         - scope:
-            key: [optional-key-domain/]key
+            key: key-ref
             operator: op
             values:
             - value1
             ...
             - valueN
         - match:
-            key: [optional-key-domain/]key
+            key: key-ref
             operator: op
             values:
             - value1
@@ -64,14 +64,14 @@ metadata:
     cri-resource-manager.intel.com/anti-affinity: |
       container1:
         - scope:
-            key: [optional-key-domain/]key
+            key: key-ref
             operator: op
             values:
             - value1
             ...
             - valueN
         - match:
-            key: [optional-key-domain/]key
+            key: key-ref
             operator: op
             values:
             - value1
@@ -109,7 +109,7 @@ words the scope of all containers that belong to the same Pod as the container f
 which the affinity is defined.
 
 The weight can also be omitted in which case it defaults to -1 for anti-affinities
-and +1 for affinities.
+and +1 for affinities. Weights are currently limited to the range [-1000,1000].
 
 Both the affinity scope and the expression select containers, therefore they are identical.
 Both of them are *expressions*. An expression consists of three parts:
@@ -117,6 +117,24 @@ Both of them are *expressions*. An expression consists of three parts:
   - key: specifies what *metadata* to pick from a container for evaluation
   - operation (op): specifies what *logical operation* the expression evaluates
   - values: a set of *strings* to evaluate the the value of the key against
+
+The supported keys are:
+
+  - for pods:
+    - `name`
+    - `namespace`
+    - `qosclass`
+    - `labels/<label-key>`
+    - `id`
+    - `uid`
+  - for containers:
+    - `pod/<pod-key>`
+    - `name`
+    - `namespace`
+    - `qosclass`
+    - `labels/<label-key>`
+    - `tags/<tag-key>`
+    - `id`
 
 Essentially an expression defines a logical operation of the form (key op values).
 Evaluating this logical expression will take the value of the key in  which
@@ -130,6 +148,10 @@ a boolean true/false result. Currently the following operations are supported:
   - `Exists`: true if the given *key* exists with any value
   - `NotExists`: true if the given *key* does not exist
   - `AlwaysTrue`: always evaluates to true, can be used to denote node-global scope (all containers)
+  - `Matches`: true if the *value of key* matches the globbing pattern in values
+  - `MatchesNot`: true if the *value of key* does not match the globbing pattern in values
+  - `MatchesAny`: true if the *value of key* matches any of the globbing patterns in values
+  - `MatchesNone`: true if the *value of key* does not match any of the globbing patterns in values
 
 The effective affinity between containers C_1 and C_2, A(C_1, C_2) is the sum of the
 weights of all pairwise in-scope matching affinities W(C_1, C_2). To put it another way,
@@ -144,6 +166,27 @@ crafted to prevent this (by making them fully symmetric). Moreover, A(C_1, C_2) 
 and taken into consideration during resource allocation for C_1, while A(C_2, C_1)
 is calculated and taken into account during resource allocation for C_2. This might be
 changed in a future version.
+
+
+Currently affinity expressions lack support for boolean operators (and, or, not).
+Sometimes this limitation can be overcome by using joint keys, especially with
+matching operators. The joint key syntax allows joining the value of several keys
+with a separator into a single value. A joint key can be specified in a simple or
+full format:
+
+  - simple: ":<colon-separated-subkeys>", this is equivalent to ":::<colon-separated-subkeys>"
+  - full:   ":<ksep><vsep><ksep-separated-keylist>"
+
+A joint key evaluates to the values of all subkeys joined by the <vsep>. A non-existent
+subkey evaluates to the empty string. For instance the joint key
+
+  :pod/qosclass:pod/name:name
+
+evaluates to
+
+  "<qosclass>:<pod name>:<container name>"
+
+For existence operators, a joint key is considered to exist if any of its subkeys exists.
 
 
 ## Examples

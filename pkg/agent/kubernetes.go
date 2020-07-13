@@ -27,8 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	k8swatch "k8s.io/apimachinery/pkg/watch"
 	k8sclient "k8s.io/client-go/kubernetes"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	resmgr "github.com/intel/cri-resource-manager/pkg/apis/resmgr/generated/clientset/versioned/typed/resmgr/v1alpha1"
 
 	agent_v1 "github.com/intel/cri-resource-manager/pkg/agent/api/v1"
 )
@@ -39,7 +42,7 @@ type namespace string
 var nodeName string
 
 // getK8sClient initializes a new Kubernetes client
-func (a *agent) getK8sClient(kubeconfig string) (*k8sclient.Clientset, error) {
+func (a *agent) getK8sClient(kubeconfig string) (*k8sclient.Clientset, *resmgr.CriresmgrV1alpha1Client, error) {
 	var config *rest.Config
 	var err error
 
@@ -50,10 +53,20 @@ func (a *agent) getK8sClient(kubeconfig string) (*k8sclient.Clientset, error) {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return k8sclient.NewForConfig(config)
+	genCli, err := k8sclient.NewForConfig(config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resmgr, err := resmgr.NewForConfig(config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return genCli, resmgr, nil
 }
 
 // getNodeObject gets a k8s Node object
@@ -94,6 +107,11 @@ func patchNodeStatus(cli *k8sclient.Clientset, fields map[string]string) error {
 	_, err := cli.CoreV1().Nodes().PatchStatus(nodeName, []byte(patch))
 
 	return err
+}
+
+// patchAdjustmentStatus is a helper for patching the status of a Adjustment CRD.
+func patchAdjustmentStatus(cli *resmgr.CriresmgrV1alpha1Client, status *resmgrStatus, names ...string) error {
+	return nil
 }
 
 // watch is a wrapper around the k8s watch.Interface
@@ -181,6 +199,30 @@ func newConfigMapWatch(parent *watcher, name string, ns namespace) *watch {
 	return w
 }
 
+// newAdustmentCRDWatch creates a watch for k8s Adjustment CRDs
+func newAdjustmentCRDWatch(parent *watcher, ns namespace) *watch {
+	w := newWatch(parent, "AdjustmentCRD", ns,
+		func(ns namespace, name string) (k8swatch.Interface, error) {
+			k8w, err := parent.resmgrCli.Adjustments(string(ns)).Watch(meta_v1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			return k8w, nil
+		},
+		func(ns namespace, name string) (interface{}, error) {
+			crds, err := parent.resmgrCli.Adjustments(string(ns)).List(meta_v1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			if crds == nil || len(crds.Items) == 0 {
+				crds = nil
+			}
+			return crds, nil
+		})
+	w.Start("AdjustmentCRD")
+	return w
+}
+
 func (w *watch) Name() string {
 	ns, name := w.ns, w.name
 	if ns != "" {
@@ -209,7 +251,7 @@ func (w *watch) Start(name string) {
 		return
 	}
 
-	// proxy events from a go-routing until we're told to stop.
+	// proxy events from a go-routine until we're told to stop.
 	go func() {
 		var k8w k8swatch.Interface
 		var events <-chan k8swatch.Event
@@ -217,7 +259,7 @@ func (w *watch) Start(name string) {
 		var err error
 
 		// let the watcher know not to expect initial event
-		if _, err = w.queryfn(w.ns, w.name); err != nil {
+		if objs, _ := w.queryfn(w.ns, w.name); objs == nil {
 			w.events <- k8swatch.Event{Type: SyntheticMissing}
 		}
 
@@ -243,6 +285,7 @@ func (w *watch) Start(name string) {
 				if ok {
 					w.events <- e
 				} else {
+					w.parent.Warn("failed to get event from watch %s", w.Name())
 					k8w.Stop()
 					events = nil
 				}

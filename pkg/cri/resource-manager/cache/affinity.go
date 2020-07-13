@@ -16,9 +16,10 @@ package cache
 
 import (
 	"fmt"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"sigs.k8s.io/yaml"
-	"strings"
+
+	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
 
 const (
@@ -28,6 +29,11 @@ const (
 	keyAntiAffinity = "anti-affinity"
 )
 
+// Expression is used to describe affinity container scope and matching criteria.
+type Expression struct {
+	resmgr.Expression
+}
+
 // simpleAffinity is an alternative, simplified syntax for intra-pod container affinity.
 type simpleAffinity map[string][]string
 
@@ -36,16 +42,9 @@ type podContainerAffinity map[string][]*Affinity
 
 // Affinity specifies a single container affinity.
 type Affinity struct {
-	Scope  *Expression `json:"scope,omitempty"`  // scope for evaluating this affinity
-	Match  *Expression `json:"match"`            // affinity expression
-	Weight int32       `json:"weight,omitempty"` // (optional) weight for this affinity
-}
-
-// Expression is used to describe a criteria to select objects within a domain.
-type Expression struct {
-	Key    string   `json:"key"`              // key to check values of/against
-	Op     Operator `json:"operator"`         // operator to apply to value of Key and Values
-	Values []string `json:"values,omitempty"` // value(s) for domain key
+	Scope  *resmgr.Expression `json:"scope,omitempty"`  // scope for evaluating this affinity
+	Match  *resmgr.Expression `json:"match"`            // affinity expression
+	Weight int32              `json:"weight,omitempty"` // (optional) weight for this affinity
 }
 
 // Operator defines the possible operators for an Expression.
@@ -98,26 +97,6 @@ func (a *Affinity) Validate() error {
 	return nil
 }
 
-// Validate checks the expression for (obvious) invalidity.
-func (e *Expression) Validate() error {
-	if e == nil {
-		return cacheError("nil expression")
-	}
-
-	switch e.Op {
-	case Equals, NotEqual:
-		if len(e.Values) != 1 {
-			return cacheError("invalid expression, '%s' requires a single value", e.Op)
-		}
-	case Exists, NotExist:
-		if e.Values != nil && len(e.Values) != 0 {
-			return cacheError("invalid expression, '%s' does not take any values", e.Op)
-		}
-	}
-
-	return nil
-}
-
 // EvaluateAffinity evaluates the given affinity against all known in-scope containers.
 func (cch *cache) EvaluateAffinity(a *Affinity) map[string]int32 {
 	results := make(map[string]int32)
@@ -131,7 +110,7 @@ func (cch *cache) EvaluateAffinity(a *Affinity) map[string]int32 {
 }
 
 // FilterScope returns the containers selected by the scope expression.
-func (cch *cache) FilterScope(scope *Expression) []Container {
+func (cch *cache) FilterScope(scope *resmgr.Expression) []Container {
 	cch.Debug("calculating scope %s", scope.String())
 	result := []Container{}
 	for _, c := range cch.GetContainers() {
@@ -145,123 +124,6 @@ func (cch *cache) FilterScope(scope *Expression) []Container {
 	return result
 }
 
-// Evaluate evaluates an expression against a container.
-func (e *Expression) Evaluate(container Container) bool {
-	value, ok := e.KeyValue(container)
-	result := false
-
-	switch e.Op {
-	case Equals:
-		result = ok && (value == e.Values[0] || e.Values[0] == "*")
-	case NotEqual:
-		result = !ok || value != e.Values[0]
-	case In:
-		result = false
-		if ok {
-			for _, v := range e.Values {
-				if value == v || v == "*" {
-					result = true
-				}
-			}
-		}
-	case NotIn:
-		result = true
-		if ok {
-			for _, v := range e.Values {
-				if value == v || v == "*" {
-					result = false
-				}
-			}
-		}
-	case Exists:
-		result = ok
-	case NotExist:
-		result = !ok
-	case AlwaysTrue:
-		result = true
-	}
-
-	return result
-}
-
-// KeyValue extracts the value of the expresssion key from a container.
-func (e *Expression) KeyValue(c Container) (string, bool) {
-	value, ok, _ := c.(*container).resolveRef(e.Key)
-	return value, ok
-}
-
-// resolveRef walks an object trying to resolve a reference to a value.
-func (c *container) resolveRef(path string) (string, bool, error) {
-	var obj interface{}
-
-	c.cache.Debug("resolving %s/%s...", c.PrettyName(), path)
-
-	obj = c
-	ref := strings.Split(path, "/")
-	if len(ref) == 1 {
-		ref = []string{"labels", path}
-	}
-	for len(ref) > 0 {
-		key := ref[0]
-		c.cache.Debug("* resolve: walking %s, @%s, obj %T...", path, key, obj)
-		switch v := obj.(type) {
-		case *container:
-			switch strings.ToLower(key) {
-			case "pod":
-				pod, ok := v.GetPod()
-				if !ok {
-					return "", false, cacheError("failed to find pod (%s) for container %s",
-						v.PodID, v.Name)
-				}
-				obj = pod
-			case "labels":
-				obj = v.Labels
-			case "tags":
-				obj = v.Tags
-			case "name":
-				obj = v.Name
-			case "namespace":
-				obj = v.Namespace
-			case "qosclass":
-				obj = string(v.GetQOSClass())
-			}
-		case *pod:
-			switch strings.ToLower(key) {
-			case "labels":
-				obj = v.Labels
-			case "name":
-				obj = v.Name
-			case "namespace":
-				obj = v.Namespace
-			case "qosclass":
-				obj = string(v.QOSClass)
-			}
-		case map[string]string:
-			value, ok := v[key]
-			if !ok {
-				return "", false, nil
-			}
-			obj = value
-
-		default:
-			return "", false, cacheError("can't handle object of type %T in reference %s",
-				obj, path)
-
-		}
-
-		ref = ref[1:]
-	}
-
-	str, ok := obj.(string)
-	if !ok {
-		return "", false, cacheError("reference %s resolved to non-string: %T", path, obj)
-	}
-
-	c.cache.Debug("%s/%s => %s", c.PrettyName(), path, str)
-
-	return str, true, nil
-}
-
 // String returns the affinity as a string.
 func (a *Affinity) String() string {
 	kind := ""
@@ -270,11 +132,6 @@ func (a *Affinity) String() string {
 	}
 	return fmt.Sprintf("<%saffinity: scope %s %s => %d>",
 		kind, a.Scope.String(), a.Match.String(), a.Weight)
-}
-
-// String returns the expression as a string.
-func (e *Expression) String() string {
-	return fmt.Sprintf("<%s %s %s>", e.Key, e.Op, strings.Join(e.Values, ","))
 }
 
 // Try to parse affinities in simplified notation from the given annotation value.
@@ -289,9 +146,9 @@ func (pca *podContainerAffinity) parseSimple(pod *pod, value string, weight int3
 		(*pca)[name] = append((*pca)[name],
 			&Affinity{
 				Scope: podScope,
-				Match: &Expression{
+				Match: &resmgr.Expression{
 					Key:    kubernetes.ContainerNameLabel,
-					Op:     In,
+					Op:     resmgr.In,
 					Values: values,
 				},
 				Weight: weight,
@@ -342,12 +199,12 @@ func (pca *podContainerAffinity) parseFull(pod *pod, value string, weight int32)
 // GlobalAffinity creates an affinity with all containers in scope.
 func GlobalAffinity(key string, weight int32) *Affinity {
 	return &Affinity{
-		Scope: &Expression{
-			Op: AlwaysTrue, // evaluate against all containers
+		Scope: &resmgr.Expression{
+			Op: resmgr.AlwaysTrue, // evaluate against all containers
 		},
-		Match: &Expression{
+		Match: &resmgr.Expression{
 			Key: key,
-			Op:  Exists,
+			Op:  resmgr.Exists,
 		},
 		Weight: weight,
 	}

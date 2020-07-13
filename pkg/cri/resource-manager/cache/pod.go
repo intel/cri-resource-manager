@@ -24,6 +24,7 @@ import (
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
+	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
@@ -390,11 +391,36 @@ func (p *pod) GetContainerAffinity(name string) []*Affinity {
 }
 
 // ScopeExpression returns an affinity expression for defining this pod as the scope.
-func (p *pod) ScopeExpression() *Expression {
-	return &Expression{
+func (p *pod) ScopeExpression() *resmgr.Expression {
+	return &resmgr.Expression{
 		//      Domain: LabelsDomain,
 		Key:    kubernetes.PodNameLabel,
-		Op:     Equals,
+		Op:     resmgr.Equals,
 		Values: []string{p.GetName()},
+	}
+}
+
+// String returns a string representation of pod.
+func (p *pod) String() string {
+	return p.Name
+}
+
+// Eval returns the value of a key for expression evaluation.
+func (p *pod) Eval(key string) interface{} {
+	switch key {
+	case resmgr.KeyName:
+		return p.Name
+	case resmgr.KeyNamespace:
+		return p.Namespace
+	case resmgr.KeyQOSClass:
+		return p.GetQOSClass()
+	case resmgr.KeyLabels:
+		return p.Labels
+	case resmgr.KeyID:
+		return p.ID
+	case resmgr.KeyUID:
+		return p.UID
+	default:
+		return cacheError("Pod cannot evaluate of %q", key)
 	}
 }

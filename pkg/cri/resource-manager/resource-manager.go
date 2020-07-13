@@ -44,8 +44,10 @@ type ResourceManager interface {
 	Start() error
 	// Stop stops the resource manager.
 	Stop()
-	// SetConfig dynamically updates the resource manager  configuration
+	// SetConfig dynamically updates the resource manager configuration.
 	SetConfig(*config.RawConfig) error
+	// SetAdjustment dynamically updates external adjustments.
+	SetAdjustment(*config.Adjustment) map[string]error
 	// SendEvent sends an event to be processed by the resource manager.
 	SendEvent(event interface{}) error
 	// Add-ons for testing.
@@ -204,6 +206,15 @@ func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	return m.setConfig(conf)
 }
 
+// SetAdjustment pushes new external adjustments to the resource manager.
+func (m *resmgr) SetAdjustment(adjustment *config.Adjustment) map[string]error {
+	m.Info("applying new adjustments from agent...")
+
+	m.Lock()
+	defer m.Unlock()
+	return m.setAdjustment(adjustment)
+}
+
 // setConfigFromFile pushes new configuration to the resource manager from a file.
 func (m *resmgr) setConfigFromFile(path string) error {
 	m.Info("applying new configuration from file %s...", path)
@@ -250,6 +261,18 @@ func (m *resmgr) setConfig(src interface{}) error {
 
 	m.Info("sucessfully switched to new configuration")
 	return nil
+}
+
+// setAdjustments pushes new external policies to the resource manager.
+func (m *resmgr) setAdjustment(adjustments *config.Adjustment) map[string]error {
+	m.Info("applying new external adjustments from agent...")
+
+	rebalance, errors := m.cache.SetAdjustment(adjustments)
+	if rebalance {
+		m.rebalance("setAdjustment")
+	}
+
+	return errors
 }
 
 // resetCachedPolicy resets the cached active policy and all of its data.
@@ -316,7 +339,7 @@ func (m *resmgr) setupConfigAgent() error {
 func (m *resmgr) setupConfigServer() error {
 	var err error
 
-	if m.configServer, err = config.NewConfigServer(m.SetConfig); err != nil {
+	if m.configServer, err = config.NewConfigServer(m.SetConfig, m.SetAdjustment); err != nil {
 		return resmgrError("failed to create configuration notification server: %v", err)
 	}
 
