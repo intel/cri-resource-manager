@@ -5,24 +5,24 @@
 # stored in the cache).
 #
 # Switching Policies:
-#     Normally cri-resmgr will refuse to change the active policy
-#     once it has been stored in the cache. This restriction can
-#     be relaxed, for now to allow the policy to be changed during
-#     startup, by passing cri-resmgr the --allow-policy-switch
-#     option on the command line.
+#     Recent versions of cri-resmgr will allow changing the active
+#     policy during startup. If you want to prevent this from hap-
+#     pening you can pass the --disable-policy-switch option to
+#     cri-resmgr on the command line.
 #
 #     With the stock packaging you can control whether startup-
 #     phase policy switching is allowed using the POLICY_OPTIONS
 #     variable in the sysconf file.
 #
-#     If switching policies is disabled, you can manually reset
-#     the active policy to allow cri-resmgr to start up withe a
-#     new one. You do this by passing the --reset-policy command
-#     line option to cri-resmgr. To switch policies this way you
-#     need to
-#         - stop cri-resmgr,
+#     If switching policies is disabled, you can still reset the
+#     active policy manually when cri-resmgr is not running. This
+#     allows cri-resmgr to start up next with a new policy. You
+#     do this by passing the --reset-policy command line option
+#     to cri-resmgr. The full sequence of switching policies this
+#     way is
+#         - stop cri-resmgr (systemctl stop cri-resource-manager),
 #         - reset the active policy (cri-resmgr --reset-policy),
-#         - restart cri-resmgr again
+#         - start cri-resmgr (systemctl start cri-resource-manager)
 #
 
 policy:

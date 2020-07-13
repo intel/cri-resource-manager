@@ -23,22 +23,22 @@ import (
 
 // Options captures our command line parameters.
 type options struct {
-	ImageSocket       string
-	RuntimeSocket     string
-	RelaySocket       string
-	RelayDir          string
-	AgentSocket       string
-	ConfigSocket      string
-	ResctrlPath       string
-	FallbackConfig    string
-	ForceConfig       string
-	ForceConfigSignal string
-	AllowPolicySwitch bool
-	ResetPolicy       bool
-	ResetConfig       bool
-	MetricsTimer      time.Duration
-	RebalanceTimer    time.Duration
-	DisableUI         bool
+	ImageSocket         string
+	RuntimeSocket       string
+	RelaySocket         string
+	RelayDir            string
+	AgentSocket         string
+	ConfigSocket        string
+	ResctrlPath         string
+	FallbackConfig      string
+	ForceConfig         string
+	ForceConfigSignal   string
+	DisablePolicySwitch bool
+	ResetPolicy         bool
+	ResetConfig         bool
+	MetricsTimer        time.Duration
+	RebalanceTimer      time.Duration
+	DisableUI           bool
 }
 
 // Relay command line options.
@@ -70,8 +70,8 @@ func init() {
 
 	flag.BoolVar(&opt.ResetPolicy, "reset-policy", false,
 		"Reset policy data stored in the cache, then exit.")
-	flag.BoolVar(&opt.AllowPolicySwitch, "allow-policy-switch", false,
-		"Allow switching policies (only during startup for now)")
+	flag.BoolVar(&opt.DisablePolicySwitch, "disable-policy-switch", false,
+		"Disable switching policies during startup.")
 
 	flag.DurationVar(&opt.MetricsTimer, "metrics-interval", 0,
 		"Interval for polling/gathering runtime metrics data. Use 'disable' for disabling.")

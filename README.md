@@ -123,6 +123,28 @@ See the [later chapter](#cri-resource-manager-node-agent) about how to set
 up and configure the agent.
 
 
+### Changing the Active Policy
+
+Currently CRI Resource Manager will disable changing the active policy using
+the agent. That is, once the active policy is recorded in the cache, any
+configuration received through the agent that requests a different policy
+will be rejected. This limitation will be removed in a future version of
+CRI Resource Manager.
+
+However, by default CRI Resource Manager will allow changing policies during
+its startup phase. If you want to disable this you can pass the command line
+option `--disable-policy-switch` to CRI Resource Manager.
+
+If you run CRI Resource Manager with disabled policy switching, you can still
+switch policies by clearing any policy-specific data stored in the cache while
+CRI Resource Manager is shut down. You can do this by using the command line
+option `--reset-policy`. The whole sequence of switching policies this way is
+
+  - stop cri-resmgr (`systemctl stop cri-resource-manager`)
+  - reset policy data (`cri-resmgr --reset-policy`)
+  - change policy (`$EDITOR /etc/cri-resource-manager/fallback.cfg`)
+  - start cri-resmgr (`systemctl start cri-resource-manager`)
+
 ## CRI Resource Manager Mutating Webhook
 
 By default CRI Resource Manager does not see the original container *resource

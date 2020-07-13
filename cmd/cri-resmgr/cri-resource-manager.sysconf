@@ -3,5 +3,5 @@
 # Use a fallback file for configuration if/when we can't acquire one from the agent.
 CONFIG_OPTIONS="--fallback-config /etc/cri-resmgr/fallback.cfg"
 
-# Enable this for allowing the active policy to be changed during startup.
-#POLICY_OPTIONS="--allow-policy-switch"
+# Enable this for preventing the active policy to be changed during startup.
+#POLICY_OPTIONS="--disable-policy-switch"
