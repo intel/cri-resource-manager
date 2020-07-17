@@ -224,8 +224,8 @@ An `Adjustment` consists of a
   - updated top tier (practically now DRAM) memory limit
 
 All adjustment data is optional. An adjustment can choose to set any or all of
-them as necessary. The current handling of adjustment udpate updates the resource
-assignments of containers, arks all existing containers as having pending changes
+them as necessary. The current handling of adjustment update updates the resource
+assignments of containers, marks all existing containers as having pending changes
 in all controller domains, then triggers a rebalancing in the active policy. This
 will cause all containers to be updated.
 
@@ -234,10 +234,10 @@ are currently matched/picked by name, but a trailing wildcard (`*`) is allowed a
 matches all nodes with the given prefix in their names.
 
 Containers are matched by expressions. These are exactly the same as the expressions
-for defining [affinity scopes](docs/container-affinity.md]. A single adjustment can
+for defining [affinity scopes](docs/container-affinity.md). A single adjustment can
 specify multipe node/container match pairs. An adjustment will apply to all containers
-in its scope. If an adjustment/update results in conflicts for some container, IOW
-at least one container being in the scope of multiple adjustments, the adjustment is
+in its scope. If an adjustment/update results in conflicts for some container, that is
+at least one container is in the scope of multiple adjustments, the adjustment is
 rejected and the whole update ignored.
 
 #### Commands for Declaring, Creating, Deleting, and Examining Adjustments
@@ -262,9 +262,10 @@ the configuration and in your adjustment specifications.
 kubectl get adjustments.criresmgr.intel.com -n kube-system
 ```
 
-You can examine the contents of a single adjustments with this command:
+You can examine the contents of a single adjustments with these commands:
 
 ```
+kubectl describe adjustments external-adjustment -n kube-system
 kubectl get adjustments.criresmgr.intel.com/<adjustment-name> -n kube-system -oyaml
 ```
 
