@@ -1,6 +1,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
 
 HOST_PROMPT=${HOST_PROMPT-"\e[38;5;11mhost>\e[0m "}
+HOST_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")"
 GOVM=${GOVM-govm}
 
 host-command() {
@@ -15,18 +16,69 @@ host-require-govm() {
 }
 
 host-create-vm() {
+    # Usage: host-create-vm NAME [NUMANODELIST_JSON]
+    #
+    # If successful, VM_IP variable contains the IP address of the govm guest.
+    #
+    # If NUMANODELIST_JSON is given, Qemu CPU and memory parameters are
+    # generated from it. Example, create VM with four identical NUMA nodes:
+    #     host-create-vm myvm '[{"cpu": 2, "mem": "2G", "nodes": 4}]'
+    #
+    # If NUMANODELIST_JSON is not given, Qemu CPU and memory parameters
+    # can be defined directly in VM_QEMU_CPUMEM environment variable.
+    # VM_QEMU_CPUMEM is expected to contain at least parameters
+    #     -m MEMORY -smp CPUCORES
+    #
+    # Example: four numa nodes, 2 cores each
+    #     VM_QEMU_CPUMEM="-m 8G,slots=4,maxmem=32G \
+    #         -smp cpus=8 \
+    #         -numa node,cpus=0-1,nodeid=0 \
+    #         -numa node,cpus=2-3,nodeid=1 \
+    #         -numa node,cpus=4-5,nodeid=2 \
+    #         -numa node,cpus=6-7,nodeid=3 \
+    #         -cpu host"
+    #     host-create-vm my-four-numa-node-pc
+    #
+    # If NUMANODELIST_JSON parameter or VM_QEMU_CPUMEM environment
+    # variable defined, the VM will be created with "govm compose" and
+    # VM_GOVM_COMPOSE_TEMPLATE yaml. In both cases parameters in
+    # VM_QEMU_EXTRA environment variable are passed through to Qemu.
+    #
+    # Debug Qemu parameters and output with
+    #     $ docker logs $(docker ps | awk '/govm/{print $1; exit}')
+    #
     VM_NAME=$1
+    local NUMANODES="$2"
+    local QEMU_CPUMEM=""
     if [ -z "$VM_NAME" ]; then
         error "cannot create VM: missing name"
     fi
-    VM_OPT_CPUS=${VM_OPT_CPUS-4}
+    if [ -n "$NUMANODES" ]; then
+        if [ -n "$VM_QEMU_CPUMEM" ]; then
+            error "cannot take both VM_QEMU_CPUMEM and numa node JSON"
+        fi
+        QEMU_CPUMEM=$(echo "$NUMANODES" | "$HOST_LIB_DIR/numajson2qemuopts.py")
+    else
+        QEMU_CPUMEM="${VM_QEMU_CPUMEM}"
+    fi
     host-require-govm
     # If VM does not exist, create it from scrach
     ${GOVM} ls | grep -q "$VM_NAME" || {
         [ -f "$VM_IMAGE" ] || {
             host-command "wget -q -O \"$VM_IMAGE\" \"$VM_IMAGE_URL\"" || error "failed to download VM image from $VM_IMAGE_URL"
         }
-        host-command "${GOVM} create --ram 8192 --cpus ${VM_OPT_CPUS} --image \"$VM_IMAGE\" --name \"$VM_NAME\" --cloud"
+        if [ -z "$QEMU_CPUMEM" ]; then
+            # Create without GoVM compose template
+            VM_OPT_CPUS=${VM_OPT_CPUS-4}
+            host-command "${GOVM} create --ram 8192 --cpus ${VM_OPT_CPUS} --image \"$VM_IMAGE\" --name \"$VM_NAME\" --cloud"
+        else
+            # Create from GoVM compose template
+            local VM_YAML="${vm}.yaml"
+            local KVM_CPU_OPTS="$QEMU_CPUMEM"
+            local EXTRA_QEMU_OPTS="$VM_QEMU_EXTRA"
+            eval "echo -e \"${VM_GOVM_COMPOSE_TEMPLATE}\"" > "${VM_YAML}"
+            host-command "${GOVM} compose -f ${VM_YAML}"
+        fi
     }
 
     VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")

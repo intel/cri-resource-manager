@@ -67,11 +67,20 @@ command-end() {
     rm -f "$COMMAND_OUT_FILE.tmp"
 }
 
-command-error() {
-    # example: command-error "creating directory failed"
+command-error() { # script API
+    # Usage: command-error MESSAGE
+    #
+    # Print executed command, observed output, exit status and MESSAGE.
+    # Stop script execution.
     ( echo "command:     $COMMAND";
       echo "output:      $COMMAND_OUTPUT";
       echo "exit status: $COMMAND_STATUS";
       echo "error:       $1" ) >&2
-    exit 1
+    command-exit-if-not-interactive
+}
+
+command-exit-if-not-interactive() {
+    if [ -z "$INTERACTIVE_MODE" ] || [ "$INTERACTIVE_MODE" == "0" ]; then
+        exit ${1:-1}
+    fi
 }
