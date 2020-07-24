@@ -5,6 +5,15 @@ VM_SSH_USER=ubuntu
 VM_IMAGE_URL=https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
 VM_IMAGE=$(basename "$VM_IMAGE_URL")
 
+VM_GOVM_COMPOSE_TEMPLATE="vms:
+  - name: \${VM_NAME}
+    image: \${VM_IMAGE}
+    cloud: true
+    ContainerEnvVars:
+      - KVM_CPU_OPTS=\$(echo "\${KVM_CPU_OPTS}")
+      - EXTRA_QEMU_OPTS=\$(echo "\${EXTRA_QEMU_OPTS}")
+"
+
 vm-command() {
     command-start "vm" "$VM_PROMPT" "$1"
     if [ "$2" == "bg" ]; then
@@ -42,6 +51,23 @@ vm-networking() {
     vm-command-q "grep -q \$(hostname) /etc/hosts" || vm-command "echo \"$VM_IP \$(hostname)\" >/etc/hosts"
     if [ -n "$http_proxy" ] || [ -n "$https_proxy" ] || [ -n "$no_proxy" ]; then
         vm-command-q "grep -q no_proxy /etc/environment" || vm-command "(echo http_proxy=$http_proxy; echo https_proxy=$https_proxy; echo no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,\$(hostname) ) >> /etc/environment"
+    fi
+}
+
+vm-install-cri-resmgr() {
+    prefix=/usr/local
+    if [ "$binsrc" == "github" ]; then
+        vm-command "apt install -y golang make"
+        vm-command "go get -d -v github.com/intel/cri-resource-manager"
+        CRI_RESMGR_SOURCE_DIR=$(awk '/package.*cri-resource-manager/{print $NF}' <<< "$COMMAND_OUTPUT")
+        vm-command "cd $CRI_RESMGR_SOURCE_DIR && make install && cd -"
+    else
+        host-command "scp \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
+            command-error "copying local cri-resmgr to VM failed"
+        }
+        vm-command "mv cri-resmgr cri-resmgr-agent $prefix/bin" || {
+            command-error "installing cri-resmgr to $prefix/bin failed"
+        }
     fi
 }
 
@@ -104,6 +130,20 @@ vm-install-k8s() {
     speed=60 vm-command "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -"
     speed=60 vm-command "echo \"deb https://apt.kubernetes.io/ kubernetes-xenial main\" > /etc/apt/sources.list.d/kubernetes.list"
     vm-command "apt update &&  apt install -y kubelet kubeadm kubectl"
+}
+
+vm-create-singlenode-cluster-cilium() {
+    vm-command "kubeadm init --pod-network-cidr=10.217.0.0/16 --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
+    if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
+        command-error "kubeadm init failed"
+    fi
+    vm-command "mkdir -p \$HOME/.kube"
+    vm-command "cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
+    vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
+    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.6/install/kubernetes/quick-install.yaml"
+    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
+        command-error "installing cilium CNI to Kubernetes timed out"
+    fi
 }
 
 vm-print-usage() {

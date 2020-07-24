@@ -73,21 +73,8 @@ screen-install-k8s() {
 }
 
 screen-install-cri-resmgr() {
-    prefix=/usr/local
     speed=60 out "### Installing CRI Resource Manager to VM."
-    if [ "$binsrc" == "github" ]; then
-        vm-command "apt install -y golang make"
-        vm-command "go get -d -v github.com/intel/cri-resource-manager"
-        CRI_RESMGR_SOURCE_DIR=$(awk '/package.*cri-resource-manager/{print $NF}' <<< "$COMMAND_OUTPUT")
-        vm-command "cd $CRI_RESMGR_SOURCE_DIR && make install && cd -"
-    elif [ "$binsrc" == "local" ]; then
-        host-command "scp \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
-            command-error "copying local cri-resmgr to VM failed"
-        }
-        vm-command "mv cri-resmgr cri-resmgr-agent $prefix/bin" || {
-            command-error "installing cri-resmgr to $prefix/bin failed"
-        }
-    fi
+    vm-install-cri-resmgr
 }
 
 screen-launch-cri-resmgr() {
@@ -100,17 +87,7 @@ screen-launch-cri-resmgr() {
 screen-create-singlenode-cluster() {
     speed=60 out "### Setting up single-node Kubernetes cluster."
     speed=60 out "### CRI Resource Manager + containerd will act as the container runtime."
-    vm-command "kubeadm init --pod-network-cidr=10.217.0.0/16 --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
-    if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
-        command-error "kubeadm init failed"
-    fi
-    vm-command "mkdir -p \$HOME/.kube"
-    vm-command "cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
-    vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
-    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.6/install/kubernetes/quick-install.yaml"
-    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
-        command-error "installing cilium CNI to Kubernetes timed out"
-    fi
+    vm-create-singlenode-cluster-cilium
 }
 
 screen-launch-cri-resmgr-agent() {
