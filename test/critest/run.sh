@@ -79,7 +79,7 @@ screen-copy-cri-resmgr() {
 
 screen-install-critest() {
     speed=60 out "### Installing critest to VM."
-    vm-command "apt install -y golang make socat"
+    vm-command "apt update && apt install -y golang make socat"
     vm-command "go get -d github.com/kubernetes-sigs/cri-tools"
     CRI_TOOLS_SOURCE_DIR=$(awk '/package.*cri-tools/{print $NF}' <<< $COMMAND_OUTPUT)
     [ -n "$CRI_TOOLS_SOURCE_DIR" ] || {
@@ -191,7 +191,7 @@ if [ "$mode" == "test" ]; then
     echo "" >> "$SUMMARY_FILE"
     # Test is passed if all critest executions had the same passrate,
     # no matter which cri-resmgr configuration was used.
-    if [ "$(awk -F: '{print $2}' < $SUMMARY_FILE | sort -u | wc -l)" == "1" ]; then
+    if [ "$(awk -F: '/Passed/{print $2}' < $SUMMARY_FILE | sort -u | wc -l)" == "1" ]; then
         echo "All critest results are the same." >> "$SUMMARY_FILE"
         echo "Test verdict: PASS" >> "$SUMMARY_FILE"
     else

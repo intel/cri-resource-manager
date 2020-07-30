@@ -47,7 +47,7 @@ vm-networking() {
 
 vm-install-containerd() {
     vm-command-q "[ -f /usr/bin/containerd ]" || {
-        vm-command "apt install -y containerd"
+        vm-command "apt update && apt install -y containerd"
         # Set proxy environment to containers managed by containerd, if needed.
         if [ -n "$http_proxy" ] || [ -n "$https_proxy" ] || [ -n "$no_proxy" ]; then
             speed=120 vm-command "mkdir -p /etc/systemd/system/containerd.service.d; (echo '[Service]'; echo 'Environment=HTTP_PROXY=$http_proxy'; echo 'Environment=HTTPS_PROXY=$https_proxy'; echo \"Environment=NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,\$(hostname)\" ) > /etc/systemd/system/containerd.service.d/proxy.conf; systemctl daemon-reload; systemctl restart containerd"
@@ -56,7 +56,7 @@ vm-install-containerd() {
 }
 
 vm-install-containernetworking() {
-    vm-command-q "command -v go >/dev/null" || vm-command "apt install -y golang"
+    vm-command-q "command -v go >/dev/null" || vm-command "apt update && apt install -y golang"
     vm-command "go get -d github.com/containernetworking/plugins"
     CNI_PLUGINS_SOURCE_DIR=$(awk '/package.*plugins/{print $NF}' <<< $COMMAND_OUTPUT)
     [ -n "$CNI_PLUGINS_SOURCE_DIR" ] || {
