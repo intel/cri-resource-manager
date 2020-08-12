@@ -200,7 +200,6 @@ func (ctl *rdtctl) stopMonitor(c cache.Container) error {
 			if err := cls.DeleteMonGroup(name); err != nil {
 				return err
 			}
-		} else {
 			log.Info("%q: removed monitoring group %q",
 				c.PrettyName(), cls.Name()+"/"+mg.Name())
 		}
