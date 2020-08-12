@@ -208,8 +208,8 @@ func (p *policy) updateSharedAllocations(grant CPUGrant) error {
 	log.Debug("* updating shared allocations affected by %s", grant)
 
 	for _, other := range p.allocations.CPU {
-		if other.SharedPortion() == 0 {
-			log.Debug("  => %s not affected (no shared portion)...", other)
+		if other.SharedPortion() == 0 && !other.ExclusiveCPUs().IsEmpty() {
+			log.Debug("  => %s not affected (only exclusive CPUs)...", other)
 			continue
 		}
 
