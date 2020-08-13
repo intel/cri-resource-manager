@@ -21,14 +21,13 @@ spec:
           operator: Equals
           values: [ "anotherpod:container" ]
   resources:
-    requirements:
-      requests:
-        cpu: 750m
-        memory: 500Mi
-      limits:
-        cpu: 1500m
-        memory: 750Mi
-    toptierLimit: 500Mi
+    requests:
+      cpu: 750m
+      memory: 500Mi
+    limits:
+      cpu: 1500m
+      memory: 750Mi
+  toptierLimit: 500Mi
   classes:
     rdt: rdt-class-1
     blockio: blockio-class-1
