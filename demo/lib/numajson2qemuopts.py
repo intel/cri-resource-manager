@@ -22,8 +22,7 @@ $ ( cat << EOF
     {
         "nvmem": "8G",
         "dist": 20,
-        "dist-group-0": 80,
-        "dist-group-1": 80
+        "node-dist": {"0": 88, "1": 88, "2": 88, "3": 88}
     }
 ]
 EOF
@@ -39,24 +38,25 @@ NUMA node group definitions:
 "nodes"               number of NUMA nodes in this group. The default is 1.
 
 NUMA node distances are defined with following keys:
-"dist-group-X": N     symmetrical distance between nodes in this group and
-                      nodes in group X. The first group in the list is group 0.
-"dist-to-group-X": N  unidirectional distance from nodes in this group to
-                      nodes in group X.
-"dist-node-X": N      symmetrical distance between nodes in this group and
-                      node X. The first node in the first group is node 0,
-                      the second node in the first group is node 1, and so on.
-"dist-to-node-X": N   unidirectional distance from nodes in this group to
-                      node X.
-"dist": N             the default distance on all node links within and between
-                      all groups.
-
+"dist-all": [[from0to0, from0to1, ...], [from1to0, from1to1, ...], ...]
+                      distances from every node to all nodes.
+                      The order is the same as in to numactl -H
+                      "node distances:" output.
+"node-dist": {"node": dist, ...}
+                      symmetrical distances from nodes in this group to other
+                      nodes.
+"dist": N             the default distance, applies to all nodes in all node
+                      groups.
 Note that the distance from a node to itself is always 10 (otherwise Qemu
-would give an error).
+would give an error). The Qemu default distance between two nodes is 20.
+
 """
 
 import sys
 import json
+
+QEMU_DEFAULT_DIST_OTHER = 20
+QEMU_DEFAULT_DIST_SELF = 10
 
 def error(msg, exitstatus=1):
     sys.stderr.write("numajson2qemuopts: %s\n" % (msg,))
@@ -71,22 +71,54 @@ def siadd(s1, s2):
 def validate(numalist):
     if not isinstance(numalist, list):
         raise ValueError('expected list containing dicts, got %s' % (type(numalist,).__name__))
-    valid_keys = set(("cpu", "mem", "nvmem", "nodes", "dist"))
-    valid_key_prefixes = set(("dist-group-", "dist-to-group-",
-                              "dist-node-", "dist-to-node-"))
+    valid_keys = set(("cpu", "mem", "nvmem", "nodes", "dist", "node-dist", "dist-all"))
     for numalistindex, numaspec in enumerate(numalist):
         for key in numaspec:
-            if key in valid_keys:
-                continue
-            for prefix in valid_key_prefixes:
-                if key.startswith(prefix):
-                    try:
-                        v = int(key[len(prefix):])
-                    except:
-                        raise ValueError('integer expected in property %r after prefix %r' % (key, prefix))
-                    break
-            else:
+            if not key in valid_keys:
                 raise ValueError('invalid property name in numalist: %r' % (key,))
+
+def dists(numalist):
+    dist_dict = {} # Return value: {sourcenode: {destnode: dist}}, fully defined for all nodes
+    sourcenode = -1
+    dist = QEMU_DEFAULT_DIST_OTHER # numalist "dist", if defined
+    dist_matrix = None # numalist "dist_matrix", if defined
+    node_node_dist = {} # numalist {sourcenode: {destnode: dist}}, if defined for sourcenode
+    for groupindex, numaspec in enumerate(numalist):
+        nodecount = int(numaspec.get("nodes", 1))
+        first_node_in_group = sourcenode + 1
+        for node in range(nodecount):
+            sourcenode += 1
+            dist_dict[sourcenode] = {}
+        lastnode_in_group = sourcenode + 1
+        if "dist" in numaspec and dist is None:
+            dist = numaspec["dist"]
+        if "dist-all" in numaspec and dist_matrix is None:
+            dist_matrix = numaspec["dist-all"]
+        if "node-dist" in numaspec:
+            for n in range(first_node_in_group, lastnode_in_group):
+                node_node_dist[n] = {int(nodename): value for nodename, value in numaspec["node-dist"].items()}
+    lastnode = lastnode_in_group - 1
+    if not dist_matrix is None:
+        # Fill the dist_dict directly from dist_matrix.
+        # It must cover all distances.
+        if len(dist_matrix) != lastnode + 1:
+            raise ValueError("wrong dimensions in dist-all %s rows seen, %s expected" % (len(dist_matrix), lastnode))
+        for sourcenode, row in enumerate(dist_matrix):
+            if len(row) != lastnode + 1:
+                raise ValueError("wrong dimensions in dist-all on row %s: %s distances seen, %s expected" % (sourcenode + 1, len(row), lastnode + 1))
+            for destnode, source_dest_dist in enumerate(row):
+                dist_dict[sourcenode][destnode] = source_dest_dist
+    else:
+        for sourcenode in range(lastnode + 1):
+            for destnode in range(lastnode + 1):
+                if sourcenode == destnode:
+                    dist_dict[sourcenode][destnode] = QEMU_DEFAULT_DIST_SELF
+                elif sourcenode in node_node_dist and destnode in node_node_dist[sourcenode]:
+                    dist_dict[sourcenode][destnode] = node_node_dist[sourcenode][destnode]
+                    dist_dict[destnode][sourcenode] = node_node_dist[sourcenode][destnode]
+                elif not destnode in dist_dict[sourcenode]:
+                    dist_dict[sourcenode][destnode] = dist
+    return dist_dict
 
 def qemuopts(numalist):
     machineparam = "-machine pc"
@@ -137,67 +169,74 @@ def qemuopts(numalist):
             if cpucount > 0:
                 numaparams[-1] = numaparams[-1] + (",cpus=%s-%s" % (lastcpu + 1, lastcpu + cpucount))
                 lastcpu += cpucount
+    node_node_dist = dists(numalist)
+    for sourcenode in sorted(node_node_dist.keys()):
+        for destnode in sorted(node_node_dist[sourcenode].keys()):
+            if sourcenode == destnode:
+                continue
+            numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (
+                sourcenode, destnode, node_node_dist[sourcenode][destnode]))
 
-    # Calculate distances in the order of precedence: nodes, groups and the default.
-    found_dests = {src: set() for src in range(lastnode + 1)}
-    # First, "dist-to-node" and "dist-node" override more general distances.
-    sourcenode = -1
-    for numalistindex, numaspec in enumerate(numalist):
-        nodecount = int(numaspec.get("nodes", 1))
-        for node in range(nodecount):
-            sourcenode += 1
-            if sourcenode not in found_dests[sourcenode]:
-                # Mark all node-to-self-distances already defined, but
-                # let Qemu use its default (10) for them instead of specifying
-                # it explicitly (-numa dist,src=N,dst=N,val=10).
-                # Qemu would give an error, if val != 10.
-                found_dests[sourcenode].add(sourcenode)
-            for destnode in range(lastnode + 1):
-                destnodedist = numaspec.get("dist-to-node-%s" % (destnode,), None)
-                symdestnodedist = numaspec.get("dist-node-%s" % (destnode,), None)
-                if not destnodedist is None and destnode not in found_dests[sourcenode]:
-                    numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, destnodedist))
-                    found_dests[sourcenode].add(destnode)
-                if not symdestnodedist is None:
-                    if destnode not in found_dests[sourcenode]:
-                        numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, symdestnodedist))
-                        found_dests[sourcenode].add(destnode)
-                    if sourcenode not in found_dests[destnode]:
-                        numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (destnode, sourcenode, symdestnodedist))
-                        found_dests[destnode].add(sourcenode)
-    # Second, "dist-to-group" and "dist-group" override the default
-    sourcenode = -1
-    for numalistindex, numaspec in enumerate(numalist):
-        nodecount = int(numaspec.get("nodes", 1))
-        for node in range(nodecount):
-            sourcenode += 1
-            for destgroup in range(len(numalist)):
-                groupdist = numaspec.get("dist-to-group-%s" % (destgroup,), None)
-                symgroupdist = numaspec.get("dist-group-%s" % (destgroup,), None)
-                if not groupdist is None:
-                    for destnode in groupnodes[destgroup]:
-                        if not destnode in found_dests[sourcenode]:
-                            numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, groupdist))
-                            found_dests[sourcenode].add(destnode)
-                if not symgroupdist is None:
-                    for destnode in groupnodes[destgroup]:
-                        if not destnode in found_dests[sourcenode]:
-                            numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, symgroupdist))
-                            found_dests[sourcenode].add(destnode)
-                        if not sourcenode in found_dests[destnode]:
-                            numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (destnode, sourcenode, symgroupdist))
-                            found_dests[destnode].add(sourcenode)
-    # Finally, use the first found default distance for all other node links
-    for numalistindex, numaspec in enumerate(numalist):
-        defaultdist = numaspec.get("dist", None)
-        if defaultdist is None:
-            continue
-        for sourcenode in range(lastnode + 1):
-            for destnode in range(lastnode + 1):
-                if not destnode in found_dests[sourcenode]:
-                    numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, defaultdist))
-                if not sourcenode in found_dests[destnode]:
-                    numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (destnode, sourcenode, defaultdist))
+    # # Calculate distances in the order of precedence: nodes, groups and the default.
+    # found_dests = {src: set() for src in range(lastnode + 1)}
+    # # First, "dist-to-node" and "node-dist" override more general distances.
+    # sourcenode = -1
+    # for numalistindex, numaspec in enumerate(numalist):
+    #     nodecount = int(numaspec.get("nodes", 1))
+    #     for node in range(nodecount):
+    #         sourcenode += 1
+    #         if sourcenode not in found_dests[sourcenode]:
+    #             # Mark all node-to-self-distances already defined, but
+    #             # let Qemu use its default (10) for them instead of specifying
+    #             # it explicitly (-numa dist,src=N,dst=N,val=10).
+    #             # Qemu would give an error, if val != 10.
+    #             found_dests[sourcenode].add(sourcenode)
+    #         for destnode in range(lastnode + 1):
+    #             destnodedist = numaspec.get("dist-to-node-%s" % (destnode,), None)
+    #             symdestnodedist = numaspec.get("node-dist-%s" % (destnode,), None)
+    #             if not destnodedist is None and destnode not in found_dests[sourcenode]:
+    #                 numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, destnodedist))
+    #                 found_dests[sourcenode].add(destnode)
+    #             if not symdestnodedist is None:
+    #                 if destnode not in found_dests[sourcenode]:
+    #                     numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, symdestnodedist))
+    #                     found_dests[sourcenode].add(destnode)
+    #                 if sourcenode not in found_dests[destnode]:
+    #                     numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (destnode, sourcenode, symdestnodedist))
+    #                     found_dests[destnode].add(sourcenode)
+    # # Second, "dist-to-group" and "dist-group" override the default
+    # sourcenode = -1
+    # for numalistindex, numaspec in enumerate(numalist):
+    #     nodecount = int(numaspec.get("nodes", 1))
+    #     for node in range(nodecount):
+    #         sourcenode += 1
+    #         for destgroup in range(len(numalist)):
+    #             groupdist = numaspec.get("dist-to-group-%s" % (destgroup,), None)
+    #             symgroupdist = numaspec.get("dist-group-%s" % (destgroup,), None)
+    #             if not groupdist is None:
+    #                 for destnode in groupnodes[destgroup]:
+    #                     if not destnode in found_dests[sourcenode]:
+    #                         numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, groupdist))
+    #                         found_dests[sourcenode].add(destnode)
+    #             if not symgroupdist is None:
+    #                 for destnode in groupnodes[destgroup]:
+    #                     if not destnode in found_dests[sourcenode]:
+    #                         numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, symgroupdist))
+    #                         found_dests[sourcenode].add(destnode)
+    #                     if not sourcenode in found_dests[destnode]:
+    #                         numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (destnode, sourcenode, symgroupdist))
+    #                         found_dests[destnode].add(sourcenode)
+    # # Finally, use the first found default distance for all other node links
+    # for numalistindex, numaspec in enumerate(numalist):
+    #     defaultdist = numaspec.get("dist", None)
+    #     if defaultdist is None:
+    #         continue
+    #     for sourcenode in range(lastnode + 1):
+    #         for destnode in range(lastnode + 1):
+    #             if not destnode in found_dests[sourcenode]:
+    #                 numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (sourcenode, destnode, defaultdist))
+    #             if not sourcenode in found_dests[destnode]:
+    #                 numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (destnode, sourcenode, defaultdist))
     # Combine all parameters
     cpuparam = "-smp %s" % (lastcpu + 1,)
     memparam = "-m %s" % (siadd(totalmem, totalnvmem),)
