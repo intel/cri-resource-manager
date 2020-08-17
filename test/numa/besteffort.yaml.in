@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  labels:
+    app: ${NAME}
+spec:
+  containers:
+  - image: busybox
+    command:
+      - sh
+      - -c
+      - echo ${NAME} \$(sleep inf)
+    imagePullPolicy: IfNotPresent
+    name: busybox
+  terminationGracePeriodSeconds: 1
