@@ -17,6 +17,8 @@ package memtier
 import (
 	"sort"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -25,6 +27,10 @@ import (
 // buildPoolsByTopology builds a hierarchical tree of pools based on HW topology.
 func (p *policy) buildPoolsByTopology() error {
 	var n Node
+
+	if err := p.checkHWTopology(); err != nil {
+		return err
+	}
 
 	socketCnt := p.sys.SocketCount()
 	nodeCnt := p.sys.NUMANodeCount()
@@ -89,6 +95,35 @@ func (p *policy) buildPoolsByTopology() error {
 
 		return nil
 	})
+
+	return nil
+}
+
+// checkHWTopology verifies our otherwise implicit assumptions about the HW.
+func (p *policy) checkHWTopology() error {
+	// NUMA nodes (memory controllers) should not be shared by multiple sockets.
+	socketNodes := map[system.ID]cpuset.CPUSet{}
+	for _, socketID := range p.sys.PackageIDs() {
+		b := cpuset.NewBuilder()
+		pkg := p.sys.Package(socketID)
+		for _, nodeID := range pkg.NodeIDs() {
+			b.Add(int(nodeID))
+		}
+		socketNodes[socketID] = b.Result()
+	}
+	for id1, nodes1 := range socketNodes {
+		for id2, nodes2 := range socketNodes {
+			if id1 == id2 {
+				continue
+			}
+			if shared := nodes1.Intersection(nodes2); !shared.IsEmpty() {
+				log.Error("can't handle HW topology: sockets #%v, #%v share NUMA node(s) #%s",
+					id1, id2, shared.String())
+				return policyError("unhandled HW topology: sockets #%v, #%v share NUMA node(s) #%s",
+					id1, id2, shared.String())
+			}
+		}
+	}
 
 	return nil
 }
