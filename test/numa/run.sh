@@ -343,9 +343,7 @@ numanodes=${numanodes-'[
     {"cpu": 4, "mem": "4G"},
     {"nvmem": "8G",
      "dist": 22,
-     "dist-group-0": 88,
-     "dist-group-1": 88,
-     "dist-group-2": 88
+     "node-dist": {"0": 88, "1": 88, "2": 88, "3": 88}
     }]'}
 code=${code-"
 CPU=1 create guaranteed # creates pod 0, 1 CPU taken
