@@ -338,17 +338,19 @@ cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
 cleanup=${cleanup-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr-0}
 numanodes=${numanodes-'[
-    {"cpu": 1, "mem": "1G", "nodes": 2},
-    {"cpu": 2, "mem": "2G"},
-    {"cpu": 4, "mem": "4G"},
+    {"cpu": 2, "mem": "1G", "nodes": 2},
+    {"cpu": 2, "mem": "2G", "nodes": 2},
     {"nvmem": "8G",
      "dist": 22,
-     "node-dist": {"0": 88, "1": 88, "2": 88, "3": 88}
+     "node-dist": {"0": 55, "1": 55, "2": 88, "3": 88}
     }]'}
 code=${code-"
 CPU=1 create guaranteed # creates pod 0, 1 CPU taken
+report cpus
 CPU=2 create guaranteed # creates pod 1, 3 CPUs taken
+report cpus
 CPU=3 create guaranteed # creates pod 2, 6 CPUs taken
+report cpus
 verify \\
     'bin(cpus[0]).count(\"1\") == 1' \\
     'bin(cpus[1]).count(\"1\") == 2' \\
