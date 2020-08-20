@@ -119,6 +119,13 @@ screen-launch-cri-resmgr() {
     }
     vm-command "cat $(basename "$cri_resmgr_cfg")"
     vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") >cri-resmgr.output.txt 2>&1 &"
+    sleep 2 >/dev/null 2>&1
+    vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
+        command-error "launching cri-resmgr failed with FATAL ERROR"
+    }
+    vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
+        command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
+    }
 }
 
 screen-create-singlenode-cluster() {

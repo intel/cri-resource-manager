@@ -58,6 +58,9 @@ host-create-vm() {
             error "cannot take both VM_QEMU_CPUMEM and numa node JSON"
         fi
         QEMU_CPUMEM=$(echo "$NUMANODES" | "$HOST_LIB_DIR/numajson2qemuopts.py")
+        if [ "$?" -ne  "0" ]; then
+            error "error in numanodes"
+        fi
     else
         QEMU_CPUMEM="${VM_QEMU_CPUMEM}"
     fi
