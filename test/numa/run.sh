@@ -153,6 +153,15 @@ get-py-cpus() {
     fi
 }
 
+get-py-cache() {
+    # Fetch current cri-resmgr cache from a virtual machine.
+    speed=1000 vm-command "cat \"/var/lib/cri-resmgr/cache\"" >/dev/null 2>&1 || {
+        command-error "fetching cache file failed"
+    }
+    cat > "${OUTPUT_DIR}/cache" <<<"$COMMAND_OUTPUT"
+    py_cache="import json;cache=json.load(open(\"${OUTPUT_DIR}/cache\"));allocations=json.loads(cache['PolicyJSON']['allocations'])"
+}
+
 ### Test script helpers
 
 sleep() { # script API
@@ -168,26 +177,29 @@ pyexec() { # script API
     # Run python3 -c PYTHONCODEs on host. Stops if execution fails.
     #
     # Variables available in PYTHONCODE:
-    #   cpus: dictionary {pod_number: cpu_mask}
+    #   cpus:        dictionary: {pod_number: cpu_mask}
+    #   cache:       dictionary, cri-resmgr cache
+    #   allocations: dictionary: shorthand to cri-resmgr policy allocations
+    #                (unmarshaled cache['PolicyJSON']['allocations'])
     #
     # Note that variables are *not* updated when pyexec is called.
     # You can update the variables by running "verify" without expressions.
     #
     # Example:
     #   verify ; pyexec 'import pprint; pprint.pprint(cpus)'
-    PYTEMPFILE_PY="$OUTPUT_DIR/pyexec.py"
-    PYTEMPFILE_LOG="$OUTPUT_DIR/pyexec.output.txt"
+    PYEXEC_PY="$OUTPUT_DIR/pyexec.py"
+    PYEXEC_LOG="$OUTPUT_DIR/pyexec.output.txt"
     local last_exit_status=0
     for PYTHONCODE in "$@"; do
-        cat > "$PYTEMPFILE_PY" <<<"$py_cpus"
-        cat >> "$PYTEMPFILE_PY" <<<"$PYTHONCODE"
-        python3 "$PYTEMPFILE_PY" 2>&1 | tee "$PYTEMPFILE_LOG"
+        cat > "$PYEXEC_PY" <<<"$py_cpus"
+        cat >> "$PYEXEC_PY" <<<"$py_cache"
+        cat >> "$PYEXEC_PY" <<<"$PYTHONCODE"
+        python3 "$PYEXEC_PY" 2>&1 | tee "$PYEXEC_LOG"
         last_exit_status=${PIPESTATUS[0]}
         if [ "$last_exit_status" != "0" ]; then
-            error "pyexec: non-zero exit status \"$last_exit_status\", see \"$PYTEMPFILE_PY\" and \"$PYTEMPFILE_LOG\""
+            error "pyexec: non-zero exit status \"$last_exit_status\", see \"$PYEXEC_PY\" and \"$PYEXEC_LOG\""
         fi
     done
-    rm -f "$PYTEMPFILE_PY" "$PYTEMPFILE_LOG"
     return "$last_exit_status"
 }
 
@@ -196,8 +208,12 @@ report() { # script API
     #
     # Updates and reports current value of VARIABLE.
     #
-    # Example:
+    # Example: print CPU masks of containers in pod0, pod1, ...
     #   report cpus
+    #
+    # Example: print cri-resmgr policy allocations. In interactive mode
+    #          you may use a pager like less.
+    #   report allocations | less
     local varname
     for varname in "$@"; do
         if [ "$varname" == "cpus" ]; then
@@ -209,6 +225,18 @@ if cpus:
     bits_needed=int(math.log2(max(cpus.values())))+1
     for podnum in sorted(cpus.keys()):
         print(('pod%d  %s') % (podnum, bin(cpus[podnum])[2:].zfill(bits_needed)))
+"
+        elif [ "$varname" == "allocations" ]; then
+            get-py-cache
+            pyexec "
+import pprint
+pprint.pprint(allocations)
+"
+        elif [ "$varname" == "cache" ]; then
+            get-py-cache
+            pyexec "
+import pprint
+pprint.pprint(cache)
 "
         else
             error "report: unknown variable \"$varname\""
@@ -227,6 +255,9 @@ verify() { # script API
     #
     # Variables available in expressions:
     #   cpus: dictionary {pod_number: cpu_mask}
+    #   cache:       dictionary, cri-resmgr cache
+    #   allocations: dictionary: shorthand to cri-resmgr policy allocations
+    #                (unmarshaled cache['PolicyJSON']['allocations'])
     #
     # Note that variables are updated every time verify is called
     # before evaluating (asserting) expressions.
@@ -236,14 +267,15 @@ verify() { # script API
     #   pod0 cpu mask has four 1's in it:
     #     verify 'cpus[0] & cpus[1] == 0' 'bin(cpus[0]).count("1") == 4'
     get-py-cpus
+    get-py-cache
     for py_assertion in "$@"; do
         speed=1000 out "### Verifying assertion '$py_assertion'"
-        ( speed=1000 host-command "python3 -c '${py_cpus}; assert($py_assertion)'" >/dev/null 2>&1 && out "### The assertion holds." ) || {
-                out "### The assertion FAILED in context ${py_cpus}"
-                echo "verify: assertion '$py_assertion' failed when ${py_cpus}" >> "$SUMMARY_FILE"
-                echo "    verify command output: $COMMAND_OUTPUT"
+        ( speed=1000 pyexec "assert(${py_assertion})" ) || {
+                out "### The assertion FAILED"
+                echo "verify: assertion '$py_assertion' failed." >> "$SUMMARY_FILE"
                 command-exit-if-not-interactive
         }
+        speed=1000 out "### The assertion holds."
     done
 }
 
