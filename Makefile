@@ -98,6 +98,7 @@ endif
 TAR        := tar
 TAR_UPDATE := $(TAR) -uf
 GZIP       := gzip
+GZIP_DC    := gzip -dc
 GZEXT      := .gz
 
 # Metadata for packages, changelog, etc.
@@ -375,6 +376,20 @@ dist-cwd:
 	$(TAR_UPDATE) $$tarball $$tardir && \
 	rm -f $$tarball.* && \
 	$(GZIP) $$tarball && \
+	rm -fr $$tardir
+
+vendored-dist: dist
+	$(Q)echo "Creating vendored dist tarball $(TAR_VERSION)..."; \
+	tardir=cri-resource-manager-$(TAR_VERSION) && \
+	tarball=cri-resource-manager-$(TAR_VERSION).tar && \
+	cp $$tarball$(GZEXT) vendored-$$tarball$(GZEXT) && \
+	$(GZIP_DC) vendored-$$tarball$(GZEXT) | tar -xf - && \
+	go mod vendor -v && \
+	mkdir -p $$tardir && \
+	  mv vendor $$tardir && \
+	rm -f vendored-$$tarball* && \
+	$(TAR) -cf vendored-$$tarball $$tardir && \
+	$(GZIP) vendored-$$tarball && \
 	rm -fr $$tardir
 
 spec: clean-spec $(SPEC_FILES)
