@@ -125,24 +125,46 @@ help script`, or with `help` when in the interactive mode.
 ## Testing different NUMA node configurations
 
 If you change NUMA node topology of an existing virtual machine, you
-must delete the virtual machine first. Otherwise `numanodes` variable
+must delete the virtual machine first. Otherwise the `topology` variable
 is ignored and the test will run in the existing NUMA
-configuration. Example:
+configuration.
+
+The `topology` variable is a JSON array of objects. Each object
+defines one or more NUMA nodes. Keys in objects:
+```
+"mem"                 mem (RAM) size on each NUMA node in this group.
+                      The default is "0G".
+"nvmem"               nvmem (non-volatile RAM) size on each NUMA node
+                      in this group. The default is "0G".
+"cores"               number of CPU cores on each NUMA node in this group.
+                      The default is 0.
+"threads"             number of threads on each CPU core.
+                      The default is 2.
+"nodes"               number of NUMA nodes on each die.
+                      The default is 1.
+"dies"                number of dies on each package.
+                      The default is 1.
+"packages"            number of packages.
+                      The default is 1.
+```
+
+
+Example:
+
+Run the test in a VM with two NUMA nodes. There are 4 CPUs (two cores, two
+threads per core by default) and 4G RAM in each node
+```
+numa$ govm delete my2x4 ; vm=my2x4 topology='[{"mem":"4G","cores":2,"nodes":2}]' ./run.sh play
+```
+
+Run the test in a VM with 32 CPUs in total: there are two packages
+(sockets) in the system, each containing two dies. Each die containing
+two NUMA nodes, each node containing 2 CPU cores, each core containing
+two threads. And with a NUMA node with 16G of non-volatile memory
+(NVRAM) but no CPUs.
 
 ```
-numa$ govm delete my2x4
-```
-
-Run the test in a VM with two NUMA nodes, 4 CPUs and 4G RAM in each node
-```
-numa$ govm delete my2x4 ; vm=my2x4 numanodes='[{"cpu":4,"mem":"4G","nodes":2}]' ./run.sh play
-```
-
-Run the test in a VM with two NUMA nodes, 8 CPUs and 4G of memory in
-one, no CPUs and 16G of non-volatile memory (NVRAM) in the other
-
-```
-numa$ vm=mynvram numanodes='[{"cpu":8,"mem":"4G"},{"nvmem":"16G"}]' ./run.sh play
+numa$ vm=mynvram topology='[{"mem":"4G","cores":2,"nodes":2,"dies":2,"packages":2},{"nvmem":"16G"}]' ./run.sh play
 ```
 
 ## Test output
