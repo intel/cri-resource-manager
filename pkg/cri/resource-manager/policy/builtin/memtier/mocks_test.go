@@ -82,6 +82,18 @@ func (p *mockCPUPackage) NodeIDs() []system.ID {
 	return []system.ID{}
 }
 
+func (p *mockCPUPackage) DieIDs() []system.ID {
+	return []system.ID{0}
+}
+
+func (p *mockCPUPackage) DieCPUSet(system.ID) cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+
+func (p *mockCPUPackage) DieNodeIDs(system.ID) []system.ID {
+	return []system.ID{}
+}
+
 type mockCPU struct {
 	isolated cpuset.CPUSet
 	online   cpuset.CPUSet
@@ -98,6 +110,9 @@ func (c *mockCPU) ID() system.ID {
 }
 func (c *mockCPU) PackageID() system.ID {
 	return c.pkg.ID()
+}
+func (c *mockCPU) DieID() system.ID {
+	return system.ID(0)
 }
 func (c *mockCPU) NodeID() system.ID {
 	return c.node.ID()
