@@ -42,6 +42,8 @@ const (
 	UnknownNode NodeKind = "unknown"
 	// SocketNode represents a physical CPU package/socket in the system.
 	SocketNode NodeKind = "socket"
+	// DieNode represents a die within a physical CPU package/socket in the system.
+	DieNode NodeKind = "die"
 	// NumaNode represents a NUMA node in the system.
 	NumaNode NodeKind = "numa node"
 	// VirtualNode represents a virtual node, currently the root multi-socket setups.
@@ -140,6 +142,13 @@ type nodeself struct {
 type socketnode struct {
 	node                     // common node data
 	id     system.ID         // NUMA node socket id
+	syspkg system.CPUPackage // corresponding system.Package
+}
+
+// dienode represents a die within a physical CPU package/socket in the system.
+type dienode struct {
+	node                     // common node data
+	id     system.ID         // die id within socket
 	syspkg system.CPUPackage // corresponding system.Package
 }
 
@@ -545,6 +554,129 @@ func (n *numanode) HintScore(hint topology.Hint) float64 {
 		if score > 0.0 {
 			// penalize underfit reciprocally (inverse-proportionally) to the socket size
 			score /= float64(len(n.System().Package(pkgID).NodeIDs()))
+		}
+		return score
+	}
+
+	return 0.0
+}
+
+// NewDieNode create a node for a CPU die.
+func (p *policy) NewDieNode(id system.ID, parent Node) Node {
+	pkg := parent.(*socketnode)
+	n := &dienode{}
+	n.self.node = n
+	n.node.init(p, fmt.Sprintf("die #%v/%v", pkg.id, id), DieNode, parent)
+	n.id = id
+	n.syspkg = p.sys.Package(pkg.id)
+
+	return n
+}
+
+// Dump (the die-specific parts of) this node.
+func (n *dienode) dump(prefix string, level ...int) {
+	log.Debug("%s<die #%v/%v>", indent(prefix, level...), n.syspkg.ID(), n.id)
+}
+
+// Get CPU supply available at this node.
+func (n *dienode) GetSupply() Supply {
+	return n.noderes.Clone()
+}
+
+func (n *dienode) GetPhysicalNodeIDs() []system.ID {
+	ids := make([]system.ID, 0)
+	ids = append(ids, n.id)
+	for _, c := range n.children {
+		cIds := c.GetPhysicalNodeIDs()
+		ids = append(ids, cIds...)
+	}
+	return ids
+}
+
+// DiscoverSupply discovers the CPU supply available at this die.
+func (n *dienode) DiscoverSupply() Supply {
+	log.Debug("discovering CPU available at node %s...", n.Name())
+	mem := createMemoryMap(0, 0, 0)
+
+	if n.IsLeafNode() {
+		nodeIDs := n.syspkg.DieNodeIDs(n.id)
+		if len(nodeIDs) == 1 {
+			node := n.System().Node(nodeIDs[0])
+			meminfo, err := node.MemoryInfo()
+			if err != nil {
+				log.Error("Couldn't get memory info for node %s...", n.Name())
+			}
+			switch n.GetMemoryType() {
+			case memoryDRAM:
+				mem = createMemoryMap(meminfo.MemTotal, 0, 0)
+			case memoryPMEM:
+				mem = createMemoryMap(0, meminfo.MemTotal, 0)
+			case memoryHBM:
+				mem = createMemoryMap(0, 0, meminfo.MemTotal)
+			case memoryUnspec:
+				mem = createMemoryMap(meminfo.MemTotal, 0, 0)
+			default:
+				log.Error("node has an unknown memory type/combination")
+			}
+		}
+		diecpus := n.syspkg.DieCPUSet(n.id)
+		isolated := diecpus.Intersection(n.policy.isolated)
+		sharable := diecpus.Difference(isolated)
+		n.noderes = newSupply(n, isolated, sharable, 0, mem, createMemoryMap(0, 0, 0))
+	} else {
+		n.noderes = newSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, mem, createMemoryMap(0, 0, 0))
+		for _, c := range n.children {
+			n.noderes.Cumulate(c.DiscoverSupply())
+		}
+	}
+
+	n.freeres = n.noderes.Clone()
+	return n.noderes.Clone()
+}
+
+// GetMemset returns the set of memory attached to this die.
+func (n *dienode) GetMemset(mtype memoryType) system.IDSet {
+	mset := system.NewIDSet()
+
+	if mtype&memoryDRAM != 0 {
+		mset.Add(n.mem.Members()...)
+	}
+	if mtype&memoryHBM != 0 {
+		mset.Add(n.hbm.Members()...)
+	}
+	if mtype&memoryPMEM != 0 {
+		mset.Add(n.pMem.Members()...)
+	}
+
+	return mset
+}
+
+// DiscoverMemset discovers the set of memory attached to this socket.
+func (n *dienode) DiscoverMemset() {
+	n.mem = system.NewIDSet()
+	n.hbm = system.NewIDSet()
+	n.pMem = system.NewIDSet()
+	for _, c := range n.children {
+		n.mem.Add(c.GetMemset(memoryDRAM).Members()...)
+		n.hbm.Add(c.GetMemset(memoryHBM).Members()...)
+		n.pMem.Add(c.GetMemset(memoryPMEM).Members()...)
+	}
+}
+
+// HintScore calculates the (CPU) score of the node for the given topology hint.
+func (n *dienode) HintScore(hint topology.Hint) float64 {
+	switch {
+	case hint.CPUs != "":
+		return cpuHintScore(hint, n.syspkg.CPUSet())
+
+	case hint.NUMAs != "":
+		return OverfitPenalty * dieHintScore(hint, n.id, n.syspkg)
+
+	case hint.Sockets != "":
+		score := socketHintScore(hint, n.syspkg.ID())
+		if score > 0.0 {
+			// penalize underfit reciprocally (inverse-proportionally) to the socket size in dies
+			score /= float64(len(n.syspkg.DieNodeIDs(n.id)))
 		}
 		return score
 	}

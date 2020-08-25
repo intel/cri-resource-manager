@@ -33,6 +33,7 @@ func (p *policy) buildPoolsByTopology() error {
 	}
 
 	socketCnt := p.sys.SocketCount()
+	dieCnt := 0
 	nodeCnt := p.sys.NUMANodeCount()
 	if nodeCnt < 2 {
 		nodeCnt = 0
@@ -45,7 +46,13 @@ func (p *policy) buildPoolsByTopology() error {
 			}
 		}
 	}
-	poolCnt := socketCnt + nodeCnt - memNodeCnt + map[bool]int{false: 0, true: 1}[socketCnt > 1]
+	for _, id := range p.sys.PackageIDs() {
+		pkg := p.sys.Package(id)
+		if n := len(pkg.DieIDs()); n > 1 {
+			dieCnt += n
+		}
+	}
+	poolCnt := socketCnt + dieCnt + nodeCnt - memNodeCnt + map[bool]int{false: 0, true: 1}[socketCnt > 1]
 
 	p.nodes = make(map[string]Node, poolCnt)
 	p.pools = make([]Node, poolCnt)
@@ -55,6 +62,9 @@ func (p *policy) buildPoolsByTopology() error {
 		p.root = p.NewVirtualNode("root", nilnode)
 		p.nodes[p.root.Name()] = p.root
 	}
+
+	// die nodes by NUMA id
+	dies := map[system.ID]Node{}
 
 	// create nodes for sockets
 	sockets := make(map[system.ID]Node, socketCnt)
@@ -67,15 +77,34 @@ func (p *policy) buildPoolsByTopology() error {
 		}
 		p.nodes[n.Name()] = n
 		sockets[id] = n
+
+		if dieCnt > 0 {
+			pkg := p.sys.Package(id)
+			for _, dieid := range pkg.DieIDs() {
+				die := p.NewDieNode(dieid, n)
+				for _, nodeid := range pkg.DieNodeIDs(dieid) {
+					dies[nodeid] = die
+				}
+			}
+		}
 	}
 
 	// create nodes for NUMA nodes
 	if nodeCnt > 0 {
 		for _, id := range p.sys.NodeIDs() {
+			var parent Node
+
 			if p.sys.Node(id).GetMemoryType() == system.MemoryTypePMEM {
 				continue
 			}
-			n = p.NewNumaNode(id, sockets[p.sys.Node(id).PackageID()])
+
+			if len(dies) > 0 {
+				parent = dies[id]
+			} else {
+				parent = sockets[p.sys.Node(id).PackageID()]
+			}
+
+			n = p.NewNumaNode(id, parent)
 			p.nodes[n.Name()] = n
 		}
 	}
@@ -104,12 +133,8 @@ func (p *policy) checkHWTopology() error {
 	// NUMA nodes (memory controllers) should not be shared by multiple sockets.
 	socketNodes := map[system.ID]cpuset.CPUSet{}
 	for _, socketID := range p.sys.PackageIDs() {
-		b := cpuset.NewBuilder()
 		pkg := p.sys.Package(socketID)
-		for _, nodeID := range pkg.NodeIDs() {
-			b.Add(int(nodeID))
-		}
-		socketNodes[socketID] = b.Result()
+		socketNodes[socketID] = system.NewIDSet(pkg.NodeIDs()...).CPUSet()
 	}
 	for id1, nodes1 := range socketNodes {
 		for id2, nodes2 := range socketNodes {
@@ -121,6 +146,28 @@ func (p *policy) checkHWTopology() error {
 					id1, id2, shared.String())
 				return policyError("unhandled HW topology: sockets #%v, #%v share NUMA node(s) #%s",
 					id1, id2, shared.String())
+			}
+		}
+	}
+
+	// NUMA nodes (memory controllers) should not be shared by multiple dies.
+	for _, socketID := range p.sys.PackageIDs() {
+		pkg := p.sys.Package(socketID)
+		for _, id1 := range pkg.DieIDs() {
+			nodes1 := system.NewIDSet(pkg.DieNodeIDs(id1)...)
+			for _, id2 := range pkg.DieIDs() {
+				if id1 == id2 {
+					continue
+				}
+				nodes2 := system.NewIDSet(pkg.DieNodeIDs(id2)...)
+				if shared := nodes1.CPUSet().Intersection(nodes2.CPUSet()); !shared.IsEmpty() {
+					log.Error("can't handle HW topology: "+
+						"socket #%v, dies #%v,%v share NUMA node(s) #%s",
+						socketID, id1, id2, shared.String())
+					return policyError("unhandled HW topology: "+
+						"socket #%v, dies #%v,#%v share NUMA node(s) #%s",
+						socketID, id1, id2, shared.String())
+				}
 			}
 		}
 	}
