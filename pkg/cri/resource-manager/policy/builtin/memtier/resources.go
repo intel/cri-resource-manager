@@ -661,6 +661,12 @@ func newRequest(container cache.Container) Request {
 				}
 			}
 		}
+	} else if mtype == memoryPMEM {
+		if coldStartOff {
+			mtype = mtype | memoryDRAM
+			log.Error("%s: forced also DRAM usage (movable non-DRAM memory zones present)",
+				container.PrettyName())
+		}
 	}
 
 	return &request{
