@@ -17,6 +17,7 @@ limitations under the License.
 package rdt
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -112,7 +113,7 @@ func (c *collector) collectGroupMetrics(ch chan<- prometheus.Metric, mg MonGroup
 
 	for cacheID, data := range allData.L3 {
 		for feature, value := range data {
-			labels := append([]string{mg.Parent().Name(), mg.Name(), string(cacheID)}, customLabelValues...)
+			labels := append([]string{mg.Parent().Name(), mg.Name(), fmt.Sprint(cacheID)}, customLabelValues...)
 
 			ch <- prometheus.MustNewConstMetric(
 				c.describeL3(feature),
