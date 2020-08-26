@@ -55,6 +55,10 @@ func (fake *mockSystemNode) GetMemoryType() system.MemoryType {
 	return system.MemoryTypeDRAM
 }
 
+func (fake *mockSystemNode) HasNormalMemory() bool {
+	return true
+}
+
 type mockSystemCPUPackage struct {
 	id system.ID // package id
 }

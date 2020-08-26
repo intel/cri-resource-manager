@@ -123,6 +123,7 @@ type Node interface {
 	DistanceFrom(id ID) int
 	MemoryInfo() (*MemInfo, error)
 	GetMemoryType() MemoryType
+	HasNormalMemory() bool
 }
 
 type node struct {
@@ -131,6 +132,7 @@ type node struct {
 	pkg        ID         // package id
 	cpus       IDSet      // cpus in this node
 	memoryType MemoryType // node memory type
+	normalMem  bool       // node has memory in a normal (kernel space allocatable) zone
 	distance   []int      // distance/cost to other NUMA nodes
 }
 
@@ -647,30 +649,48 @@ func (sys *system) discoverNodes() error {
 		return nil
 	}
 
+	sysNodesPath := filepath.Join(sys.path, sysfsNumaNodePath)
 	sys.nodes = make(map[ID]*node)
-	entries, _ := filepath.Glob(filepath.Join(sys.path, sysfsNumaNodePath, "node[0-9]*"))
+	entries, _ := filepath.Glob(filepath.Join(sysNodesPath, "node[0-9]*"))
 	for _, entry := range entries {
 		if err := sys.discoverNode(entry); err != nil {
 			return fmt.Errorf("failed to discover node for entry %s: %v", entry, err)
 		}
 	}
 
+	normalMemNodeIDs, err := readSysfsEntry(sysNodesPath, "has_normal_memory", nil)
+	if err != nil {
+		return fmt.Errorf("failed to discover nodes with normal memory: %v", err)
+	}
+	normalMemNodes, err := cpuset.Parse(normalMemNodeIDs)
+	if err != nil {
+		return fmt.Errorf("failed to parse nodes with normal memory (%q): %v",
+			normalMemNodes, err)
+	}
+	memoryNodeIDs, err := readSysfsEntry(sysNodesPath, "has_memory", nil)
+	if err != nil {
+		return fmt.Errorf("failed to discover nodes with memory: %v", err)
+	}
+	memoryNodes, err := cpuset.Parse(memoryNodeIDs)
+	if err != nil {
+		return fmt.Errorf("failed to parse nodes with memory (%q): %v",
+			memoryNodeIDs, err)
+	}
+
 	cpuNodesBuilder := cpuset.NewBuilder()
-	memoryNodesBuilder := cpuset.NewBuilder()
-	for _, node := range sys.nodes {
+	for id, node := range sys.nodes {
 		if node.cpus.Size() > 0 {
-			cpuNodesBuilder.Add(int(node.id))
+			cpuNodesBuilder.Add(int(id))
 		}
-		mem, _ := filepath.Glob(filepath.Join(node.path, "memory[0-9]*"))
-		if len(mem) > 0 {
-			memoryNodesBuilder.Add(int(node.id))
+		if normalMemNodes.Contains(int(id)) {
+			node.normalMem = true
 		}
 	}
 	cpuNodes := cpuNodesBuilder.Result()
-	memoryNodes := memoryNodesBuilder.Result()
 
 	sys.Logger.Info("NUMA nodes with CPUs: %s", cpuNodes.String())
-	sys.Logger.Info("NUMA nodes with memory: %s", memoryNodes.String())
+	sys.Logger.Info("NUMA nodes with (any) memory: %s", memoryNodes.String())
+	sys.Logger.Info("NUMA nodes with normal memory: %s", normalMemNodes.String())
 
 	dramNodes := memoryNodes.Intersection(cpuNodes)
 	pmemOrHbmNodes := memoryNodes.Difference(dramNodes)
@@ -806,6 +826,11 @@ func (n *node) MemoryInfo() (*MemInfo, error) {
 // GetMemoryType returns the memory type for this node.
 func (n *node) GetMemoryType() MemoryType {
 	return n.memoryType
+}
+
+// HasNormalMemory returns true if the node has memory that belongs to a normal zone.
+func (n *node) HasNormalMemory() bool {
+	return n.normalMem
 }
 
 // Discover physical packages (CPU sockets) present in the system.
