@@ -69,10 +69,14 @@ type policy struct {
 	allocations    allocations               // container pool assignments
 	cpuAllocator   cpuallocator.CPUAllocator // CPU allocator used by the policy
 	dynamicDemoter Demoter                   // Dynamic demoter for moving memory pages
+	coldstartOff   bool                      // coldstart forced off (have movable PMEM zones)
 }
 
 // Make sure policy implements the policy.Backend interface.
 var _ policyapi.Backend = &policy{}
+
+// Whether we have coldstart forced off due to PMEM in movable memory zones.
+var coldStartOff bool
 
 // CreateMemtierPolicy creates a new policy instance.
 func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
@@ -124,6 +128,12 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	if err := p.restoreCache(); err != nil {
 		return policyError("failed to start: %v", err)
 	}
+
+	// Turn coldstart forcibly off if we have movable non-DRAM memory.
+	// Note that although this can change dynamically we only check it
+	// during startup and trust users to either not fiddle with memory
+	// or restart us if they do.
+	p.checkColdstartOff()
 
 	// TODO: the dirty bit reset timer should only be started if there is a container
 	// for which there is a demotion possiblity.
@@ -471,6 +481,19 @@ func (p *policy) restoreCache() error {
 	p.saveAllocations()
 
 	return nil
+}
+
+func (p *policy) checkColdstartOff() {
+	for _, id := range p.sys.NodeIDs() {
+		node := p.sys.Node(id)
+		if node.GetMemoryType() == system.MemoryTypePMEM {
+			if !node.HasNormalMemory() {
+				coldStartOff = true
+				log.Error("coldstart forced off: NUMA node #%d does not have normal memory", id)
+				return
+			}
+		}
+	}
 }
 
 // Register us as a policy implementation.
