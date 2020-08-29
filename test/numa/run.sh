@@ -55,8 +55,9 @@ usage() {
     echo "             2: stop VM, but do not delete it."
     echo ""
     echo "  Test input VARs:"
-    echo "    numanodes: JSON to override NUMA node list used in tests."
+    echo "    topology: JSON to override NUMA node list used in tests."
     echo "             Effective only if \"vm\" does not exist."
+    echo "             See: python3 ${DEMO_LIB_DIR}/numajson2qemuopts.py --help"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
     echo "    code:    Variable that contains test script code to be run"
     echo "             if SCRIPT is not given."
@@ -94,7 +95,7 @@ screen-create-vm() {
     # Qemu default NUMA node self-distance is 10.
     # Define distance 22 between all 4 nodes with CPU(s).
     # The distance from nodes with CPU(s) and the node with NVRAM is 88.
-    host-create-vm "$vm" "$numanodes"
+    host-create-vm "$vm" "$topology"
     vm-networking
     if [ -z "$VM_IP" ]; then
         error "creating VM failed"
@@ -376,13 +377,11 @@ vm=${vm-"crirm-test-numa"}
 cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
 cleanup=${cleanup-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr-0}
-numanodes=${numanodes-'[
-    {"cpu": 2, "mem": "1G", "nodes": 2},
-    {"cpu": 2, "mem": "2G", "nodes": 2},
-    {"nvmem": "8G",
-     "dist": 22,
-     "node-dist": {"0": 55, "1": 55, "2": 88, "3": 88}
-    }]'}
+topology=${topology-'[
+    {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
+    {"nvmem": "8G", "node-dist": {"5": 28, "0": 17}},
+    {"nvmem": "8G", "node-dist": {"2": 17}}
+    ]'}
 code=${code-"
 CPU=1 create guaranteed # creates pod 0, 1 CPU taken
 report cpus
@@ -413,7 +412,7 @@ if [ "$mode" == "help" ]; then
     if [ "$2" == "defaults" ]; then
         echo "Test input defaults:"
         echo ""
-        echo "numanodes=${numanodes}"
+        echo "topology=${topology}"
         echo ""
         echo "cri_resmgr_cfg=${cri_resmgr_cfg}"
         echo ""

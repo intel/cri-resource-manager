@@ -48,18 +48,18 @@ host-create-vm() {
     #     $ docker logs $(docker ps | awk '/govm/{print $1; exit}')
     #
     VM_NAME=$1
-    local NUMANODES="$2"
+    local TOPOLOGY="$2"
     local QEMU_CPUMEM=""
     if [ -z "$VM_NAME" ]; then
         error "cannot create VM: missing name"
     fi
-    if [ -n "$NUMANODES" ]; then
+    if [ -n "$TOPOLOGY" ]; then
         if [ -n "$VM_QEMU_CPUMEM" ]; then
             error "cannot take both VM_QEMU_CPUMEM and numa node JSON"
         fi
-        QEMU_CPUMEM=$(echo "$NUMANODES" | "$HOST_LIB_DIR/numajson2qemuopts.py")
+        QEMU_CPUMEM=$(echo "$TOPOLOGY" | "$HOST_LIB_DIR/topology2qemuopts.py")
         if [ "$?" -ne  "0" ]; then
-            error "error in numanodes"
+            error "error in topology"
         fi
     else
         QEMU_CPUMEM="${VM_QEMU_CPUMEM}"
