@@ -52,6 +52,10 @@ func (fake *mockSystemNode) GetMemoryType() system.MemoryType {
 	return fake.memType
 }
 
+func (fake *mockSystemNode) HasNormalMemory() bool {
+	return true
+}
+
 func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
