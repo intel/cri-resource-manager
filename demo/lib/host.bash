@@ -2,6 +2,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
 
 HOST_PROMPT=${HOST_PROMPT-"\e[38;5;11mhost>\e[0m "}
 HOST_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")"
+HOST_PROJECT_DIR="$(dirname "$(dirname "$(realpath "$HOST_LIB_DIR")")")"
 GOVM=${GOVM-govm}
 
 host-command() {
