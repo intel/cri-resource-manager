@@ -30,6 +30,7 @@ usage() {
     echo "  MODE:     \"play\" plays the test as a demo."
     echo "            \"record\" plays and records the demo."
     echo "            \"test\" runs fast, reports pass or fail."
+    echo "            \"debug\" enables cri-resmgr debugging."
     echo "            \"interactive\" launches interactive shell"
     echo "            for running test script commands"
     echo "            (see ./run.sh help script [FUNCTION])."
@@ -111,6 +112,17 @@ screen-install-k8s() {
 screen-install-cri-resmgr() {
     speed=60 out "### Installing CRI Resource Manager to VM."
     vm-install-cri-resmgr
+}
+
+screen-install-cri-resmgr-debugging() {
+    speed=60 out "### Installing cri-resmgr debugging enablers"
+    vm-command "apt install -y golang"
+    vm-command "go get github.com/go-delve/delve/cmd/dlv" || {
+        command-error "installing delve failed"
+    }
+    host-command "cd \"$HOST_PROJECT_DIR/..\" && rsync -av --exclude .git $(basename "$HOST_PROJECT_DIR") $VM_SSH_USER@$VM_IP:"
+    vm-command "mkdir -p \"\$HOME/.config/dlv\""
+    vm-command "( echo 'substitute-path:'; echo ' - {from: $HOST_PROJECT_DIR, to: /home/$VM_SSH_USER/$(basename "$HOST_PROJECT_DIR")}' ) > \"\$HOME/.config/dlv/config.yml\""
 }
 
 screen-launch-cri-resmgr() {
@@ -440,6 +452,8 @@ elif [ "$mode" == "play" ]; then
     speed=${speed-10}
 elif [ "$mode" == "test" ]; then
     PV=
+elif [ "$mode" == "debug" ]; then
+    PV=
 elif [ "$mode" == "interactive" ]; then
     PV=
 elif [ "$mode" == "record" ]; then
@@ -500,6 +514,19 @@ if vm-command-q "[ ! -f /var/lib/kubelet/config.yaml ]"; then
 else
     # Wait for kube-apiserver to launch (may be down if the VM was just booted)
     vm-wait-process kube-apiserver
+fi
+
+if [ "$mode" == "debug" ]; then
+    screen-install-cri-resmgr-debugging
+    echo "How to debug cri-resmgr:"
+    echo "- Attach debugger to running cri-resmgr:"
+    echo "  ssh $VM_SSH_USER@$VM_IP"
+    echo "  sudo /root/go/bin/dlv attach \$(pidof cri-resmgr)"
+    echo "- Relaunch cri-resmgr in debugger:"
+    echo "  ssh $VM_SSH_USER@$VM_IP"
+    echo "  sudo -i"
+    echo "  kill -9 \$(pidof cri-resmgr); /root/go/bin/dlv exec /usr/local/bin/cri-resmgr -- -force-config /home/$VM_SSH_USER/*.cfg"
+    exit 0
 fi
 
 declare -A kind_count # associative arrays for counting created objects, like kind_count[pod]=1
