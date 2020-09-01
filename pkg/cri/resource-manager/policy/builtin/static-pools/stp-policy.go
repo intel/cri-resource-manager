@@ -53,6 +53,10 @@ const (
 	// to communicate all CPUs of the infra pool to the workload. We use the
 	// same environment variable for compatibility.
 	CmkEnvInfra = "CMK_CPUS_INFRA"
+	// CmkEnvShared is the name of the env variable that the original CMK sets
+	// to communicate all CPUs of the shared pool to the workload. We use the
+	// same environment variable for compatibility.
+	CmkEnvShared = "CMK_CPUS_SHARED"
 	// CmkEnvNumCores is the name of the env used in the original CMK to select
 	// the number of exclusive CPUs, deprecated here
 	CmkEnvNumCores = "CMK_NUM_CORES"
@@ -490,6 +494,12 @@ func (stp *stp) allocateStpResources(c cache.Container, cs stpContainerStatus) e
 	pool, ok = stp.conf.Pools[CmkPoolInfra]
 	if ok {
 		c.SetEnv(CmkEnvInfra, pool.cpuSet())
+	}
+
+	// Advertise CPUs belonging to the shared pool
+	pool, ok = stp.conf.Pools[CmkPoolShared]
+	if ok {
+		c.SetEnv(CmkEnvShared, pool.cpuSet())
 	}
 
 	return nil
