@@ -865,7 +865,22 @@ func (cs *supply) GetScore(req Request) Score {
 	}
 
 	// calculate free shared capacity
-	score.shared = 1000*cs.sharable.Size() - cs.node.GrantedSharedCPU()
+	// Notes:
+	//   Take into account the supplies/grants in all ancestors, making sure
+	//   none of them gets overcommitted as the result of fulfilling this request.
+	shared := 1000*cs.sharable.Size() - cs.node.GrantedSharedCPU()
+	log.Debug("%s: unadjusted free shared CPU: %dm", cs.node.Name(), shared)
+	for node := cs.node.Parent(); !node.IsNil(); node = node.Parent() {
+		pSupply := node.FreeSupply()
+		pShared := 1000*pSupply.SharableCPUs().Size() - pSupply.GetNode().GrantedSharedCPU()
+		if pShared < shared {
+			log.Debug("%s: capping free shared CPU (%dm -> %dm) to avoid overcommit of %s",
+				cs.node.Name(), shared, pShared, node.Name())
+			shared = pShared
+		}
+	}
+	log.Debug("%s: ancestor-adjusted free shared CPU: %dm", cs.node.Name(), shared)
+	score.shared = shared
 
 	// calculate isolated node capacity CPU
 	if cr.isolate {
