@@ -67,6 +67,16 @@ type poolConfig struct {
 	CPULists []*cpuList `json:"cpuLists"`
 }
 
+func (p *poolConfig) cpuSet() string {
+	cpuset := ""
+	delim := ""
+	for _, cl := range p.CPULists {
+		cpuset += delim + cl.Cpuset
+		delim = ","
+	}
+	return cpuset
+}
+
 var (
 	cpusetValidationRe = regexp.MustCompile(`^(([\d]+)|([\d]+-[\d]+))(,(([\d]+)|([\d]+-[\d]+)))*$`)
 )
