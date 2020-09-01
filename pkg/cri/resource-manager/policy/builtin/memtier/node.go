@@ -91,7 +91,7 @@ type Node interface {
 	GetSupply() Supply
 	// FreeSupply returns the available CPU supply of this node.
 	FreeSupply() Supply
-	// GrantedSharedCPU returns the amount of granted shared CPU capacity of this node.
+	// GrantedSharedCPU returns the amount of granted shared CPU of this node and its children.
 	GrantedSharedCPU() int
 	// GetMemset
 	GetMemset(mtype memoryType) system.IDSet
@@ -277,8 +277,8 @@ func (n *node) Dump(prefix string, level ...int) {
 	idt := indent(prefix, lvl)
 
 	n.self.node.dump(prefix, lvl)
-	log.Debug("%s  - node CPU: %v", idt, n.noderes)
-	log.Debug("%s  - free CPU: %v", idt, n.freeres)
+	log.Debug("%s  - %s", idt, n.noderes.DumpCapacity())
+	log.Debug("%s  - %s", idt, n.freeres.DumpAllocatable())
 	log.Debug("%s  - normal memory: %v", idt, n.mem)
 	log.Debug("%s  - HBM memory: %v", idt, n.hbm)
 	log.Debug("%s  - PMEM memory: %v", idt, n.pMem)
@@ -370,7 +370,7 @@ func (n *node) GetPhysicalNodeIDs() []system.ID {
 	return n.self.node.GetPhysicalNodeIDs()
 }
 
-// GrantedSharedCPU returns the amount of granted shared CPU capacity of this node.
+// GrantedSharedCPU returns the amount of granted shared CPU of this node and its children.
 func (n *node) GrantedSharedCPU() int {
 	granted := n.freeres.Granted()
 	for _, c := range n.children {
