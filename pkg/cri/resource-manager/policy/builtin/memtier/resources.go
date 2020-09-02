@@ -256,6 +256,27 @@ func createMemoryMap(normalMemory, persistentMemory, hbMemory uint64) memoryMap 
 	}
 }
 
+func (m memoryMap) String() string {
+	mem, sep := "", ""
+
+	dram, pmem, hbm := m[memoryDRAM], m[memoryPMEM], m[memoryHBM]
+	if dram > 0 || pmem > 0 || hbm > 0 {
+		if dram > 0 {
+			mem += "dram:" + strconv.FormatUint(dram, 10)
+			sep = ", "
+		}
+		if pmem > 0 {
+			mem += sep + "pmem:" + strconv.FormatUint(pmem, 10)
+			sep = ", "
+		}
+		if hbm > 0 {
+			mem += sep + "hbm:" + strconv.FormatUint(hbm, 10)
+		}
+	}
+
+	return mem
+}
+
 // GetNode returns the node supplying CPU and memory.
 func (cs *supply) GetNode() Node {
 	return cs.node
