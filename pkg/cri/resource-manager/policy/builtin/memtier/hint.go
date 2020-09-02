@@ -52,6 +52,25 @@ func numaHintScore(hint topology.Hint, sysIDs ...system.ID) float64 {
 	return 0.0
 }
 
+// Calculate the die node score of the given hint and die.
+func dieHintScore(hint topology.Hint, sysID system.ID, socket system.CPUPackage) float64 {
+	numaNodes := system.NewIDSet(socket.DieNodeIDs(sysID)...)
+
+	for _, idstr := range strings.Split(hint.NUMAs, ",") {
+		hID, err := strconv.ParseInt(idstr, 0, 0)
+		if err != nil {
+			log.Warn("invalid hint NUMA node %s from %s", idstr, hint.Provider)
+			return 0.0
+		}
+
+		if numaNodes.Has(system.ID(hID)) {
+			return 1.0
+		}
+	}
+
+	return 0.0
+}
+
 // Calculate the socket node score of the given hint and NUMA node.
 func socketHintScore(hint topology.Hint, sysID system.ID) float64 {
 	for _, idstr := range strings.Split(hint.Sockets, ",") {

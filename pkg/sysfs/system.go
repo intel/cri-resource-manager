@@ -105,13 +105,19 @@ type system struct {
 type CPUPackage interface {
 	ID() ID
 	CPUSet() cpuset.CPUSet
+	DieIDs() []ID
 	NodeIDs() []ID
+	DieNodeIDs(ID) []ID
+	DieCPUSet(ID) cpuset.CPUSet
 }
 
 type cpuPackage struct {
-	id    ID    // package id
-	cpus  IDSet // CPUs in this package
-	nodes IDSet // nodes in this package
+	id       ID           // package id
+	cpus     IDSet        // CPUs in this package
+	nodes    IDSet        // nodes in this package
+	dies     IDSet        // dies in this package
+	dieCPUs  map[ID]IDSet // CPUs per die
+	dieNodes map[ID]IDSet // NUMA nodes per die
 }
 
 // Node represents a NUMA node.
@@ -140,6 +146,7 @@ type node struct {
 type CPU interface {
 	ID() ID
 	PackageID() ID
+	DieID() ID
 	NodeID() ID
 	CoreID() ID
 	ThreadCPUSet() cpuset.CPUSet
@@ -154,6 +161,7 @@ type cpu struct {
 	path     string  // sysfs path
 	id       ID      // CPU id
 	pkg      ID      // package id
+	die      ID      // die id
 	node     ID      // node id
 	core     ID      // core id
 	threads  IDSet   // sibling/hyper-threads
@@ -271,6 +279,11 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 			sys.Info("package #%d:", id)
 			sys.Debug("   cpus: %s", pkg.cpus)
 			sys.Debug("  nodes: %s", pkg.nodes)
+			sys.Debug("   dies: %s", pkg.dies)
+			for die := range pkg.dies {
+				sys.Debug("    die #%v nodes: %v", die, pkg.DieNodeIDs(die))
+				sys.Debug("    die #%v cpus: %s", die, pkg.DieCPUSet(die).String())
+			}
 		}
 
 		for id, node := range sys.nodes {
@@ -282,6 +295,7 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 		for id, cpu := range sys.cpus {
 			sys.Debug("CPU #%d:", id)
 			sys.Debug("        pkg: %d", cpu.pkg)
+			sys.Debug("        die: %d", cpu.die)
 			sys.Debug("       node: %d", cpu.node)
 			sys.Debug("       core: %d", cpu.core)
 			sys.Debug("    threads: %s", cpu.threads)
@@ -510,6 +524,7 @@ func (sys *system) discoverCPU(path string) error {
 		if _, err := readSysfsEntry(path, "topology/physical_package_id", &cpu.pkg); err != nil {
 			return err
 		}
+		readSysfsEntry(path, "topology/die_id", &cpu.die)
 		if _, err := readSysfsEntry(path, "topology/core_id", &cpu.core); err != nil {
 			return err
 		}
@@ -564,6 +579,11 @@ func (c *cpu) ID() ID {
 // PackageID returns package id of this CPU.
 func (c *cpu) PackageID() ID {
 	return c.pkg
+}
+
+// DieID returns the die id of this CPU.
+func (c *cpu) DieID() ID {
+	return c.die
 }
 
 // NodeID returns the node id of this CPU.
@@ -845,14 +865,29 @@ func (sys *system) discoverPackages() error {
 		pkg, found := sys.packages[cpu.pkg]
 		if !found {
 			pkg = &cpuPackage{
-				id:    cpu.pkg,
-				cpus:  NewIDSet(),
-				nodes: NewIDSet(),
+				id:       cpu.pkg,
+				cpus:     NewIDSet(),
+				nodes:    NewIDSet(),
+				dies:     NewIDSet(),
+				dieCPUs:  make(map[ID]IDSet),
+				dieNodes: make(map[ID]IDSet),
 			}
 			sys.packages[cpu.pkg] = pkg
 		}
 		pkg.cpus.Add(cpu.id)
 		pkg.nodes.Add(cpu.node)
+		pkg.dies.Add(cpu.die)
+
+		if dieCPUs, ok := pkg.dieCPUs[cpu.die]; !ok {
+			pkg.dieCPUs[cpu.die] = NewIDSet(cpu.id)
+		} else {
+			dieCPUs.Add(cpu.id)
+		}
+		if dieNodes, ok := pkg.dieNodes[cpu.die]; !ok {
+			pkg.dieNodes[cpu.die] = NewIDSet(cpu.node)
+		} else {
+			dieNodes.Add(cpu.node)
+		}
 	}
 
 	return nil
@@ -868,9 +903,30 @@ func (p *cpuPackage) CPUSet() cpuset.CPUSet {
 	return p.cpus.CPUSet()
 }
 
+// DieIDs returns the die ids for this package.
+func (p *cpuPackage) DieIDs() []ID {
+	return p.dies.SortedMembers()
+}
+
 // NodeIDs returns the NUMA node ids for this package.
 func (p *cpuPackage) NodeIDs() []ID {
 	return p.nodes.SortedMembers()
+}
+
+// DieNodeIDs returns the set of NUMA nodes in the given die of this package.
+func (p *cpuPackage) DieNodeIDs(id ID) []ID {
+	if dieNodes, ok := p.dieNodes[id]; ok {
+		return dieNodes.SortedMembers()
+	}
+	return []ID{}
+}
+
+// DieCPUSet returns the set of CPUs in the given die of this package.
+func (p *cpuPackage) DieCPUSet(id ID) cpuset.CPUSet {
+	if dieCPUs, ok := p.dieCPUs[id]; ok {
+		return dieCPUs.CPUSet()
+	}
+	return cpuset.NewCPUSet()
 }
 
 // Discover cache associated with the given CPU.
