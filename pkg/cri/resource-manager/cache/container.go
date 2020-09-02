@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
@@ -71,6 +72,18 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 		c.Env[kv.Key] = kv.Value
 	}
 
+	genHints := true
+	if hintSetting, ok := c.GetEffectiveAnnotation(TopologyHintsKey); ok {
+		preference, err := strconv.ParseBool(hintSetting)
+		if err != nil {
+			c.cache.Error("invalid annotation %q=%q: %v", TopologyHintsKey, hintSetting, err)
+		} else {
+			genHints = preference
+		}
+	}
+	c.cache.Info("automatic topology hint generation %s for %q",
+		map[bool]string{false: "disabled", true: "enabled"}[genHints], c.PrettyName())
+
 	c.Mounts = make(map[string]*Mount)
 	for _, m := range cfg.Mounts {
 		c.Mounts[m.ContainerPath] = &Mount{
@@ -80,8 +93,11 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Relabel:     m.SelinuxRelabel,
 			Propagation: MountType(m.Propagation),
 		}
-		if hints := getTopologyHints(m.HostPath, m.ContainerPath, m.Readonly); len(hints) > 0 {
-			c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+
+		if genHints {
+			if hints := getTopologyHints(m.HostPath, m.ContainerPath, m.Readonly); len(hints) > 0 {
+				c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+			}
 		}
 	}
 
@@ -92,8 +108,10 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 			Host:        d.HostPath,
 			Permissions: d.Permissions,
 		}
-		if hints := getTopologyHints(d.HostPath, d.ContainerPath, strings.IndexAny(d.Permissions, "wm") == -1); len(hints) > 0 {
-			c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+		if genHints {
+			if hints := getTopologyHints(d.HostPath, d.ContainerPath, strings.IndexAny(d.Permissions, "wm") == -1); len(hints) > 0 {
+				c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+			}
 		}
 	}
 
