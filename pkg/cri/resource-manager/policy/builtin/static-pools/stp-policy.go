@@ -49,9 +49,21 @@ const (
 	// sets to communicate the selected cpuset to the workload. We use the same
 	// environment variable for compatibility.
 	CmkEnvAssigned = "CMK_CPUS_ASSIGNED"
+	// CmkEnvInfra is the name of the env variable that the original CMK sets
+	// to communicate all CPUs of the infra pool to the workload. We use the
+	// same environment variable for compatibility.
+	CmkEnvInfra = "CMK_CPUS_INFRA"
+	// CmkEnvShared is the name of the env variable that the original CMK sets
+	// to communicate all CPUs of the shared pool to the workload. We use the
+	// same environment variable for compatibility.
+	CmkEnvShared = "CMK_CPUS_SHARED"
 	// CmkEnvNumCores is the name of the env used in the original CMK to select
 	// the number of exclusive CPUs, deprecated here
 	CmkEnvNumCores = "CMK_NUM_CORES"
+	// PoolInfra is the hardcoded name of the 'infra' pool
+	CmkPoolInfra = "infra"
+	// PoolInfra is the hardcoded name of the 'infra' pool
+	CmkPoolShared = "shared"
 )
 
 type stp struct {
@@ -161,7 +173,7 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 	cs := stpContainerStatus{Socket: -1}
 
 	// Default pool name
-	poolName := "shared"
+	poolName := CmkPoolShared
 
 	// Get resource requests
 	stp.Debug("RESOURCE REQUESTS: %s", c.GetResourceRequirements().Requests)
@@ -207,7 +219,7 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 	}
 
 	// Force socket to -1 if pool is not "socket aware"
-	if poolName == "infra" {
+	if poolName == CmkPoolInfra {
 		cs.Socket = -1
 	}
 
@@ -477,6 +489,18 @@ func (stp *stp) allocateStpResources(c cache.Container, cs stpContainerStatus) e
 	}
 
 	c.SetEnv(CmkEnvAssigned, cpuset)
+
+	// Advertise CPUs belonging to the infa pool
+	pool, ok = stp.conf.Pools[CmkPoolInfra]
+	if ok {
+		c.SetEnv(CmkEnvInfra, pool.cpuSet())
+	}
+
+	// Advertise CPUs belonging to the shared pool
+	pool, ok = stp.conf.Pools[CmkPoolShared]
+	if ok {
+		c.SetEnv(CmkEnvShared, pool.cpuSet())
+	}
 
 	return nil
 }
