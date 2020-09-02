@@ -33,22 +33,36 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
-func findNodeWithID(id int, nodes []Node) *Node {
+func findNodeWithID(id int, nodes []Node) Node {
 	for _, node := range nodes {
 		if node.NodeID() == id {
-			return &node
+			return node
 		}
 	}
 	panic("No node found")
 }
 
 func setLinks(nodes []Node, tree map[int][]int) {
+	parents := map[int]int{}
+
 	for parent, children := range tree {
 		parentNode := findNodeWithID(parent, nodes)
 		for _, child := range children {
 			childNode := findNodeWithID(child, nodes)
-			(*childNode).LinkParent(*parentNode)
+			childNode.LinkParent(parentNode)
+			parents[child] = parent
 		}
+	}
+	orphans := []int{}
+	for id := range tree {
+		if _, ok := parents[id]; !ok {
+			node := findNodeWithID(id, nodes)
+			node.LinkParent(nilnode)
+			orphans = append(orphans, id)
+		}
+	}
+	if len(orphans) != 1 {
+		panic(fmt.Sprintf("expected one root node, got %d with IDs %v", len(orphans), orphans))
 	}
 }
 
