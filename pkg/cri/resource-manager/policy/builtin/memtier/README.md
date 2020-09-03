@@ -111,3 +111,32 @@ Due to inaccuracies in how `cri-resmgr` calculates memory requests for
 pods in QoS class `Burstable`, you should either use `Limit` for setting
 the amount of memory for containers in `Burstable` pods or run the
 resource-annotating webhook as described in the top-level README file.
+
+## Implicit Hardware Topology Hints
+
+`CRI Resource Manager` automatically generates HW `Topology Hints` for
+containers before resource allocation by a policy. The `memtier` policy
+is hint-aware and takes these hints into account. Since hints indicate
+optimal or preferred `HW locality` for devices and potentially local
+volumes used by the container, they can alter significantly how resources
+are assigned to the container.
+
+Using the 'topologyhints' resource manager annotation key it is possible
+to opt out from automatic topology hint generation on a per pod or container
+basis.
+
+Use this annotation to opt out a full pod:
+```
+  annotations:
+    topologyhints.cri-resource-manager.intel.com/pod: "false"
+```
+
+Use this annotation to opt out container 'foo' in the pod:
+```
+  annotations:
+    topologyhints.cri-resource-manager.intel.com/container.foo: "false"
+```
+
+Currently topology hint generation is enabled by default, so using the
+annotation as opt in (setting it to "true") should have no effect on the
+placement of containers of a pod. This might change in the future however.
