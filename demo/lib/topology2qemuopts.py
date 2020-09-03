@@ -233,8 +233,13 @@ def qemuopts(numalist):
                 continue
             numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (
                 sourcenode, destnode, node_node_dist[sourcenode][destnode]))
-
-    cpuparam = "-smp cpus=%s,threads=%s,dies=%s,sockets=%s" % (lastcpu + 1, threadcount, (lastdie + 1) // (lastsocket + 1), lastsocket + 1)
+    if (lastdie + 1) // (lastsocket + 1) > 1:
+        diesparam = ",dies=%s" % ((lastdie + 1) // (lastsocket + 1),)
+    else:
+        # Don't give dies parameter unless it is absolutely necessary
+        # because it requires Qemu >= 5.0.
+        diesparam = ""
+    cpuparam = "-smp cpus=%s,threads=%s%s,sockets=%s" % (lastcpu + 1, threadcount, diesparam, lastsocket + 1)
     memparam = "-m %s" % (siadd(totalmem, totalnvmem),)
     return (machineparam + " " +
             cpuparam + " " +
