@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
@@ -69,8 +70,10 @@ type Supply interface {
 	Reserve(Grant) error
 	// ReserveMemory accounts for memory grants after reloading cached allocations.
 	ReserveMemory(Grant) error
-	// String returns a printable representation of this supply.
-	String() string
+	// DumpCapacity returns a printable representation of the supply's resource capacity.
+	DumpCapacity() string
+	// DumpAllocatable returns a printable representation of the supply's alloctable resources.
+	DumpAllocatable() string
 }
 
 // Request represents CPU and memory resources requested by a container.
@@ -254,6 +257,27 @@ func createMemoryMap(normalMemory, persistentMemory, hbMemory uint64) memoryMap 
 		memoryAll:    normalMemory + persistentMemory + hbMemory,
 		memoryUnspec: 0,
 	}
+}
+
+func (m memoryMap) String() string {
+	mem, sep := "", ""
+
+	dram, pmem, hbm := m[memoryDRAM], m[memoryPMEM], m[memoryHBM]
+	if dram > 0 || pmem > 0 || hbm > 0 {
+		if dram > 0 {
+			mem += "dram:" + strconv.FormatUint(dram, 10)
+			sep = ", "
+		}
+		if pmem > 0 {
+			mem += sep + "pmem:" + strconv.FormatUint(pmem, 10)
+			sep = ", "
+		}
+		if hbm > 0 {
+			mem += sep + "hbm:" + strconv.FormatUint(hbm, 10)
+		}
+	}
+
+	return mem
 }
 
 // GetNode returns the node supplying CPU and memory.
@@ -561,16 +585,16 @@ func (cs *supply) Reserve(g Grant) error {
 
 	if !cs.isolated.Intersection(isolated).Equals(isolated) {
 		return policyError("can't reserve isolated CPUs (%s) of %s from %s",
-			isolated.String(), g.String(), cs.String())
+			isolated.String(), g.String(), cs.DumpAllocatable())
 	}
 	if !cs.sharable.Intersection(exclusive).Equals(exclusive) {
 		return policyError("can't reserve exclusive CPUs (%s) of %s from %s",
-			exclusive.String(), g.String(), cs.String())
+			exclusive.String(), g.String(), cs.DumpAllocatable())
 	}
 
 	if 1000*(cs.sharable.Size()-exclusive.Size())-(cs.granted+fraction) < 0 {
 		return policyError("can't reserve %d fractional CPUs of %s from %s",
-			fraction, g.String(), cs.String())
+			fraction, g.String(), cs.DumpAllocatable())
 	}
 
 	cs.isolated = cs.isolated.Difference(isolated)
@@ -618,23 +642,87 @@ func (cs *supply) takeCPUs(from, to *cpuset.CPUSet, cnt int) (cpuset.CPUSet, err
 	return cset, err
 }
 
-// String returns the CPU and memory supply as a string.
-func (cs *supply) String() string {
-	none, isolated, sharable, sep := "-", "", "", ""
+// DumpCapacity returns a printable representation of the supply's resource capacity.
+func (cs *supply) DumpCapacity() string {
+	cpu, mem, sep := "", cs.mem.String(), ""
 
 	if !cs.isolated.IsEmpty() {
-		isolated = fmt.Sprintf("isolated:%s", cs.isolated)
+		cpu = fmt.Sprintf("isolated:%s", kubernetes.ShortCPUSet(cs.isolated))
 		sep = ", "
-		none = ""
 	}
 	if !cs.sharable.IsEmpty() {
-		sharable = fmt.Sprintf("%ssharable:%s (granted:%d, free: %d)", sep,
-			cs.sharable, cs.granted, 1000*cs.sharable.Size()-cs.granted)
-		none = ""
+		cpu += sep + fmt.Sprintf("sharable:%s (%dm)", kubernetes.ShortCPUSet(cs.sharable),
+			1000*cs.sharable.Size())
 	}
-	mem := "limit: { pmem:" + strconv.FormatUint(cs.mem[memoryPMEM], 10) + ", dram: " + strconv.FormatUint(cs.mem[memoryDRAM], 10) + "}" + ", granted: { pmem:" + strconv.FormatUint(cs.grantedMem[memoryPMEM], 10) + ", dram: " + strconv.FormatUint(cs.grantedMem[memoryDRAM], 10) + "}"
 
-	return "<" + cs.node.Name() + " CPU: " + none + isolated + sharable + ", Mem: " + mem + ">"
+	capacity := "<" + cs.node.Name() + " capacity: "
+
+	if cpu == "" && mem == "" {
+		capacity += "-"
+	} else {
+		sep = ""
+		if cpu != "" {
+			capacity += "CPU: " + cpu
+			sep = ", "
+		}
+		if mem != "" {
+			capacity += sep + "MemLimit: " + mem
+		}
+	}
+	capacity += ">"
+
+	return capacity
+}
+
+// DumpAllocatable returns a printable representation of the supply's resource capacity.
+func (cs *supply) DumpAllocatable() string {
+	cpu, mem, sep := "", cs.mem.String(), ""
+
+	if !cs.isolated.IsEmpty() {
+		cpu = fmt.Sprintf("isolated:%s", kubernetes.ShortCPUSet(cs.isolated))
+		sep = ", "
+	}
+
+	local_granted := cs.granted
+	total_granted := cs.node.GrantedSharedCPU()
+	if !cs.sharable.IsEmpty() {
+		cpu += sep + fmt.Sprintf("sharable:%s (", kubernetes.ShortCPUSet(cs.sharable))
+		sep = ""
+		if local_granted > 0 || total_granted > 0 {
+			cpu += fmt.Sprintf("grants:")
+			kind := ""
+			if local_granted > 0 {
+				cpu += fmt.Sprintf("%dm", local_granted)
+				kind = "local"
+				sep = "/"
+			}
+			if total_granted > 0 {
+				cpu += sep + fmt.Sprintf("%dm", total_granted)
+				kind += sep + "subtree"
+			}
+			cpu += " " + kind
+			sep = ", "
+		}
+		cpu += sep + fmt.Sprintf("free:%dm)", 1000*cs.sharable.Size()-total_granted)
+	}
+
+	allocatable := "<" + cs.node.Name() + " allocatable: "
+
+	if cpu == "" && mem == "" {
+		allocatable += "-"
+	} else {
+		sep = ""
+		if cpu != "" {
+			allocatable += "CPU: " + cpu
+			sep = ", "
+		}
+		if mem != "" {
+			allocatable += sep + "MemLimit: " + mem
+		}
+	}
+	allocatable += ">"
+
+	return allocatable
 }
 
 // newRequest creates a new request for the given container.
@@ -942,7 +1030,6 @@ func (cg *grant) MemLimit() memoryMap {
 // String returns a printable representation of the CPU grant.
 func (cg *grant) String() string {
 	var isolated, exclusive, shared, sep string
-	mem := "mem limit: { pmem: " + strconv.FormatUint(cg.allocatedMem[memoryPMEM], 10) + ", dram: " + strconv.FormatUint(cg.allocatedMem[memoryDRAM], 10) + " }"
 
 	isol := cg.IsolatedCPUs()
 	if !isol.IsEmpty() {
@@ -954,11 +1041,17 @@ func (cg *grant) String() string {
 		sep = ", "
 	}
 	if cg.portion > 0 {
-		shared = fmt.Sprintf("%sshared: %s (%d milli-CPU)", sep,
+		shared = fmt.Sprintf("%sshared: %s (%dm)", sep,
 			cg.node.FreeSupply().SharableCPUs(), cg.portion)
+		sep = ", "
 	}
 
-	return fmt.Sprintf("<CPU grant for %s from %s: %s%s%s, mem: %s>",
+	mem := cg.allocatedMem.String()
+	if mem != "" {
+		mem = sep + "MemLimit: " + mem
+	}
+
+	return fmt.Sprintf("<CPU grant for %s from %s: %s%s%s%s>",
 		cg.container.PrettyName(), cg.node.Name(), isolated, exclusive, shared, mem)
 }
 
