@@ -63,15 +63,15 @@ const (
 	// NotExist evalutes to true if the named key does not exist.
 	NotExist Operator = "NotExist"
 	// AlwaysTrue always evaluates to true.
-	AlwaysTrue = "AlwaysTrue"
+	AlwaysTrue Operator = "AlwaysTrue"
 	// Matches tests if the key value matches the only given globbing pattern.
-	Matches = "Matches"
+	Matches Operator = "Matches"
 	// MatchesNot is true if Matches would be false for the same key and pattern.
-	MatchesNot = "MatchesNot"
+	MatchesNot Operator = "MatchesNot"
 	// MatchesAny tests if the key value matches any of the given globbing patterns.
-	MatchesAny = "MatchesAny"
+	MatchesAny Operator = "MatchesAny"
 	// MatchesNone is true if MatchesAny would be false for the same key and patterns.
-	MatchesNone = "MatchesNone"
+	MatchesNone Operator = "MatchesNone"
 )
 
 // Our logger instance.
