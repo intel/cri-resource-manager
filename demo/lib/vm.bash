@@ -72,6 +72,17 @@ vm-install-cri-resmgr() {
         CRI_RESMGR_SOURCE_DIR=$(awk '/package.*cri-resource-manager/{print $NF}' <<< "$COMMAND_OUTPUT")
         vm-command "cd $CRI_RESMGR_SOURCE_DIR && make install && cd -"
     else
+        local bin_change
+        local src_change
+        bin_change=$(stat --format "%Z" "$BIN_DIR/cri-resmgr")
+        src_change=$(find "$HOST_PROJECT_DIR" -name '*.go' -type f | xargs stat --format "%Z" | sort -n | tail -n 1)
+        if [[ "$src_change" > "$bin_change" ]]; then
+            echo ""
+            echo "!!! WARNING !!!"
+            echo "!!! SOURCE FILES CHANGED - INSTALLING POSSIBLY OUTDATED EXECUTABLES"
+            echo "!!! FROM $BIN_DIR/"
+            echo ""
+        fi
         host-command "scp \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying local cri-resmgr to VM failed"
         }
