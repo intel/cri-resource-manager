@@ -134,6 +134,10 @@ type Grant interface {
 	String() string
 	// Release releases the grant from all the Supplys it uses.
 	Release()
+	// AccountAllocate accounts for (removes) allocated exclusive capacity for this grant.
+	AccountAllocate()
+	// AccountRelease accounts for (reinserts) released exclusive capacity for this grant.
+	AccountRelease()
 	// UpdateExtraMemoryReservation() updates the reservations in the subtree
 	// of nodes under the node from which the memory was granted.
 	UpdateExtraMemoryReservation()
@@ -504,10 +508,7 @@ func (cs *supply) Allocate(r Request) (Grant, error) {
 
 	grant := newGrant(cs.node, cr.GetContainer(), exclusive, cr.fraction, memType, cr.memType, allocatedMem, coldStart)
 
-	cs.node.DepthFirst(func(n Node) error {
-		n.FreeSupply().AccountAllocate(grant)
-		return nil
-	})
+	grant.AccountAllocate()
 
 	return grant, nil
 }
@@ -539,10 +540,7 @@ func (cs *supply) ReleaseCPU(g Grant) {
 	cs.sharable = cs.sharable.Union(sharable)
 	cs.granted -= g.SharedPortion()
 
-	cs.node.DepthFirst(func(n Node) error {
-		n.FreeSupply().AccountRelease(g)
-		return nil
-	})
+	g.AccountRelease()
 }
 
 // ReleaseMemory returns memory from the given grant to the supply.
@@ -608,10 +606,7 @@ func (cs *supply) Reserve(g Grant) error {
 	cs.sharable = cs.sharable.Difference(exclusive)
 	cs.granted += fraction
 
-	cs.node.DepthFirst(func(n Node) error {
-		n.FreeSupply().AccountAllocate(g)
-		return nil
-	})
+	g.AccountAllocate()
 
 	// TODO: do the same for memory
 
@@ -1090,10 +1085,30 @@ func (cg *grant) String() string {
 		cg.container.PrettyName(), cg.node.Name(), isolated, exclusive, shared, mem)
 }
 
+func (cg *grant) AccountAllocate() {
+	cg.node.DepthFirst(func(n Node) error {
+		n.FreeSupply().AccountAllocate(cg)
+		return nil
+	})
+	for node := cg.node.Parent(); !node.IsNil(); node = node.Parent() {
+		node.FreeSupply().AccountAllocate(cg)
+	}
+}
+
 func (cg *grant) Release() {
 	cg.GetCPUNode().FreeSupply().ReleaseCPU(cg)
 	cg.GetMemoryNode().FreeSupply().ReleaseMemory(cg)
 	cg.StopTimer()
+}
+
+func (cg *grant) AccountRelease() {
+	cg.node.DepthFirst(func(n Node) error {
+		n.FreeSupply().AccountRelease(cg)
+		return nil
+	})
+	for node := cg.node.Parent(); !node.IsNil(); node = node.Parent() {
+		node.FreeSupply().AccountRelease(cg)
+	}
 }
 
 func (cg *grant) RestoreMemset() {
