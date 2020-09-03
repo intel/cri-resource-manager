@@ -58,6 +58,9 @@ const (
 
 	// ToptierLimitUnset is the reserved value for indicating unset top tier limits.
 	ToptierLimitUnset int64 = -1
+
+	// TopologyHintsKey can be used to opt out from automatic topology hint generation.
+	TopologyHintsKey = "topologyhints" + "." + kubernetes.ResmgrKeyNamespace
 )
 
 // allControllers is a slice of all controller domains.
