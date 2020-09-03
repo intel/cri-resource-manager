@@ -85,6 +85,31 @@ host-create-vm() {
         fi
     }
 
+    sleep 1
+    VM_CONTAINER_ID=$(${GOVM} ls | awk "/$VM_NAME/{print \$1}")
+    echo "# VM Docker container: $VM_CONTAINER_ID"
+    # Verify Qemu version. Refuse to run if Qemu < 5.0.
+    # Use "docker run IMAGE" instead of "docker exec CONTAINER",
+    # because the container may have already failed.
+    VM_CONTAINER_IMAGE=$(docker inspect $VM_CONTAINER_ID | jq '.[0].Image' -r | awk -F: '{print $2}')
+    echo "# VM Docker image: $VM_CONTAINER_IMAGE"
+    if [ -n "$VM_CONTAINER_IMAGE" ]; then
+        VM_CONTAINER_QEMU_VERSION=$(docker run --entrypoint=/usr/bin/qemu-system-x86_64 $VM_CONTAINER_IMAGE -version | awk '/QEMU emulator version/{print $4}')
+    fi
+    if [ -n "$VM_CONTAINER_QEMU_VERSION" ]; then
+        if [[ "$VM_CONTAINER_QEMU_VERSION" > "5" ]]; then
+            echo "# VM Qemu version: $VM_CONTAINER_QEMU_VERSION"
+        else
+            if [[ "$QEMU_CPUMEM" =~ ",dies=" ]]; then
+                error "Too old Qemu version \"$VM_CONTAINER_QEMU_VERSION\". Topology with dies > 1 requires Qemu >= 5.0"
+            else
+                echo "# (Your Qemu does not support dies > 1, consider updating for full topology support)"
+            fi
+        fi
+    else
+        echo "Warning: cannot verify Qemu version on govm image. In case of failure, check it is >= 5.0" >&2
+    fi
+
     VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
     while [ "x$VM_IP" == "x" ]; do
         host-command "${GOVM} start \"$VM_NAME\""
