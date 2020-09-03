@@ -560,6 +560,9 @@ func (p *policy) calculateContainerAffinity(container cache.Container) map[strin
 		}
 	}
 
+	// self-affinity does not make sense, so remove any
+	delete(result, container.GetCacheID())
+
 	log.Debug("  => affinity: %v", result)
 
 	return result
