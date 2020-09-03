@@ -480,7 +480,7 @@ func TestWorkloadPlacement(t *testing.T) {
 				memLim:    10000,
 				memType:   memoryUnspec,
 				isolate:   false,
-				full:      28,
+				full:      27, // 28: fully exhaustin the shared CPU subpool is is disallowed
 				container: &mockContainer{},
 			},
 			expectedRemainingNodes: []int{0, 1, 2, 3, 4, 5, 6},

@@ -49,6 +49,8 @@ type Supply interface {
 	AccountRelease(Grant)
 	// GetScore calculates how well this supply fits/fulfills the given request.
 	GetScore(Request) Score
+	// AllocatableSharedCPU calculates the allocatable amount of shared CPU of this supply.
+	AllocatableSharedCPU(...bool) int
 	// Allocate allocates CPU capacity from this supply and returns it as a grant.
 	Allocate(Request) (Grant, error)
 	// ReleaseCPU releases a previously allocated CPU grant from this supply.
@@ -460,25 +462,30 @@ func (cs *supply) Allocate(r Request) (Grant, error) {
 		exclusive, err = cs.takeCPUs(&cs.isolated, nil, cr.full)
 		if err != nil {
 			return nil, policyError("internal error: "+
-				"can't allocate %d exclusive CPUs from %s of %s",
-				cr.full, cs.isolated, cs.node.Name())
+				"%s: can't take %d exclusive isolated CPUs from %s: %v",
+				cs.node.Name(), cr.full, cs.isolated, err)
 		}
 
-	case cr.full > 0 && (1000*cs.sharable.Size()-cs.granted)/1000 > cr.full:
+	case cr.full > 0 && cs.AllocatableSharedCPU() > 1000*cr.full:
 		exclusive, err = cs.takeCPUs(&cs.sharable, nil, cr.full)
 		if err != nil {
 			return nil, policyError("internal error: "+
-				"can't slice %d exclusive CPUs from %s(-%d) of %s",
-				cr.full, cs.sharable, cs.granted, cs.node.Name())
+				"%s: can't take %d exclusive CPUs from %s: %v",
+				cs.node.Name(), cr.full, cs.sharable, err)
 		}
+
+	case cr.full > 0:
+		return nil, policyError("internal error: "+
+			"%s: can't slice %d exclusive CPUs from %s, %dm available",
+			cs.node.Name(), cr.full, cs.sharable, cs.AllocatableSharedCPU())
 	}
 
 	// allocate requested portion of the sharable set
 	if cr.fraction > 0 {
-		if 1000*cs.sharable.Size()-cs.granted < cr.fraction {
+		if cs.AllocatableSharedCPU() < cr.fraction {
 			return nil, policyError("internal error: "+
-				"not enough sharable CPU for %d in %s(-%d) of %s",
-				cr.fraction, cs.sharable, cs.granted, cs.node.Name())
+				"%s: not enough sharable CPU for %dm, %dm available",
+				cs.node.Name(), cr.fraction, cs.sharable, cs.AllocatableSharedCPU())
 		}
 		cs.granted += cr.fraction
 	}
@@ -592,7 +599,7 @@ func (cs *supply) Reserve(g Grant) error {
 			exclusive.String(), g.String(), cs.DumpAllocatable())
 	}
 
-	if 1000*(cs.sharable.Size()-exclusive.Size())-(cs.granted+fraction) < 0 {
+	if cs.AllocatableSharedCPU() < 1000*exclusive.Size()+fraction {
 		return policyError("can't reserve %d fractional CPUs of %s from %s",
 			fraction, g.String(), cs.DumpAllocatable())
 	}
@@ -689,7 +696,7 @@ func (cs *supply) DumpAllocatable() string {
 		cpu += sep + fmt.Sprintf("sharable:%s (", kubernetes.ShortCPUSet(cs.sharable))
 		sep = ""
 		if local_granted > 0 || total_granted > 0 {
-			cpu += fmt.Sprintf("grants:")
+			cpu += fmt.Sprintf("granted:")
 			kind := ""
 			if local_granted > 0 {
 				cpu += fmt.Sprintf("%dm", local_granted)
@@ -703,7 +710,7 @@ func (cs *supply) DumpAllocatable() string {
 			cpu += " " + kind
 			sep = ", "
 		}
-		cpu += sep + fmt.Sprintf("free:%dm)", 1000*cs.sharable.Size()-total_granted)
+		cpu += sep + fmt.Sprintf("allocatable:%dm)", cs.AllocatableSharedCPU(true))
 	}
 
 	allocatable := "<" + cs.node.Name() + " allocatable: "
@@ -785,11 +792,11 @@ func (cr *request) String() string {
 
 	case cr.full > 0 && cr.fraction > 0:
 		return fmt.Sprintf("<CPU request "+cr.container.PrettyName()+": "+
-			"%sfull: %d, shared: %d>", isolated, cr.full, cr.fraction) + mem
+			"%sexclusive: %d, shared: %d>", isolated, cr.full, cr.fraction) + mem
 
 	case cr.full > 0:
 		return fmt.Sprintf("<CPU request "+
-			cr.container.PrettyName()+": %sfull: %d>", isolated, cr.full) + mem
+			cr.container.PrettyName()+": %sexclusive: %d>", isolated, cr.full) + mem
 
 	default:
 		return fmt.Sprintf("<CPU request "+
@@ -865,22 +872,7 @@ func (cs *supply) GetScore(req Request) Score {
 	}
 
 	// calculate free shared capacity
-	// Notes:
-	//   Take into account the supplies/grants in all ancestors, making sure
-	//   none of them gets overcommitted as the result of fulfilling this request.
-	shared := 1000*cs.sharable.Size() - cs.node.GrantedSharedCPU()
-	log.Debug("%s: unadjusted free shared CPU: %dm", cs.node.Name(), shared)
-	for node := cs.node.Parent(); !node.IsNil(); node = node.Parent() {
-		pSupply := node.FreeSupply()
-		pShared := 1000*pSupply.SharableCPUs().Size() - pSupply.GetNode().GrantedSharedCPU()
-		if pShared < shared {
-			log.Debug("%s: capping free shared CPU (%dm -> %dm) to avoid overcommit of %s",
-				cs.node.Name(), shared, pShared, node.Name())
-			shared = pShared
-		}
-	}
-	log.Debug("%s: ancestor-adjusted free shared CPU: %dm", cs.node.Name(), shared)
-	score.shared = shared
+	score.shared = cs.AllocatableSharedCPU()
 
 	// calculate isolated node capacity CPU
 	if cr.isolate {
@@ -928,6 +920,34 @@ func (cs *supply) GetScore(req Request) Score {
 	}
 
 	return score
+}
+
+// AllocatableSharedCPU calculates the allocatable amount of shared CPU of this supply.
+func (cs *supply) AllocatableSharedCPU(quiet ...bool) int {
+	verbose := !(len(quiet) > 0 && quiet[0])
+
+	// Notes:
+	//   Take into account the supplies/grants in all ancestors, making sure
+	//   none of them gets overcommitted as the result of fulfilling this request.
+	shared := 1000*cs.sharable.Size() - cs.node.GrantedSharedCPU()
+	if verbose {
+		log.Debug("%s: unadjusted free shared CPU: %dm", cs.node.Name(), shared)
+	}
+	for node := cs.node.Parent(); !node.IsNil(); node = node.Parent() {
+		pSupply := node.FreeSupply()
+		pShared := 1000*pSupply.SharableCPUs().Size() - pSupply.GetNode().GrantedSharedCPU()
+		if pShared < shared {
+			if verbose {
+				log.Debug("%s: capping free shared CPU (%dm -> %dm) to avoid overcommit of %s",
+					cs.node.Name(), shared, pShared, node.Name())
+			}
+			shared = pShared
+		}
+	}
+	if verbose {
+		log.Debug("%s: ancestor-adjusted free shared CPU: %dm", cs.node.Name(), shared)
+	}
+	return shared
 }
 
 // Eval...
