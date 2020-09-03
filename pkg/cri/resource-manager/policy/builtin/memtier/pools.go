@@ -15,6 +15,7 @@
 package memtier
 
 import (
+	"math"
 	"sort"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -647,11 +648,12 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	score1, score2 := scores[id1], scores[id2]
 	isolated1, shared1 := score1.IsolatedCapacity(), score1.SharedCapacity()
 	isolated2, shared2 := score2.IsolatedCapacity(), score2.SharedCapacity()
-	affinity1, affinity2 := affinity[id1], affinity[id2]
+	a1 := affinityScore(affinity, node1)
+	a2 := affinityScore(affinity, node2)
 
 	log.Debug("comparing scores for %s and %s", node1.Name(), node2.Name())
-	log.Debug("  %s: %s", node1.Name(), score1.String())
-	log.Debug("  %s: %s", node2.Name(), score2.String())
+	log.Debug("  %s: %s, affinity score %f", node1.Name(), score1.String(), a1)
+	log.Debug("  %s: %s, affinity score %f", node2.Name(), score2.String(), a2)
 
 	//
 	// Notes:
@@ -659,7 +661,7 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	// Our scoring/score sorting algorithm is:
 	//
 	// 1) - insufficient isolated or shared capacity loses
-	// 2) - if we have affinity, the higher affinity wins
+	// 2) - if we have affinity, the higher affinity score wins
 	// 3) - if only one node matches the memory type request, it wins
 	// 4) - if we have topology hints
 	//       * better hint score wins
@@ -690,12 +692,12 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 
 	log.Debug("  - isolated/shared inusfficiency is a TIE")
 
-	// 2) higher affinity wins
-	if affinity1 > affinity2 {
+	// 2) higher affinity score wins
+	if a1 > a2 {
 		log.Debug("  => %s loses on affinity", node2.Name())
 		return true
 	}
-	if affinity2 > affinity1 {
+	if a2 > a1 {
 		log.Debug("  => %s loses on affinity", node1.Name())
 		return false
 	}
@@ -836,6 +838,37 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 		map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
 	return id1 < id2
+}
+
+// affinityScore calculate the 'goodness' of the affinity for a node.
+func affinityScore(affinities map[int]int32, node Node) float64 {
+	Q := 0.75
+
+	// Calculate affinity for every node as a combination of
+	// affinities of the nodes on the path from the node to
+	// the root and the nodes in the subtree under the node.
+	//
+	// The combined affinity for node n is Sum_x(A_x*D_x),
+	// where for every node x, A_x is the affinity for x and
+	// D_x is Q ** (number of links from node to x). IOW, the
+	// effective affinity is the sum of the affinity of n and
+	// the affinity of each node x of the above mentioned set
+	// diluted proprotionally to the distance of x to n, with
+	// Q being 0.75.
+
+	var score float64
+	for n, q := node.Parent(), Q; !n.IsNil(); n, q = n.Parent(), q*Q {
+		a := affinities[n.NodeID()]
+		score += q * float64(a)
+	}
+	node.BreadthFirst(func(n Node) error {
+		diff := float64(n.RootDistance() - node.RootDistance())
+		q := math.Pow(Q, diff)
+		a := affinities[n.NodeID()]
+		score += q * float64(a)
+		return nil
+	})
+	return score
 }
 
 // hintScores calculates combined full and zero-filtered hint scores.
