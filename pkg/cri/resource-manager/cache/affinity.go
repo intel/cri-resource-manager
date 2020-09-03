@@ -47,24 +47,7 @@ type Affinity struct {
 	Weight int32              `json:"weight,omitempty"` // (optional) weight for this affinity
 }
 
-// Operator defines the possible operators for an Expression.
-type Operator string
-
 const (
-	// Equals tests for equality with a single value.
-	Equals Operator = "Equals"
-	// NotEqual test for inequality with a single value.
-	NotEqual Operator = "NotEqual"
-	// In tests if the key's value is one of the specified set.
-	In Operator = "In"
-	// NotIn tests if the key's value is not one of the specified set.
-	NotIn Operator = "NotIn"
-	// Exists evalutes to true if the named key exists.
-	Exists Operator = "Exists"
-	// NotExist evalutes to true if the named key does not exist.
-	NotExist Operator = "NotExist"
-	// AlwaysTrue always evaluates to true.
-	AlwaysTrue = "AlwaysTrue"
 	// UserWeightCutoff is the cutoff we clamp user-provided weights to.
 	UserWeightCutoff = 1000
 	// DefaultWeight is the default assigned weight if omitted in annotations.
