@@ -646,11 +646,12 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	score1, score2 := scores[id1], scores[id2]
 	isolated1, shared1 := score1.IsolatedCapacity(), score1.SharedCapacity()
 	isolated2, shared2 := score2.IsolatedCapacity(), score2.SharedCapacity()
-	affinity1, affinity2 := affinity[id1], affinity[id2]
+	a1 := affinityScore(affinity, node1)
+	a2 := affinityScore(affinity, node2)
 
 	log.Debug("comparing scores for %s and %s", node1.Name(), node2.Name())
-	log.Debug("  score1: %s", score1.String())
-	log.Debug("  score2: %s", score2.String())
+	log.Debug("  score1: %s, affinity score %f", score1.String(), a1)
+	log.Debug("  score2: %s, affinity score %f", score2.String(), a2)
 
 	//
 	// Notes:
@@ -689,12 +690,12 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 
 	log.Debug("  - isolated/shared inusfficiency is a TIE")
 
-	// 2) higher affinity wins
-	if affinity1 > affinity2 {
+	// 2) higher affinity score wins
+	if a1 > a2 {
 		log.Debug("  => %s loses on affinity", node2.Name())
 		return true
 	}
-	if affinity2 > affinity1 {
+	if a2 > a1 {
 		log.Debug("  => %s loses on affinity", node1.Name())
 		return false
 	}
@@ -835,6 +836,24 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 		map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
 	return id1 < id2
+}
+
+// affinityScore calculate the 'goodness' of the affinity for a node.
+func affinityScore(affinities map[int]int32, node Node) float64 {
+	var score float64
+	for n, diff := node.Parent(), 1; !n.IsNil(); n, diff = n.Parent(), diff+1 {
+		q := 1 << diff
+		a := affinities[n.NodeID()]
+		score += float64(a) / float64(q)
+	}
+	node.BreadthFirst(func(n Node) error {
+		diff := n.RootDistance() - node.RootDistance()
+		q := 1 << diff
+		a := affinities[n.NodeID()]
+		score += float64(a) / float64(q)
+		return nil
+	})
+	return score
 }
 
 // hintScores calculates combined full and zero-filtered hint scores.
