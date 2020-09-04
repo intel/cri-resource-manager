@@ -6,11 +6,13 @@ metadata:
     app: ${NAME}
 spec:
   containers:
-  - image: busybox
+  $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
+  - name: ${NAME}c$(( contnum - 1 ))
+    image: busybox
     command:
       - sh
       - -c
-      - echo ${NAME}c0 \$(sleep inf)
+      - echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
     imagePullPolicy: IfNotPresent
-    name: busybox
+  "; done )
   terminationGracePeriodSeconds: 1

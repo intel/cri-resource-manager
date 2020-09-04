@@ -38,7 +38,7 @@ usage() {
     echo ""
     echo "  VARs:"
     echo "    vm:      govm virtual machine name."
-    echo "             The default is \"crirm-test-numa\"."
+    echo "             The default is \"crirm-test-e2e\"."
     echo "    speed:   Demo play speed."
     echo "             The default is 10 (keypresses per second)."
     echo "    binsrc:  Where to get cri-resmgr to the VM."
@@ -54,6 +54,12 @@ usage() {
     echo "             0: leave VM running (the default)"
     echo "             1: delete VM"
     echo "             2: stop VM, but do not delete it."
+    echo "  Hook VARs:"
+    echo "    on_verify_fail, on_create_fail: code to be executed in case"
+    echo "             verify() or create() fails. Example: go to interactive"
+    echo "             mode if a verification fails: on_verify_fail=interactive"
+    echo "    on_verify, on_create: code to be executed every time after"
+    echo "             verify and create"
     echo ""
     echo "  Test input VARs:"
     echo "    topology: JSON to override NUMA node list used in tests."
@@ -163,11 +169,12 @@ get-py-allowed() {
         echo -e "$COMMAND_OUTPUT" > "$topology_dump_file"
     fi
     # Fetch data and update allowed* variables from the virtual machine
-    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed pod{0,1,2,3,4,5,6,7,8,9}c0)" >/dev/null || {
+    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed pod{0,1,2,3,4,5,6,7,8,9}c{0,1,2,3})" >/dev/null || {
         command-error "error fetching res_allowed from $VM_NAME"
     }
     echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
     py_allowed="
+import re
 allowed=$("$DEMO_LIB_DIR/topology.py" -t "$topology_dump_file" -r "$res_allowed_file" res_allowed -o json)
 _branch_pod=[(p, d, n, c, t, cpu, pod.rsplit('/', 1)[0])
              for p in allowed
@@ -194,6 +201,30 @@ for p, d, n, c, t, cpu, pod in _branch_pod:
     cores[pod].add('%s/%s' % (n, c))
     threads[pod].add('%s/%s/%s' % (n, c, t))
     cpus[pod].add(cpu)
+
+def disjoint_sets(*sets):
+    'set.isdisjoint() for n > 1 sets'
+    s = sets[0]
+    for next in sets[1:]:
+        if not s.isdisjoint(next):
+            return False
+        s = s.union(next)
+    return True
+
+def set_ids(str_ids, chars='[a-z]'):
+    num_ids = set()
+    for str_id in str_ids:
+        if '/' in str_id:
+            num_ids.add(tuple(int(re.sub(chars, '', s)) for s in str_id.split('/')))
+        else:
+            num_ids.add(int(re.sub(chars, '', str_id)))
+    return num_ids
+package_ids = lambda i: set_ids(i, '[package]')
+die_ids = lambda i: set_ids(i, '[packagedie]')
+node_ids = lambda i: set_ids(i, '[node]')
+core_ids = lambda i: set_ids(i, '[nodecore]')
+thread_ids = lambda i: set_ids(i, '[nodecorethread]')
+cpu_ids = lambda i: set_ids(i, '[cpu]')
 "
 }
 
@@ -225,6 +256,48 @@ for _contid in list(containers.keys()):
         containers[_contname] = containers[_contid]
         pods[_podname] = pods[_podid]
 "
+}
+
+resolve-template() {
+    local name="$1" r="" d t
+    shift
+    for d in "$@"; do
+        if [ -z "$d" ] || ! [ -d "$d" ]; then
+            continue
+        fi
+        t="$d/$name.yaml.in"
+        if ! [ -e "$t" ]; then
+            continue
+        fi
+        if [ -z "$r" ]; then
+            r="$t"
+        else
+            echo "WARNING: template file $r shadows $t"
+        fi
+    done
+    if [ -n "$r" ]; then
+        echo "$r"
+        return 0
+    fi
+    return 1
+}
+
+is-hooked() {
+    local hook_code_var hook_code
+    hook_code_var=$1
+    hook_code="${!hook_code_var}"
+    if [ -n "${hook_code}" ]; then
+        return 0 # logic: if is-hooked xyz; then run-hook xyz; fi
+    fi
+    return 1
+}
+
+run-hook() {
+    local hook_code_var hook_code
+    hook_code_var=$1
+    hook_code="${!hook_code_var}"
+    echo "Running hook: $hook_code_var"
+    eval "${hook_code}"
 }
 
 ### Test script helpers
@@ -351,10 +424,16 @@ verify() { # script API
         ( speed=1000 pyexec "assert(${py_assertion})" ) || {
                 out "### The assertion FAILED"
                 echo "verify: assertion '$py_assertion' failed." >> "$SUMMARY_FILE"
-                command-exit-if-not-interactive
+                if is-hooked on_verify_fail; then
+                    run-hook on_verify_fail
+                else
+                    command-exit-if-not-interactive
+                fi
         }
         speed=1000 out "### The assertion holds."
     done
+    is-hooked on_verify && run-hook on_verify
+    return 0
 }
 
 kubectl() { # script API
@@ -380,7 +459,9 @@ create() { # script API
     #
     # Create n instances from TEMPLATE_NAME.yaml.in, copy each of them
     # from host to vm, kubectl create -f them, and wait for them
-    # becoming Ready.
+    # becoming Ready. Templates are searched in $TEST_DIR, $TOPOLOGY_DIR,
+    # $POLICY_DIR, and $SCRIPT_DIR in this order of preference. The first
+    # template found is used.
     #
     # Parameters:
     #   TEMPLATE_NAME: the name of the template without extension (.yaml.in)
@@ -389,34 +470,59 @@ create() { # script API
     #   wait: condition to be waited for (see kubectl wait --for=condition=).
     #         If empty (""), skip waiting. The default is wait="Ready".
     #   wait_t: wait timeout. The default is wait_t=60s.
-    template_name=$1.yaml.in
+
+    template_file=$(resolve-template "$1" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
+
     local template_kind
-    template_kind=$(awk '/kind/{print tolower($2)}' < "$template_name")
+    template_kind=$(awk '/kind/{print tolower($2)}' < "$template_file")
     local wait=${wait-Ready}
     local wait_t=${wait_t-60s}
     if [ -z "$n" ]; then
         local n=1
     fi
-    if [ ! -f "$template_name" ]; then
-        error "error creating \"$1\": missing template ${template_name}"
+    if [ ! -f "$template_file" ]; then
+        error "error creating \"$1\": missing template ${template_file}"
     fi
     for _ in $(seq 1 $n); do
         kind_count[$template_kind]=$(( ${kind_count[$template_kind]} + 1 ))
         local NAME="${template_kind}$(( ${kind_count[$template_kind]} - 1 ))" # the first pod is pod0
-        eval "echo -e \"$(<"${template_name}")\"" > "$NAME.yaml"
-        host-command "scp $NAME.yaml $VM_SSH_USER@$VM_IP:" || {
-            command-error "copying $NAME.yaml to VM failed"
+        eval "echo -e \"$(<"${template_file}")\"" > "$OUTPUT_DIR/$NAME.yaml"
+        host-command "scp \"$OUTPUT_DIR/$NAME.yaml\" $VM_SSH_USER@$VM_IP:" || {
+            command-error "copying \"$OUTPUT_DIR/$NAME.yaml\" to VM failed"
         }
         vm-command "cat $NAME.yaml"
         vm-command "kubectl create -f $NAME.yaml" || {
-            command-error "kubectl create error"
+            if is-hooked on_create_fail; then
+                echo "kubectl create error"
+                run-hook on_create_fail
+            else
+                command-error "kubectl create error"
+            fi
         }
         if [ "x$wait" != "x" ]; then
             speed=1000 vm-command "kubectl wait --timeout=${wait_t} --for=condition=${wait} ${template_kind}/$NAME" >/dev/null 2>&1 || {
-                command-error "waiting for ${template_kind} \"$NAME\" to become ready timed out"
+                if is-hooked on_create_fail; then
+                    echo "waiting for ${template_kind} \"$NAME\" to become ready timed out"
+                    run-hook on_create_fail
+                else
+                    command-error "waiting for ${template_kind} \"$NAME\" to become ready timed out"
+                fi
             }
         fi
     done
+    is-hooked on_create && run-hook on_create
+    return 0
+}
+
+reset() { # script API
+    # Usage: reset counters
+    #
+    # Resets counters
+    if [ "$1" == "counters" ]; then
+        kind_count[pod]=0
+    else
+        error "invalid reset \"$1\""
+    fi
 }
 
 interactive() { # script API
@@ -459,7 +565,7 @@ test-user-code() {
 INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
-vm=${vm-"crirm-test-numa"}
+vm=${vm-"crirm-test-e2e"}
 cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
 cleanup=${cleanup-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr-0}
@@ -493,7 +599,7 @@ verify \\
     'len(set.union(cpus[\"pod0c0\"], cpus[\"pod1c0\"], cpus[\"pod8c0\"], cpus[\"pod9c0\"])) == 7'
 "}
 
-yaml_in_defaults="CPU=1 MEM=100M ISO=true CPUREQ=1 CPULIM=2 MEMREQ=100M MEMLIM=200M"
+yaml_in_defaults="CPU=1 MEM=100M ISO=true CPUREQ=1 CPULIM=2 MEMREQ=100M MEMLIM=200M CONTCOUNT=1"
 
 if [ "$mode" == "help" ]; then
     if [ "$2" == "defaults" ]; then
