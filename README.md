@@ -97,8 +97,8 @@ You can do it with the following command:
 ```
 
 When started this way CRI Resource Manager reads its configuration from the
-given file. It also disables its agent interface for external configuration
-and updates.
+given file. It does not fetch external configuration from the node agent and
+also disables the config interface for receiving configuration updates.
 
 ### Using CRI Resource Manager Agent and a ConfigMap
 

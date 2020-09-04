@@ -93,10 +93,8 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, err
 	}
 
-	if opt.ForceConfig == "" {
-		if err := m.setupConfigAgent(); err != nil {
-			return nil, err
-		}
+	if err := m.setupAgentInterface(); err != nil {
+		return nil, err
 	}
 
 	if err := m.loadConfig(); err != nil {
@@ -324,8 +322,8 @@ func (m *resmgr) setupCache() error {
 
 }
 
-// setupConfigAgent sets up the connection to the configuration agent.
-func (m *resmgr) setupConfigAgent() error {
+// setupAgentInterface sets up the connection to the node agent.
+func (m *resmgr) setupAgentInterface() error {
 	var err error
 
 	if m.agent, err = agent.NewAgentInterface(opt.AgentSocket); err != nil {
