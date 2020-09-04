@@ -12,7 +12,7 @@ spec:
     command:
       - sh
       - -c
-      - echo ${NAME} \$(sleep inf)
+      - echo ${NAME}c0 \$(sleep inf)
     imagePullPolicy: IfNotPresent
     name: busybox
     resources:

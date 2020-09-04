@@ -153,17 +153,48 @@ screen-launch-cri-resmgr-agent() {
     vm-command "NODE_NAME=\$(hostname) cri-resmgr-agent -kubeconfig \$HOME/.kube/config >cri-resmgr-agent.output.txt 2>&1 &"
 }
 
-get-py-cpus() {
-    # Fetch Cpus_allowed masks of running pods from the virtual machine
-    # and update them in the "cpus" dictionary in Python code.
-    speed=1000 vm-command "echo cpus={}; for pod_name in \$(kubectl get pods | awk '/pod/{print \$1}'); do pod_index=\${pod_name/pod/}; mask=\$(grep Cpus_allowed: /proc/\$(pgrep -f \${pod_name})/status | awk '{print \$2}'); echo cpus[\$pod_index]=0x\$mask; done" >/dev/null 2>&1 || {
-        command-error "error in reading Cpus_allowed masks from running pods"
-    }
-    if grep -q '=0' <<<"$COMMAND_OUTPUT"; then
-        py_cpus="$COMMAND_OUTPUT"
-    else
-        py_cpus="cpus={}"
+get-py-allowed() {
+    topology_dump_file="$OUTPUT_DIR/topology_dump.$VM_NAME"
+    res_allowed_file="$OUTPUT_DIR/res_allowed.$VM_NAME"
+    if ! [ -f "$topology_dump_file" ]; then
+        vm-command "$("$DEMO_LIB_DIR/topology.py" bash_topology_dump)" >/dev/null || {
+            command-error "error fetching topology_dump from $VM_NAME"
+        }
+        echo -e "$COMMAND_OUTPUT" > "$topology_dump_file"
     fi
+    # Fetch data and update allowed* variables from the virtual machine
+    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed pod{0,1,2,3,4,5,6,7,8,9}c0)" >/dev/null || {
+        command-error "error fetching res_allowed from $VM_NAME"
+    }
+    echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
+    py_allowed="
+allowed=$("$DEMO_LIB_DIR/topology.py" -t "$topology_dump_file" -r "$res_allowed_file" res_allowed -o json)
+_branch_pod=[(p, d, n, c, t, cpu, pod.rsplit('/', 1)[0])
+             for p in allowed
+             for d in allowed[p]
+             for n in allowed[p][d]
+             for c in allowed[p][d][n]
+             for t in allowed[p][d][n][c]
+             for cpu in allowed[p][d][n][c][t]
+             for pod in allowed[p][d][n][c][t][cpu]]
+packages, dies, nodes, cores, threads, cpus = {}, {}, {}, {}, {}, {}
+for p, d, n, c, t, cpu, pod in _branch_pod:
+    if not c.startswith('core'):
+        continue
+    if not pod in packages:
+        packages[pod] = set()
+        dies[pod] = set()
+        nodes[pod] = set()
+        cores[pod] = set()
+        threads[pod] = set()
+        cpus[pod] = set()
+    packages[pod].add(p)
+    dies[pod].add('%s/%s' % (p, d))
+    nodes[pod].add(n)
+    cores[pod].add('%s/%s' % (n, c))
+    threads[pod].add('%s/%s/%s' % (n, c, t))
+    cpus[pod].add(cpu)
+"
 }
 
 get-py-cache() {
@@ -172,7 +203,28 @@ get-py-cache() {
         command-error "fetching cache file failed"
     }
     cat > "${OUTPUT_DIR}/cache" <<<"$COMMAND_OUTPUT"
-    py_cache="import json;cache=json.load(open(\"${OUTPUT_DIR}/cache\"));allocations=json.loads(cache['PolicyJSON']['allocations'])"
+    py_cache="
+import json
+cache=json.load(open(\"${OUTPUT_DIR}/cache\"))
+allocations=json.loads(cache['PolicyJSON']['allocations'])
+containers=cache['Containers']
+pods=cache['Pods']
+for _contid in list(containers.keys()):
+    try:
+        _cmd = ' '.join(containers[_contid]['Command'])
+    except:
+        continue # Command may be None
+    # Recognize echo podXcY ; sleep inf -type test pods and make them
+    # easily accessible: containers['pod0c0'], pods['pod0']
+    if 'echo pod' in _cmd and 'sleep inf' in _cmd:
+        _contname = _cmd.split()[3] # _contname is podXcY
+        _podid = containers[_contid]['PodID']
+        _podname = pods[_podid]['Name'] # _podname is podX
+        if _contid in allocations:
+            allocations[_contname] = allocations[_contid]
+        containers[_contname] = containers[_contid]
+        pods[_podname] = pods[_podid]
+"
 }
 
 ### Test script helpers
@@ -190,24 +242,35 @@ pyexec() { # script API
     # Run python3 -c PYTHONCODEs on host. Stops if execution fails.
     #
     # Variables available in PYTHONCODE:
-    #   cpus:        dictionary: {pod_number: cpu_mask}
-    #   cache:       dictionary, cri-resmgr cache
     #   allocations: dictionary: shorthand to cri-resmgr policy allocations
     #                (unmarshaled cache['PolicyJSON']['allocations'])
+    #   allowed      tree: {package: {die: {node: {core: {thread: {pod}}}}}}
+    #                resource topology and pods allowed to use the resources.
+    #   packages, dies, nodes, cores, threads:
+    #                dictionaries: {podname: set-of-allowed}
+    #                Example: pyexec 'print(dies["pod0c0"])'
+    #   cache:       dictionary, cri-resmgr cache
     #
     # Note that variables are *not* updated when pyexec is called.
     # You can update the variables by running "verify" without expressions.
     #
     # Example:
-    #   verify ; pyexec 'import pprint; pprint.pprint(cpus)'
+    #   verify ; pyexec 'import pprint; pprint.pprint(allowed)'
+    PYEXEC_STATE_PY="$OUTPUT_DIR/pyexec_state.py"
     PYEXEC_PY="$OUTPUT_DIR/pyexec.py"
     PYEXEC_LOG="$OUTPUT_DIR/pyexec.output.txt"
     local last_exit_status=0
+    {
+        echo "import pprint; pp=pprint.pprint"
+        echo -e "$py_allowed"
+        echo -e "$py_cache"
+    } > "$PYEXEC_STATE_PY"
     for PYTHONCODE in "$@"; do
-        cat > "$PYEXEC_PY" <<<"$py_cpus"
-        cat >> "$PYEXEC_PY" <<<"$py_cache"
-        cat >> "$PYEXEC_PY" <<<"$PYTHONCODE"
-        python3 "$PYEXEC_PY" 2>&1 | tee "$PYEXEC_LOG"
+        {
+            echo "from pyexec_state import *"
+            echo -e "$PYTHONCODE"
+        } > "$PYEXEC_PY"
+        PYTHONPATH="$OUTPUT_DIR:$PYTHONPATH:$DEMO_LIB_DIR" python3 "$PYEXEC_PY" 2>&1 | tee "$PYEXEC_LOG"
         last_exit_status=${PIPESTATUS[0]}
         if [ "$last_exit_status" != "0" ]; then
             error "pyexec: non-zero exit status \"$last_exit_status\", see \"$PYEXEC_PY\" and \"$PYEXEC_LOG\""
@@ -216,34 +279,39 @@ pyexec() { # script API
     return "$last_exit_status"
 }
 
+pp() { # script API
+    # Usage: pp EXPR
+    #
+    # Pretty-print the value of Python expression EXPR.
+    pyexec "pp($*)"
+}
+
 report() { # script API
     # Usage: report [VARIABLE...]
     #
     # Updates and reports current value of VARIABLE.
     #
-    # Example: print CPU masks of containers in pod0, pod1, ...
-    #   report cpus
+    # Supported VARIABLEs:
+    #     allocations
+    #     allowed
+    #     cache
     #
     # Example: print cri-resmgr policy allocations. In interactive mode
     #          you may use a pager like less.
     #   report allocations | less
     local varname
     for varname in "$@"; do
-        if [ "$varname" == "cpus" ]; then
-            get-py-cpus
-            pyexec "
-import math
-print('Pod   Cpus_allowed_mask')
-if cpus:
-    bits_needed=int(math.log2(max(cpus.values())))+1
-    for podnum in sorted(cpus.keys()):
-        print(('pod%d  %s') % (podnum, bin(cpus[podnum])[2:].zfill(bits_needed)))
-"
-        elif [ "$varname" == "allocations" ]; then
+        if [ "$varname" == "allocations" ]; then
             get-py-cache
             pyexec "
 import pprint
 pprint.pprint(allocations)
+"
+        elif [ "$varname" == "allowed" ]; then
+            get-py-allowed
+            pyexec "
+import topology
+print(topology.str_tree(allowed))
 "
         elif [ "$varname" == "cache" ]; then
             get-py-cache
@@ -261,25 +329,22 @@ verify() { # script API
     # Usage: verify [EXPR...]
     #
     # Run python3 -c "assert(EXPR)" to test that every EXPR is True.
-    # Stop evaluation on the first EXPR not True and stops script.
+    # Stop evaluation on the first EXPR not True and fail the test.
     # You can allow script execution to continue after failed verification
     # by running verify in a subshell (in parenthesis):
     #   (verify 'False') || echo '...but was expected to fail.'
     #
-    # Variables available in expressions:
-    #   cpus: dictionary {pod_number: cpu_mask}
-    #   cache:       dictionary, cri-resmgr cache
-    #   allocations: dictionary: shorthand to cri-resmgr policy allocations
-    #                (unmarshaled cache['PolicyJSON']['allocations'])
+    # Variables available in EXPRs:
+    #   See variables in: help pyexec
     #
-    # Note that variables are updated every time verify is called
+    # Note that all variables are updated every time verify is called
     # before evaluating (asserting) expressions.
     #
-    # Example:
-    #   require that pod0 and pod1 cpu masks are disjoint and that
-    #   pod0 cpu mask has four 1's in it:
-    #     verify 'cpus[0] & cpus[1] == 0' 'bin(cpus[0]).count("1") == 4'
-    get-py-cpus
+    # Example: require that containers pod0c0 and pod1c0 run on separate NUMA
+    #          nodes and that pod0c0 is allowed to run on 4 CPUs:
+    #   verify 'set.intersection(nodes["pod0c0"], nodes["pod1c0"]) == set()' \
+    #          'len(cpus["pod0c0"]) == 4'
+    get-py-allowed
     get-py-cache
     for py_assertion in "$@"; do
         speed=1000 out "### Verifying assertion '$py_assertion'"
@@ -292,6 +357,15 @@ verify() { # script API
     done
 }
 
+kubectl() { # script API
+    # Usage: kubectl parameters
+    #
+    # Runs kubectl command on virtual machine.
+    vm-command "kubectl $*" || {
+        command-error "kubectl $* failed"
+    }
+}
+
 delete() { # script API
     # Usage: delete PARAMETERS
     #
@@ -302,7 +376,7 @@ delete() { # script API
 }
 
 create() { # script API
-    # Usage: [VAR=VALUE] create TEMPLATE_NAME
+    # Usage: [VAR=VALUE][n=COUNT] create TEMPLATE_NAME
     #
     # Create n instances from TEMPLATE_NAME.yaml.in, copy each of them
     # from host to vm, kubectl create -f them, and wait for them
@@ -396,26 +470,27 @@ topology=${topology-'[
     ]'}
 code=${code-"
 CPU=1 create guaranteed # creates pod 0, 1 CPU taken
-report cpus
+report allowed
 CPU=2 create guaranteed # creates pod 1, 3 CPUs taken
-report cpus
+report allowed
 CPU=3 create guaranteed # creates pod 2, 6 CPUs taken
-report cpus
+report allowed
 verify \\
-    'bin(cpus[0]).count(\"1\") == 1' \\
-    'bin(cpus[1]).count(\"1\") == 2' \\
-    'bin(cpus[2]).count(\"1\") == 3' \\
-    'bin(cpus[0] | cpus[1] | cpus[2]).count(\"1\") == 6'
-
+    'len(cpus[\"pod0c0\"]) == 1' \\
+    'len(cpus[\"pod1c0\"]) == 2' \\
+    'len(cpus[\"pod2c0\"]) == 3' \\
+    'len(set.union(cpus[\"pod0c0\"], cpus[\"pod1c0\"], cpus[\"pod2c0\"])) == 6'
 n=3 create besteffort   # creates pods 3, 4 and 5
 verify \\
-    '(cpus[3] | cpus[4] | cpus[5]) & (cpus[0] | cpus[1] | cpus[2]) == 0' || true
+    'set.intersection(
+       set.union(cpus[\"pod0c0\"], cpus[\"pod1c0\"], cpus[\"pod2c0\"]),
+       set.union(cpus[\"pod3c0\"], cpus[\"pod4c0\"], cpus[\"pod5c0\"])) == set()'
 
 delete pods pod2        # deletes pod 2, 3 CPUs taken
 n=2 create besteffort   # creates pods 6 and 7
 CPU=2 n=2 create guaranteed # creates pod 8 and 9, 7 CPUs taken
 verify \\
-    'bin(cpus[0] | cpus[1] | cpus[8] | cpus[9]).count(\"1\") == 7'
+    'len(set.union(cpus[\"pod0c0\"], cpus[\"pod1c0\"], cpus[\"pod8c0\"], cpus[\"pod9c0\"])) == 7'
 "}
 
 yaml_in_defaults="CPU=1 MEM=100M ISO=true CPUREQ=1 CPULIM=2 MEMREQ=100M MEMLIM=200M"

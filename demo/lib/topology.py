@@ -6,9 +6,10 @@ Usage: topology.py [options] command
 
 Options:
   -t TOPOLOGY_DUMP    load topology_dump from TOPOLOGY_DUMP file instead of
-                      the topology_dump environment variable or local host.
+                      the "topology_dump" environment variable or local host.
   -r RES_ALLOWED      load res_allowed from RES_ALLOWED file instead of
-                      the res_allowed environment variable or local host.
+                      the "res_allowed" environment variable or local host.
+  -o OUTPUT_FORMAT    "json" or "text". The default is "text".
 
 Commands:
   help                print help
@@ -42,10 +43,10 @@ Examples:
   Watch how pod0..2 are allowed to CPUS on remote host, read topology only once
   $ export topology_dump="$(ssh remotehost "$(topology.py bash_topology_dump)")"
   $ watch 'res_allowed=$(ssh remotehost "$(topology.py bash_res_allowed pod0 pod1 pod2)") topology.py res_allowed'
-
 """
 
 import getopt
+import json
 import os
 import re
 import subprocess
@@ -53,7 +54,7 @@ import sys
 
 _bash_topology_dump = """for cpu in /sys/devices/system/cpu/cpu[0-9]*; do cpu_id=${cpu#/sys/devices/system/cpu/cpu}; echo "cpu p:$(< ${cpu}/topology/physical_package_id) d:$(< ${cpu}/topology/die_id) n:$(basename  ${cpu}/node* | sed 's:node::g') c:$(< ${cpu}/topology/core_id) t:$(< ${cpu}/topology/thread_siblings) cpu:${cpu_id}" ; done;  for node in /sys/devices/system/node/node[0-9]*; do node_id=${node#/sys/devices/system/node/node}; echo "dist n:$node_id d:$(< $node/distance)"; echo "mem n:$node_id s:$(awk '/MemTotal/{print $4/1024}' < $node/meminfo)"; done"""
 
-_bash_res_allowed = r"""for process in '%s'; do for pid in $(pgrep -f $process); do [ "$pid" != "$$" ] && [ "$pid" != "$PPID" ] && echo "${process}-${pid} $(awk '/Cpus_allowed:/{c=$2}/Mems_allowed:/{m=$2}END{print "c:"c" m:"m}' < /proc/$pid/status)"; done; done"""
+_bash_res_allowed = r"""for process in '%s'; do for pid in $(pgrep -f $process); do [ "$pid" != "$$" ] && [ "$pid" != "$PPID" ] && echo "${process}/${pid} $(awk '/Cpus_allowed:/{c=$2}/Mems_allowed:/{m=$2}END{print "c:"c" m:"m}' < /proc/$pid/status)"; done; done"""
 
 def error(msg, exit_status=1):
     """Print error message and exit."""
@@ -65,6 +66,14 @@ def error(msg, exit_status=1):
 def warning(msg):
     """Print warning."""
     sys.stderr.write('topology.py warning: %s\n' % (msg,))
+
+def output_tree(tree):
+    """Print tree to output in OUTPUT_FORMAT"""
+    if opt_output_format == "json":
+        sys.stdout.write(json.dumps(tree))
+    else:
+        sys.stdout.write(str_tree(tree) + "\n")
+    sys.stdout.flush()
 
 def add_tree(root, branch, value_dict):
     """Add key-value pairs in value_dict to given branch in the tree starting from root.
@@ -271,8 +280,8 @@ def get_topology(show_mem=True):
     if opt_topology_dump:
         topology_dump = opt_topology_dump
     else:
-        topology_dump = os.getenv("topology_dump")
-    if not topology_dump:
+        topology_dump = os.getenv("topology_dump", None)
+    if topology_dump is None:
         topology_dump = get_local_topology_dump()
     return dump_to_topology(topology_dump, show_mem=show_mem)
 
@@ -282,15 +291,15 @@ def get_res_allowed(processes):
     if opt_res_allowed_dump:
         res_allowed_dump = opt_res_allowed_dump
     else:
-        res_allowed_dump = os.getenv("res_allowed")
-    if not res_allowed_dump:
+        res_allowed_dump = os.getenv("res_allowed", None)
+    if res_allowed_dump is None:
         res_allowed_dump = get_local_res_allowed_dump(processes)
     return dump_to_res_allowed(res_allowed_dump)
 
 def report_res(show_mem=True):
     """Print topology tree."""
     topology = get_topology(show_mem=show_mem)
-    print(str_tree(topology["tree"]))
+    output_tree(topology["tree"])
 
 def report_res_allowed(processes, show_mem=True):
     """Print topology tree with allowed processes as leaf nodes."""
@@ -313,14 +322,18 @@ def report_res_allowed(processes, show_mem=True):
             for node in range(max_node + 1):
                 if memmask & (1 << node):
                     add_tree(tree, mem_branch[node], {owner: {}})
-    print(str_tree(tree))
+    output_tree(tree)
 
 if __name__ == "__main__":
     opt_topology_dump = None
     opt_res_allowed_dump = None
-    options, commands = getopt.gnu_getopt(
-        sys.argv[1:], 'ht:r:',
-        ['help', '--topology-dump-file=', '--res-allowed-file='])
+    opt_output_format = "text"
+    try:
+        options, commands = getopt.gnu_getopt(
+            sys.argv[1:], 'ht:r:o:',
+            ['help', '--topology-dump-file=', '--res-allowed-file='])
+    except getopt.GetoptError as e:
+        error(str(e))
     for opt, arg in options:
         if opt in ["-h", "--help"]:
             print(__doc__)
@@ -335,6 +348,11 @@ if __name__ == "__main__":
                 opt_res_allowed_dump = open(arg).read()
             except IOError as e:
                 error("cannot read res_allowed dump from file %r: %s" % (arg, e))
+        elif opt in ["-o"]:
+            if arg in ["json", "text"]:
+                opt_output_format = arg
+            else:
+                error("invalid output format %r")
     if not commands:
         error("missing command, see --help")
     elif commands[0] == "help":
