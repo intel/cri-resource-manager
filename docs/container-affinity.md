@@ -45,7 +45,7 @@ metadata:
             - value1
             ...
             - valueN
-        - match:
+          match:
             key: key-ref
             operator: op
             values:
@@ -70,7 +70,7 @@ metadata:
             - value1
             ...
             - valueN
-        - match:
+          match:
             key: key-ref
             operator: op
             values:
