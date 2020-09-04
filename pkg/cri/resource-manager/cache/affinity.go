@@ -125,14 +125,55 @@ func (pca *podContainerAffinity) parseSimple(pod *pod, value string, weight int3
 	}
 
 	podScope := pod.ScopeExpression()
+
+	//
+	// Notes:
+	//   We turn affinities given in the simple notation into a symmetric set of
+	//   affinities. IOW, if X has affinity on Y with wight W, then Y will have
+	//   affinity on X with W as well. In practice this is done by
+	//     1) ensuring there is an affinity Y: X for every affinity X: Y
+	//     2) generating an affinity expression for every container with affinities
+	//  The generated expression uses the operator Equal or In depending on whether
+	//  if the container has affinities on exactly one container in the symmetric
+	//  set.
+	//
+
+	symmetric := map[string]map[string]struct{}{}
+
 	for name, values := range parsed {
+		for _, v := range values {
+			forw, ok := symmetric[name]
+			if !ok {
+				forw = map[string]struct{}{}
+				symmetric[name] = forw
+			}
+			back, ok := symmetric[v]
+			if !ok {
+				back = map[string]struct{}{}
+				symmetric[v] = back
+			}
+			forw[v], back[name] = struct{}{}, struct{}{}
+		}
+	}
+
+	var op resmgr.Operator
+	for name, affinities := range symmetric {
+		others := []string{}
+		for o := range affinities {
+			others = append(others, o)
+		}
+		if len(others) == 1 {
+			op = resmgr.Equals
+		} else {
+			op = resmgr.In
+		}
 		(*pca)[name] = append((*pca)[name],
 			&Affinity{
 				Scope: podScope,
 				Match: &resmgr.Expression{
 					Key:    kubernetes.ContainerNameLabel,
-					Op:     resmgr.In,
-					Values: values,
+					Op:     op,
+					Values: others,
 				},
 				Weight: weight,
 			})
