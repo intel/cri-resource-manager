@@ -11,7 +11,7 @@ RUN dnf install -y /usr/bin/bash /usr/bin/git /usr/bin/make \
     /usr/bin/grep /usr/bin/sed /usr/bin/tr /usr/bin/find \
     /usr/bin/sort /usr/bin/uniq \
     /usr/bin/wget /usr/bin/tar /usr/bin/bzip2 \
-    kernel-devel rpm-build clang gcc
+    kernel-devel rpm-build systemd-rpm-macros clang gcc
 
 RUN arch="$(rpm --eval %{_arch})"; \
     case "${arch}" in \
