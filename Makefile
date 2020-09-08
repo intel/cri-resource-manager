@@ -247,7 +247,7 @@ install-config-%:
 	for f in $$(find $$dir -name \*.cfg.sample); do \
 	    echo "  $$f in $(DESTDIR)$(CONFIGDIR)..."; \
 	    df=$${f##*/}; \
-	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df%.sample}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df}; \
 	done
 
 clean-%:
