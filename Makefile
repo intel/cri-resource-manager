@@ -139,6 +139,18 @@ DOCKER_RPM_BUILD := \
     done && \
     cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
 
+# Supported distros with debian native packaging format.
+SUPPORTED_DEB_DISTROS := $(shell \
+    grep -l 'apt-get ' dockerfiles/cross-build/Dockerfile.* | \
+    egrep -v '((~)|(swp))$$' | \
+    sed 's:^.*Dockerfile.::g')
+
+# Supported distros with rpm native packaging format.
+SUPPORTED_RPM_DISTROS := $(shell \
+    egrep -l '(dnf )|(yum )|(zypper )' dockerfiles/cross-build/Dockerfile.* | \
+    egrep -v '((~)|(swp))$$' | \
+    sed 's:^.*Dockerfile.::g')
+
 # Directory to leave built distro packages and collateral in.
 PACKAGES_DIR := packages
 
@@ -358,6 +370,13 @@ ifneq ($(DISTRO_ID),fedora)
 else
     packages: cross-$(DISTRO_PACKAGE).$(DISTRO_ID)
 endif
+
+cross-packages: cross-rpm cross-deb
+
+cross-rpm: $(foreach d,$(SUPPORTED_RPM_DISTROS),cross-rpm.$(d))
+
+cross-deb: $(foreach d,$(SUPPORTED_DEB_DISTROS),cross-deb.$(d))
+
 
 #
 # Rules for building dist-tarballs, rpm, and deb packages.
@@ -588,8 +607,9 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 
 
 # phony targets
-.PHONY: all build install clean test images images-push\
-	format vet cyclomatic-check lint golangci-lint release-tests
+.PHONY: all build install clean test images images-push release-tests \
+	format vet cyclomatic-check lint golangci-lint \
+	cross-packages cross-rpm cross-deb
 
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
