@@ -35,12 +35,16 @@ KERNEL_SRC_DIR ?= /lib/modules/$(KERNEL_VERSION)/source
 KERNEL_BUILD_DIR ?= /lib/modules/$(KERNEL_VERSION)/build
 
 # Binaries and directories for installation.
+INSTALL    := install
 PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 UNITDIR    ?= $(PREFIX)/lib/systemd/system
 SYSCONFDIR ?= /etc
 CONFIGDIR  ?= /etc/cri-resmgr
-INSTALL    := install
+DEFAULTDIR ?= $(shell \
+    [ -d /etc/rpm ] && { echo /etc/sysconfig; exit 0; };  \
+    [ -f /etc/debian_version ] && { echo /etc/default; exit 0; }; \
+    echo unknown; exit 1)
 
 # Directories (in cmd) with go code we'll want to build and install.
 BUILD_DIRS = $(shell find cmd -name \*.go | sed 's:cmd/::g;s:/.*::g' | uniq)
@@ -227,7 +231,13 @@ install-systemd-%:
 	$(INSTALL) -d $(DESTDIR)$(UNITDIR) && \
 	for f in $$(find $$dir -name \*.service -o -name \*.socket); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
-	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f; \
+	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f.in; \
+	done
+	for f in $$(find $$dir -name \*.service.in -o -name \*.socket.in); do \
+	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
+	    df=$${f##*/}; df=$${df%.in}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(UNITDIR)/$$df; \
+	    sed -E -i "s:__DEFAULTDIR__:$(DEFAULTDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
 	done
 
 install-sysconf-%:

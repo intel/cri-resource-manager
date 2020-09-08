@@ -5,7 +5,7 @@ Before=kubelet.service
 
 [Service]
 Type=simple
-EnvironmentFile=/etc/sysconfig/cri-resource-manager
+EnvironmentFile=__DEFAULTDIR__/cri-resource-manager
 ExecStart=/usr/bin/cri-resmgr $CONFIG_OPTIONS $POLICY_OPTIONS
 Restart=always
 
