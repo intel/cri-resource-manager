@@ -9,12 +9,10 @@ ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-RUN yum install -y /usr/bin/bash /usr/bin/make /usr/bin/git \
-    /usr/bin/grep /usr/bin/sed /usr/bin/tr /usr/bin/find \
-    /usr/bin/sort /usr/bin/uniq \
-    /usr/bin/wget /usr/bin/tar /usr/bin/bzip2 /usr/bin/gzip \
-    kernel-devel rpm-build clang gcc \
-    curl-devel zlib-devel openssl-devel expat-devel
+RUN yum install -y rpm-build \
+    kernel-devel clang gcc \
+    curl-devel zlib-devel openssl-devel expat-devel \
+    make wget
 
 # fetch and build go from sources
 RUN arch="$(rpm --eval %{_arch})"; \

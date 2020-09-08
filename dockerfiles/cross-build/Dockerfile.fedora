@@ -7,11 +7,9 @@ ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-RUN dnf install -y /usr/bin/bash /usr/bin/git /usr/bin/make \
-    /usr/bin/grep /usr/bin/sed /usr/bin/tr /usr/bin/find \
-    /usr/bin/sort /usr/bin/uniq \
-    /usr/bin/wget /usr/bin/tar /usr/bin/bzip2 \
-    kernel-devel rpm-build systemd-rpm-macros clang gcc
+RUN dnf install -y rpm-build systemd-rpm-macros \
+    kernel-devel gcc clang \
+    git-core make wget
 
 RUN arch="$(rpm --eval %{_arch})"; \
     case "${arch}" in \
