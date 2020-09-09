@@ -336,6 +336,9 @@ else
             exit $$rc
 endif
 
+release-tests:
+	$(Q): # An empty placeholder
+
 #
 # Rules for building distro packages.
 #
@@ -576,7 +579,7 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 
 # phony targets
 .PHONY: all build install clean test images images-push\
-	format vet cyclomatic-check lint golangci-lint
+	format vet cyclomatic-check lint golangci-lint release-tests
 
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
