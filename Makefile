@@ -35,12 +35,16 @@ KERNEL_SRC_DIR ?= /lib/modules/$(KERNEL_VERSION)/source
 KERNEL_BUILD_DIR ?= /lib/modules/$(KERNEL_VERSION)/build
 
 # Binaries and directories for installation.
+INSTALL    := install
 PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 UNITDIR    ?= $(PREFIX)/lib/systemd/system
 SYSCONFDIR ?= /etc
 CONFIGDIR  ?= /etc/cri-resmgr
-INSTALL    := install
+DEFAULTDIR ?= $(shell \
+    [ -d /etc/rpm ] && { echo /etc/sysconfig; exit 0; };  \
+    [ -f /etc/debian_version ] && { echo /etc/default; exit 0; }; \
+    echo unknown; exit 1)
 
 # Directories (in cmd) with go code we'll want to build and install.
 BUILD_DIRS = $(shell find cmd -name \*.go | sed 's:cmd/::g;s:/.*::g' | uniq)
@@ -135,6 +139,18 @@ DOCKER_RPM_BUILD := \
     done && \
     cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
 
+# Supported distros with debian native packaging format.
+SUPPORTED_DEB_DISTROS := $(shell \
+    grep -l 'apt-get ' dockerfiles/cross-build/Dockerfile.* | \
+    egrep -v '((~)|(swp))$$' | \
+    sed 's:^.*Dockerfile.::g')
+
+# Supported distros with rpm native packaging format.
+SUPPORTED_RPM_DISTROS := $(shell \
+    egrep -l '(dnf )|(yum )|(zypper )' dockerfiles/cross-build/Dockerfile.* | \
+    egrep -v '((~)|(swp))$$' | \
+    sed 's:^.*Dockerfile.::g')
+
 # Directory to leave built distro packages and collateral in.
 PACKAGES_DIR := packages
 
@@ -227,7 +243,13 @@ install-systemd-%:
 	$(INSTALL) -d $(DESTDIR)$(UNITDIR) && \
 	for f in $$(find $$dir -name \*.service -o -name \*.socket); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
-	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f; \
+	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f.in; \
+	done
+	for f in $$(find $$dir -name \*.service.in -o -name \*.socket.in); do \
+	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
+	    df=$${f##*/}; df=$${df%.in}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(UNITDIR)/$$df; \
+	    sed -E -i "s:__DEFAULTDIR__:$(DEFAULTDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
 	done
 
 install-sysconf-%:
@@ -247,7 +269,7 @@ install-config-%:
 	for f in $$(find $$dir -name \*.cfg.sample); do \
 	    echo "  $$f in $(DESTDIR)$(CONFIGDIR)..."; \
 	    df=$${f##*/}; \
-	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df%.sample}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df}; \
 	done
 
 clean-%:
@@ -348,6 +370,13 @@ ifneq ($(DISTRO_ID),fedora)
 else
     packages: cross-$(DISTRO_PACKAGE).$(DISTRO_ID)
 endif
+
+cross-packages: cross-rpm cross-deb
+
+cross-rpm: $(foreach d,$(SUPPORTED_RPM_DISTROS),cross-rpm.$(d))
+
+cross-deb: $(foreach d,$(SUPPORTED_DEB_DISTROS),cross-deb.$(d))
+
 
 #
 # Rules for building dist-tarballs, rpm, and deb packages.
@@ -578,8 +607,9 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 
 
 # phony targets
-.PHONY: all build install clean test images images-push\
-	format vet cyclomatic-check lint golangci-lint release-tests
+.PHONY: all build install clean test images images-push release-tests \
+	format vet cyclomatic-check lint golangci-lint \
+	cross-packages cross-rpm cross-deb
 
 SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build

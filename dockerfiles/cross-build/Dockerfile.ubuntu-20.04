@@ -1,19 +1,23 @@
 # pull in base + a minimal set of useful packages
-FROM centos:8 as centos-8-build
+FROM ubuntu:20.04 as ubuntu-20.04-build
 
 ARG GOLANG_VERSION=1.14.8
 ARG GOLANG_URLDIR=https://dl.google.com/go
-ARG CREATE_USER="build"
+ARG CREATE_USER="test"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
+ENV DEBIAN_FRONTEND noninteractive
 
-RUN dnf install -y rpm-build \
-    kernel-devel clang gcc \
-    git-core make wget
+# pull in stuff for building
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        tzdata build-essential fakeroot devscripts \
+        bash git make sed debhelper wget ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN arch="$(rpm --eval %{_arch})"; \
-    case "${arch}" in \
-        x86_64) goarch=linux-amd64;; \
+RUN arch="$(dpkg --print-architecture)"; \
+    case "${arch##*-}" in \
+        amd64) goarch=linux-amd64;; \
         i386) goarch=linux-386;; \
         armhf) goarch=linux-armv6l;; \
         ppc64el) goarch=linux-ppc64le;; \

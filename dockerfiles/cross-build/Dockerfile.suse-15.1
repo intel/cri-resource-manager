@@ -7,12 +7,10 @@ ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-RUN zypper install -y bash git make grep \
-    sed findutils coreutils \
-    tar bzip2 wget \
-    clang gcc \
-    kernel-devel \
-    rpm-build
+RUN zypper install -y rpm-build \
+    kernel-devel clang gcc \
+    git make \
+    wget
 
 RUN arch="$(rpm --eval %{_arch})"; \
     case "${arch}" in \

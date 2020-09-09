@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VOLUMES="-v /sys:/sys -v /home:/mnt/host/home"
+VOLUMES=(-v /sys:/sys -v /home:/mnt/host/home)
 IMAGE=$1
 DOCKERFILE=dockerfiles/cross-build/Dockerfile.${IMAGE%-build}
 shift
@@ -8,7 +8,7 @@ shift
 while [ -n "$1" ]; do
     case $1 in
         --volume|-v)
-            VOLUMES="$VOLUMES -v $2"
+            VOLUMES=("${VOLUMES[@]}" -v "$2")
             shift 2
             ;;
         --container|-c)
@@ -21,7 +21,7 @@ while [ -n "$1" ]; do
             shift
             ;;
         *)
-            PASSTHROUGH="$PASSTHROUGH $1"
+            PASSTHROUGH=("${PASSTHROUGH[@]}" "$1")
             shift
             ;;
     esac
@@ -31,15 +31,15 @@ echo "* Building docker images with"
 echo "  - Dockerfile: $DOCKERFILE"
 echo "  - image name: $IMAGE"
 echo "  - container : $CONTAINER"
-echo "  - volumes   : $VOLUMES"
-echo "  - options   : $PASSTHROUGH"
+echo "  - volumes   : " "${VOLUMES[@]}"
+echo "  - options   : " "${PASSTHROUGH[@]}"
 
 docker build . \
        -f "$DOCKERFILE" -t "$IMAGE" \
        --build-arg "CREATE_USER=$USER" \
        --build-arg USER_OPTIONS="-u__$(id -u)" \
-       "$PASSTHROUGH" || exit 1
+       "${PASSTHROUGH[@]}" || exit 1
 
 if [ -n "$CONTAINER" ]; then
-    docker create --name "$CONTAINER" "$VOLUMES" "$IMAGE"
+    docker create --name "$CONTAINER" "${VOLUMES[@]}" "$IMAGE"
 fi
