@@ -210,7 +210,8 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 	supply := pool.FreeSupply()
 	grant, err := supply.Allocate(request)
 	if err != nil {
-		return nil, policyError("failed to allocate %s from %s: %v", request, supply, err)
+		return nil, policyError("failed to allocate %s from %s: %v",
+			request, supply.DumpAllocatable(), err)
 	}
 
 	log.Debug("allocated req '%s' to memory node '%s' (memset %s,%s)", container.GetCacheID(), grant.GetMemoryNode().Name(), grant.GetMemoryNode().GetMemset(memoryDRAM), grant.GetMemoryNode().GetMemset(memoryPMEM))
