@@ -62,6 +62,34 @@ vm-wait-process() {
     fi
 }
 
+vm-set-kernel-cmdline() { # script API
+    # Usage: vm-set-kernel-cmdline E2E-DEFAULTS
+    #
+    # Adds/replaces E2E-DEFAULTS to kernel command line"
+    #
+    # Example:
+    #   vm-set-kernel-cmdline nr_cpus=4
+    #   vm-reboot
+    #   vm-command "cat /proc/cmdline"
+    local e2e_defaults="$1"
+    vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\"' > /etc/default/grub.d/60-e2e-defaults.cfg" || {
+        command-error "writing new command line parameters failed"
+    }
+    vm-command "update-grub" || {
+        command-error "updating grub failed"
+    }
+}
+
+vm-reboot() { # script API
+    # Usage: vm-reboot
+    #
+    # Reboots the virtual machine and waits that the ssh server starts
+    # responding again.
+    vm-command "reboot"
+    sleep 5
+    host-wait-vm-ssh-server
+}
+
 vm-networking() {
     vm-command-q "grep -q 1 /proc/sys/net/ipv4/ip_forward" || vm-command "sysctl -w net.ipv4.ip_forward=1"
     vm-command-q "grep -q ^net.ipv4.ip_forward=1 /etc/sysctl.conf" || vm-command "sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf"
