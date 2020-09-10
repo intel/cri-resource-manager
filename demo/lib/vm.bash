@@ -131,6 +131,20 @@ vm-install-cri-resmgr() {
     fi
 }
 
+vm-checksum-cri-resmgr() {
+    if [ -f bin/cri-resmgr ]; then
+        local chksum
+        chksum=$(md5sum bin/cri-resmgr | cut -d ' ' -f 1)
+        vm-command "[ -f /usr/local/bin/cri-resmgr ] && md5sum /usr/local/bin/cri-resmgr | grep -q $chksum" || {
+            echo "REALLY BIG FAT WARNING:"
+            echo "REALLY BIG FAT WARNING: local / VM cri-resmgr binary MD5 sum MISMATCH !!!"
+            echo "REALLY BIG FAT WARNING:"
+            sleep 2
+            return 1
+        }
+    fi
+}
+
 vm-install-containerd() {
     vm-command-q "[ -f /usr/bin/containerd ]" || {
         vm-command "apt update && apt install -y containerd"

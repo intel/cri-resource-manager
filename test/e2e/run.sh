@@ -120,6 +120,18 @@ screen-install-cri-resmgr() {
     vm-install-cri-resmgr
 }
 
+screen-checksum-cri-resmgr() {
+    speed=60 out "### Checking CRI Resource Manager binary against VM."
+    if  ! vm-checksum-cri-resmgr; then
+            echo "REALLY BIG FAT WARNING:"
+            echo "REALLY BIG FAT WARNING: Are you absolutely sure you intentionally omitted"
+            echo "REALLY BIG FAT WARNING:     reinstall_cri_resmgr=1"
+            echo "REALLY BIG FAT WARNING: ???"
+            echo "REALLY BIG FAT WARNING:"
+            sleep 3
+    fi
+}
+
 screen-install-cri-resmgr-debugging() {
     speed=60 out "### Installing cri-resmgr debugging enablers"
     vm-command "apt install -y golang"
@@ -682,6 +694,8 @@ fi
 
 if ! vm-command-q "[ -f /usr/local/bin/cri-resmgr ]"; then
     screen-install-cri-resmgr
+else
+    screen-checksum-cri-resmgr
 fi
 
 # Start cri-resmgr if not already running
