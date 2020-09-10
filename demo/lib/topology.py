@@ -264,10 +264,13 @@ def dump_to_res_allowed(res_allowed_dump):
     # "pod2  c:040c0000,00000000 m:00000000,00000300"
     re_owner_mask = re.compile(r'(?P<owner>[^ ]+)\s+c:(?P<cpumask>[0-9a-f,]+)\s+m:(?P<memmask>[0-9a-f,]+)')
     for line in res_allowed_dump.splitlines():
+        if not line:
+            continue
         try:
             mdict = re_owner_mask.match(line).groupdict()
         except:
             warning("cannot parse res_allowed line %r" % (line,))
+            continue
         owner_mask[mdict["owner"]] = {
             "cpu": eval("0x" + mdict["cpumask"].replace(",", "")),
             "mem": eval("0x" + mdict["memmask"].replace(",", ""))

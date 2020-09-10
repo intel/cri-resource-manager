@@ -4,17 +4,16 @@ metadata:
   name: ${NAME}
   labels:
     app: ${NAME}
-  annotations:
-    cri-resource-manager.intel.com/prefer-isolated-cpus: '${ISO}'
 spec:
   containers:
-  - image: busybox
+  $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
+  - name: ${NAME}c$(( contnum - 1 ))
+    image: busybox
     command:
       - sh
       - -c
-      - echo ${NAME}c0 \$(sleep inf)
+      - echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
     imagePullPolicy: IfNotPresent
-    name: busybox
     resources:
       requests:
         cpu: ${CPU}
@@ -22,4 +21,5 @@ spec:
       limits:
         cpu: ${CPU}
         memory: '${MEM}'
+  "; done )
   terminationGracePeriodSeconds: 1

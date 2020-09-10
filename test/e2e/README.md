@@ -1,4 +1,4 @@
-# CRI Resource Manager - NUMA node tests
+# CRI Resource Manager - End-to-end tests
 
 ## Prerequisites
 
@@ -12,29 +12,42 @@ Install:
 
 ## Usage
 
+Run policy tests:
+
+```
+[VAR=VALUE...] ./run_tests.sh policies
+```
+
+Run tests only on certain policy, topology, or only selected test:
+
+```
+[VAR=VALUE...] ./run_tests.sh policies[/POLICY[/TOPOLOGY[/testNN-*]]]
+```
+
+Run custom tests:
+
 ```
 [VAR=VALUE...] ./run.sh MODE
 ```
 
-Get help on available `VAR=VALUE`'s with `./run.sh help`.
+Get help on available `VAR=VALUE`'s with `./run.sh
+help`. `run_tests.sh` calls `run.sh` in order to execute selected
+tests. Therefore the same `VAR=VALUE` definitions apply both scripts.
 
 ## Test phases
 
-In the *setup phase* NUMA node tests create a virtual machine unless
-it already exists. When it is running, tests create a single-node
-cluster and launches `cri-resmgr` on it, unless they are already
-running.
+In the *setup phase* `run.sh` creates a virtual machine unless it
+already exists. When it is running, tests create a single-node cluster
+and launches `cri-resmgr` on it, unless they are already running.
 
-In the *test phase* NUMA node tests run the default test script, a
-custom script, or give a prompt (`run.sh> `) asking a user to run test
-script commands in the `interactive` mode. *Test scripts* are `bash`
-scripts that can use helper functions for running commands and
-observing the status of the virtual machine and software running on
-it.
+In the *test phase* `run.sh` runs a test script, or gives a prompt
+(`run.sh> `) asking a user to run test script commands in the
+`interactive` mode. *Test scripts* are `bash` scripts that can use
+helper functions for running commands and observing the status of the
+virtual machine and software running on it.
 
-In the *tear down phase* NUMA node tests copy logs from the virtual
-machine and finally stop or delete the virtual machine, if that is
-wanted.
+In the *tear down phase* `run.sh` copies logs from the virtual machine
+and finally stops or deletes the virtual machine, if that is wanted.
 
 ## Test modes
 
@@ -54,7 +67,7 @@ modes.
 ## Running from scratch and quick rerun in existing virtual machine
 
 The test will use `govm`-managed virtual machine named in the `vm`
-environment variable. The default is `crirm-test-numa`. If a virtual
+environment variable. The default is `crirm-test-e2e`. If a virtual
 machine with that name exists, the test will be run on it. Otherwise
 the test will create a virtual machine with that name from
 scratch. You can delete a virtual machine with `govm delete NAME`.
@@ -74,8 +87,8 @@ existing virtual machine before rerunning the test:
 
 ```
 cri-resource-manager$ make
-cri-resource-manager$ cd test/numa
-numa$ reinstall_cri_resmgr=1 speed=1000 ./run.sh play
+cri-resource-manager$ cd test/e2e
+e2e$ reinstall_cri_resmgr=1 speed=1000 ./run.sh play
 ```
 
 You can also let the test script build `cri-resmgr` from the github
@@ -83,13 +96,13 @@ master branch. This takes place inside the virtual machine, so your
 local git sources will not be affected:
 
 ```
-numa$ reinstall_cri_resmgr=1 binsrc=github ./run.sh play
+e2e$ reinstall_cri_resmgr=1 binsrc=github ./run.sh play
 ```
 
 ## Custom tests
 
-You can run a custom test script in a virtual machine with NUMA
-setup and single-node Kubernetes cluster is running. Example:
+You can run a custom test script in a virtual machine that runs
+single-node Kubernetes cluster. Example:
 
 ```
 $ cat > myscript.sh << EOF
@@ -98,31 +111,14 @@ CPU=2 n=2 create guaranteed
 # create four pods, no resource requests
 n=4 create besteffort
 # show pods
-vm-command "kubectl get pods"
-# check that
-#   1. the first two pods are not allowed to use the same CPUs
-#   2. the first two and the last four pods are not allowed to run on
-#      the same CPUs
-#   3. the first two pods get four CPUs in total.
-verify 'cpus[0] & cpus[1] == 0' \
-       '(cpus[2] | cpus[3] | cpus[4] | cpus[5]) & (cpus[0] | cpus[1]) == 0' \
-       'bin(cpus[0] | cpus[1]).count("1") == 4'
+kubectl get pods
+# check that the first two pods are not allowed to use the same CPUs
+verify 'cpus["pod0c0"].isdisjoint(cpus["pod1c0"])'
 EOF
-$ ./run.sh play myscript.sh
+$ ./run.sh test myscript.sh
 ```
 
-Interactive mode helps developing and debugging custom scripts:
-
-```
-$ ./run.sh interactive
-...
-run.sh> CPU=2 n=2 create guaranteed
-```
-
-You can get help on functions available in test scripts with `./run.sh
-help script`, or with `help` when in the interactive mode.
-
-## Testing different NUMA node configurations
+## Custom topologies
 
 If you change NUMA node topology of an existing virtual machine, you
 must delete the virtual machine first. Otherwise the `topology` variable
@@ -154,7 +150,7 @@ Example:
 Run the test in a VM with two NUMA nodes. There are 4 CPUs (two cores, two
 threads per core by default) and 4G RAM in each node
 ```
-numa$ govm delete my2x4 ; vm=my2x4 topology='[{"mem":"4G","cores":2,"nodes":2}]' ./run.sh play
+e2e$ govm delete my2x4 ; vm=my2x4 topology='[{"mem":"4G","cores":2,"nodes":2}]' ./run.sh play
 ```
 
 Run the test in a VM with 32 CPUs in total: there are two packages
@@ -164,7 +160,7 @@ two threads. And with a NUMA node with 16G of non-volatile memory
 (NVRAM) but no CPUs.
 
 ```
-numa$ vm=mynvram topology='[{"mem":"4G","cores":2,"nodes":2,"dies":2,"packages":2},{"nvmem":"16G"}]' ./run.sh play
+e2e$ vm=mynvram topology='[{"mem":"4G","cores":2,"nodes":2,"dies":2,"packages":2},{"nvmem":"16G"}]' ./run.sh play
 ```
 
 ## Test output
@@ -179,4 +175,38 @@ You can find Qemu output from Docker logs. For instance, output of the
 most recent Qemu launced by `govm`:
 ```
 $ docker logs $(docker ps | awk '/govm/{print $1; exit}')
+```
+
+## Manual testing and debugging
+
+Interactive mode helps developing and debugging scripts:
+
+```
+$ ./run.sh interactive
+...
+run.sh> CPU=2 n=2 create guaranteed
+```
+
+You can get help on functions available in test scripts with `./run.sh
+help script`, or with `help` and `help FUNCTION` when in the
+interactive mode.
+
+If a test has stopped to a failing `verify`, you can inspect
+`cri-resmgr` cache and allowed OS resources in Python after the test
+run:
+
+```
+$ PYTHONPATH=<TEST-OUTPUT-DIR> python3
+>>> from pyexec_state import *
+>>> pp(allowed) # allowed OS resources
+>>> pp(pods["pod0"]) # pod entry in cache
+>>> pp(containers["pod0c0"])) # container entry in cache
+```
+
+If you want to get the interactive prompt in the middle of a test run
+wherever a `verify` or `create` fails, you can set a `on_FUNC_fail` hook to
+either or both of them. Example:
+
+```
+$ on_verify_fail=interactive ./run.sh myscript.sh
 ```
