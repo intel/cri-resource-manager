@@ -14,6 +14,17 @@ VM_GOVM_COMPOSE_TEMPLATE="vms:
       - EXTRA_QEMU_OPTS=\$(echo "\${EXTRA_QEMU_OPTS}")
 "
 
+vm-check-env() {
+    if [ ! -e ${HOME}/.ssh/id_rsa.pub ]; then
+        echo "ERROR:"
+        echo "ERROR: environment check failed."
+        echo "ERROR: You don't have an id_rsa.pub SSH public key, but govm needs it."
+        echo "ERROR: You can generate one by running ssh-keygen."
+        echo "ERROR:"
+        return 1
+    fi
+}
+
 vm-command() { # script API
     # Usage: vm-command COMMAND
     #
@@ -172,3 +183,5 @@ vm-print-usage() {
     echo "- Stop VM:      govm stop $VM_NAME"
     echo "- Delete VM:    govm delete $VM_NAME"
 }
+
+vm-check-env || exit 1
