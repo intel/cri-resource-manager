@@ -98,6 +98,9 @@ else
     GCFLAGS=
 endif
 
+# Release/end-to-end testing. Specify E2E_TESTS to override the default test set.
+E2E_RUN := reinstall_cri_resmgr=1 test/e2e/run_tests.sh
+
 # tar-related commands and options.
 TAR        := tar
 TAR_UPDATE := $(TAR) -uf
@@ -358,8 +361,16 @@ else
             exit $$rc
 endif
 
-release-tests:
-	$(Q): # An empty placeholder
+release-tests: e2e-tests
+
+e2e-tests: build
+	$(Q)tests="$(if $(E2E_TESTS),$(E2E_TESTS),test/e2e/policies)"; \
+	$(E2E_RUN) $$tests; \
+	if [ "$$?" != "0" ]; then \
+	    echo "You drop into interactive mode upon failures if you run e2e tests as"; \
+	    echo "    on_verify_fail=interactive $(E2E_RUN) $$tests"; \
+	    exit 1; \
+	fi
 
 #
 # Rules for building distro packages.
@@ -607,7 +618,7 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 
 
 # phony targets
-.PHONY: all build install clean test images images-push release-tests \
+.PHONY: all build install clean test images images-push release-tests e2e-tests \
 	format vet cyclomatic-check lint golangci-lint \
 	cross-packages cross-rpm cross-deb
 
