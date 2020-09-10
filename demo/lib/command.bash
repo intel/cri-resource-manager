@@ -9,8 +9,13 @@
 #
 # command-start and command-end set environment variables:
 # COMMAND, COMMAND_STATUS, COMMAND_OUTPUT
+
+epochrealtime() {
+    [ -n "$EPOCHREALTIME" ] && echo "$EPOCHREALTIME" || echo "$SECONDS"
+}
+
 COMMAND_COUNTER=0
-command_init_time=$EPOCHREALTIME
+command_init_time=$(epochrealtime)
 
 command-start() {
     # example: command-start vm prompt "mkdir $MYDIR"
@@ -20,7 +25,7 @@ command-start() {
     COMMAND_STATUS=""
     COMMAND_OUTPUT=""
     COMMAND_COUNTER=$(( COMMAND_COUNTER + 1 ))
-    local command_start_time=$EPOCHREALTIME
+    local command_start_time=$(epochrealtime)
     local time_since_start=$(echo "$command_start_time - $command_init_time" | bc)
     COMMAND_OUT_FILE="$COMMAND_OUTPUT_DIR/$(printf %04g $COMMAND_COUNTER)-$COMMAND_TARGET"
     echo "# start time: $time_since_start" > "$COMMAND_OUT_FILE" || {
@@ -60,7 +65,7 @@ command-runs-in-bg() {
 command-end() {
     # example: command-end EXIT_STATUS
     COMMAND_STATUS=$1
-    local command_end_time=$EPOCHREALTIME
+    local command_end_time=$(epochrealtime)
     local time_since_start=$(echo "$command_end_time - $command_init_time" | bc)
     ( echo "# exit status: $COMMAND_STATUS"; echo "# end time: $time_since_start" ) >> "$COMMAND_OUT_FILE"
     COMMAND_OUTPUT=$(<"$COMMAND_OUT_FILE.tmp")
