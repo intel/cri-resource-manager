@@ -133,18 +133,7 @@ screen-install-cri-resmgr-debugging() {
 
 screen-launch-cri-resmgr() {
     speed=60 out "### Launching cri-resmgr with config $cri_resmgr_cfg."
-    host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
-        command-error "copying \"$cri_resmgr_cfg\" to VM failed"
-    }
-    vm-command "cat $(basename "$cri_resmgr_cfg")"
-    vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") >cri-resmgr.output.txt 2>&1 &"
-    sleep 2 >/dev/null 2>&1
-    vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
-        command-error "launching cri-resmgr failed with FATAL ERROR"
-    }
-    vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
-        command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
-    }
+    launch cri-resmgr
 }
 
 screen-create-singlenode-cluster() {
@@ -301,6 +290,59 @@ run-hook() {
 }
 
 ### Test script helpers
+
+install() { # script API
+    # Usage: install TARGET
+    #
+    # Supported TARGETs:
+    #   cri-resmgr: install cri-resmgr to VM.
+    #               Install latest local build to VM: (the default)
+    #                 $ install cri-resmgr
+    #               Fetch github master to VM, build and install on VM:
+    #                 $ binsrc=github install cri-resmgr
+    #
+    # Example:
+    #   uninstall cri-resmgr
+    #   install cri-resmgr
+    #   launch cri-resmgr
+    if [ "$1" == "cri-resmgr" ]; then
+        vm-install-cri-resmgr
+    else
+        error "unknown target to install \"$1\""
+    fi
+}
+
+uninstall() { # script API
+    # Usage: uninstall TARGET
+    #
+    # Supported TARGETs:
+    #   cri-resmgr: stop (kill) cri-resmgr and purge all files from VM.
+    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null; rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr"
+}
+
+launch() { # script API
+    # Usage: launch TARGET
+    #
+    # Supported TARGETs:
+    #   cri-resmgr:  launch cri-resmgr on VM with configuration file
+    #                in environment variable cri_resmgr_cfg.
+    #
+    # Example:
+    #   cri_resmgr_cfg=/tmp/memtier.cfg launch cri-resmgr
+    host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+        command-error "copying \"$cri_resmgr_cfg\" to VM failed"
+    }
+    vm-command "cat $(basename "$cri_resmgr_cfg")"
+    vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") >cri-resmgr.output.txt 2>&1 &"
+    sleep 2 >/dev/null 2>&1
+    vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
+        command-error "launching cri-resmgr failed with FATAL ERROR"
+    }
+    vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
+        command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
+    }
+
+}
 
 sleep() { # script API
     # Usage: sleep PARAMETERS
@@ -598,6 +640,7 @@ CPU=2 n=2 create guaranteed # creates pod 8 and 9, 7 CPUs taken
 verify \\
     'len(set.union(cpus[\"pod0c0\"], cpus[\"pod1c0\"], cpus[\"pod8c0\"], cpus[\"pod9c0\"])) == 7'
 "}
+warning_delay=${warning_delay-5}
 
 yaml_in_defaults="CPU=1 MEM=100M ISO=true CPUREQ=1 CPULIM=2 MEMREQ=100M MEMLIM=200M CONTCOUNT=1"
 
@@ -677,17 +720,19 @@ if ! vm-command-q "dpkg -l | grep -q kubelet"; then
 fi
 
 if [ "$reinstall_cri_resmgr" == "1" ]; then
-    vm-command "kill -9 \$(pgrep cri-resmgr); rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr"
+    uninstall cri-resmgr
 fi
 
 if ! vm-command-q "[ -f /usr/local/bin/cri-resmgr ]"; then
-    screen-install-cri-resmgr
+    install cri-resmgr
 fi
 
 # Start cri-resmgr if not already running
 if ! vm-command-q "pidof cri-resmgr" >/dev/null; then
     screen-launch-cri-resmgr
 fi
+
+vm-check-binary-cri-resmgr
 
 # Create kubernetes cluster or wait that it is online
 if vm-command-q "[ ! -f /var/lib/kubelet/config.yaml ]"; then

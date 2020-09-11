@@ -58,6 +58,22 @@ vm-check-env() {
     fi
 }
 
+vm-check-binary-cri-resmgr() {
+    # Check running cri-resmgr version, print warning if it is not
+    # the latest local build.
+    if [ -f "$BIN_DIR/cri-resmgr" ] && [ "$(vm-command-q 'md5sum < /proc/$(pidof cri-resmgr)/exe')" != "$(md5sum < "$BIN_DIR/cri-resmgr")" ]; then
+        echo "WARNING:"
+        echo "WARNING: Running cri-resmgr binary is different from"
+        echo "WARNING: $BIN_DIR/cri-resmgr"
+        echo "WARNING: Consider restarting with \"reinstall_cri_resmgr=1\" or"
+        echo "WARNING: run.sh> uninstall cri-resmgr; install cri-resmgr; launch cri-resmgr"
+        echo "WARNING:"
+        sleep ${warning_delay}
+        return 1
+    fi
+    return 0
+}
+
 vm-command() { # script API
     # Usage: vm-command COMMAND
     #
@@ -104,6 +120,7 @@ vm-set-kernel-cmdline() { # script API
     #   vm-set-kernel-cmdline nr_cpus=4
     #   vm-reboot
     #   vm-command "cat /proc/cmdline"
+    #   launch cri-resmgr
     local e2e_defaults="$1"
     vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\"' > /etc/default/grub.d/60-e2e-defaults.cfg" || {
         command-error "writing new command line parameters failed"
@@ -149,11 +166,11 @@ vm-install-cri-resmgr() {
         bin_change=$(stat --format "%Z" "$BIN_DIR/cri-resmgr")
         src_change=$(find "$HOST_PROJECT_DIR" -name '*.go' -type f | xargs stat --format "%Z" | sort -n | tail -n 1)
         if [[ "$src_change" > "$bin_change" ]]; then
-            echo ""
-            echo "!!! WARNING !!!"
-            echo "!!! SOURCE FILES CHANGED - INSTALLING POSSIBLY OUTDATED EXECUTABLES"
-            echo "!!! FROM $BIN_DIR/"
-            echo ""
+            echo "WARNING:"
+            echo "WARNING: Source files changed - installing possibly outdated binaries from"
+            echo "WARNING: $BIN_DIR/"
+            echo "WARNING:"
+            sleep ${warning_delay}
         fi
         host-command "scp \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying local cri-resmgr to VM failed"
