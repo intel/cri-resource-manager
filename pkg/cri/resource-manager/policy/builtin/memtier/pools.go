@@ -647,8 +647,8 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	affinity1, affinity2 := affinity[id1], affinity[id2]
 
 	log.Debug("comparing scores for %s and %s", node1.Name(), node2.Name())
-	log.Debug("  score1: %s", score1.String())
-	log.Debug("  score2: %s", score2.String())
+	log.Debug("  %s: %s", node1.Name(), score1.String())
+	log.Debug("  %s: %s", node2.Name(), score2.String())
 
 	//
 	// Notes:
@@ -677,10 +677,10 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 
 	// 1) a node with insufficient isolated or shared capacity loses
 	switch {
-	case (isolated2 < 0 && isolated1 >= 0) || (shared2 < 0 && shared1 >= 0):
+	case (isolated2 < 0 && isolated1 >= 0) || (shared2 <= 0 && shared1 > 0):
 		log.Debug("  => %s loses, insufficent isolated or shared", node2.Name())
 		return true
-	case (isolated1 < 0 && isolated2 >= 0) || (shared1 < 0 && shared2 >= 0):
+	case (isolated1 < 0 && isolated2 >= 0) || (shared1 <= 0 && shared2 > 0):
 		log.Debug("  => %s loses, insufficent isolated or shared", node1.Name())
 		return false
 	}
