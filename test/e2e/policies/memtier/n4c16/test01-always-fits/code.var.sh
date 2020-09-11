@@ -28,7 +28,15 @@ verify \
     'len(nodes["pod2c0"]) == 1' \
     'disjoint_sets(cpus["pod0c0"], cpus["pod1c0"], cpus["pod2c0"])'
 
-# pod3, takes a full node
+# pod3, tries to fully exhaust the shared subset of a (NUMA node) pool
+# Currently memtier refuses to exhaust even idle shared CPU subsets of
+# a pool. Therefore such attempts will try to squeeze the container to
+# another pool at the same level or, if none found, push the container
+# one level up to the parent pool.
+#
+# There is a pending commit to change this behavior to allow exhausting
+# fully idle subsets (no active shared grants). Once that lands, update
+# this test accordingly as well.
 CPU=4 create guaranteed
 report allowed
 verify \
@@ -40,7 +48,7 @@ verify \
     'len(nodes["pod2c0"]) == 1' \
     'len(cpus["pod3c0"]) == 4' \
     'len(cores["pod3c0"]) == 2' \
-    'len(nodes["pod3c0"]) == 1' \
+    'len(nodes["pod3c0"]) == 2' \
     'disjoint_sets(cpus["pod0c0"], cpus["pod1c0"], cpus["pod2c0"], cpus["pod3c0"])'
 
 kubectl delete pods --all --now
