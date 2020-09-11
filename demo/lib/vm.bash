@@ -15,11 +15,44 @@ VM_GOVM_COMPOSE_TEMPLATE="vms:
 "
 
 vm-check-env() {
+    type -p govm >& /dev/null || {
+        echo "ERROR:"
+        echo "ERROR: environment check failed:"
+        echo "ERROR:   govm binary not found."
+        echo "ERROR:"
+        echo "ERROR: You can install it using the following commands:"
+        echo "ERROR:"
+        echo "ERROR:     git clone https://github.com/govm-project/govm"
+        echo "ERROR:     cd govm"
+        echo "ERROR:     go build -o govm"
+        echo "ERROR:     cp -v govm \$GOPATH/bin"
+        echo "ERROR:     docker build . -t govm/govm:latest"
+        echo "ERROR:     cd .."
+        echo "ERROR:"
+        return 1
+    }
+    docker inspect govm/govm >& /dev/null || {
+        echo "ERROR:"
+        echo "ERROR: environment check failed:"
+        echo "ERROR:   govm/govm docker image not present (but govm needs it)."
+        echo "ERROR:"
+        echo "ERROR: You can install it using the following commands:"
+        echo "ERROR:"
+        echo "ERROR:     git clone https://github.com/govm-project/govm"
+        echo "ERROR:     cd govm"
+        echo "ERROR:     docker build . -t govm/govm:latest"
+        echo "ERROR:     cd .."
+        echo "ERROR:"
+        return 1
+    }
     if [ ! -e ${HOME}/.ssh/id_rsa.pub ]; then
         echo "ERROR:"
-        echo "ERROR: environment check failed."
-        echo "ERROR: You don't have an id_rsa.pub SSH public key, but govm needs it."
-        echo "ERROR: You can generate one by running ssh-keygen."
+        echo "ERROR: environment check failed:"
+        echo "ERROR:   id_rsa.pub SSH public key not found (but govm needs it)."
+        echo "ERROR:"
+        echo "ERROR: You can generate it using the following command:"
+        echo "ERROR:"
+        echo "ERROR:     ssh-keygen"
         echo "ERROR:"
         return 1
     fi
