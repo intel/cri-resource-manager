@@ -1,0 +1,66 @@
+name: Release Tests
+on:
+  pull_request:
+    branches:
+      - 'releases/**'
+  push:
+    branches:
+      - 'releases/**'
+      - '**/release-tests'
+    tags:
+      - v*
+
+jobs:
+  build:
+    name: Run Release Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install golang-1.14
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14
+      id: go
+
+    - name: Install golang protoc generator
+      run: go get -u github.com/golang/protobuf/protoc-gen-go
+
+    - name: Install golang protoc gRPC plugin
+      run: go get -u google.golang.org/grpc
+
+    - name: Install vfsgendev
+      run: go get -u github.com/shurcooL/vfsgen/cmd/vfsgendev
+
+    - name: Clone CRI Resource Manager
+      uses: actions/checkout@v2
+
+    - name: Clone govm/govm
+      uses: actions/checkout@v2
+      with:
+        repository: govm-project/govm
+        path: govm/govm
+
+    - name: Compile govm
+      run: |
+          cd govm/govm
+          go build -o govm
+          sudo cp govm $(go env GOROOT)/bin
+
+    - name: Generate govm docker image
+      run: |
+          cd govm/govm
+          sudo docker build . -f Dockerfile -t govm/govm:latest
+
+    - name: Generate govm SSH key
+      run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          ssh-keygen -t rsa -b 1024 -f ~/.ssh/id_rsa -N ""
+
+    - name: Build CRI Resource Manager
+      run: make build
+
+    - name: Set up tmate session/ssh into workflow runner VM
+      if: ${{ contains(github.ref, 'debug') || contains(github.base_ref, 'debug') }}
+      uses: mxschmitt/action-tmate@v3
+
+    - name: Run release tests
+      run: USE_NET_BRIDGES=1 make release-tests
