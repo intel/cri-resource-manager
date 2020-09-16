@@ -12,6 +12,7 @@ VM_GOVM_COMPOSE_TEMPLATE="vms:
     ContainerEnvVars:
       - KVM_CPU_OPTS=\$(echo "\${KVM_CPU_OPTS}")
       - EXTRA_QEMU_OPTS=\$(echo "\${EXTRA_QEMU_OPTS}")
+      - USE_NET_BRIDGES=${USE_NET_BRIDGES-0}
 "
 
 vm-check-env() {
