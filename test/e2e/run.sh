@@ -260,8 +260,9 @@ resolve-template() {
         fi
         if [ -z "$r" ]; then
             r="$t"
+            echo 1>&2 "template $name resolved to file $r"
         else
-            echo "WARNING: template file $r shadows $t"
+            echo 1>&2 "WARNING: template file $r shadows $t"
         fi
     done
     if [ -n "$r" ]; then
