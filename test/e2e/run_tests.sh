@@ -8,7 +8,7 @@ usage() {
     echo "TESTS_DIR is expected to be structured as POLICY/TOPOLOGY/TEST with files:"
     echo "POLICY/cri-resmgr.cfg: configuration of cri-resmgr"
     echo "POLICY/TOPOLOGY/topology.var.json: contents of the topology variable for run.sh"
-    echo "POLICY/TOPOLOGY/code.var.sh: contents of the code var (that is, test script)"
+    echo "POLICY/TOPOLOGY/TEST/code.var.sh: contents of the code var (that is, test script)"
 }
 
 error() {
