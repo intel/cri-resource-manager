@@ -158,7 +158,7 @@ get-py-allowed() {
         echo -e "$COMMAND_OUTPUT" > "$topology_dump_file"
     fi
     # Fetch data and update allowed* variables from the virtual machine
-    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed pod{0,1,2,3,4,5,6,7,8,9}c{0,1,2,3})" >/dev/null || {
+    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed 'pod[0-9]*c[0-9]*')" >/dev/null || {
         command-error "error fetching res_allowed from $VM_NAME"
     }
     echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
