@@ -78,6 +78,7 @@ BUILD_BUILDID := $(shell scripts/build/get-buildid --buildid --shell=no)
 RPM_VERSION   := $(shell scripts/build/get-buildid --rpm --shell=no)
 DEB_VERSION   := $(shell scripts/build/get-buildid --deb --shell=no)
 TAR_VERSION   := $(shell scripts/build/get-buildid --tar --shell=no)
+SITE_VERSION  := $(shell scripts/build/get-buildid --site --shell=no)
 
 # Kubernetes version we pull in as modules and our external API versions.
 KUBERNETES_VERSION := $(shell grep 'k8s.io/kubernetes ' go.mod | sed 's/^.* //')
@@ -643,24 +644,24 @@ BUILDDIR      = _build
 
 vhtml: _work/venv/.stamp
 	. _work/venv/bin/activate && \
-		$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) && \
-		cp docs/html/index.html $(BUILDDIR)/html/index.html
+		make -C docs html && \
+		cp -r docs/_build .
 
 html:
-		$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) && \
-		cp docs/html/index.html $(BUILDDIR)/html/index.html
+	$(SPHINXBUILD) -c docs . "$(BUILDDIR)" $(SPHINXOPTS)
+	cp docs/index.html "$(BUILDDIR)"
 
 clean-html:
-	rm -rf $(BUILDDIR)/html
+	rm -rf $(BUILDDIR)/*
 
 site-build: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
 	$(Q)$(DOCKER_SITE_CMD) make html
 
 site-serve: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
-	$(Q)$(DOCKER_SITE_CMD) bash -c "make html && cd _build/html && python3 -m http.server 8081"
+	$(Q)$(DOCKER_SITE_CMD) bash -c "make html && cd _build && python3 -m http.server 8081"
 
-.$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile
-	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) -f docs/Dockerfile .
+.$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile docs/requirements.txt
+	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) docs
 	touch $@
 
 # Set up a Python3 environment with the necessary tools for document creation.

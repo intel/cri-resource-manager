@@ -20,8 +20,9 @@ jobs:
     - name: Add latest generated docs to gh-pages
       shell: bash
       run: |
-        touch _build/html/.nojekyll
-        git --work-tree _build/html add --no-all -v .
+        touch _build/.nojekyll
+        rm -rf _build/.doctrees _build/_sources
+        git --work-tree _build add --no-all -v .
         author=$(git log --merges --pretty=format:%an -n 1)
         email=$(git log --merges --pretty=format:%ae -n 1)
         git config --global user.name "$author"
