@@ -549,7 +549,7 @@ create() { # script API
     for _ in $(seq 1 $n); do
         kind_count[$template_kind]=$(( ${kind_count[$template_kind]} + 1 ))
         local NAME="${template_kind}$(( ${kind_count[$template_kind]} - 1 ))" # the first pod is pod0
-        eval "echo -e \"$(<"${template_file}")\"" > "$OUTPUT_DIR/$NAME.yaml"
+        eval "echo -e \"$(<"${template_file}")\"" | grep -v '^ *$' > "$OUTPUT_DIR/$NAME.yaml"
         host-command "scp \"$OUTPUT_DIR/$NAME.yaml\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying \"$OUTPUT_DIR/$NAME.yaml\" to VM failed"
         }
