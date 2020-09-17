@@ -11,11 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Install dependencies
-      run: |
-        export PATH="$HOME/.local/bin:$PATH"
-        sudo apt-get install -y python3-setuptools
-        pip3 install --user -r docs/requirements.txt
+    - name: Build docs builder image
+      run: make site-build
     - name: Branch off base for updated gh-pages
       run: |
         git branch gh-pages
@@ -23,7 +20,6 @@ jobs:
     - name: Add latest generated docs to gh-pages
       shell: bash
       run: |
-        PATH="$HOME/.local/bin:$PATH" make html
         cp -rv _build/html/* .
         for f in $(find _build/html -type f -name '.*'); do \
             cp -v $f ./${f#_build/html/}; \
