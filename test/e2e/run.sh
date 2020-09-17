@@ -464,7 +464,27 @@ verify() { # script API
     get-py-cache
     for py_assertion in "$@"; do
         speed=1000 out "### Verifying assertion '$py_assertion'"
-        ( speed=1000 pyexec "assert(${py_assertion})" ) || {
+        ( speed=1000 pyexec "
+try:
+    import time,sys
+    assert(${py_assertion})
+except KeyError as e:
+    print('WARNING: *')
+    print('WARNING: *** KeyError - %s' % str(e))
+    print('WARNING: *** Your verify expression might have a typo/thinko.')
+    print('WARNING: *')
+    sys.stdout.flush()
+    time.sleep(5)
+    raise e
+except IndexError as e:
+    print('WARNING: *')
+    print('WARNING: *** IndexError - %s' % str(e))
+    print('WARNING: *** Your verify expression might have a typo/thinko.')
+    print('WARNING: *')
+    sys.stdout.flush()
+    time.sleep(5)
+    raise e
+" ) || {
                 out "### The assertion FAILED"
                 echo "verify: assertion '$py_assertion' failed." >> "$SUMMARY_FILE"
                 if is-hooked on_verify_fail; then
