@@ -109,6 +109,11 @@ screen-create-vm() {
     fi
 }
 
+screen-pull-k8s-images() {
+    speed=60 out "### Pre-pulling Kubernetes control plane images to the VM."
+    vm-pull-k8s-images
+}
+
 screen-install-k8s() {
     speed=60 out "### Installing Kubernetes to the VM."
     vm-install-containerd
@@ -287,6 +292,21 @@ run-hook() {
     hook_code="${!hook_code_var}"
     echo "Running hook: $hook_code_var"
     eval "${hook_code}"
+}
+
+HOSTVM_RETURN=""
+is-host-vm() {
+   if [ -z "$HOSTVM_RETURN" ]; then
+       case $(uname -r) in
+           *-azure)
+               HOSTVM_RETURN=0
+               ;;
+           *)
+               HOSTVM_RETURN=1
+               ;;
+       esac
+   fi
+   return $HOSTVM_RETURN
 }
 
 ### Test script helpers
@@ -736,6 +756,7 @@ vm-check-binary-cri-resmgr
 
 # Create kubernetes cluster or wait that it is online
 if vm-command-q "[ ! -f /var/lib/kubelet/config.yaml ]"; then
+    screen-pull-k8s-images
     screen-create-singlenode-cluster
 else
     # Wait for kube-apiserver to launch (may be down if the VM was just booted)

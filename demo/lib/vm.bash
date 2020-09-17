@@ -243,6 +243,10 @@ vm-install-k8s() {
     vm-command "apt update &&  apt install -y kubelet kubeadm kubectl"
 }
 
+vm-pull-k8s-images() {
+    vm-command "kubeadm config images pull --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
+}
+
 vm-create-singlenode-cluster-cilium() {
     vm-command "kubeadm init --pod-network-cidr=10.217.0.0/16 --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
