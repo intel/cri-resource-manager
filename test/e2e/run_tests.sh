@@ -116,7 +116,8 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
                         export outdir="$TEST_DIR/output"
                         mkdir -p "$outdir"
                         echo "Run $(basename "$TEST_DIR")"
-                        "$RUN_SH" test 2>&1 | tee "$outdir/run.sh.output"
+                        TEST_DIR=$TEST_DIR TOPOLOGY_DIR=$TOPOLOGY_DIR POLICY_DIR=$POLICY_DIR \
+                            "$RUN_SH" test 2>&1 | tee "$outdir/run.sh.output"
                         test_name="$(basename "$POLICY_DIR")/$(basename "$TOPOLOGY_DIR")/$(basename "$TEST_DIR")"
                         if grep -q "Test verdict: PASS" "$outdir/run.sh.output"; then
                             echo "PASS $test_name" >> "$summary_file"
