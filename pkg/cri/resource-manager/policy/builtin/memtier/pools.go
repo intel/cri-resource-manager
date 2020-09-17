@@ -775,7 +775,7 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	log.Debug("  - depth is a TIE")
 
 	// 6) more isolated capacity wins
-	if request.Isolate() {
+	if request.Isolate() && (isolated1 > 0 || isolated2 > 0) {
 		if isolated1 > isolated2 {
 			return true
 		}
@@ -790,7 +790,7 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	}
 
 	// 7) more slicable shared capacity wins
-	if request.FullCPUs() > 0 {
+	if request.FullCPUs() > 0 && (shared1 > 0 || shared2 > 0) {
 		if shared1 > shared2 {
 			log.Debug("  => %s WINS on more slicable capacity", node1.Name())
 			return true
