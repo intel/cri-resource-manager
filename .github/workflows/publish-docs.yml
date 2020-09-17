@@ -20,22 +20,13 @@ jobs:
     - name: Add latest generated docs to gh-pages
       shell: bash
       run: |
-        cp -rv _build/html/* .
-        for f in $(find _build/html -type f -name '.*'); do \
-            cp -v $f ./${f#_build/html/}; \
-        done
-        for src in $(find _build/html -type f); do \
-            dst="${src#_build/html/}"; \
-            echo "adding generated $dst to git repo..."; \
-            git add ./$dst; \
-        done
-        touch .nojekyll
-        git add .nojekyll
+        touch _build/html/.nojekyll
+        git --work-tree _build/html add --no-all -v .
         author=$(git log --merges --pretty=format:%an -n 1)
         email=$(git log --merges --pretty=format:%ae -n 1)
         git config --global user.name "$author"
         git config --global user.email "$email"
-        git commit -m "publish-docs.yml: generated latest html output." .
+        git commit -m "publish-docs.yml: generated latest html output."
     - name: Publish/force-push to gh-pages
       shell: bash
       env:
