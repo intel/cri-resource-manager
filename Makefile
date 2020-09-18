@@ -120,6 +120,8 @@ SPEC_FILES = $(shell find packaging -name \*.spec.in | sed 's/.spec.in/.spec/g' 
 SYSTEMD_DIRS = $(shell find cmd -name \*.service -o -name \*.socket | sed 's:cmd/::g;s:/.*::g'|uniq)
 SYSCONF_DIRS = $(shell find cmd -name \*.sysconf | sed 's:cmd/::g;s:/.*::g' | uniq)
 
+DOCKER := docker
+
 # Extra options to pass to docker (for instance --network host).
 DOCKER_OPTIONS =
 
@@ -141,6 +143,10 @@ DOCKER_RPM_BUILD := \
         rpmbuild -bb $$spec; \
     done && \
     cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
+
+# Docker base command for working with html documentation.
+DOCKER_SITE_BUILDER_IMAGE := cri-resmgr-site-builder
+DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` -p 8081:8081 $(DOCKER_SITE_BUILDER_IMAGE)
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
@@ -285,12 +291,12 @@ clean-gen:
 
 image-%:
 	$(Q)bin=$(patsubst image-%,%,$@); \
-		docker build . -f "cmd/$$bin/Dockerfile" -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
+		$(DOCKER) build . -f "cmd/$$bin/Dockerfile" -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
 image-push-%: image-%
 	$(Q)bin=$(patsubst image-push-%,%,$@); \
 		if [ -z "$(IMAGE_REPO)" ]; then echo "ERROR: no IMAGE_REPO specified"; exit 1; fi; \
-		docker push $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
+		$(DOCKER) push $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
 #
 # Rules for format checking, various code quality and complexity checks and measures.
@@ -456,7 +462,7 @@ cross-rpm.%: docker/cross-build/% clean-spec spec dist
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp packaging/rpm/cri-resource-manager.spec $$builddir/input && \
-	docker run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
@@ -499,7 +505,7 @@ cross-deb.%: docker/cross-build/% \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp -r debian $$builddir/input && \
-	docker run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
@@ -513,7 +519,7 @@ deb: debian/changelog debian/control debian/rules debian/compat dist
 docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	$(Q)distro=$(patsubst docker/cross-build/%,%,$@) && \
 	echo "Building cross-build docker image for $$distro..." && \
-	img=$${distro}-build && docker rm $$distro-build || : && \
+	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
 	scripts/build/docker-build-image $$distro-build --container $(DOCKER_OPTIONS)
 
 # Rule for recompiling a changed protobuf.
@@ -627,7 +633,11 @@ SPHINXBUILD   = sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
 
-# Generate doc site under _build/html with Sphinx.
+
+#
+# Rules for documentation
+#
+
 vhtml: _work/venv/.stamp
 	. _work/venv/bin/activate && \
 		$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) && \
@@ -639,6 +649,16 @@ html:
 
 clean-html:
 	rm -rf $(BUILDDIR)/html
+
+site-build: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
+	$(Q)$(DOCKER_SITE_CMD) make html
+
+site-serve: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
+	$(Q)$(DOCKER_SITE_CMD) bash -c "make html && cd _build/html && python3 -m http.server 8081"
+
+.$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile
+	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) -f docs/Dockerfile .
+	touch $@
 
 # Set up a Python3 environment with the necessary tools for document creation.
 _work/venv/.stamp: docs/requirements.txt
