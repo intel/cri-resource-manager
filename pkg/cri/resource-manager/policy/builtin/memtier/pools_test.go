@@ -17,6 +17,7 @@ package memtier
 import (
 	"archive/tar"
 	"compress/bzip2"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -36,6 +37,15 @@ import (
 func findNodeWithID(id int, nodes []Node) Node {
 	for _, node := range nodes {
 		if node.NodeID() == id {
+			return node
+		}
+	}
+	panic("No node found")
+}
+
+func findNodeWithName(name string, nodes []Node) Node {
+	for _, node := range nodes {
+		if node.Name() == name {
 			return node
 		}
 	}
@@ -721,6 +731,244 @@ func TestContainerMove(t *testing.T) {
 			}
 			if grant3.GetMemoryNode().IsLeafNode() != tc.expectedLeafNodeForContainer3 {
 				t.Errorf("Workload 3 should have been placed in a leaf node: %t, node: %s", tc.expectedLeafNodeForContainer3, grant3.GetMemoryNode().Name())
+			}
+		})
+	}
+}
+
+func TestAffinities(t *testing.T) {
+	//
+	// Test how (already pre-calculated) affinities affect workload placement.
+	//
+
+	// Create a temporary directory for the test data.
+	dir, err := ioutil.TempDir("", "cri-resource-manager-test-sysfs-")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(dir)
+
+	// Uncompress the test data to the directory.
+	file, err := os.Open(path.Join("testdata", "sysfs.tar.bz2"))
+	if err != nil {
+		panic(err)
+	}
+	err = uncompress(file, dir)
+	if err != nil {
+		panic(err)
+	}
+
+	tcases := []struct {
+		path       string
+		name       string
+		req        Request
+		affinities map[string]int32
+		expected   string
+	}{
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "no affinities",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{},
+			expected:   "numa node #0",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "affinity to NUMA node #1",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"numa node #1": 1,
+			},
+			expected: "numa node #1",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "affinity to socket #1",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"socket #1": 1,
+			},
+			expected: "socket #1",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "equal affinities to numa node #1, socket #1",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"socket #1":    1,
+				"numa node #1": 1,
+			},
+			expected: "numa node #1",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "equal affinities to numa node #1, numa node #3",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"numa node #1": 1,
+				"numa node #3": 1,
+			},
+			expected: "socket #1",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "double affinity to numa node #1 vs. #3",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"numa node #1": 2,
+				"numa node #3": 1,
+			},
+			expected: "socket #1",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "triple affinity to numa node #1 vs. #3",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"numa node #1": 3,
+				"numa node #3": 1,
+			},
+			expected: "numa node #1",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "double affinity to numa node #0,#3 vs. socket #1",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"numa node #0": 2,
+				"numa node #3": 2,
+				"socket #1":    1,
+			},
+			expected: "root",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "equal affinity to numa node #0,#3 vs. socket #1",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"numa node #0": 1,
+				"numa node #3": 1,
+				"socket #1":    1,
+			},
+			expected: "root",
+		},
+		{
+			path: path.Join(dir, "sysfs", "server", "sys"),
+			name: "half the affinity to numa node #0,#3 vs. socket #1",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryUnspec,
+				isolate:   false,
+				full:      3,
+				container: &mockContainer{},
+			},
+			affinities: map[string]int32{
+				"numa node #0": 1,
+				"numa node #3": 1,
+				"socket #1":    2,
+			},
+			expected: "socket #1",
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			sys, err := system.DiscoverSystemAt(tc.path)
+			if err != nil {
+				panic(err)
+			}
+
+			policy := &policy{
+				sys:   sys,
+				cache: &mockCache{},
+			}
+
+			err = policy.buildPoolsByTopology()
+			if err != nil {
+				panic(err)
+			}
+
+			affinities := map[int]int32{}
+			for name, weight := range tc.affinities {
+				affinities[findNodeWithName(name, policy.pools).NodeID()] = weight
+			}
+
+			flag.CommandLine.Parse([]string{"--logger-debug", "*"})
+			scores, filteredPools := policy.sortPoolsByScore(tc.req, affinities)
+			fmt.Printf("scores: %v, remaining pools: %v\n", scores, filteredPools)
+			flag.CommandLine.Parse([]string{"--logger-debug", "off:*"})
+
+			if len(filteredPools) < 1 {
+				t.Errorf("pool scoring failed to find any pools")
+			}
+
+			node := filteredPools[0]
+			if node.Name() != tc.expected {
+				t.Errorf("expected best pool %s, got %s", tc.expected, node.Name())
 			}
 		})
 	}
