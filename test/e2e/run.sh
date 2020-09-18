@@ -158,7 +158,7 @@ get-py-allowed() {
         echo -e "$COMMAND_OUTPUT" > "$topology_dump_file"
     fi
     # Fetch data and update allowed* variables from the virtual machine
-    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed pod{0,1,2,3,4,5,6,7,8,9}c{0,1,2,3})" >/dev/null || {
+    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed 'pod[0-9]*c[0-9]*')" >/dev/null || {
         command-error "error fetching res_allowed from $VM_NAME"
     }
     echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
@@ -260,8 +260,9 @@ resolve-template() {
         fi
         if [ -z "$r" ]; then
             r="$t"
+            echo 1>&2 "template $name resolved to file $r"
         else
-            echo "WARNING: template file $r shadows $t"
+            echo 1>&2 "WARNING: template file $r shadows $t"
         fi
     done
     if [ -n "$r" ]; then
@@ -463,7 +464,27 @@ verify() { # script API
     get-py-cache
     for py_assertion in "$@"; do
         speed=1000 out "### Verifying assertion '$py_assertion'"
-        ( speed=1000 pyexec "assert(${py_assertion})" ) || {
+        ( speed=1000 pyexec "
+try:
+    import time,sys
+    assert(${py_assertion})
+except KeyError as e:
+    print('WARNING: *')
+    print('WARNING: *** KeyError - %s' % str(e))
+    print('WARNING: *** Your verify expression might have a typo/thinko.')
+    print('WARNING: *')
+    sys.stdout.flush()
+    time.sleep(5)
+    raise e
+except IndexError as e:
+    print('WARNING: *')
+    print('WARNING: *** IndexError - %s' % str(e))
+    print('WARNING: *** Your verify expression might have a typo/thinko.')
+    print('WARNING: *')
+    sys.stdout.flush()
+    time.sleep(5)
+    raise e
+" ) || {
                 out "### The assertion FAILED"
                 echo "verify: assertion '$py_assertion' failed." >> "$SUMMARY_FILE"
                 if is-hooked on_verify_fail; then
@@ -528,7 +549,7 @@ create() { # script API
     for _ in $(seq 1 $n); do
         kind_count[$template_kind]=$(( ${kind_count[$template_kind]} + 1 ))
         local NAME="${template_kind}$(( ${kind_count[$template_kind]} - 1 ))" # the first pod is pod0
-        eval "echo -e \"$(<"${template_file}")\"" > "$OUTPUT_DIR/$NAME.yaml"
+        eval "echo -e \"$(<"${template_file}")\"" | grep -v '^ *$' > "$OUTPUT_DIR/$NAME.yaml"
         host-command "scp \"$OUTPUT_DIR/$NAME.yaml\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying \"$OUTPUT_DIR/$NAME.yaml\" to VM failed"
         }
