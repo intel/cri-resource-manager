@@ -7,4 +7,18 @@ Welcome to CRI Resource Manager's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   introduction.md
+   quick-start.md
+   installation.md
+   configuration.md
+   node-agent.md
+   webhook.md
+
+   developers-guide/index.rst
+
+   reference/index.md
+
+   contributing.md
+   security.md
+
    Project GitHub repository <https://github.com/intel/cri-resource-manager>
