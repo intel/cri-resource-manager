@@ -147,7 +147,9 @@ DOCKER_RPM_BUILD := \
 
 # Docker base command for working with html documentation.
 DOCKER_SITE_BUILDER_IMAGE := cri-resmgr-site-builder
-DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` -p 8081:8081 $(DOCKER_SITE_BUILDER_IMAGE)
+DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` \
+	-p 8081:8081 -e BUILD_VERSION=$(BUILD_VERSION) -e SITE_VERSION=$(SITE_VERSION) \
+	$(DOCKER_SITE_BUILDER_IMAGE)
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
