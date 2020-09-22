@@ -148,8 +148,7 @@ DOCKER_RPM_BUILD := \
 # Docker base command for working with html documentation.
 DOCKER_SITE_BUILDER_IMAGE := cri-resmgr-site-builder
 DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` \
-	-p 8081:8081 -e BUILD_VERSION=$(BUILD_VERSION) -e SITE_VERSION=$(SITE_VERSION) \
-	$(DOCKER_SITE_BUILDER_IMAGE)
+	-p 8081:8081 -e BUILD_VERSION=$(BUILD_VERSION) -e SITE_VERSION=$(SITE_VERSION)
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
@@ -653,14 +652,17 @@ html:
 	$(SPHINXBUILD) -c docs . "$(BUILDDIR)" $(SPHINXOPTS)
 	cp docs/index.html "$(BUILDDIR)"
 
+serve-html: html
+	$(Q)cd $(BUILDDIR) && python3 -m http.server 8081
+
 clean-html:
 	rm -rf $(BUILDDIR)/*
 
 site-build: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
-	$(Q)$(DOCKER_SITE_CMD) make html
+	$(Q)$(DOCKER_SITE_CMD) $(DOCKER_SITE_BUILDER_IMAGE) make html
 
 site-serve: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
-	$(Q)$(DOCKER_SITE_CMD) bash -c "make html && cd _build && python3 -m http.server 8081"
+	$(Q)$(DOCKER_SITE_CMD) -it $(DOCKER_SITE_BUILDER_IMAGE) make serve-html
 
 .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile docs/requirements.txt
 	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) docs
