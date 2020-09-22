@@ -66,6 +66,8 @@ usage() {
     echo "             Effective only if \"vm\" does not exist."
     echo "             See: python3 ${DEMO_LIB_DIR}/numajson2qemuopts.py --help"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
+    echo "    cri_resmgr_extra_args: arguments to be added on cri-resmgr"
+    echo "             command line when launched"
     echo "    code:    Variable that contains test script code to be run"
     echo "             if SCRIPT is not given."
     echo ""
@@ -325,8 +327,9 @@ launch() { # script API
     # Usage: launch TARGET
     #
     # Supported TARGETs:
-    #   cri-resmgr:  launch cri-resmgr on VM with configuration file
-    #                in environment variable cri_resmgr_cfg.
+    #   cri-resmgr:  launch cri-resmgr on VM. Environment variables:
+    #                cri_resmgr_cfg: configuration filepath (on host)
+    #                cri_resmgr_extra_args: extra arguments on command line
     #
     # Example:
     #   cri_resmgr_cfg=/tmp/memtier.cfg launch cri-resmgr
@@ -334,7 +337,7 @@ launch() { # script API
         command-error "copying \"$cri_resmgr_cfg\" to VM failed"
     }
     vm-command "cat $(basename "$cri_resmgr_cfg")"
-    vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") >cri-resmgr.output.txt 2>&1 &"
+    vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args >cri-resmgr.output.txt 2>&1 &"
     sleep 2 >/dev/null 2>&1
     vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
         command-error "launching cri-resmgr failed with FATAL ERROR"
@@ -630,6 +633,7 @@ mode=$1
 user_script_file=$2
 vm=${vm-"crirm-test-e2e"}
 cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
+cri_resmgr_extra_args=${cri_resmgr_extra_args-""}
 cleanup=${cleanup-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr-0}
 topology=${topology-'[
@@ -672,6 +676,8 @@ if [ "$mode" == "help" ]; then
         echo "topology=${topology}"
         echo ""
         echo "cri_resmgr_cfg=${cri_resmgr_cfg}"
+        echo ""
+        echo "cri_resmgr_extra_args=${cri_resmgr_extra_args}"
         echo ""
         echo -e "code=\"${code}\""
         echo ""
