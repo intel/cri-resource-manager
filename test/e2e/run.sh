@@ -68,6 +68,15 @@ usage() {
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
     echo "    cri_resmgr_extra_args: arguments to be added on cri-resmgr"
     echo "             command line when launched"
+    echo "    vm_files: \"serialized\" associative array of files to be created on vm"
+    echo "             associative array syntax:"
+    echo "             vm_files['/path/file']=file:/path/on/host"
+    echo "                                   ='data:,plain text content'"
+    echo "                                   =data:;base64,ZGF0YQ=="
+    echo "                                   =dir: (creates only /path/file directory)"
+    echo "             vm_files['/etc/motd']='data:,hello world'"
+    echo "             How to execute run.sh with serialized array:"
+    echo "             vm_files=\$(declare -p vm_files) ./run.sh"
     echo "    code:    Variable that contains test script code to be run"
     echo "             if SCRIPT is not given."
     echo ""
@@ -290,6 +299,54 @@ run-hook() {
     hook_code="${!hook_code_var}"
     echo "Running hook: $hook_code_var"
     eval "${hook_code}"
+}
+
+install-files() {
+    # Usage: install-files $(declare -p files_assoc_array)
+    #
+    # Parameter is a serialized associative array with
+    # key: target filepath on VM
+    # value: source URL ("file:", limited "data:" and "dir:" schemes supported)
+    #
+    # Example: build an associative array and install files in the array
+    #   files['/path/file1']=file:/hostpath/file
+    #   files['/path/file2']=data:,hello
+    #   files['/path/file3']=data:;base64,aGVsbG8=
+    #   files['/path/dir1']='dir:'
+    #   install-files "$(declare -p files)"
+    local -A files
+    eval "files=${1#*=}"
+    local tgt src data
+    for tgt in "${!files[@]}"; do
+        src="${files[$tgt]}"
+        case $src in
+            "data:,"*)
+                data=${src#data:,}
+                ;;
+            "data:;base64,"*)
+                data=$(base64 -d <<< "${src#data:;base64,}")
+                ;;
+            "file:"*)
+                data=$(< "${src#file:}")
+                ;;
+            "dir:")
+                echo -n "Creating on vm: $tgt/... "
+                vm-command-q "mkdir -p \"$tgt\"" || {
+                    error "failed to make directory to vm \"$tgt\""
+                }
+                echo "ok."
+                continue
+                ;;
+            *)
+                error "invalid source scheme \"${src}\", expected \"data:,\" \"data:;base64,\", \"file:\" or \"dir:\""
+                ;;
+        esac
+        echo -n "Writing on vm: $tgt... "
+        vm-write-file "$tgt" "$data" || {
+            error "failed to write to vm file \"$tgt\""
+        }
+        echo "ok."
+    done
 }
 
 ### Test script helpers
@@ -632,6 +689,7 @@ INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
 vm=${vm-"crirm-test-e2e"}
+vm_files=${vm_files-""}
 cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
 cri_resmgr_extra_args=${cri_resmgr_extra_args-""}
 cleanup=${cleanup-0}
@@ -740,6 +798,10 @@ fi
 
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ] || [ -z "$VM_NAME" ]; then
     screen-create-vm
+fi
+
+if [ -n "$vm_files" ]; then
+    install-files "$vm_files"
 fi
 
 if ! vm-command-q "dpkg -l | grep -q kubelet"; then
