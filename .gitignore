@@ -1,11 +1,18 @@
 *~
+*.swp
+
 *_gendata.go
-cmd/cri-resmgr/cri-resmgr
-cmd/cri-resmgr-agent/cri-resmgr-agent
-cmd/webhook/webhook
+/bin
 coverage.html
 coverage.txt
 .git-hooks.redirected
 
+*.tar
+*.tar.*
+*.spec
+/debian
+/packages
+
 /_build
 /_work
+*.stamp
