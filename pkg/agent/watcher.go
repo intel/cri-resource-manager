@@ -88,6 +88,10 @@ func newK8sWatcher(k8sCli *k8sclient.Clientset, resmgrCli *resmgrcli.CriresmgrV1
 // Start runs a k8sWatcher instance
 func (w *watcher) Start() error {
 	w.Info("starting watcher...")
+	if nodeName == "" {
+		return agentError("node name not set, NODE_NAME env variable should be set to match the name of this k8s Node")
+	}
+
 	go func() {
 		w.watch()
 	}()
