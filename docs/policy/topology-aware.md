@@ -61,7 +61,7 @@ Whether to allocate shared CPUs unless the Pod or Container is explicitly annota
 ### Dynamic Configuration
 
 The `topology-aware` policy can be configured dynamically using the
-[`node agent`](/README.md#cri-resource-manager-node-agent). It takes
+[`node agent`](../node-agent.md). It takes
 a JSON configuration with the following keys corresponding to the above
 mentioned options:
 
@@ -73,7 +73,8 @@ mentioned options:
 See the [`documentation`](/README.md#dynamic-configuration) for information about
 dynamic configuration.
 
-See the [sample ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
+See the
+[sample ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
 for an example which configures the `topology-aware` policy with the built-in
 defaults.
 

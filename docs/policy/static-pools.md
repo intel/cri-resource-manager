@@ -3,7 +3,7 @@
 ## Overview
 
 The `static-pools` (STP) builtin policy was inspired by [CMK (CPU Manager for
-Kubernetes)](https://github.com/intel/CPU-Manager-for-Kubernetes). It is an
+Kubernetes)][cmk]. It is an
 example policy demonstrating some capabilities of `cri-resource-manager` - not
 production ready.
 
@@ -17,7 +17,7 @@ Features:
 - dynamic configuration updates via `cri-resmgr-agent`
 
 Please see the documentation of
-[CMK](https://github.com/intel/CPU-Manager-for-Kubernetes) for a more detailed
+[CMK][cmk] for a more detailed
 description of the terminology and functionality.
 
 CMK compatibility features:
@@ -45,9 +45,10 @@ the original CMK. It tries to read the configuration from a location specified
 with `-static-pools-conf-dir` (`/etc/cmk` by default).
 Alternatively, you can provide a configuration file (YAML) by using the
 `-static-pools-conf-file` flag.
-See the [example config](/sample-configs/static-pools-policy.conf.example) for a
-starting point.  However, if `cri-resmgr` at a later time receives a valid
-configuration from the `cri-resmr-agent` this will override the fallback
+See the
+[example config](/sample-configs/static-pools-policy.conf.example)
+for a starting point.  However, if `cri-resmgr` at a later time receives a
+valid configuration from the `cri-resmr-agent` this will override the fallback
 configuration read from the directory or file.
 
 **NOTE:** cri-resmgr does not have any utility for automatically generating a
@@ -64,7 +65,7 @@ Deploy cri-resmgr on each node as you would for any other policy.
 You need to run and enable the cri-resmgr mutating admission webhook which is
 making resource request annotations. This is required so that the STP policy is
 able to inspect the extended resources (in this case, exclusive CPU cores)
-requested by containers. See the [README](../README.md) for instructions.
+requested by containers. See the [webhook](../webhook.md) for instructions.
 
 ## Running cri-resmgr
 
@@ -155,3 +156,6 @@ spec:
     args:
       - "/opt/bin/cmk isolate --conf-dir=/etc/cmk --pool=infra sleep 10000"
 ```
+
+<!-- Links -->
+[cmk]: https://github.com/intel/CPU-Manager-for-Kubernetes
