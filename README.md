@@ -6,7 +6,7 @@ If you want to give CRI Resource Manager a try, here is the list of things
 you need to do, assuming you already have a Kubernetes cluster up and running,
 using either `containerd` or `cri-o` as the runtime.
 
-  0. [Install](/docs/INSTALL.md) CRI Resource Manager.
+  0. [Install](/docs/installation.md) CRI Resource Manager.
   1. Set up kubelet to use CRI Resource Manager as the runtime.
   2. Set up CRI Resource Manager to use the runtime with a policy.
 
