@@ -10,7 +10,7 @@ Welcome to CRI Resource Manager's documentation!
    introduction.md
    quick-start.md
    installation.md
-   configuration.md
+   setup.md
    policy/index.rst
    node-agent.md
    webhook.md
