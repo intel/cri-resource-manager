@@ -210,7 +210,7 @@ install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-config-$(dir))
 
 
-clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-deb clean-ui-assets
+clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-deb clean-ui-assets clean-html
 
 images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 
@@ -656,7 +656,7 @@ serve-html: html
 	$(Q)cd $(BUILDDIR) && python3 -m http.server 8081
 
 clean-html:
-	rm -rf $(BUILDDIR)/*
+	rm -rf $(BUILDDIR)
 
 site-build: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
 	$(Q)$(DOCKER_SITE_CMD) $(DOCKER_SITE_BUILDER_IMAGE) make html
