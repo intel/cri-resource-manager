@@ -5,3 +5,4 @@ Developer's Guide
 
    architecture.md
    policy-writers-guide.md
+   testing.rst

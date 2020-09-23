@@ -1,4 +1,4 @@
-# CRI Resource Manager - End-to-end tests
+# End-to-End tests
 
 ## Prerequisites
 
