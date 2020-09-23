@@ -57,7 +57,7 @@ the `--runtime-socket <path>` and, optionally, the `--image-socket <path>`.
 For providing a configuration there are two options:
 
   1. use a local configuration YAML file
-  2. use the CRI Resource Manager Agent and a `ConfigMap`
+  2. use the [CRI Resource Manager Node Agent][agent] and a `ConfigMap`
 
 The former is easier to set up and it is also the preferred way to run CRI
 Resource Manager for development, and in some cases testing. Setting up the
@@ -81,7 +81,7 @@ also disables the config interface for receiving configuration updates.
 
 ### Using CRI Resource Manager Agent and a ConfigMap
 
-This setup requires an extra component, the CRI Resource Manager Node Agent,
+This setup requires an extra component, the [CRI Resource Manager Node Agent][agent],
 to monitor and fetch configuration from the ConfigMap and pass it on to CRI
 Resource Manager. By default CRI Resource Manager will automatically try to
 use the agent to acquire configuration, unless you override this by forcing
@@ -98,14 +98,13 @@ Manager is restarted (unless that time the --force-config option is used).
 While CRI Resource Manager is shut down, any cached configuration can be
 cleared from the cache using the --reset-config command line option.
 
-See the [later chapter](#cri-resource-manager-node-agent) about how to set
-up and configure the agent.
+See the [Node Agent][agent] about how to set up and configure the agent.
 
 
 ### Changing the Active Policy
 
 Currently CRI Resource Manager will disable changing the active policy using
-the agent. That is, once the active policy is recorded in the cache, any
+the [agent][agent]. That is, once the active policy is recorded in the cache, any
 configuration received through the agent that requests a different policy
 will be rejected. This limitation will be removed in a future version of
 CRI Resource Manager.
@@ -125,43 +124,9 @@ option `--reset-policy`. The whole sequence of switching policies this way is
   - start cri-resmgr (`systemctl start cri-resource-manager`)
 
 
-## CRI Resource Manager Node Agent
-
-CRI Resource Manager can be configured dynamically using the CRI Resource
-Manager Node Agent and Kubernetes ConfigMaps. The agent can be build using
-the [provided Dockerfile](cmd/cri-resmgr-agent/Dockerfile). It can be deployed
-as a `DaemonSet` in the cluster using the [provided deployment file](cmd/cri-resmgr-agent/agent-deployment.yaml).
-
-To run the agent manually or as a `systemd` service, set the environment variable
-`NODE_NAME` to the name of the cluster node the agent is running on. If necessary
-pass it the credentials for accessing the cluster using the the `-kubeconfig <file>`
-command line option.
-
-The agent monitors two ConfigMaps for the node, a primary node-specific one, and
-a secondary group-specific or default one, depending on whether the node belongs
-to a configuration group. The node-specific ConfigMap always takes precedence over
-the others.
-
-The names of these ConfigMaps are
-
-1. `cri-resmgr-config.node.$NODE_NAME`: primary, node-specific configuration
-2. `cri-resmgr-config.group.$GROUP_NAME`: secondary group-specific node configuration
-3. `cri-resmgr-config.default`: secondary: secondary default node configuration
-
-You can assign a node to a configuration group by setting the
-`cri-resource-manager.intel.com/group` label on the node to the name of
-the configuration group. You can remove a node from its group by deleting the node
-group label.
-
-There is a [sample ConfigMap spec](sample-configs/cri-resmgr-configmap.example.yaml)
-that contains anode-specific, a group-specific, and a default ConfigMap examples.
-See [any available policy-specific documentation](docs) for more information on the
-policy configurations.
-
-
 ### Container Adjustments
 
-When the agent is in use, it is also possible to `adjust` container `resource
+When the [agent][agent] is in use, it is also possible to `adjust` container `resource
 assignments` externally, using dedicated `Adjustment` `Custom Resources` in
 the `adjustments.criresmgr.intel.com` group. You can use the
 [provided schema](pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml) to define
@@ -357,3 +322,6 @@ to your real kubelet instance's configuration:
 You can control logging and debugging with the `--logger-*` command line options. By
 default debug logs are globally disabled. You can turn on full debug logs with the
 `--logger-debug '*'` command line option.
+
+<!-- Links -->
+[agent]: docs/node-agent.md
