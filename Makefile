@@ -648,7 +648,7 @@ vhtml: _work/venv/.stamp
 		make -C docs html && \
 		cp -r docs/_build .
 
-html:
+html: clean-html
 	$(SPHINXBUILD) -c docs . "$(BUILDDIR)" $(SPHINXOPTS)
 	cp docs/index.html "$(BUILDDIR)"
 
