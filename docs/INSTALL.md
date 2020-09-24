@@ -65,12 +65,12 @@ build `rpm` packages for `CentOS 8`
 ## Post-Install Configuration
 
 The provided packages install `systemd` service files and sample configuration.
-The easiest way to get up and running is to copy the sample configuration in
-the correct place and start CRI Resource Manager using systemd. You can do
-this using the following commands:
+The easiest way to get up and running is to rename the sample configuration and
+start CRI Resource Manager using systemd. You can do this using the following
+commands:
 
 ```
-cp /usr/share/doc/cri-resource-manager/fallback.cfg.sample /etc/cri-resmgr/fallback.cfg
+mv /etc/cri-resmgr/fallback.cfg.sample /etc/cri-resmgr/fallback.cfg
 systemctl start cri-resource-manager
 ```
 

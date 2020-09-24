@@ -263,12 +263,12 @@ install-systemd-%:
 
 install-sysconf-%:
 	$(Q)bin=$(patsubst install-sysconf-%,%,$@); dir=cmd/$$bin; \
-	echo "Installing sysconf collateral for $$bin..."; \
-	$(INSTALL) -d $(DESTDIR)$(SYSCONFDIR)/sysconfig && \
+	echo "Installing sysconf/default collateral for $$bin..."; \
+	$(INSTALL) -d $(DESTDIR)$(DEFAULTDIR) && \
 	for f in $$(find $$dir -name \*.sysconf); do \
-	    echo "  $$f in $(DESTDIR)$(SYSCONFDIR)/sysconfig..."; \
+	    echo "  $$f in $(DESTDIR)$(DEFAULTDIR)..."; \
 	    df=$${f##*/}; df=$${df%.sysconf}; \
-	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(SYSCONFDIR)/sysconfig/$$df; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(DEFAULTDIR)/$$df; \
 	done
 
 install-config-%:
