@@ -161,7 +161,23 @@ vm-install-cri-resmgr() {
         vm-command "go get -d -v github.com/intel/cri-resource-manager"
         CRI_RESMGR_SOURCE_DIR=$(awk '/package.*cri-resource-manager/{print $NF}' <<< "$COMMAND_OUTPUT")
         vm-command "cd $CRI_RESMGR_SOURCE_DIR && make install && cd -"
-    else
+    elif [[ "$binsrc" == "packages/debian"* ]] || [[ "$binsrc" == "packages/ubuntu"* ]]; then
+        vm-command "rm -f *.deb"
+        local deb_count
+        deb_count=$(ls "$HOST_PROJECT_DIR/$binsrc"/cri-resource-manager_*.deb | wc -l)
+        if [ "$deb_count" == "0" ]; then
+            error "installing from $binsrc failed: cannot find cri-resource-manager_*deb from $HOST_PROJECT_DIR/$binsrc"
+        elif [[ "$deb_count" > "1" ]]; then
+            error "installing from $binsrc failed: expected exactly one cri-resource-manager_*.deb in $HOST_PROJECT_DIR/$binsrc, found $deb_count alternatives."
+        fi
+        host-command "scp $HOST_PROJECT_DIR/$binsrc/*.deb $VM_SSH_USER@$VM_IP:" || {
+            command-error "copying *.deb to vm failed, run \"make cross-deb\" first"
+        }
+        vm-command "dpkg -i *.deb" || {
+            command-error "installing packages failed"
+        }
+        vm-command "systemd daemon-reload"
+    elif [ -z "$binsrc" ] || [ "$binsrc" == "local" ]; then
         local bin_change
         local src_change
         bin_change=$(stat --format "%Z" "$BIN_DIR/cri-resmgr")
@@ -179,6 +195,8 @@ vm-install-cri-resmgr() {
         vm-command "mv cri-resmgr cri-resmgr-agent $prefix/bin" || {
             command-error "installing cri-resmgr to $prefix/bin failed"
         }
+    else
+        error "vm-install-cri-resmgr: unknown binsrc=\"$binsrc\""
     fi
 }
 
