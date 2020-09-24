@@ -3,6 +3,8 @@
 TESTS_DIR="$1"
 RUN_SH="${0%/*}/run.sh"
 
+DEFAULT_DISTRO="ubuntu-20.04"
+
 usage() {
     echo "Usage: run_tests.sh TESTS_DIR"
     echo "TESTS_DIR is expected to be structured as POLICY/TOPOLOGY/TEST with files:"
@@ -142,7 +144,11 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
             (
                 export-var-files "$TOPOLOGY_DIR"
                 export-vm-files "$TOPOLOGY_DIR/vm-files"
-                vm="$(basename "$TOPOLOGY_DIR")"
+                distro=${distro:=$DEFAULT_DISTRO}
+                export distro
+                cri=${cri:=containerd}
+                export cri
+                vm="$(basename "$TOPOLOGY_DIR")-${distro}-${cri}"
                 export vm
                 for TEST_DIR in "$TOPOLOGY_DIR"/*; do
                     if ! [ -d "$TEST_DIR" ]; then

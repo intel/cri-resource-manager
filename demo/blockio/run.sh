@@ -68,7 +68,7 @@ screen-create-vm() {
 
 screen-install-k8s() {
     speed=60 out "### Installing Kubernetes to the VM."
-    vm-install-containerd
+    vm-install-cri
     vm-install-k8s
 }
 
@@ -145,7 +145,11 @@ demo-blockio() {
 
 # Validate parameters
 mode=$1
-vm=${vm-"crirm-demo-blockio"}
+distro=${distro:="ubuntu-20.04"}
+cri=${cri:="containerd"}
+vm=${vm:="blockio-$distro-$cri"}
+echo "vm is here: \"$vm\""
+host-set-vm-config "$vm" "$distro" "$cri"
 
 if [ "$mode" == "play" ]; then
     speed=${speed-10}

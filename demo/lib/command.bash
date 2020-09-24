@@ -10,6 +10,10 @@
 # command-start and command-end set environment variables:
 # COMMAND, COMMAND_STATUS, COMMAND_OUTPUT
 
+SSH_OPTS="-o StrictHostKeyChecking=No"
+SSH="ssh $SSH_OPTS"
+SCP="scp $SSH_OPTS"
+
 epochrealtime() {
     [ -n "$EPOCHREALTIME" ] && echo "$EPOCHREALTIME" || echo "$SECONDS"
 }
