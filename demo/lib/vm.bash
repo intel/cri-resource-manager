@@ -13,6 +13,11 @@ VM_GOVM_COMPOSE_TEMPLATE="vms:
       - KVM_CPU_OPTS=\$(echo "\${KVM_CPU_OPTS}")
       - EXTRA_QEMU_OPTS=\$(echo "\${EXTRA_QEMU_OPTS}")
       - USE_NET_BRIDGES=${USE_NET_BRIDGES-0}
+    user-data: |
+      #!/bin/bash
+      mkdir -p /etc/sudoers.d
+      echo 'Defaults !requiretty' > /etc/sudoers.d/10-norequiretty
+\$(sed 's/^/      /g' <<< \"\${VM_EXTRA_BOOTSTRAP_COMMANDS}\")
 "
 
 vm-check-env() {
