@@ -1,4 +1,4 @@
-# CRI Resoure Manager: Block I/O Demo
+# Block I/O Demo
 
 This demo creates a virtual machine for a single-node Kubernetes
 cluster where container runtime features are extended by `cri-resmgr`.

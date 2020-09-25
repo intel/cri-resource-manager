@@ -16,4 +16,4 @@ See [sample blockio configuration](/sample-configs/blockio.cfg).
 
 ## Demo
 
-See [Block IO demo](/demo/blockio/README.md)
+See [Block IO demo](../demos/blockio.md)
