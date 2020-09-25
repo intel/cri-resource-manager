@@ -633,7 +633,7 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 	format vet cyclomatic-check lint golangci-lint \
 	cross-packages cross-rpm cross-deb
 
-SPHINXOPTS    =
+SPHINXOPTS    = -W
 SPHINXBUILD   = sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
