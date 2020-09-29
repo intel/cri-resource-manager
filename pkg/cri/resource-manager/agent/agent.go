@@ -358,7 +358,7 @@ func (a *agentInterface) RemoveTaints(taints []core_v1.Taint, timeout time.Durat
 	patches := []*agent_v1.JsonPatch{}
 	for _, t := range taints {
 		idx, found := findTaintIndex(node.Spec.Taints, &t)
-		if !found {
+		if found {
 			patch := &agent_v1.JsonPatch{
 				Op:   "remove",
 				Path: taintPatchPath(idx),
