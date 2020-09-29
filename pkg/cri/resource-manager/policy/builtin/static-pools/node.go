@@ -71,7 +71,7 @@ func (stp *stp) updateNode(conf conf) error {
 
 	legacyTaint := core_v1.Taint{
 		Key:    "cmk",
-		Value:  `"true"`,
+		Value:  "true",
 		Effect: core_v1.TaintEffectNoSchedule,
 	}
 	cmkTaints := []core_v1.Taint{legacyTaint}
