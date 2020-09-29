@@ -188,8 +188,10 @@ func (a *agentInterface) SetLabels(labels map[string]string, timeout time.Durati
 	patches := []*agent_v1.JsonPatch{}
 	for key, val := range labels {
 		patch := &agent_v1.JsonPatch{
-			Path:  labelPatchPath(key),
-			Value: val,
+			Path: labelPatchPath(key),
+			// Value is supposed to be in marshalled JSON format. Thus, we need
+			// to add quotes so that it will be interpreted as a string.
+			Value: "\"" + val + "\"",
 		}
 		if _, ok := node.Labels[key]; ok {
 			patch.Op = PatchReplace
