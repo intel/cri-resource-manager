@@ -112,6 +112,12 @@ vm-wait-process() {
     fi
 }
 
+vm-write-file() {
+    local vm_path_file="$1"
+    local file_content_b64="$(base64 <<<$2)"
+    vm-command-q "mkdir -p $(dirname "$vm_path_file"); echo -n \"$file_content_b64\" | base64 -d > \"$vm_path_file\""
+}
+
 vm-set-kernel-cmdline() { # script API
     # Usage: vm-set-kernel-cmdline E2E-DEFAULTS
     #
