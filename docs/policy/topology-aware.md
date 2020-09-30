@@ -228,4 +228,4 @@ metadata:
         weight: -1
 ```
 
-For a more detailed description see [the documentation of annotations](/docs/container-affinity.md).
+For a more detailed description see [the documentation of annotations](container-affinity.md).

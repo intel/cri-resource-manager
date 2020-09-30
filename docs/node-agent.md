@@ -28,7 +28,7 @@ group label.
 
 There is a [sample ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
 that contains anode-specific, a group-specific, and a default ConfigMap examples.
-See [any available policy-specific documentation](docs) for more information on the
+See [any available policy-specific documentation](policy/index.rst) for more information on the
 policy configurations.
 
 

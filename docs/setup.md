@@ -151,7 +151,7 @@ are currently matched/picked by name, but a trailing wildcard (`*`) is allowed a
 matches all nodes with the given prefix in their names.
 
 Containers are matched by expressions. These are exactly the same as the expressions
-for defining [affinity scopes](docs/container-affinity.md). A single adjustment can
+for defining [affinity scopes](policy/container-affinity.md). A single adjustment can
 specify multipe node/container match pairs. An adjustment will apply to all containers
 in its scope. If an adjustment/update results in conflicts for some container, that is
 at least one container is in the scope of multiple adjustments, the adjustment is
