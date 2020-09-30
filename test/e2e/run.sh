@@ -45,6 +45,7 @@ usage() {
     echo "             \"github\": go get from master and build inside VM."
     echo "             \"local\": copy from source tree bin/ (the default)."
     echo "                      (set bindir=/path/to/cri-resmgr* to override bin/)"
+    echo "             \"packages/debian-10\": use deb packages from this dir"
     echo "    reinstall_cri_resmgr: If 1, stop running cri-resmgr, reinstall,"
     echo "             and restart it on the VM before starting test run."
     echo "             The default is 0."
@@ -135,7 +136,11 @@ screen-install-cri-resmgr-debugging() {
 
 screen-launch-cri-resmgr() {
     speed=60 out "### Launching cri-resmgr with config $cri_resmgr_cfg."
-    launch cri-resmgr
+    if [[ "$binsrc" == "packages/"* ]]; then
+        launch cri-resmgr-systemd
+    else
+        launch cri-resmgr
+    fi
 }
 
 screen-create-singlenode-cluster() {
@@ -320,7 +325,7 @@ uninstall() { # script API
     #
     # Supported TARGETs:
     #   cri-resmgr: stop (kill) cri-resmgr and purge all files from VM.
-    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null; rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr"
+    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null; command -v apt && apt remove -y --purge cri-resource-manager; rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr /etc/cri-resmgr"
 }
 
 launch() { # script API
@@ -331,20 +336,48 @@ launch() { # script API
     #                cri_resmgr_cfg: configuration filepath (on host)
     #                cri_resmgr_extra_args: extra arguments on command line
     #
+    #   cri-resmgr-systemd:
+    #                launch cri-resmgr on VM using "systemctl start".
+    #                Works when installed with binsrc=packages/debian-10.
+    #                Environment variables:
+    #                cri_resmgr_cfg: configuration filepath (on host)
+    #
     # Example:
     #   cri_resmgr_cfg=/tmp/memtier.cfg launch cri-resmgr
-    host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
-        command-error "copying \"$cri_resmgr_cfg\" to VM failed"
-    }
-    vm-command "cat $(basename "$cri_resmgr_cfg")"
-    vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args >cri-resmgr.output.txt 2>&1 &"
-    sleep 2 >/dev/null 2>&1
-    vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
-        command-error "launching cri-resmgr failed with FATAL ERROR"
-    }
-    vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
-        command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
-    }
+    target="$1"
+    case $target in
+        "cri-resmgr")
+            host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+                command-error "copying \"$cri_resmgr_cfg\" to VM failed"
+            }
+            vm-command "cat $(basename "$cri_resmgr_cfg")"
+            vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args >cri-resmgr.output.txt 2>&1 &"
+            sleep 2 >/dev/null 2>&1
+            vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
+                command-error "launching cri-resmgr failed with FATAL ERROR"
+            }
+            vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
+                command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
+            }
+            ;;
+        "cri-resmgr-systemd")
+            host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+                command-error "copying \"$cri_resmgr_cfg\" to VM failed"
+            }
+            vm-command "cp \"$(basename "$cri_resmgr_cfg")\" /etc/cri-resmgr/fallback.cfg"
+            vm-command "systemctl daemon-reload ; systemctl start cri-resource-manager" || {
+                command-error "systemd failed to start cri-resource-manager"
+            }
+            sleep 5
+            vm-command "systemctl is-active cri-resource-manager" || {
+                vm-command "systemctl status cri-resource-manager"
+                command-error "cri-resource-manager did not become active after systemctl start"
+            }
+            ;;
+        *)
+            error "launch: invalid target \"$1\""
+            ;;
+    esac
 
 }
 
@@ -520,6 +553,7 @@ delete() { # script API
     }
 }
 
+declare -a pulled_images_on_vm
 create() { # script API
     # Usage: [VAR=VALUE][n=COUNT] create TEMPLATE_NAME
     #
@@ -536,13 +570,15 @@ create() { # script API
     #   wait: condition to be waited for (see kubectl wait --for=condition=).
     #         If empty (""), skip waiting. The default is wait="Ready".
     #   wait_t: wait timeout. The default is wait_t=60s.
-
+    local template_file
     template_file=$(resolve-template "$1" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
-
     local template_kind
     template_kind=$(awk '/kind/{print tolower($2)}' < "$template_file")
     local wait=${wait-Ready}
     local wait_t=${wait_t-60s}
+    local images
+    local image
+    local errormsg
     if [ -z "$n" ]; then
         local n=1
     fi
@@ -557,6 +593,21 @@ create() { # script API
             command-error "copying \"$OUTPUT_DIR/$NAME.yaml\" to VM failed"
         }
         vm-command "cat $NAME.yaml"
+        images="$(grep -E '^ *image: .*$' "$OUTPUT_DIR/$NAME.yaml" | sed -E 's/^ *image: *([^ ]*)$/\1/g' | sort -u)"
+        for image in $images; do
+            if ! [[ " ${pulled_images_on_vm[*]} " == *" ${image} "* ]]; then
+                vm-command "crictl -i unix:///var/run/cri-resmgr/cri-resmgr.sock pull \"$image\"" || {
+                    errormsg="pulling image \"$image\" for \"$OUTPUT_DIR/$NAME.yaml\" failed."
+                    if is-hooked on_create_fail; then
+                        echo "$errormsg"
+                        run-hook on_create_fail
+                    else
+                        command-error "$errormsg"
+                    fi
+                }
+                pulled_images_on_vm+=("$image")
+            fi
+        done
         vm-command "kubectl create -f $NAME.yaml" || {
             if is-hooked on_create_fail; then
                 echo "kubectl create error"
@@ -567,11 +618,12 @@ create() { # script API
         }
         if [ "x$wait" != "x" ]; then
             speed=1000 vm-command "kubectl wait --timeout=${wait_t} --for=condition=${wait} ${template_kind}/$NAME" >/dev/null 2>&1 || {
+                errormsg="waiting for ${template_kind} \"$NAME\" to become ready timed out"
                 if is-hooked on_create_fail; then
-                    echo "waiting for ${template_kind} \"$NAME\" to become ready timed out"
+                    echo "$errormsg"
                     run-hook on_create_fail
                 else
-                    command-error "waiting for ${template_kind} \"$NAME\" to become ready timed out"
+                    command-error "$errormsg"
                 fi
             }
         fi
@@ -750,7 +802,7 @@ if [ "$reinstall_cri_resmgr" == "1" ]; then
     uninstall cri-resmgr
 fi
 
-if ! vm-command-q "[ -f /usr/local/bin/cri-resmgr ]"; then
+if ! vm-command-q "type -p cri-resmgr >/dev/null"; then
     install cri-resmgr
 fi
 

@@ -378,6 +378,9 @@ e2e-tests: build
 	    exit 1; \
 	fi
 
+packaging-tests: cross-deb
+	$(E2E_RUN) test/e2e/packages/debian-10
+
 #
 # Rules for building distro packages.
 #
