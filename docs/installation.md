@@ -1,3 +1,5 @@
+# Installation
+
 ## Installing From Packages
 
 You can install CRI Resource Manager from `deb` or `rpm` packages

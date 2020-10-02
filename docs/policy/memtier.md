@@ -1,4 +1,4 @@
-# Memory Tiering
+# Memtier Policy
 
 ## Overview
 
@@ -6,7 +6,7 @@ The `memtier` policy extends the `topology-aware` policy. It supports
 the same features and configuration options, such as `topology hints`
 and `annotations`, which the `topology-aware` policy does. Please see
 the [documentation for topology-aware
-policy](../topology-aware/README.md) for the description of how
+policy](topology-aware.md) for the description of how
 `topology-aware`policy works and how it is configured.
 
 The main goal of `memtier` policy is to let workloads choose the kinds

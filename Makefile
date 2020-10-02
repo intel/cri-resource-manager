@@ -78,6 +78,7 @@ BUILD_BUILDID := $(shell scripts/build/get-buildid --buildid --shell=no)
 RPM_VERSION   := $(shell scripts/build/get-buildid --rpm --shell=no)
 DEB_VERSION   := $(shell scripts/build/get-buildid --deb --shell=no)
 TAR_VERSION   := $(shell scripts/build/get-buildid --tar --shell=no)
+SITE_VERSION  := $(shell scripts/build/get-buildid --site --shell=no)
 
 # Kubernetes version we pull in as modules and our external API versions.
 KUBERNETES_VERSION := $(shell grep 'k8s.io/kubernetes ' go.mod | sed 's/^.* //')
@@ -146,7 +147,8 @@ DOCKER_RPM_BUILD := \
 
 # Docker base command for working with html documentation.
 DOCKER_SITE_BUILDER_IMAGE := cri-resmgr-site-builder
-DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` -p 8081:8081 $(DOCKER_SITE_BUILDER_IMAGE)
+DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` \
+	-p 8081:8081 -e BUILD_VERSION=$(BUILD_VERSION) -e SITE_VERSION=$(SITE_VERSION)
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
@@ -208,7 +210,7 @@ install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-config-$(dir))
 
 
-clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-deb clean-ui-assets
+clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-deb clean-ui-assets clean-html
 
 images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 
@@ -631,7 +633,7 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 	format vet cyclomatic-check lint golangci-lint \
 	cross-packages cross-rpm cross-deb
 
-SPHINXOPTS    =
+SPHINXOPTS    = -W
 SPHINXBUILD   = sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
@@ -643,24 +645,27 @@ BUILDDIR      = _build
 
 vhtml: _work/venv/.stamp
 	. _work/venv/bin/activate && \
-		$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) && \
-		cp docs/html/index.html $(BUILDDIR)/html/index.html
+		make -C docs html && \
+		cp -r docs/_build .
 
-html:
-		$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) && \
-		cp docs/html/index.html $(BUILDDIR)/html/index.html
+html: clean-html
+	$(SPHINXBUILD) -c docs . "$(BUILDDIR)" $(SPHINXOPTS)
+	cp docs/index.html "$(BUILDDIR)"
+
+serve-html: html
+	$(Q)cd $(BUILDDIR) && python3 -m http.server 8081
 
 clean-html:
-	rm -rf $(BUILDDIR)/html
+	rm -rf $(BUILDDIR)
 
 site-build: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
-	$(Q)$(DOCKER_SITE_CMD) make html
+	$(Q)$(DOCKER_SITE_CMD) $(DOCKER_SITE_BUILDER_IMAGE) make html
 
 site-serve: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
-	$(Q)$(DOCKER_SITE_CMD) bash -c "make html && cd _build/html && python3 -m http.server 8081"
+	$(Q)$(DOCKER_SITE_CMD) -it $(DOCKER_SITE_BUILDER_IMAGE) make serve-html
 
-.$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile
-	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) -f docs/Dockerfile .
+.$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile docs/requirements.txt
+	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) docs
 	touch $@
 
 # Set up a Python3 environment with the necessary tools for document creation.
