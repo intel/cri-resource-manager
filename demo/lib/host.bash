@@ -16,6 +16,62 @@ host-require-govm() {
     command -v "$GOVM" >/dev/null || error "cannot run govm \"$GOVM\". Check PATH or set GOVM=/path/to/govm."
 }
 
+host-set-vm-config() {
+    if [ -z "$1" ]; then
+        error "can't configure VM, name not set"
+    fi
+    if [ -z "$2" ]; then
+        error "can't configure VM, distro not set"
+    fi
+    if [ -z "$3" ]; then
+        error "can't configure VM, CRI runtime not set"
+    fi
+    VM_NAME="$1"
+    VM_DISTRO="$2"
+    VM_CRI="$3"
+    VM_SSH_USER=$(vm-ssh-user)
+}
+
+host-fetch-vm-image() {
+    local url=$(vm-image-url)
+    local file=$(basename $url)
+    local image decompress
+    case $file in
+        *.xz)
+            image=${file%.xz}
+            decompress="xz -d"
+            ;;
+        *.bz2)
+            image=${file%.bz2}
+            decompress="bzip -d"
+            ;;
+        *.gz)
+            image=${file%.gz}
+            decompress="gzip -d"
+            ;;
+        *)
+            image="$file"
+            decompress=":"
+            ;;
+    esac
+    [ -f "$image" ] || {
+        echo "VM image $image not found..."
+        [ -f "$file" ] || {
+            echo "downloading VM image $image..."
+            host-command "wget --progress=dot:giga \"$url\"" ||
+                error "failed to download VM image ($url)"
+        }
+        if [ -n "$decompress" ]; then
+            echo "decompressing VM image $file..."
+            $decompress $file || error "failed to decompress $file to $image using $decompress"
+        fi
+        if [ ! -f "$image" ]; then
+            error "internal error, fetching+decompressing $url did not produce $image"
+        fi
+    }
+    VM_IMAGE=$image
+}
+
 host-create-vm() {
     # Usage: host-create-vm NAME [NUMANODELIST_JSON]
     #
@@ -48,9 +104,8 @@ host-create-vm() {
     # Debug Qemu parameters and output with
     #     $ docker logs $(docker ps | awk '/govm/{print $1; exit}')
     #
-    VM_NAME=$1
     local TOPOLOGY="$2"
-    local QEMU_CPUMEM=""
+
     if [ -z "$VM_NAME" ]; then
         error "cannot create VM: missing name"
     fi
@@ -58,31 +113,17 @@ host-create-vm() {
         if [ -n "$VM_QEMU_CPUMEM" ]; then
             error "cannot take both VM_QEMU_CPUMEM and numa node JSON"
         fi
-        QEMU_CPUMEM=$(echo "$TOPOLOGY" | "$HOST_LIB_DIR/topology2qemuopts.py")
+        VM_QEMU_CPUMEM=$(echo "$TOPOLOGY" | "$HOST_LIB_DIR/topology2qemuopts.py")
         if [ "$?" -ne  "0" ]; then
             error "error in topology"
         fi
-    else
-        QEMU_CPUMEM="${VM_QEMU_CPUMEM}"
     fi
     host-require-govm
     # If VM does not exist, create it from scrach
     ${GOVM} ls | grep -q "$VM_NAME" || {
-        [ -f "$VM_IMAGE" ] || {
-            host-command "wget -q -O \"$VM_IMAGE\" \"$VM_IMAGE_URL\"" || error "failed to download VM image from $VM_IMAGE_URL"
-        }
-        if [ -z "$QEMU_CPUMEM" ]; then
-            # Create without GoVM compose template
-            VM_OPT_CPUS=${VM_OPT_CPUS-4}
-            host-command "${GOVM} create --ram 8192 --cpus ${VM_OPT_CPUS} --image \"$VM_IMAGE\" --name \"$VM_NAME\" --cloud"
-        else
-            # Create from GoVM compose template
-            local VM_YAML="${vm}.yaml"
-            local KVM_CPU_OPTS="$QEMU_CPUMEM"
-            local EXTRA_QEMU_OPTS="$VM_QEMU_EXTRA"
-            eval "echo -e \"${VM_GOVM_COMPOSE_TEMPLATE}\"" > "${VM_YAML}"
-            host-command "${GOVM} compose -f ${VM_YAML}"
-        fi
+        host-fetch-vm-image
+        vm-compose-govm-template > $vm.yaml
+        host-command "${GOVM} compose -f $vm.yaml"
     }
 
     sleep 1
@@ -123,7 +164,7 @@ host-wait-vm-ssh-server() {
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP" >/dev/null 2>&1
     retries=60
     retries_left=$retries
-    while ! ssh -o ConnectTimeout=2 -o StrictHostKeyChecking=No ${VM_SSH_USER}@${VM_IP} true 2>/dev/null; do
+    while ! $SSH ${VM_SSH_USER}@${VM_IP} -o ConnectTimeout=2 true 2>/dev/null; do
         if [ "$retries" == "$retries_left" ]; then
             echo -n "Waiting for VM SSH server to respond..."
         fi
@@ -138,7 +179,7 @@ host-wait-vm-ssh-server() {
 }
 
 host-stop-vm() {
-    VM_NAME=$1
+    #VM_NAME=$1
     host-require-govm
     host-command "${GOVM} stop $VM_NAME" || {
         command-error "stopping govm \"$VM_NAME\" failed"
@@ -146,7 +187,7 @@ host-stop-vm() {
 }
 
 host-delete-vm() {
-    VM_NAME=$1
+    #VM_NAME=$1
     host-require-govm
     host-command "${GOVM} delete $VM_NAME" || {
         command-error "deleting govm \"$VM_NAME\" failed"

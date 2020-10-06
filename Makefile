@@ -380,8 +380,11 @@ e2e-tests: build
 	    exit 1; \
 	fi
 
-packaging-tests: cross-deb
-	$(E2E_RUN) test/e2e/packages/debian-10
+packaging-tests: cross-deb cross-rpm
+	$(Q)for dir in test/e2e/packages/*; do \
+	    [ "$${dir%centos-7}" != "$$dir" ] && continue; \
+	    distro=$${dir##*/} $(E2E_RUN) $$dir; \
+	done
 
 #
 # Rules for building distro packages.
@@ -398,7 +401,6 @@ cross-packages: cross-rpm cross-deb
 cross-rpm: $(foreach d,$(SUPPORTED_RPM_DISTROS),cross-rpm.$(d))
 
 cross-deb: $(foreach d,$(SUPPORTED_DEB_DISTROS),cross-deb.$(d))
-
 
 #
 # Rules for building dist-tarballs, rpm, and deb packages.

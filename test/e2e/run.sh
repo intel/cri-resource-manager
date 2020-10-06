@@ -1,6 +1,7 @@
 #!/bin/bash
 
-DEMO_TITLE="CRI Resource Manager: Numa test"
+DEMO_TITLE="CRI Resource Manager: End-to-End Testing"
+DEFAULT_DISTRO="ubuntu-20.04"
 
 PV='pv -qL'
 
@@ -45,7 +46,7 @@ usage() {
     echo "             \"github\": go get from master and build inside VM."
     echo "             \"local\": copy from source tree bin/ (the default)."
     echo "                      (set bindir=/path/to/cri-resmgr* to override bin/)"
-    echo "             \"packages/debian-10\": use deb packages from this dir"
+    echo "             \"packages/<distro>\": use distro packages from this dir"
     echo "    reinstall_cri_resmgr: If 1, stop running cri-resmgr, reinstall,"
     echo "             and restart it on the VM before starting test run."
     echo "             The default is 0."
@@ -109,11 +110,7 @@ record() {
 }
 
 screen-create-vm() {
-    speed=60 out "### Running the test in VM \"$vm\"."
-    # Create a machine with 5 NUMA nodes.
-    # Qemu default NUMA node self-distance is 10.
-    # Define distance 22 between all 4 nodes with CPU(s).
-    # The distance from nodes with CPU(s) and the node with NVRAM is 88.
+    speed=60 out "### Running the test in VM \"$VM_NAME\"."
     host-create-vm "$vm" "$topology"
     vm-networking
     if [ -z "$VM_IP" ]; then
@@ -122,8 +119,9 @@ screen-create-vm() {
 }
 
 screen-install-k8s() {
+    speed=60 out "### Installing CRI Runtime to the VM."
+    vm-install-cri
     speed=60 out "### Installing Kubernetes to the VM."
-    vm-install-containerd
     vm-install-k8s
 }
 
@@ -134,7 +132,7 @@ screen-install-cri-resmgr() {
 
 screen-install-cri-resmgr-debugging() {
     speed=60 out "### Installing cri-resmgr debugging enablers"
-    vm-command "apt install -y golang"
+    vm-install-golang
     vm-command "go get github.com/go-delve/delve/cmd/dlv" || {
         command-error "installing delve failed"
     }
@@ -145,7 +143,7 @@ screen-install-cri-resmgr-debugging() {
 
 screen-launch-cri-resmgr() {
     speed=60 out "### Launching cri-resmgr with config $cri_resmgr_cfg."
-    if [[ "$binsrc" == "packages/"* ]]; then
+    if [ "${binsrc#packages}" != "$binsrc" ]; then
         launch cri-resmgr-systemd
     else
         launch cri-resmgr
@@ -382,7 +380,9 @@ uninstall() { # script API
     #
     # Supported TARGETs:
     #   cri-resmgr: stop (kill) cri-resmgr and purge all files from VM.
-    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null; command -v apt && apt remove -y --purge cri-resource-manager; rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr /etc/cri-resmgr"
+    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null"
+    distro-remove-pkg cri-resource-manager
+    vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr /etc/cri-resmgr"
 }
 
 launch() { # script API
@@ -395,7 +395,7 @@ launch() { # script API
     #
     #   cri-resmgr-systemd:
     #                launch cri-resmgr on VM using "systemctl start".
-    #                Works when installed with binsrc=packages/debian-10.
+    #                Works when installed with binsrc=packages/<distro>.
     #                Environment variables:
     #                cri_resmgr_cfg: configuration filepath (on host)
     #
@@ -740,7 +740,10 @@ test-user-code() {
 INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
-vm=${vm-"crirm-test-e2e"}
+distro=${distro:=$DEFAULT_DISTRO}
+cri=${cri:=containerd}
+TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
+vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
 vm_files=${vm_files-""}
 cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
 cri_resmgr_extra_args=${cri_resmgr_extra_args-""}
@@ -848,7 +851,9 @@ if [ "$binsrc" == "local" ]; then
     [ -f "${BIN_DIR}/cri-resmgr-agent" ] || error "missing \"${BIN_DIR}/cri-resmgr-agent\""
 fi
 
-if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ] || [ -z "$VM_NAME" ]; then
+host-set-vm-config "$vm" "$distro" "$cri"
+
+if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
 fi
 
@@ -856,7 +861,7 @@ if [ -n "$vm_files" ]; then
     install-files "$vm_files"
 fi
 
-if ! vm-command-q "dpkg -l | grep -q kubelet"; then
+if ! vm-command-q "type -p kubelet >/dev/null"; then
     screen-install-k8s
 fi
 

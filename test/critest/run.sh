@@ -58,7 +58,7 @@ screen-create-vm() {
 
 screen-install-containerd() {
     speed=60 out "### Installing Containerd to the VM."
-    vm-install-containerd
+    vm-install-cri
     vm-install-containernetworking
 }
 
@@ -119,7 +119,11 @@ require_cmd() {
 
 # Validate parameters
 mode=$1
-vm=${vm-"crirm-test-critest"}
+distro=${distro:="ubuntu-20.04"}
+cri=${cri:="containerd"}
+vm=${vm:="critest-$distro-$cri"}
+host-set-vm-config "$vm" "$distro" "$cri"
+
 cd "${SCRIPT_DIR}" || error "failed to cd to \"${SCRIPT_DIR}\""
 tests=${tests-*.cfg}
 
