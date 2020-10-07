@@ -168,7 +168,7 @@ def dump_to_topology(dump, show_mem=True):
     # "cpu p:0 d:1 n:3 c:2 t:00003000 cpu:13"
     # mem line:
     # "mem n:4: s:8063.83"
-    re_cpu_line = re.compile('cpu p:(?P<package>[0-9]+) d:(?P<die>[0-9]+) n:(?P<node>[0-9]+) c:(?P<core>[0-9]+) t:(?P<thread_siblings>[0-9a-f,]+) cpu:(?P<cpu_id>[0-9]+)')
+    re_cpu_line = re.compile('cpu p:(?P<package>[0-9]+) d:(?P<die>[0-9]*) n:(?P<node>[0-9]+) c:(?P<core>[0-9]+) t:(?P<thread_siblings>[0-9a-f,]+) cpu:(?P<cpu_id>[0-9]+)')
     re_mem_line = re.compile('mem n:(?P<node>[0-9]+) s:(?P<size>[0-9.]+)')
     re_dist_line = re.compile('dist n:(?P<node>[0-9]+) d:(?P<dist>([0-9 ]+))')
     numeric_cpu_lines = []
@@ -179,7 +179,10 @@ def dump_to_topology(dump, show_mem=True):
         if m:
             mdict = m.groupdict()
             package = int(mdict["package"])
-            die = int(mdict["die"])
+            try:
+                die = int(mdict["die"])
+            except ValueError:
+                die = 0 # handle kernels that do not provide topology/die_id
             node = int(mdict["node"])
             core = int(mdict["core"])
             thread_siblings = eval("0x" + mdict["thread_siblings"].replace(",", ""))
