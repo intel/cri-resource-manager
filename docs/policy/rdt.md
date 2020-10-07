@@ -1,6 +1,6 @@
 # RDT (Intel® Resource Director Technology)
 
-## Overview
+## Background
 
 Intel® RDT provides capabilities for cache and memory allocation and
 monitoring. In Linux system the functionality is exposed to the user space via
@@ -10,43 +10,119 @@ control groups. Resource allocation is specified on the group level and each
 task (process/thread) is assigned to one group. In the context of CRI Resource
 we use the term 'RDT class' instead of 'resource control group'.
 
-Out of the RDT technologies, CRI Resource Manager currently supports L3 cache
-allocation and memory bandwidth allocation. The configuration contains a set of
-RDT classes which the policies can assign containers to. In the underlying
-system (on OS level) one resctrl group per RDT class) is created.
+CRI Resource Manager supports all available RDT technologies, i.e. L3 Cache
+Allocation (CAT) with Code and Data Prioritization (CDP) and Memory Bandwidth
+Allocation (MBA) plus Cache Monitoring (CMT) and Memory Bandwidth Monitoring
+(MBM).
+
+
+## Overview
+
+RDT configuration in CRI-RM is class-based. Each container gets assigned to an
+RDT class. In turn, all processes of the container will be assigned to the RDT
+CLOS  (under `/sys/fs/resctrl`) corresponding the RDT class. CRI-RM will configure
+the CLOSes according to its configuration at startup or whenever the
+configuration changes.
+
+By default there is a direct mapping between Pod QoS classes and RDT classes:
+the containers of the Pod get an RDT class with the same name as its QoS class
+(Guaranteed, Burstable or Besteffort). However, that can be overridden with the
+rdtclass.cri-resource-manager.intel.com Pod annotation. You can also specify
+RDT classes other than Guaranteed, Burstable or Besteffort. In this case, the
+Pod can only be assigned to these classes with the Pod annotation, though.
+The default behavior can also be overridden by a policy but currently none of
+the builtin policies do that.
+
 
 ## Configuration
 
-### Command Line Flags
+The RDT configuration in CRI-RM is a two-level hierarchy consisting of
+partitions and classes. It specifies a set of partitions each having a set of
+classes.
 
-| Flag      | Description                           |
-| --------- | ------------------------------------- |
-| `-no-rdt` | Disable RDT resource management
-
-### Dynamic Configuration
-
-CRI utilizes configuration received from
-[`cri-resmgr-agent`](../README.md#cri-resource-manager-node-agent), under the
-key `rdt` in the ConfigMap containing `cri-resmgr` configuration data. The
-configuration specifies a set of 'partitions' each further containing a set of
-'classes'. The configuration can be dynamically updated by editing the
-ConfigMap.
+### Partitions
 
 Partitions represent a logical grouping of the underlying classes, each
 partition specifying a portion of the available resources (L3/MB) which will be
-shared by the classes under it. L3 allocations between partitions are exclusive,
-i.e. no overlap on the cache ways between partitions is allowed. MB
-allocations do not have this property, i.e. all partitions may have 100% of
-bandwidth, for example.
+shared by the classes under it. Partitions guarantee non-overlapping exclusive
+cache allocation - i.e. no overlap on the cache ways between partitions is
+allowed. However, by technology, MB allocations are not exclusive. Thus, it is
+possible to assign all partitions 100% of memory bandwidth, for example.
 
-Classes represent the actual RDT classes that the policies assign containers
-to. The set of RDT classes can be freely specified, but, one must ensure that
-classes required by the active policy are specified, and, that the maxmimum
-number of classes (CLOSes) supported by the underlying system is not exceeded.
+### Classes
 
-CRI-RM has a built-in default configuration containing three classes
-corresponding to the Pod QOS classes of Kubernetes. These are utilized by the
-`static` policy.
+Classes represent the actual RDT classes containers are assigned to. In
+contrast to partitions, cache allocation between classes under a specific
+partition may overlap (and they usually do).
+
+The set of RDT classes can be freely specified, but, it should be ensured that
+classes corresponding to the Pod QoS classes are specified. Also, the maximum
+number of classes (CLOSes) supported by the underlying hardware must not be
+exceeded.
+
+### Example
+
+Below is a config snippet that would allocate (ca.) 60% of the cache lines
+exclusively to the Guarenteed class. The remaining 40% is for Burstable and
+Besteffort, Besteffort getting only 50% of this.
+
+```
+metadata:
+  name: cri-resmgr-config.default
+  namespace: kube-system
+data:
+...
+  rdt: |+
+    # Common options
+    options:
+      l3:
+        # Make this false if CAT must be available
+        optional: true
+    partitions:
+      exclusive:
+        l3Allocation:
+          # Allocate 60% of all cache IDs to the "exclusive" partition
+          all: "60%"
+        classes:
+          Guaranteed:
+            l3schema:
+              # Allocate all of the partitions cache lines to "Guarenteed"
+              all: "100%"
+      shared:
+        l3Allocation:
+          # Allocate 40% of all cache IDs to the "shared" partition
+          # These will NOT overlap with the cache lines allocated for "exclusive" partition
+          all: "40%"
+        classes:
+          Burstable:
+            l3schema:
+              # Allow "Burstable" to use all cache lines of the "shared" partition
+              all: "100%"
+          BestEffort:
+            l3schema:
+              # Allow "Besteffort" to use half of the cache lines of the "shared" partition
+              # These will overlap with those used by "Burstable"
+              all: "50%"
+```
+
+The configuration also supports far more fine-grained control, e.g. per
+cache-ID configuration (i.e. different sockets having different allocation) and
+Code and Data Prioritization (CDP) allowing different allocation for code and
+data paths.
+
+In addition, if the hardware details are known, raw bitmasks or bit numbers
+("0x1f" or 0-4) can be used instead of percentages in order to be able to
+configure allocations exactly as required. The bits in this case are
+corresponding to those in /sys/fs/resctrl/ bitmasks. You can also mix relative
+(percentage) and absolute (bitmask) allocations.
 
 See `rdt` in the [example ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
-for an example configuration.
+for a more complete example configuration.
+
+### Dynamic Configuration
+
+RDT supports dynamic configuration i.e. the resctrl filesystem is reconfigured
+whenever a configuration update e.g. via the [Node Agent](../node-agent.md) is
+received. However, the configuration update is rejected if it is incompatible
+with the set of currently running containers - e.g. the new config is missing a
+class that a running container has been assigned to.
