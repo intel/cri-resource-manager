@@ -18,8 +18,7 @@ the [provided Dockerfile][/cmd/cri-resmgr-webhook/Dockerfile] and published it,
 you can set up the webhook with these commands:
 
 ```
-  kubectl apply -f cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
   kubectl apply -f cmd/cri-resmgr-webhook/webhook-deployment.yaml
-
+  kubectl wait --for=condition=Available -n cri-resmgr deployments/cri-resmgr-webhook
+  kubectl apply -f cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
 ```
-
