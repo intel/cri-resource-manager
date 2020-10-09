@@ -78,7 +78,6 @@ BUILD_BUILDID := $(shell scripts/build/get-buildid --buildid --shell=no)
 RPM_VERSION   := $(shell scripts/build/get-buildid --rpm --shell=no)
 DEB_VERSION   := $(shell scripts/build/get-buildid --deb --shell=no)
 TAR_VERSION   := $(shell scripts/build/get-buildid --tar --shell=no)
-SITE_VERSION  := $(shell scripts/build/get-buildid --site --shell=no)
 
 # Kubernetes version we pull in as modules and our external API versions.
 KUBERNETES_VERSION := $(shell grep 'k8s.io/kubernetes ' go.mod | sed 's/^.* //')
@@ -145,10 +144,17 @@ DOCKER_RPM_BUILD := \
     done && \
     cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
 
+# Documentation-related variables
+SPHINXOPTS    ?= -W
+SPHINXBUILD   = sphinx-build
+SITE_BUILDDIR ?= _build
+
 # Docker base command for working with html documentation.
 DOCKER_SITE_BUILDER_IMAGE := cri-resmgr-site-builder
 DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` \
-	-p 8081:8081 -e BUILD_VERSION=$(BUILD_VERSION) -e SITE_VERSION=$(SITE_VERSION)
+	-p 8081:8081 \
+	-e SITE_BUILDDIR=$(SITE_BUILDDIR) -e SPHINXOPTS=$(SPHINXOPTS)
+
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
@@ -635,11 +641,6 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 	format vet cyclomatic-check lint golangci-lint \
 	cross-packages cross-rpm cross-deb
 
-SPHINXOPTS    = -W
-SPHINXBUILD   = sphinx-build
-SOURCEDIR     = .
-BUILDDIR      = _build
-
 
 #
 # Rules for documentation
@@ -651,17 +652,18 @@ vhtml: _work/venv/.stamp
 		cp -r docs/_build .
 
 html: clean-html
-	$(Q)$(SPHINXBUILD) -c docs . "$(BUILDDIR)" $(SPHINXOPTS)
-	cp docs/index.html "$(BUILDDIR)"
+	$(Q)BUILD_VERSION=$(BUILD_VERSION) \
+		$(SPHINXBUILD) -c docs . "$(SITE_BUILDDIR)" $(SPHINXOPTS)
+	cp docs/index.html "$(SITE_BUILDDIR)"
 	for d in $$(find docs -name figures -type d); do \
-	    mkdir -p $(BUILDDIR)/$$d && cp $$d/* $(BUILDDIR)/$$d; \
+	    mkdir -p $(SITE_BUILDDIR)/$$d && cp $$d/* $(SITE_BUILDDIR)/$$d; \
 	done
 
 serve-html: html
-	$(Q)cd $(BUILDDIR) && python3 -m http.server 8081
+	$(Q)cd $(SITE_BUILDDIR) && python3 -m http.server 8081
 
 clean-html:
-	rm -rf $(BUILDDIR)
+	rm -rf $(SITE_BUILDDIR)
 
 site-build: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
 	$(Q)$(DOCKER_SITE_CMD) $(DOCKER_SITE_BUILDER_IMAGE) make html
