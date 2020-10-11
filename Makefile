@@ -651,8 +651,11 @@ vhtml: _work/venv/.stamp
 		cp -r docs/_build .
 
 html: clean-html
-	$(SPHINXBUILD) -c docs . "$(BUILDDIR)" $(SPHINXOPTS)
+	$(Q)$(SPHINXBUILD) -c docs . "$(BUILDDIR)" $(SPHINXOPTS)
 	cp docs/index.html "$(BUILDDIR)"
+	for d in $$(find docs -name figures -type d); do \
+	    mkdir -p $(BUILDDIR)/$$d && cp $$d/* $(BUILDDIR)/$$d; \
+	done
 
 serve-html: html
 	$(Q)cd $(BUILDDIR) && python3 -m http.server 8081
