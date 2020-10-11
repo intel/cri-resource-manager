@@ -1,4 +1,4 @@
-name: Go
+name: Verify
 on: [push, pull_request]
 jobs:
 
@@ -44,3 +44,6 @@ jobs:
 
     - name: Codecov report
       run: bash <(curl -s https://codecov.io/bash)
+
+    - name: Build docs
+      run: make site-build
