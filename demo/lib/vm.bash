@@ -11,7 +11,7 @@ vms:
     cloud: true
     ContainerEnvVars:
       - KVM_CPU_OPTS=${VM_QEMU_CPUMEM:=-machine pc -smp cpus=4 -m 8G}
-      - EXTRA_QEMU_OPTS=${VM_QEMU_EXTRA}
+      - EXTRA_QEMU_OPTS=-monitor unix:/data/monitor,server,nowait ${VM_QEMU_EXTRA}
       - USE_NET_BRIDGES=${USE_NET_BRIDGES:-0}
     user-data: |
       #!/bin/bash
