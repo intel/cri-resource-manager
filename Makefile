@@ -640,6 +640,9 @@ SPHINXBUILD   = sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
 
+# By default generate a single (latest) X.Y for every tagged version X.Y.Z.
+BUILD_DOCS_OPTIONS = -W --squash
+BUILD_DOCS         = scripts/docs/build-versioned-docs $(BUILD_DOCS_OPTIONS)
 
 #
 # Rules for documentation
@@ -658,7 +661,7 @@ html: clean-html
 	done
 
 serve-html: html
-	$(Q)cd $(BUILDDIR) && python3 -m http.server 8081
+	$(Q)cd $(BUILDDIR) && python3 -m http.server 8082
 
 clean-html:
 	rm -rf $(BUILDDIR)
@@ -672,6 +675,12 @@ site-serve: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
 .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile docs/requirements.txt
 	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) docs
 	touch $@
+
+build-docs:
+	$(Q)$(BUILD_DOCS)
+
+serve-docs:
+	$(Q)cd docs && python3 -m http.server 8082
 
 # Set up a Python3 environment with the necessary tools for document creation.
 _work/venv/.stamp: docs/requirements.txt
