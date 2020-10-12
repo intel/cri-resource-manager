@@ -48,7 +48,7 @@ master_doc = 'docs/index'
 ##############################################################################
 
 baseBranch = "master"
-useGitHubURL = False
+useGitHubURL = True if getenv("USE_GITHUBURL")[0] in ['T','t','Y','y','1'] else False
 commitSHA = getenv('GITHUB_SHA')
 githubBaseURL = "https://github.com/intel/cri-resource-manager/"
 githubFileURL = githubBaseURL + "blob/"
@@ -62,7 +62,6 @@ else:
 
 version = getenv("SITE_VERSION", default="unknown")
 release = getenv("BUILD_VERSION", default="unknown")
-
 
 # -- General configuration ---------------------------------------------------
 
