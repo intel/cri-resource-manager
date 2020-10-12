@@ -1,0 +1,271 @@
+#!/bin/bash
+
+# we generate versioned documentation here
+OUTDIR=docs/versioned
+# we put temporary git worktrees here
+TMPDIR=generate/docs
+# we always generate documentation for these rolling branches
+ROLLING="master"
+
+# print help on usage
+usage() {
+    echo "usage: $1 [--squash] [--force]"
+    echo ""
+    echo "Generate documentation for each tagged version + rolling master,"
+    echo "putting each version under $OUTDIR/<version>."
+    echo ""
+    echo "The possible options are:"
+    echo "  --squash    for each tagged version X.Y.Z, generate only a single"
+    echo "              documentation version X.Y, using the largest tagged Z"
+    echo "  --force     force regenerating also up-to-date documentation"
+}
+
+# print an info message
+info() {
+    echo "$*"
+}
+
+# print a fatal error and exit
+fatal() {
+    echo "fatal error: $*" 1>&2
+    exit 1
+}
+
+# check if we already have the docs version generated from the same SHA1
+check-docs-sha1() {
+    local name="$1" sha1="$2"
+    local dst="$OUTDIR/$name"
+    if [ ! -e "$dst" ]; then
+        return 1
+    fi
+    if [ ! -d "$dst" ]; then
+        fatal "failed to check version for $name ($sha1): existing $dst is not a directory"
+    fi
+    if [ ! -f "$dst/sha1" ]; then
+        fatal "failed to check version for $name ($sha1): $dst/sha1 does not exist"
+    fi
+    if [ "$(cat $dst/sha1)" != "$sha1" ]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+# write the SHA1 we generated the docs version from
+write-docs-sha1() {
+   local name="$1" sha1="$2"
+   local dst="$OUTDIR/$name"
+   echo "$sha1" > "$dst"/sha1
+}
+
+# create a git worktree the the given docs version
+create-git-worktree() {
+    local version="$1" name="$2" sha1="$3" worktree
+    local current="$(git branch --show-current)"
+    local cfg
+
+    if [ "$version" = "$current" ]; then
+        worktree="."
+        if [ ! -f "$worktree/docs/index.rst" ]; then
+            echo "worktree=; src=; cfg=; err=;"
+            return 0
+        fi
+    fi
+    worktree="$TMPDIR/$version"
+    if [ -d "$worktree" ]; then
+        echo "err=\"$worktree already exists.\""
+        return 1
+    fi
+    git worktree add "$worktree" "$sha1" >& /dev/null ||
+        echo "err=\"failed to create git worktree\""
+    if [ ! -f "$worktree/docs/index.rst" ]; then
+        git worktree remove "$worktree" >& /dev/null
+        echo "worktree=; src=; cfg=; err=;"
+        return 0
+    fi
+    src="$worktree"
+    cfg="./docs"
+    echo "worktree=$worktree; src=$src; cfg=$cfg; err=;"
+    return 0
+}
+
+# delete the given git worktree
+delete-git-worktree() {
+    local worktree="$1"
+    if [ "$worktree" != "." -a -d "$worktree" ]; then
+        git worktree remove "$worktree"
+    fi
+}
+
+# generate the given docs version
+generate-docs-version() {
+    local name="$1" version="$2" sha1="$3"
+    local worktree cfg src dst err
+
+    eval "$(create-git-worktree $version $name $sha1)"
+    if [ -n "$err" ]; then
+        fatal "failed to create worktree for $name ($version, $sha1): $err"
+    fi
+    if [ -z "$cfg" ]; then
+        info "  - skipping, $name has no sphinx-based docs"
+        return 0
+    fi
+    trap "delete-git-worktree \"$worktree\"" EXIT RETURN
+
+
+    dst="$OUTDIR/$name"
+    rm -fr "$dst"
+    mkdir -p "$dst"
+    (export GITHUB_SHA="$sha1"
+     export SITE_VERSION="$version"
+     export BUILD_VERSION="$version"
+     export USE_GITHUBURL=true
+     sphinx-build $WERROR -q -c "$cfg" "$src" "$dst") |& 
+        while read -r line; do
+            info "  + [SPHINX] $line"
+        done
+     if [ "${PIPESTATUS[0]}" != "0" ]; then
+         fatal "sphinx-build failed"
+     fi
+
+    for d in $(find "$src" -name figures -type d); do
+        case "$d" in
+            "./$OUTDIR"*) ;;
+            *)
+                local from="$d"
+                local figs="${d#$worktree/}"
+                local f
+                info "  + copying figures to $dst/$figs..."
+                mkdir -p "$dst/$figs"
+                for f in "$from"/*; do
+                    info "    -> ${f##*/}"
+                    cp "$f" "$dst/$figs"
+                done
+                ;;
+        esac
+    done
+    write-docs-sha1 "$name" "$sha1"
+}
+
+discover-versions-unsquashed() {
+    local v t
+    TAGGED=""
+    for v in $(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$'); do
+        TAGGED="$TAGGED$t$v=$v"
+        t=" "
+    done
+}
+
+discover-versions-squashed() {
+    local s v max pl t
+    TAGGED=""
+    for s in $(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' |
+                   sed -E 's/\.[0-9]+$//g' | sort -u); do
+        max=""
+        for v in $(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -E "^$s\\."); do
+            pl="${v#$s.}"
+            if [ -z "$max" ]; then
+                max="$pl"
+            else
+                if [[ "$max" < "$pl" ]]; then
+                    max="$pl"
+                fi
+            fi
+        done
+        if [ -z "$max" ]; then
+            fatal "failed to resolve $s to an unsquashed version/tag"
+        fi
+        TAGGED="$TAGGED$t$s=$s.$max"
+        t=" "
+    done
+}
+
+generate-docs() {
+    local version name sha1
+    info "Generating versioned documentation..."
+    for version in $ROLLING $TAGGED; do
+        case $version in
+            *=*)
+                name="${version%=*}"
+                version="${version#*=}"
+                ;;
+            *)
+                name="$version"
+                ;;
+        esac
+        sha1=$(git rev-parse "$version")
+        if [ -z "$FORCE" ]; then
+            if check-docs-sha1 "$name" "$sha1"; then
+                info "* $name: $version, $sha1... already up-to-date."
+                continue
+            fi
+        fi
+        info "* $name: $version, $sha1..."
+        generate-docs-version "$name" "$version" "$sha1"
+    done
+}
+
+generate-index() {
+    local index="docs/index.html" main="${ROLLING%% *}" timeout=15
+    local version name sha1
+
+    info "Generating documentation index $index"
+    { 
+        echo "<html>"
+        echo "<head>"
+        echo "<meta http-equiv='refresh' content='$timeout; url=${OUTDIR#docs}/$main/docs/index.html'>"
+        echo "<title>CRI Resource Manager Versioned Documentation</title>"
+        echo "</head>"
+        echo ""
+        echo "Please... someone replace this vomitted page with a decent one.<br>"
+        echo "<br>"
+        echo "You will be redirected to the $main documentation after $timeout seconds...<br>"
+        echo "<ul>"
+        for version in $ROLLING $TAGGED; do
+            name="${version%=*}"
+            version="${version#*=}"
+            if [ ! -e $OUTDIR/$name/sha1 ]; then
+                continue
+            fi
+            sha1="$(cat $OUTDIR/$name/sha1)"
+            info "* adding version $name ($sha1)..." 1>&2
+            echo "<li><a href='versioned/$name/docs/index.html'>$name ($sha1)</a>"
+        done
+        echo "</ul>"
+        echo "</html>"
+    } > $index
+}
+
+#######################################
+# main script
+
+SQUASHED=unsquashed
+
+while [ "${1#-}" != "$1" ]; do
+    case $1 in
+        -s|--squash|--squashed)
+            SQUASHED=squashed
+            shift
+            ;;
+        -f|--force)
+            FORCE=true
+            shift
+            ;;
+        -W|-Werror)
+            WERROR="-W"
+            shift
+            ;;
+        -h|--help)
+            usage "$0"
+            exit 0
+            ;;
+        *) echo "unknown option \"$1\""
+           usage "$0"
+           exit 1
+           ;;
+    esac
+done
+
+discover-versions-$SQUASHED
+generate-docs
+generate-index
