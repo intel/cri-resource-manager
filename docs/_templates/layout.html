@@ -1,0 +1,21 @@
+{%- extends "!layout.html" %}
+
+{% block footer %}
+  {% if versions %}
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> Read the Docs</span>
+        v: {{ version }}
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl>
+          <dt>{{ _('Versions') }}</dt>
+          {% for version in versions %}
+          <dd><a href="/cri-resource-manager/{{ version }}">{{ version }}</a></dd>
+          {% endfor %}
+        </dl>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

@@ -26,6 +26,7 @@ author = 'various'
 
 master_doc = 'docs/index'
 
+
 ##############################################################################
 #
 # This section determines the behavior of links to local items in .md files.
@@ -63,6 +64,9 @@ else:
 version = getenv("SITE_VERSION", default="unknown")
 release = getenv("BUILD_VERSION", default="unknown")
 
+# Versions to show in the version menu
+versions = getenv('VERSIONS', default="").split()
+html_context = {'versions': sorted(set(versions))}
 
 # -- General configuration ---------------------------------------------------
 
