@@ -1,0 +1,486 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.4.0-82-gef3a137 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Static-Pools (STP) Policy" href="static-pools.html" />
+    <link rel="prev" title="Memtier Policy" href="memtier.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> CRI Resource Manager
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.4.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Policies</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="memtier.html">Memtier Policy</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Topology-Aware Policy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#features">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#activating-the-topology-aware-policy">Activating the Topology-Aware Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#commandline-options">Commandline Options</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dynamic-configuration">Dynamic Configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#container-pod-allocation-policy-hints">Container / <code class="docutils literal notranslate"><span class="pre">Pod</span></code> Allocation Policy Hints</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Policies</a> &raquo;</li>
+        
+      <li>Topology-Aware Policy</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../../_sources/docs/policy/topology-aware.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="topology-aware-policy">
+<h1>Topology-Aware Policy<a class="headerlink" href="#topology-aware-policy" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> builtin policy splits up the node into a tree of pools from
+which then resources are allocated to Containers. Currently the tree of pools is
+constructed automatically using runtime-discovered hardware topology information
+about the node. The pools correspond to the topologically relevant HW components:
+sockets, NUMA nodes, and CPUs/cores. The root of the tree corresponds to the full
+HW available in the system, the next level corresponds to individual sockets in the
+system, the next one to individual NUMA nodes.</p>
+<p>The main goal of the <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy is to try and distribute Containers
+among the pools (tree nodes) in a way that both maximizes Container performance
+and minimizes interference between the Containers of different <code class="docutils literal notranslate"><span class="pre">Pod</span></code>s. This is
+accomplished by considering</p>
+<ul class="simple">
+<li><p>topological characteristics of the Container’s devices (<code class="docutils literal notranslate"><span class="pre">topology</span> <span class="pre">hints</span></code>)</p></li>
+<li><p>potential hints provided by the user (in the form of policy-specific <code class="docutils literal notranslate"><span class="pre">annotations</span></code>)</p></li>
+<li><p>current availability of hardware resources</p></li>
+<li><p>other colocated Containers running on the node</p></li>
+</ul>
+</div>
+<div class="section" id="features">
+<h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>aligning workload CPU and memory wrt. the locality of devices used</p></li>
+<li><p>exclusive CPU allocation from pools</p></li>
+<li><p>discovering and using kernel-isolated CPUs for exclusive allocations</p></li>
+<li><p>shared CPU allocation from pools</p></li>
+<li><p>mixed (both exclusive and shared) allocation from pools</p></li>
+<li><p>exposing the allocated CPU to Containers</p></li>
+<li><p>notifying Containers about changes in allocation</p></li>
+</ul>
+</div>
+<div class="section" id="activating-the-topology-aware-policy">
+<h2>Activating the Topology-Aware Policy<a class="headerlink" href="#activating-the-topology-aware-policy" title="Permalink to this headline">¶</a></h2>
+<p>You can activate the tpology-aware policy by setting the <code class="docutils literal notranslate"><span class="pre">--policy</span></code> option of
+<code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> to <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code>. For instance like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span> <span class="o">--</span><span class="n">policy</span> <span class="n">topology</span><span class="o">-</span><span class="n">aware</span> <span class="o">--</span><span class="n">reserved</span><span class="o">-</span><span class="n">resources</span> <span class="n">cpu</span><span class="o">=</span><span class="mi">750</span><span class="n">m</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="commandline-options">
+<h3>Commandline Options<a class="headerlink" href="#commandline-options" title="Permalink to this headline">¶</a></h3>
+<p>There are a number of options specific to this policy:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--topology-aware-pin-cpu</span></code>:
+Whether to pin Containers to the CPUs of the assigned pool.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--topology-aware-pin-memory</span></code>:
+Whether to pin Containers to the memory of the assigned pool.</p></li>
+<li><p>`–topology-aware-prefer-isolated-cpus:
+Whether to try to allocate kernel-isolated CPUs for exclusive usage unless the Pod or Container
+is explicitly annotated otherwise.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--topology-aware-prefer-shared-cpus</span></code>:
+Whether to allocate shared CPUs unless the Pod or Container is explicitly annotated otherwise.</p></li>
+</ul>
+</div>
+<div class="section" id="dynamic-configuration">
+<h3>Dynamic Configuration<a class="headerlink" href="#dynamic-configuration" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy can be configured dynamically using the
+<a class="reference internal" href="../node-agent.html"><span class="doc">node agent</span></a>. It takes
+a JSON configuration with the following keys corresponding to the above
+mentioned options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">PinCPU</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PinMemory</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferIsolatedCPUs</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferSharedCPUs</span></code></p></li>
+</ul>
+<p>See the <a class="reference external" href="../../README.md#dynamic-configuration"><code class="docutils literal notranslate"><span class="pre">documentation</span></code></a> for information about
+dynamic configuration.</p>
+<p>See the
+<a class="reference external" href="../../sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
+for an example which configures the <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy with the built-in
+defaults.</p>
+</div>
+<div class="section" id="container-pod-allocation-policy-hints">
+<h3>Container / <code class="docutils literal notranslate"><span class="pre">Pod</span></code> Allocation Policy Hints<a class="headerlink" href="#container-pod-allocation-policy-hints" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy recognizes a number of policy-specific annotations
+that can be used to provide hints and preferences about how resources should
+be allocated to the Containers. These hints are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/prefer-isolated-cpus</span></code>: isolated exclusive CPU preference</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/prefer-shared-cpus</span></code>: shared allocation preference</p></li>
+</ul>
+<div class="section" id="isolated-exclusive-cpus">
+<h4>Isolated Exclusive CPUs<a class="headerlink" href="#isolated-exclusive-cpus" title="Permalink to this headline">¶</a></h4>
+<p>When kernel-isolated CPUs are available ,the <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy will prefer
+to allocate those to any Container of a <code class="docutils literal notranslate"><span class="pre">Pod</span></code> in the <code class="docutils literal notranslate"><span class="pre">Guaranteed</span> <span class="pre">QoS</span> <span class="pre">class</span></code> if
+the Container <code class="docutils literal notranslate"><span class="pre">resource</span> <span class="pre">requirements</span></code> ask for exactly 1 CPU. If multiple CPUs are
+requested, exlusive CPUs will be sliced off from the shared CPU set of the pool.</p>
+<p>This default behavior can be changed using the <code class="docutils literal notranslate"><span class="pre">--topology-aware-prefer-isolated-cpus</span></code>
+boolean configuration option.</p>
+<p>The global default behavior can also be overridden, per Pod or per Container, using
+the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/prefer-isolated-cpus</span></code> <code class="docutils literal notranslate"><span class="pre">annotation</span></code>. Setting the
+value to <code class="docutils literal notranslate"><span class="pre">true</span></code> asks the policy to prefer isoalted CPUs for exclusive allocation even
+if the Container asks for multiple CPUs and only fall back to slicing off shared CPUs
+then there is insufficent free isolated capacity. Similarly, setting the value of the
+<code class="docutils literal notranslate"><span class="pre">annotation</span></code> to <code class="docutils literal notranslate"><span class="pre">false</span></code> opts out every Container in the <code class="docutils literal notranslate"><span class="pre">Pod</span></code> from taking any isolated
+CPUs.</p>
+<p>The same mechanism can be used to opt-in or out of isolated CPU usage per Container
+within the <code class="docutils literal notranslate"><span class="pre">Pod</span></code> by setting the value of the <code class="docutils literal notranslate"><span class="pre">annotation</span></code> to the string represenation of
+a JSON object where each key is the name of a Container and each value is either
+<code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+</div>
+<div class="section" id="shared-cpu-allocation">
+<h4>Shared CPU Allocation<a class="headerlink" href="#shared-cpu-allocation" title="Permalink to this headline">¶</a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy assumes mixed mode exclusive+shared CPU allocation
+preference by default. Under those assumptions every Container of a <code class="docutils literal notranslate"><span class="pre">Pod</span></code> in the
+´Guaranteed QoS class<code class="docutils literal notranslate"><span class="pre">will</span> <span class="pre">get</span> <span class="pre">exclusive</span> <span class="pre">CPUs</span> <span class="pre">allocated</span> <span class="pre">worth</span> <span class="pre">the</span> <span class="pre">integer</span> <span class="pre">part</span> <span class="pre">of</span> <span class="pre">their</span></code>CPU request<code class="docutils literal notranslate"><span class="pre">and</span> <span class="pre">a</span> <span class="pre">portion</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">pool</span> <span class="pre">shared</span> <span class="pre">CPU</span> <span class="pre">set</span> <span class="pre">proportional</span> <span class="pre">to</span> <span class="pre">the</span> <span class="pre">fractional</span> <span class="pre">part</span> <span class="pre">of</span> <span class="pre">their</span></code>CPU request`. So for instance, a Container requesting
+2.5 CPUs or 2500 milli-CPUs will get by default two exclusive CPUs allocated and
+half a CPU worth allocated from the pools CPU set shared with other Container in
+the same pool.</p>
+<p>This default behavior can be changed using the <code class="docutils literal notranslate"><span class="pre">--topology-aware-prefer-shared-cpus</span></code>
+boolean configuration option.</p>
+<p>Pods or Containers can opt-out of this assumption using the
+<code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/prefer-shared-cpus</span></code> <code class="docutils literal notranslate"><span class="pre">annotation</span></code>. Setting its value
+to <code class="docutils literal notranslate"><span class="pre">true</span></code> will cause the policy to always allocate the entire requested capacity for
+all Containers of the Pod from the shared CPUs of a pool. Setting the value to <code class="docutils literal notranslate"><span class="pre">false</span></code>
+will cause the policy to allocate any integer portion of the CPU request exclusively
+and any fractional part from the shared CPUs.</p>
+<p>The same thing can be accomplished per Container by using as value a <code class="docutils literal notranslate"><span class="pre">JSON</span> <span class="pre">object</span></code>
+similarly to the isolated CPU preference <code class="docutils literal notranslate"><span class="pre">annotation</span></code>: using the Container name as
+a key, and <code class="docutils literal notranslate"><span class="pre">true</span></code> or <code class="docutils literal notranslate"><span class="pre">false</span></code> as the value. Moreover, if a negative integer is used
+as the value, it is interpreted as <code class="docutils literal notranslate"><span class="pre">true</span></code> with a Container displacement upward in
+the tree. For instance, setting the annotation value to</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  &quot;{\&quot;container-1\&quot;: -1, \&quot;container-2\&quot;: true}&quot; (or `0` instead of `true`)
+</pre></div>
+</div>
+<p>requests container-1 to be placed to the parent of the pool with the best fitting
+score and container-2 to be placed in the best fitting pool itself.</p>
+</div>
+<div class="section" id="intra-pod-container-affinity-anti-affinity">
+<h4>Intra-Pod Container Affinity/Anti-affinity<a class="headerlink" href="#intra-pod-container-affinity-anti-affinity" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Containers</span></code> within a <code class="docutils literal notranslate"><span class="pre">Pod</span></code> can be annotated with <code class="docutils literal notranslate"><span class="pre">affinity</span></code> or <code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code>
+rules, using the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/affinity</span></code> and
+<code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/anti-affinity</span></code> annotations.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Affinity</span></code> indicates a <code class="docutils literal notranslate"><span class="pre">soft</span> <span class="pre">pull</span></code> preference while <code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code> indicates
+a <code class="docutils literal notranslate"><span class="pre">soft</span> <span class="pre">push</span></code> preference. The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy will try to colocate <code class="docutils literal notranslate"><span class="pre">containers</span></code>
+with <code class="docutils literal notranslate"><span class="pre">affinity</span></code> to the same pool and <code class="docutils literal notranslate"><span class="pre">Containers</span></code> with <code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code> to different
+pools.</p>
+<p>Here is an example snippet of a <code class="docutils literal notranslate"><span class="pre">Pod</span> <span class="pre">Spec</span></code> with</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">container3</span></code> having <code class="docutils literal notranslate"><span class="pre">affinity</span></code> to <code class="docutils literal notranslate"><span class="pre">container1</span></code> and <code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code> to <code class="docutils literal notranslate"><span class="pre">container2</span></code>,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">container4</span></code> having <code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code> to <code class="docutils literal notranslate"><span class="pre">container2</span></code>, and <code class="docutils literal notranslate"><span class="pre">container3</span></code></p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">affinity</span><span class="p">:</span> <span class="o">|</span>
+      <span class="n">container3</span><span class="p">:</span> <span class="p">[</span> <span class="n">container1</span> <span class="p">]</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">anti</span><span class="o">-</span><span class="n">affinity</span><span class="p">:</span> <span class="o">|</span>
+      <span class="n">container3</span><span class="p">:</span> <span class="p">[</span> <span class="n">container2</span> <span class="p">]</span>
+      <span class="n">container4</span><span class="p">:</span> <span class="p">[</span> <span class="n">container2</span><span class="p">,</span> <span class="n">container3</span> <span class="p">]</span>
+</pre></div>
+</div>
+<p>This is actually a shorthand notation for the following, as <code class="docutils literal notranslate"><span class="pre">key</span></code> defaults to
+<code class="docutils literal notranslate"><span class="pre">io.kubernetes.container.name</span></code>, and <code class="docutils literal notranslate"><span class="pre">operator</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">In</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
+  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">affinity</span><span class="p">:</span> <span class="o">|+</span>
+      <span class="n">container3</span><span class="p">:</span>
+      <span class="o">-</span> <span class="n">match</span><span class="p">:</span>
+          <span class="n">key</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">container</span><span class="o">.</span><span class="n">name</span>
+          <span class="n">operator</span><span class="p">:</span> <span class="n">In</span>
+          <span class="n">values</span><span class="p">:</span>
+          <span class="o">-</span> <span class="n">container1</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">anti</span><span class="o">-</span><span class="n">affinity</span><span class="p">:</span> <span class="o">|+</span>
+      <span class="n">container3</span><span class="p">:</span>
+      <span class="o">-</span> <span class="n">match</span><span class="p">:</span>
+          <span class="n">key</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">container</span><span class="o">.</span><span class="n">name</span>
+          <span class="n">operator</span><span class="p">:</span> <span class="n">In</span>
+          <span class="n">values</span><span class="p">:</span>
+          <span class="o">-</span> <span class="n">container2</span>
+      <span class="n">container4</span><span class="p">:</span>
+      <span class="o">-</span> <span class="n">match</span><span class="p">:</span>
+          <span class="n">key</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">container</span><span class="o">.</span><span class="n">name</span>
+          <span class="n">operator</span><span class="p">:</span> <span class="n">In</span>
+          <span class="n">values</span><span class="p">:</span>
+          <span class="o">-</span> <span class="n">container2</span>
+          <span class="o">-</span> <span class="n">container3</span>
+</pre></div>
+</div>
+<p>Affinity and anti-affinity can have weights assigned as well. If omitted affinity weights
+default to <code class="docutils literal notranslate"><span class="pre">1</span></code> and anti-affinity weights to <code class="docutils literal notranslate"><span class="pre">-1</span></code>. The above example is actually represented
+internally with something equivalent to the following.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
+  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">affinity</span><span class="p">:</span> <span class="o">|+</span>
+      <span class="n">container3</span><span class="p">:</span>
+      <span class="o">-</span> <span class="n">match</span><span class="p">:</span>
+          <span class="n">key</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">container</span><span class="o">.</span><span class="n">name</span>
+          <span class="n">operator</span><span class="p">:</span> <span class="n">In</span>
+          <span class="n">values</span><span class="p">:</span>
+          <span class="o">-</span> <span class="n">container1</span>
+        <span class="n">weight</span><span class="p">:</span> <span class="mi">1</span>
+      <span class="o">-</span> <span class="n">match</span><span class="p">:</span>
+          <span class="n">key</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">container</span><span class="o">.</span><span class="n">name</span>
+          <span class="n">operator</span><span class="p">:</span> <span class="n">In</span>
+          <span class="n">values</span><span class="p">:</span>
+          <span class="o">-</span> <span class="n">container2</span>
+        <span class="n">weight</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span>
+      <span class="n">container4</span><span class="p">:</span>
+      <span class="o">-</span> <span class="n">match</span><span class="p">:</span>
+          <span class="n">key</span><span class="p">:</span> <span class="n">io</span><span class="o">.</span><span class="n">kubernetes</span><span class="o">.</span><span class="n">container</span><span class="o">.</span><span class="n">name</span>
+          <span class="n">operator</span><span class="p">:</span> <span class="n">In</span>
+          <span class="n">values</span><span class="p">:</span>
+          <span class="o">-</span> <span class="n">container2</span>
+          <span class="o">-</span> <span class="n">container3</span>
+        <span class="n">weight</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span>
+</pre></div>
+</div>
+<p>For a more detailed description see <a class="reference internal" href="container-affinity.html"><span class="doc">the documentation of annotations</span></a>.</p>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="static-pools.html" class="btn btn-neutral float-right" title="Static-Pools (STP) Policy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="memtier.html" class="btn btn-neutral float-left" title="Memtier Policy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, various
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+  
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v: 0.4.0
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl>
+          <dt>Versions</dt>
+          
+          <dd><a href="/cri-resource-manager/devel">devel</a></dd>
+          
+          <dd><a href="/cri-resource-manager/stable">stable</a></dd>
+          
+          <dd><a href="/cri-resource-manager/v0.4">v0.4</a></dd>
+          
+        </dl>
+      </div>
+    </div>
+  
+
+
+</body>
+</html>

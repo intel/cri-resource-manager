@@ -1,0 +1,307 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Welcome to CRI Resource Manager’s documentation! &mdash; CRI Resource Manager 0.4.0-82-gef3a137 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Introduction" href="introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="#" class="icon icon-home" alt="Documentation Home"> CRI Resource Manager
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.4.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="setup.html">Setup and Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="policy/index.html">Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">CRI Resource Manager</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="#" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Welcome to CRI Resource Manager’s documentation!</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/docs/index.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="welcome-to-cri-resource-manager-s-documentation">
+<h1>Welcome to CRI Resource Manager’s documentation!<a class="headerlink" href="#welcome-to-cri-resource-manager-s-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quick-start.html#pre-requisites">Pre-requisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quick-start.html#setup-cri-resmgr">Setup CRI-Resmgr</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quick-start.html#kubelet-setup">Kubelet setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quick-start.html#what-next">What Next</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#installing-from-packages">Installing From Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#installing-from-sources">Installing From Sources</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#building-packages-for-the-distro-of-your-host">Building Packages for the Distro of Your Host</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#building-packages-for-another-distro">Building Packages for Another Distro</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation.html#post-install-configuration">Post-Install Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="setup.html">Setup and Usage</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="setup.html#setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime">Setting Up kubelet To Use CRI Resource Manager as the Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="setup.html#setting-up-cri-resource-manager">Setting Up CRI Resource Manager</a></li>
+<li class="toctree-l2"><a class="reference internal" href="setup.html#using-cri-resource-manager-as-a-message-dumper">Using CRI Resource Manager as a Message Dumper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="setup.html#using-docker-as-the-runtime">Using Docker as the Runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="setup.html#logging-and-debugging">Logging and Debugging</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="policy/index.html">Policies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="policy/memtier.html">Memtier Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy/topology-aware.html">Topology-Aware Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy/static-pools.html">Static-Pools (STP) Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy/container-affinity.html">Container Affinity and Anti-Affinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy/blockio.html">Block IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy/rdt.html">RDT (Intel® Resource Director Technology)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers-guide/index.html">Developer’s Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="developers-guide/architecture.html">Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developers-guide/policy-writers-guide.html">Policy Writer’s Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developers-guide/testing.html">Testing</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="demos/index.html">Demos</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="demos/blockio.html">Block I/O Demo</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference/resmgr-command-line-reference.html">CRI-Resmgr Command-line Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/agent-command-line-reference.html">CRI-Resmgr-Agent Command-line Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/configuration-reference.html">Configuration Reference</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="introduction.html" class="btn btn-neutral float-right" title="Introduction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, various
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+  
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v: 0.4.0
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl>
+          <dt>Versions</dt>
+          
+          <dd><a href="/cri-resource-manager/devel">devel</a></dd>
+          
+          <dd><a href="/cri-resource-manager/stable">stable</a></dd>
+          
+          <dd><a href="/cri-resource-manager/v0.4">v0.4</a></dd>
+          
+        </dl>
+      </div>
+    </div>
+  
+
+
+</body>
+</html>
