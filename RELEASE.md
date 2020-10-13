@@ -20,7 +20,9 @@ The process to release a new version of cri-resource-manager is:
   - [ ] Verify runnability of container images
 - Publishing
   - [ ] Push the tag with `git push $VERSION`
-  - [ ] Push container images *to where*???
+  - [ ] Check that container images are published
+    - https://hub.docker.com/r/intel/cri-resmgr-agent/tags
+    - https://hub.docker.com/r/intel/cri-resmgr-webhook/tags
   - [ ] Write the change log into the
   [Github release info](https://github.com/intel/cri-resource-manager/releases).
   - [ ] Add a link to the tagged release in this issue.

@@ -1,6 +1,7 @@
 #!/bin/bash
 
-DEMO_TITLE="CRI Resource Manager: Numa test"
+DEMO_TITLE="CRI Resource Manager: End-to-End Testing"
+DEFAULT_DISTRO="ubuntu-20.04"
 
 PV='pv -qL'
 
@@ -45,6 +46,7 @@ usage() {
     echo "             \"github\": go get from master and build inside VM."
     echo "             \"local\": copy from source tree bin/ (the default)."
     echo "                      (set bindir=/path/to/cri-resmgr* to override bin/)"
+    echo "             \"packages/<distro>\": use distro packages from this dir"
     echo "    reinstall_cri_resmgr: If 1, stop running cri-resmgr, reinstall,"
     echo "             and restart it on the VM before starting test run."
     echo "             The default is 0."
@@ -68,6 +70,15 @@ usage() {
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
     echo "    cri_resmgr_extra_args: arguments to be added on cri-resmgr"
     echo "             command line when launched"
+    echo "    vm_files: \"serialized\" associative array of files to be created on vm"
+    echo "             associative array syntax:"
+    echo "             vm_files['/path/file']=file:/path/on/host"
+    echo "                                   ='data:,plain text content'"
+    echo "                                   =data:;base64,ZGF0YQ=="
+    echo "                                   =dir: (creates only /path/file directory)"
+    echo "             vm_files['/etc/motd']='data:,hello world'"
+    echo "             How to execute run.sh with serialized array:"
+    echo "             vm_files=\$(declare -p vm_files) ./run.sh"
     echo "    code:    Variable that contains test script code to be run"
     echo "             if SCRIPT is not given."
     echo ""
@@ -99,11 +110,7 @@ record() {
 }
 
 screen-create-vm() {
-    speed=60 out "### Running the test in VM \"$vm\"."
-    # Create a machine with 5 NUMA nodes.
-    # Qemu default NUMA node self-distance is 10.
-    # Define distance 22 between all 4 nodes with CPU(s).
-    # The distance from nodes with CPU(s) and the node with NVRAM is 88.
+    speed=60 out "### Running the test in VM \"$VM_NAME\"."
     host-create-vm "$vm" "$topology"
     vm-networking
     if [ -z "$VM_IP" ]; then
@@ -112,8 +119,9 @@ screen-create-vm() {
 }
 
 screen-install-k8s() {
+    speed=60 out "### Installing CRI Runtime to the VM."
+    vm-install-cri
     speed=60 out "### Installing Kubernetes to the VM."
-    vm-install-containerd
     vm-install-k8s
 }
 
@@ -124,7 +132,7 @@ screen-install-cri-resmgr() {
 
 screen-install-cri-resmgr-debugging() {
     speed=60 out "### Installing cri-resmgr debugging enablers"
-    vm-command "apt install -y golang"
+    vm-install-golang
     vm-command "go get github.com/go-delve/delve/cmd/dlv" || {
         command-error "installing delve failed"
     }
@@ -135,7 +143,11 @@ screen-install-cri-resmgr-debugging() {
 
 screen-launch-cri-resmgr() {
     speed=60 out "### Launching cri-resmgr with config $cri_resmgr_cfg."
-    launch cri-resmgr
+    if [ "${binsrc#packages}" != "$binsrc" ]; then
+        launch cri-resmgr-systemd
+    else
+        launch cri-resmgr
+    fi
 }
 
 screen-create-singlenode-cluster() {
@@ -292,6 +304,54 @@ run-hook() {
     eval "${hook_code}"
 }
 
+install-files() {
+    # Usage: install-files $(declare -p files_assoc_array)
+    #
+    # Parameter is a serialized associative array with
+    # key: target filepath on VM
+    # value: source URL ("file:", limited "data:" and "dir:" schemes supported)
+    #
+    # Example: build an associative array and install files in the array
+    #   files['/path/file1']=file:/hostpath/file
+    #   files['/path/file2']=data:,hello
+    #   files['/path/file3']=data:;base64,aGVsbG8=
+    #   files['/path/dir1']='dir:'
+    #   install-files "$(declare -p files)"
+    local -A files
+    eval "files=${1#*=}"
+    local tgt src data
+    for tgt in "${!files[@]}"; do
+        src="${files[$tgt]}"
+        case $src in
+            "data:,"*)
+                data=${src#data:,}
+                ;;
+            "data:;base64,"*)
+                data=$(base64 -d <<< "${src#data:;base64,}")
+                ;;
+            "file:"*)
+                data=$(< "${src#file:}")
+                ;;
+            "dir:")
+                echo -n "Creating on vm: $tgt/... "
+                vm-command-q "mkdir -p \"$tgt\"" || {
+                    error "failed to make directory to vm \"$tgt\""
+                }
+                echo "ok."
+                continue
+                ;;
+            *)
+                error "invalid source scheme \"${src}\", expected \"data:,\" \"data:;base64,\", \"file:\" or \"dir:\""
+                ;;
+        esac
+        echo -n "Writing on vm: $tgt... "
+        vm-write-file "$tgt" "$data" || {
+            error "failed to write to vm file \"$tgt\""
+        }
+        echo "ok."
+    done
+}
+
 ### Test script helpers
 
 install() { # script API
@@ -320,7 +380,9 @@ uninstall() { # script API
     #
     # Supported TARGETs:
     #   cri-resmgr: stop (kill) cri-resmgr and purge all files from VM.
-    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null; rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr"
+    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null"
+    distro-remove-pkg cri-resource-manager
+    vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr /etc/cri-resmgr"
 }
 
 launch() { # script API
@@ -331,20 +393,48 @@ launch() { # script API
     #                cri_resmgr_cfg: configuration filepath (on host)
     #                cri_resmgr_extra_args: extra arguments on command line
     #
+    #   cri-resmgr-systemd:
+    #                launch cri-resmgr on VM using "systemctl start".
+    #                Works when installed with binsrc=packages/<distro>.
+    #                Environment variables:
+    #                cri_resmgr_cfg: configuration filepath (on host)
+    #
     # Example:
     #   cri_resmgr_cfg=/tmp/memtier.cfg launch cri-resmgr
-    host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
-        command-error "copying \"$cri_resmgr_cfg\" to VM failed"
-    }
-    vm-command "cat $(basename "$cri_resmgr_cfg")"
-    vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args >cri-resmgr.output.txt 2>&1 &"
-    sleep 2 >/dev/null 2>&1
-    vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
-        command-error "launching cri-resmgr failed with FATAL ERROR"
-    }
-    vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
-        command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
-    }
+    target="$1"
+    case $target in
+        "cri-resmgr")
+            host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+                command-error "copying \"$cri_resmgr_cfg\" to VM failed"
+            }
+            vm-command "cat $(basename "$cri_resmgr_cfg")"
+            vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args >cri-resmgr.output.txt 2>&1 &"
+            sleep 2 >/dev/null 2>&1
+            vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
+                command-error "launching cri-resmgr failed with FATAL ERROR"
+            }
+            vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
+                command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
+            }
+            ;;
+        "cri-resmgr-systemd")
+            host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+                command-error "copying \"$cri_resmgr_cfg\" to VM failed"
+            }
+            vm-command "cp \"$(basename "$cri_resmgr_cfg")\" /etc/cri-resmgr/fallback.cfg"
+            vm-command "systemctl daemon-reload ; systemctl start cri-resource-manager" || {
+                command-error "systemd failed to start cri-resource-manager"
+            }
+            sleep 5
+            vm-command "systemctl is-active cri-resource-manager" || {
+                vm-command "systemctl status cri-resource-manager"
+                command-error "cri-resource-manager did not become active after systemctl start"
+            }
+            ;;
+        *)
+            error "launch: invalid target \"$1\""
+            ;;
+    esac
 
 }
 
@@ -520,6 +610,7 @@ delete() { # script API
     }
 }
 
+declare -a pulled_images_on_vm
 create() { # script API
     # Usage: [VAR=VALUE][n=COUNT] create TEMPLATE_NAME
     #
@@ -536,13 +627,15 @@ create() { # script API
     #   wait: condition to be waited for (see kubectl wait --for=condition=).
     #         If empty (""), skip waiting. The default is wait="Ready".
     #   wait_t: wait timeout. The default is wait_t=60s.
-
+    local template_file
     template_file=$(resolve-template "$1" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
-
     local template_kind
     template_kind=$(awk '/kind/{print tolower($2)}' < "$template_file")
     local wait=${wait-Ready}
     local wait_t=${wait_t-60s}
+    local images
+    local image
+    local errormsg
     if [ -z "$n" ]; then
         local n=1
     fi
@@ -557,6 +650,21 @@ create() { # script API
             command-error "copying \"$OUTPUT_DIR/$NAME.yaml\" to VM failed"
         }
         vm-command "cat $NAME.yaml"
+        images="$(grep -E '^ *image: .*$' "$OUTPUT_DIR/$NAME.yaml" | sed -E 's/^ *image: *([^ ]*)$/\1/g' | sort -u)"
+        for image in $images; do
+            if ! [[ " ${pulled_images_on_vm[*]} " == *" ${image} "* ]]; then
+                vm-command "crictl -i unix:///var/run/cri-resmgr/cri-resmgr.sock pull \"$image\"" || {
+                    errormsg="pulling image \"$image\" for \"$OUTPUT_DIR/$NAME.yaml\" failed."
+                    if is-hooked on_create_fail; then
+                        echo "$errormsg"
+                        run-hook on_create_fail
+                    else
+                        command-error "$errormsg"
+                    fi
+                }
+                pulled_images_on_vm+=("$image")
+            fi
+        done
         vm-command "kubectl create -f $NAME.yaml" || {
             if is-hooked on_create_fail; then
                 echo "kubectl create error"
@@ -567,11 +675,12 @@ create() { # script API
         }
         if [ "x$wait" != "x" ]; then
             speed=1000 vm-command "kubectl wait --timeout=${wait_t} --for=condition=${wait} ${template_kind}/$NAME" >/dev/null 2>&1 || {
+                errormsg="waiting for ${template_kind} \"$NAME\" to become ready timed out"
                 if is-hooked on_create_fail; then
-                    echo "waiting for ${template_kind} \"$NAME\" to become ready timed out"
+                    echo "$errormsg"
                     run-hook on_create_fail
                 else
-                    command-error "waiting for ${template_kind} \"$NAME\" to become ready timed out"
+                    command-error "$errormsg"
                 fi
             }
         fi
@@ -631,7 +740,11 @@ test-user-code() {
 INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
-vm=${vm-"crirm-test-e2e"}
+distro=${distro:=$DEFAULT_DISTRO}
+cri=${cri:=containerd}
+TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
+vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
+vm_files=${vm_files-""}
 cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
 cri_resmgr_extra_args=${cri_resmgr_extra_args-""}
 cleanup=${cleanup-0}
@@ -738,11 +851,17 @@ if [ "$binsrc" == "local" ]; then
     [ -f "${BIN_DIR}/cri-resmgr-agent" ] || error "missing \"${BIN_DIR}/cri-resmgr-agent\""
 fi
 
-if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ] || [ -z "$VM_NAME" ]; then
+host-set-vm-config "$vm" "$distro" "$cri"
+
+if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
 fi
 
-if ! vm-command-q "dpkg -l | grep -q kubelet"; then
+if [ -n "$vm_files" ]; then
+    install-files "$vm_files"
+fi
+
+if ! vm-command-q "type -p kubelet >/dev/null"; then
     screen-install-k8s
 fi
 
@@ -750,7 +869,7 @@ if [ "$reinstall_cri_resmgr" == "1" ]; then
     uninstall cri-resmgr
 fi
 
-if ! vm-command-q "[ -f /usr/local/bin/cri-resmgr ]"; then
+if ! vm-command-q "type -p cri-resmgr >/dev/null"; then
     install cri-resmgr
 fi
 

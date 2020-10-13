@@ -17,9 +17,8 @@ override_dh_auto_install:
 	export PATH="$$PATH:$$(go env GOPATH)/bin"; \
 	make BUILD_DIRS="__BUILD_DIRS__" install DESTDIR=debian/__PACKAGE__
 	mkdir -p debian/__PACKAGE__/usr/share/doc/__PACKAGE__
-	cp CONTRIBUTING.md LICENSE README.md SECURITY.md cmd/*/*.sample \
+	cp LICENSE README.md docs/*.md cmd/*/*.sample \
 	    debian/__PACKAGE__/usr/share/doc/__PACKAGE__
-
 
 override_dh_gencontrol:
 	dh_gencontrol -- -v$(PACKAGEVERSION)

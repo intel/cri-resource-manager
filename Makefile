@@ -144,9 +144,17 @@ DOCKER_RPM_BUILD := \
     done && \
     cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
 
+# Documentation-related variables
+SPHINXOPTS    ?= -W
+SPHINXBUILD   = sphinx-build
+SITE_BUILDDIR ?= _build
+
 # Docker base command for working with html documentation.
 DOCKER_SITE_BUILDER_IMAGE := cri-resmgr-site-builder
-DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` -p 8081:8081 $(DOCKER_SITE_BUILDER_IMAGE)
+DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` \
+	-p 8081:8081 \
+	-e SITE_BUILDDIR=$(SITE_BUILDDIR) -e SPHINXOPTS=$(SPHINXOPTS)
+
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
@@ -208,7 +216,7 @@ install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-config-$(dir))
 
 
-clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-deb clean-ui-assets
+clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-deb clean-ui-assets clean-html
 
 images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 
@@ -378,6 +386,12 @@ e2e-tests: build
 	    exit 1; \
 	fi
 
+packaging-tests: cross-deb cross-rpm
+	$(Q)for dir in test/e2e/packages/*; do \
+	    [ "$${dir%centos-7}" != "$$dir" ] && continue; \
+	    distro=$${dir##*/} $(E2E_RUN) $$dir; \
+	done
+
 #
 # Rules for building distro packages.
 #
@@ -393,7 +407,6 @@ cross-packages: cross-rpm cross-deb
 cross-rpm: $(foreach d,$(SUPPORTED_RPM_DISTROS),cross-rpm.$(d))
 
 cross-deb: $(foreach d,$(SUPPORTED_DEB_DISTROS),cross-deb.$(d))
-
 
 #
 # Rules for building dist-tarballs, rpm, and deb packages.
@@ -628,11 +641,6 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 	format vet cyclomatic-check lint golangci-lint \
 	cross-packages cross-rpm cross-deb
 
-SPHINXOPTS    =
-SPHINXBUILD   = sphinx-build
-SOURCEDIR     = .
-BUILDDIR      = _build
-
 
 #
 # Rules for documentation
@@ -640,24 +648,31 @@ BUILDDIR      = _build
 
 vhtml: _work/venv/.stamp
 	. _work/venv/bin/activate && \
-		$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) && \
-		cp docs/html/index.html $(BUILDDIR)/html/index.html
+		make -C docs html && \
+		cp -r docs/_build .
 
-html:
-		$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) && \
-		cp docs/html/index.html $(BUILDDIR)/html/index.html
+html: clean-html
+	$(Q)BUILD_VERSION=$(BUILD_VERSION) \
+		$(SPHINXBUILD) -c docs . "$(SITE_BUILDDIR)" $(SPHINXOPTS)
+	cp docs/index.html "$(SITE_BUILDDIR)"
+	for d in $$(find docs -name figures -type d); do \
+	    mkdir -p $(SITE_BUILDDIR)/$$d && cp $$d/* $(SITE_BUILDDIR)/$$d; \
+	done
+
+serve-html: html
+	$(Q)cd $(SITE_BUILDDIR) && python3 -m http.server 8081
 
 clean-html:
-	rm -rf $(BUILDDIR)/html
+	rm -rf $(SITE_BUILDDIR)
 
 site-build: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
-	$(Q)$(DOCKER_SITE_CMD) make html
+	$(Q)$(DOCKER_SITE_CMD) $(DOCKER_SITE_BUILDER_IMAGE) make html
 
 site-serve: .$(DOCKER_SITE_BUILDER_IMAGE).image.stamp
-	$(Q)$(DOCKER_SITE_CMD) bash -c "make html && cd _build/html && python3 -m http.server 8081"
+	$(Q)$(DOCKER_SITE_CMD) -it $(DOCKER_SITE_BUILDER_IMAGE) make serve-html
 
-.$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile
-	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) -f docs/Dockerfile .
+.$(DOCKER_SITE_BUILDER_IMAGE).image.stamp: docs/Dockerfile docs/requirements.txt
+	docker build -t $(DOCKER_SITE_BUILDER_IMAGE) docs
 	touch $@
 
 # Set up a Python3 environment with the necessary tools for document creation.

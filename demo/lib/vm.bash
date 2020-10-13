@@ -1,19 +1,36 @@
 source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
+source "$(dirname "${BASH_SOURCE[0]}")/distro.bash"
 
 VM_PROMPT=${VM_PROMPT-"\e[38;5;11mroot@vm>\e[0m "}
-VM_SSH_USER=ubuntu
-VM_IMAGE_URL=https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img
-VM_IMAGE=$(basename "$VM_IMAGE_URL")
 
-VM_GOVM_COMPOSE_TEMPLATE="vms:
-  - name: \${VM_NAME}
-    image: \${VM_IMAGE}
+vm-compose-govm-template() {
+    (echo "
+vms:
+  - name: ${VM_NAME}
+    image: ${VM_IMAGE}
     cloud: true
     ContainerEnvVars:
-      - KVM_CPU_OPTS=\$(echo "\${KVM_CPU_OPTS}")
-      - EXTRA_QEMU_OPTS=\$(echo "\${EXTRA_QEMU_OPTS}")
-      - USE_NET_BRIDGES=${USE_NET_BRIDGES-0}
+      - KVM_CPU_OPTS=${VM_QEMU_CPUMEM:=-machine pc -smp cpus=4 -m 8G}
+      - EXTRA_QEMU_OPTS=-monitor unix:/data/monitor,server,nowait ${VM_QEMU_EXTRA}
+      - USE_NET_BRIDGES=${USE_NET_BRIDGES:-0}
+    user-data: |
+      #!/bin/bash
+      set -e
 "
+    (if [ -n "$VM_EXTRA_BOOTSTRAP_COMMANDS" ]; then
+         sed 's/^/      /g' <<< "${VM_EXTRA_BOOTSTRAP_COMMANDS}"
+     fi
+     sed 's/^/      /g' <<< $(distro-bootstrap-commands))) |
+        grep -E -v '^ *$'
+}
+
+vm-image-url() {
+    distro-image-url
+}
+
+vm-ssh-user() {
+    distro-ssh-user
+}
 
 vm-check-env() {
     type -p govm >& /dev/null || {
@@ -88,19 +105,19 @@ vm-command() { # script API
     #   vm-command "whoami | grep myuser" || command-error "user is not myuser"
     command-start "vm" "$VM_PROMPT" "$1"
     if [ "$2" == "bg" ]; then
-        ( ssh -o StrictHostKeyChecking=No ${VM_SSH_USER}@${VM_IP} sudo bash <<<"$COMMAND" 2>&1 | command-handle-output ;
+        ( $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
           command-end ${PIPESTATUS[0]}
         ) &
         command-runs-in-bg
     else
-        ssh -o StrictHostKeyChecking=No ${VM_SSH_USER}@${VM_IP} sudo bash <<<"$COMMAND" 2>&1 | command-handle-output ;
+        $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
         command-end ${PIPESTATUS[0]}
     fi
     return $COMMAND_STATUS
 }
 
 vm-command-q() {
-    ssh -o StrictHostKeyChecking=No ${VM_SSH_USER}@${VM_IP} sudo bash <<<"$1"
+    $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$1"
 }
 
 vm-wait-process() {
@@ -110,6 +127,94 @@ vm-wait-process() {
     if ! vm-command-q "retry=$timeout; until ps -A | grep -q $process; do retry=\$(( \$retry - 1 )); [ \"\$retry\" == \"0\" ] && exit 1; sleep 1; done"; then
         error "waiting for process \"$process\" timed out"
     fi
+}
+
+vm-write-file() {
+    local vm_path_file="$1"
+    local file_content_b64="$(base64 <<<$2)"
+    vm-command-q "mkdir -p $(dirname "$vm_path_file"); echo -n \"$file_content_b64\" | base64 -d > \"$vm_path_file\""
+}
+
+vm-put-file() { # script API
+    # Usage: vm-put-file [--cleanup] [--append] SRC-HOST-FILE DST-VM-FILE
+    #
+    # Copy SRC-HOST-FILE to DST-VM-FILE on the VM, removing
+    # SRC-HOST-FILE if called with the --cleanup flag, and
+    # appending instead of copying if the --append flag is
+    # specified.
+    #
+    # Example:
+    #   src=$(mktemp) && \
+    #       echo 'Ahoy, Matey...' > $src && \
+    #       vm-put-file --cleanup $src /etc/motd
+    local cleanup append invalid
+    while [ "${1#-}" != "$1" -a -n "$1" ]; do
+        case "$1" in
+            --cleanup)
+                cleanup=1
+                shift
+                ;;
+            --append)
+                append=1
+                shift
+                ;;
+            *)
+                invalid="${invalid}${invalid:+,}\"$1\""
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$cleanup" -a -n "$1" ]; then
+        trap "rm -f $1" RETURN EXIT
+    fi
+    if [ -n "$invalid" ]; then
+        error "invalid options: $invalid"
+        return 1
+    fi
+    host-command "$SCP $1 ${VM_SSH_USER}@${VM_IP}:" ||
+        error "failed to scp file $1 to ${VM_SSH_USER}@${VM_IP}:"
+    vm-command "mkdir -p \"$(dirname $2)\""
+    if [ -z "$append" ]; then
+        vm-command "mv -v ${1##*/} $2" ||
+            error "failed to copy file $1 as $2"
+    else
+        vm-command "touch $2 && cat ${1##*/} >> $2 && rm -f ${1##*/}" ||
+            error "failed to append file $1 as $2"
+
+    fi
+}
+
+vm-pipe-to-file() { # script API
+    # Usage: vm-pipe-to-file [--append] DST-VM-FILE
+    #
+    # Reads stdin and writes the content to DST-VM-FILE, creating any
+    # intermediate directories necessary.
+    #
+    # Example:
+    #   echo 'Ahoy, Matey...' | vm-pipe-to-file /etc/motd
+    local tmp=$(mktemp) append
+    if [ "$1" = "--append" ]; then
+        append="--append"
+        shift
+    fi
+    cat > $tmp
+    vm-put-file --cleanup $append $tmp $1
+}
+
+vm-sed-file() { # script API
+    # Usage: vm-sed-file PATH-IN-VM SED-EXTENDED-REGEXP-COMMANDS
+    #
+    # Edits the given file in place with the given extended regexp
+    # sed commands.
+    #
+    # Example:
+    #   vm-sed-file /etc/motd 's/Matey/Guybrush Threepwood/'
+    local file="$1" cmd
+    shift
+    for cmd in "$@"; do
+        vm-command "sed -E -i \"$cmd\" $file" ||
+            command-error "failed to edit $file with sed commands $@"
+    done
 }
 
 vm-set-kernel-cmdline() { # script API
@@ -122,13 +227,7 @@ vm-set-kernel-cmdline() { # script API
     #   vm-reboot
     #   vm-command "cat /proc/cmdline"
     #   launch cri-resmgr
-    local e2e_defaults="$1"
-    vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\"' > /etc/default/grub.d/60-e2e-defaults.cfg" || {
-        command-error "writing new command line parameters failed"
-    }
-    vm-command "update-grub" || {
-        command-error "updating grub failed"
-    }
+    distro-set-kernel-cmdline "$@"
 }
 
 vm-reboot() { # script API
@@ -143,25 +242,42 @@ vm-reboot() { # script API
 
 vm-networking() {
     vm-command-q "grep -q 1 /proc/sys/net/ipv4/ip_forward" || vm-command "sysctl -w net.ipv4.ip_forward=1"
-    vm-command-q "grep -q ^net.ipv4.ip_forward=1 /etc/sysctl.conf" || vm-command "sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/g' /etc/sysctl.conf"
+    vm-command-q "grep -q ^net.ipv4.ip_forward=1 /etc/sysctl.conf" || vm-command "echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf"
     vm-command-q "grep -q 1 /proc/sys/net/bridge/bridge-nf-call-iptables 2>/dev/null" || {
         vm-command "modprobe br_netfilter"
         vm-command "echo br_netfilter > /etc/modules-load.d/br_netfilter.conf"
     }
     vm-command-q "grep -q \$(hostname) /etc/hosts" || vm-command "echo \"$VM_IP \$(hostname)\" >/etc/hosts"
-    if [ -n "$http_proxy" ] || [ -n "$https_proxy" ] || [ -n "$no_proxy" ]; then
-        vm-command-q "grep -q no_proxy /etc/environment" || vm-command "(echo http_proxy=$http_proxy; echo https_proxy=$https_proxy; echo no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,\$(hostname) ) >> /etc/environment"
-    fi
+
+    distro-setup-proxies
 }
 
 vm-install-cri-resmgr() {
     prefix=/usr/local
     if [ "$binsrc" == "github" ]; then
-        vm-command "apt install -y golang make"
+        vm-install-golang
+        vm-install-pkg make
         vm-command "go get -d -v github.com/intel/cri-resource-manager"
         CRI_RESMGR_SOURCE_DIR=$(awk '/package.*cri-resource-manager/{print $NF}' <<< "$COMMAND_OUTPUT")
         vm-command "cd $CRI_RESMGR_SOURCE_DIR && make install && cd -"
-    else
+    elif [ "${binsrc#packages/}" != "$binsrc" ]; then
+        suf=$(vm-pkg-type)
+        vm-command "rm -f *.$suf"
+        local pkg_count
+        pkg_count=$(ls "$HOST_PROJECT_DIR/$binsrc"/cri-resource-manager*.$suf | grep -v dbg | wc -l)
+        if [ "$pkg_count" == "0" ]; then
+            error "installing from $binsrc failed: cannot find cri-resource-manager_*.$suf from $HOST_PROJECT_DIR/$binsrc"
+        elif [[ "$pkg_count" > "1" ]]; then
+            error "installing from $binsrc failed: expected exactly one cri-resource-manager*.$suf in $HOST_PROJECT_DIR/$binsrc, found $pkg_count alternatives."
+        fi
+        host-command "$SCP $HOST_PROJECT_DIR/$binsrc/*.$suf $VM_SSH_USER@$VM_IP:/tmp" || {
+            command-error "copying *.$suf to vm failed, run \"make cross-$suf\" first"
+        }
+        vm-install-pkg "/tmp/cri-resource-manager*.$suf" || {
+            command-error "installing packages failed"
+        }
+        vm-command "systemctl daemon-reload"
+    elif [ -z "$binsrc" ] || [ "$binsrc" == "local" ]; then
         local bin_change
         local src_change
         bin_change=$(stat --format "%Z" "$BIN_DIR/cri-resmgr")
@@ -173,27 +289,45 @@ vm-install-cri-resmgr() {
             echo "WARNING:"
             sleep ${warning_delay}
         fi
-        host-command "scp \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
+        host-command "$SCP \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying local cri-resmgr to VM failed"
         }
         vm-command "mv cri-resmgr cri-resmgr-agent $prefix/bin" || {
             command-error "installing cri-resmgr to $prefix/bin failed"
         }
+    else
+        error "vm-install-cri-resmgr: unknown binsrc=\"$binsrc\""
     fi
 }
 
-vm-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        vm-command "apt update && apt install -y containerd"
-        # Set proxy environment to containers managed by containerd, if needed.
-        if [ -n "$http_proxy" ] || [ -n "$https_proxy" ] || [ -n "$no_proxy" ]; then
-            speed=120 vm-command "mkdir -p /etc/systemd/system/containerd.service.d; (echo '[Service]'; echo 'Environment=HTTP_PROXY=$http_proxy'; echo 'Environment=HTTPS_PROXY=$https_proxy'; echo \"Environment=NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,\$(hostname)\" ) > /etc/systemd/system/containerd.service.d/proxy.conf; systemctl daemon-reload; systemctl restart containerd"
-        fi
-    }
+vm-pkg-type() {
+    distro-pkg-type
+}
+
+vm-install-pkg() {
+    distro-install-pkg "$@"
+}
+
+vm-install-golang() {
+    distro-install-golang
+}
+
+vm-install-cri() {
+    case "${VM_CRI}" in
+        containerd)
+            distro-install-containerd
+            ;;
+        crio)
+            distro-install-crio
+            ;;
+        *)
+            command-error "unsupported CRI runtime \"$VM_CRI\" requested"
+            ;;
+    esac
 }
 
 vm-install-containernetworking() {
-    vm-command-q "command -v go >/dev/null" || vm-command "apt update && apt install -y golang"
+    vm-install-golang
     vm-command "go get -d github.com/containernetworking/plugins"
     CNI_PLUGINS_SOURCE_DIR=$(awk '/package.*plugins/{print $NF}' <<< $COMMAND_OUTPUT)
     [ -n "$CNI_PLUGINS_SOURCE_DIR" ] || {
@@ -237,13 +371,18 @@ EOF'
 }
 
 vm-install-k8s() {
-    vm-command "apt update && apt install -y apt-transport-https curl"
-    speed=60 vm-command "curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -"
-    speed=60 vm-command "echo \"deb https://apt.kubernetes.io/ kubernetes-xenial main\" > /etc/apt/sources.list.d/kubernetes.list"
-    vm-command "apt update &&  apt install -y kubelet kubeadm kubectl"
+    distro-install-k8s
 }
 
 vm-create-singlenode-cluster-cilium() {
+    vm-create-singlenode-cluster
+    vm-install-cni-cilium
+    if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=120s"; then
+        command-error "kubectl waiting for node readiness timed out"
+    fi
+}
+
+vm-create-singlenode-cluster() {
     vm-command "kubeadm init --pod-network-cidr=10.217.0.0/16 --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
         command-error "kubeadm init failed"
@@ -251,7 +390,10 @@ vm-create-singlenode-cluster-cilium() {
     vm-command "mkdir -p \$HOME/.kube"
     vm-command "cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
-    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.6/install/kubernetes/quick-install.yaml"
+}
+
+vm-install-cni-cilium() {
+    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.8/install/kubernetes/quick-install.yaml"
     if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
         command-error "installing cilium CNI to Kubernetes timed out"
     fi

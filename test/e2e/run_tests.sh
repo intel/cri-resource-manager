@@ -3,6 +3,8 @@
 TESTS_DIR="$1"
 RUN_SH="${0%/*}/run.sh"
 
+DEFAULT_DISTRO="ubuntu-20.04"
+
 usage() {
     echo "Usage: run_tests.sh TESTS_DIR"
     echo "TESTS_DIR is expected to be structured as POLICY/TOPOLOGY/TEST with files:"
@@ -16,7 +18,12 @@ error() {
     exit 1
 }
 
-export_var_files() {
+warning() {
+    echo "WARNING: $1" >&2
+}
+
+export-var-files() {
+    # export ENV_VAR from ENV_VAR.var.* file content
     local var_file_dir="$1"
     local var_filepath
     local var_file_name
@@ -30,6 +37,36 @@ export_var_files() {
         echo "exporting $var_name from $var_filepath"
         export "$var_name"="$(< "$var_filepath")"
     done
+}
+
+export-vm-files() {
+    # update and export vm_files associative array from directory content
+    local vm_files_dir="$1"
+    if [ ! -d "$vm_files_dir" ]; then
+        return
+    fi
+    if [[ "$vm_files" == *"="* ]] ; then
+        eval "declare -A vm_files_aa=${vm_files#*=}"
+    else
+        declare -A vm_files_aa
+    fi
+    prefix_len=${#vm_files_dir}
+    shopt -s globstar
+    for f in "$vm_files_dir"/**; do
+        file_vm_name=${f:$prefix_len}
+        if [ -z "$file_vm_name" ] || [ "$file_vm_name" == "/" ]; then
+            continue
+        elif [ -f "$f" ]; then
+            if [ -n "${vm_files_aa[$file_vm_name]}" ]; then
+                warning "vm file $file_vm_name: new file \"$f\" overrides \"${vm_files_aa[$file_vm_name]}\""
+            fi
+            vm_files_aa[$file_vm_name]="file:$(realpath "$f")"
+        fi
+    done
+    # serialize from associative array
+    local serialized_vm_files
+    serialized_vm_files="$(declare -p vm_files_aa)"
+    export vm_files="declare -A vm_files${serialized_vm_files#declare -A vm_files_aa}"
 }
 
 if [ -z "$TESTS_DIR" ] || [ "$TESTS_DIR" == "help" ] || [ "$TESTS_DIR" == "--help" ]; then
@@ -92,7 +129,8 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
             fi
             export cri_resmgr_cfg=$CFG_FILE
         done
-        export_var_files "$POLICY_DIR"
+        export-var-files "$POLICY_DIR"
+        export-vm-files "$POLICY_DIR/vm-files"
         for TOPOLOGY_DIR in "$POLICY_DIR"/*; do
             if ! [ -d "$TOPOLOGY_DIR" ]; then
                 continue
@@ -100,9 +138,17 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
             if ! [[ "$(basename "$TOPOLOGY_DIR")" =~ .*"$TESTS_TOPOLOGY_FILTER".* ]]; then
                 continue
             fi
+            if [ "$(basename "$TOPOLOGY_DIR")" == "vm-files" ]; then
+                continue
+            fi
             (
-                export_var_files "$TOPOLOGY_DIR"
-                vm="$(basename "$TOPOLOGY_DIR")"
+                export-var-files "$TOPOLOGY_DIR"
+                export-vm-files "$TOPOLOGY_DIR/vm-files"
+                distro=${distro:=$DEFAULT_DISTRO}
+                export distro
+                cri=${cri:=containerd}
+                export cri
+                vm="$(basename "$TOPOLOGY_DIR")-${distro}-${cri}"
                 export vm
                 for TEST_DIR in "$TOPOLOGY_DIR"/*; do
                     if ! [ -d "$TEST_DIR" ]; then
@@ -111,8 +157,12 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
                     if ! [[ "$(basename "$TEST_DIR")" =~ .*"$TESTS_TEST_FILTER".* ]]; then
                         continue
                     fi
+                    if [ "$(basename "$TEST_DIR")" == "vm-files" ]; then
+                        continue
+                    fi
                     (
-                        export_var_files "$TEST_DIR"
+                        export-var-files "$TEST_DIR"
+                        export-vm-files "$TEST_DIR/vm-files"
                         export outdir="$TEST_DIR/output"
                         mkdir -p "$outdir"
                         echo "Run $(basename "$TEST_DIR")"

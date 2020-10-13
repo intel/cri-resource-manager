@@ -32,4 +32,6 @@ install -m 0700 -d %{?buildroot}%{_sharedstatedir}/cri-resmgr
 %dir %attr(0700,root,root) %{_sharedstatedir}/cri-resmgr
 %dir %attr(0700,root,root) %{_sysconfdir}/cri-resmgr
 %config(noreplace) %{_sysconfdir}/cri-resmgr/*
-%doc CONTRIBUTING.md LICENSE README.md SECURITY.md cmd/*/*.sample
+%doc LICENSE
+%doc README.md docs/*.md
+%doc cmd/*/*.sample
