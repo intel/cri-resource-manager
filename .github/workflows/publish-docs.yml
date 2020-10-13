@@ -13,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Build docs builder image
-      run: make site-build
 
     - name: Fetch gh-pages
       run: git fetch --no-tags --prune --depth=1 origin refs/heads/gh-pages:refs/heads/gh-pages

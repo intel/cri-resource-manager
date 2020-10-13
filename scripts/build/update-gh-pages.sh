@@ -45,7 +45,7 @@ fi
 #
 # Build the documentation
 #
-build_dir="_build-ghpages"
+build_dir="_build"
 echo "Creating new Git worktree at $build_dir"
 git worktree add "$build_dir" gh-pages
 
