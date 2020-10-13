@@ -26,6 +26,7 @@ author = 'various'
 
 master_doc = 'docs/index'
 
+
 ##############################################################################
 #
 # This section determines the behavior of links to local items in .md files.
@@ -60,9 +61,24 @@ else:
     githubFileURL = githubFileURL + baseBranch + "/"
     githubDirURL = githubDirURL + baseBranch + "/"
 
-version = getenv("SITE_VERSION", default="unknown")
+# Version displayed in the upper left corner of the site
+ref = getenv('GITHUB_REF', default="")
+if ref == "refs/heads/master":
+    version = "devel"
+elif ref.startswith("refs/heads/release-"):
+    # For release branches just show the latest tag name
+    buildVersion = getenv("BUILD_VERSION", default="unknown")
+    version = buildVersion.split('-')[0]
+elif ref.startswith("refs/tags/"):
+    version = ref[len("refs/tags/"):]
+else:
+    version = getenv("BUILD_VERSION", default="unknown")
+
 release = getenv("BUILD_VERSION", default="unknown")
 
+# Versions to show in the version menu
+versions = getenv('VERSIONS', default="").split()
+html_context = {'versions': sorted(set(versions))}
 
 # -- General configuration ---------------------------------------------------
 

@@ -4,7 +4,9 @@ on:
   push:
     branches:
         - master
-        - documentation/test
+        - release-*
+    tags:
+        - v*
 
 jobs:
   update-gh-pages:
@@ -13,24 +15,24 @@ jobs:
     - uses: actions/checkout@v1
     - name: Build docs builder image
       run: make site-build
-    - name: Branch off base for updated gh-pages
+
+    - name: Fetch gh-pages
+      run: git fetch --no-tags --prune --depth=1 origin refs/heads/gh-pages:refs/heads/gh-pages
+
+    - name: Install build dependencies
       run: |
-        git branch gh-pages
-        git checkout gh-pages
-    - name: Add latest generated docs to gh-pages
-      shell: bash
+        pip3 install --user -r docs/requirements.txt
+        echo "`python3 -m site --user-base`/bin" >> $GITHUB_PATH
+
+    - name: Add docs from this revision to gh-pages
       run: |
-        touch _build/.nojekyll
-        rm -rf _build/.doctrees _build/_sources
-        git --work-tree _build add --no-all -v .
-        author=$(git log --merges --pretty=format:%an -n 1)
-        email=$(git log --merges --pretty=format:%ae -n 1)
-        git config --global user.name "$author"
-        git config --global user.email "$email"
-        git commit -m "publish-docs.yml: generated latest html output."
-    - name: Publish/force-push to gh-pages
+        git config user.name "Github"
+        git config user.email "no-reply@github.com"
+        ./scripts/build/update-gh-pages.sh
+
+    - name: Publish/push to gh-pages
       shell: bash
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        git push -f https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git HEAD:gh-pages
+        git push https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git gh-pages

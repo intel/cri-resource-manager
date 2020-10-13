@@ -153,10 +153,6 @@ package_versions() {
     esac
 }
 
-site_version() {
-    [[ $VERSION =~ ^([0-9]+\.[0-9]+)(\.[0-9]+)*$ ]] && SITE=${BASH_REMATCH[1]} || SITE=devel
-}
-
 print_variables() {
     local _what _var _val
 
@@ -181,10 +177,6 @@ print_variables() {
             tar)
                 [ -n "$SHVAR" ] && _var='tarversion='
                 _val="$VERSION"
-                ;;
-            site)
-                [ -n "$SHVAR" ] && _var='siteversion='
-                _val="$SITE"
                 ;;
             *)
                 print_usage "unknown version/buildid-related tag \"$_what\""
@@ -235,9 +227,6 @@ while [ "$#" != "0" ]; do
         --tar)
             PRINT="$PRINT tar"
             ;;
-        --site)
-            PRINT="$PRINT site"
-            ;;
         --all)
             PRINT="version buildid rpm deb tar"
             ;;
@@ -280,7 +269,6 @@ if [ -z "$STORE" ] && [ -z "$PRINT" ]; then
 fi
 
 package_versions
-site_version
 print_variables
 
 if [ -n "$STORE" ]; then
