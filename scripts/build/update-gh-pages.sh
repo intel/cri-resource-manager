@@ -116,7 +116,7 @@ _stable=`ls -d1 v*/ || : | sort -n | tail -n1`
 [ -n "$_stable" ] && ln -sfT "$_stable" stable
 
 cat > index.html << EOF
-<meta http-equiv="refresh" content="0; URL='devel'" />
+<meta http-equiv="refresh" content="0; URL='stable'" />
 EOF
 
 if [ -z "`git status --short`" ]; then
