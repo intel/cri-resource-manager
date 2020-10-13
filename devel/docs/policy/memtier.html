@@ -1,0 +1,397 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Memtier Policy &mdash; CRI Resource Manager 0.4.0-74-g318950e documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Topology-Aware Policy" href="topology-aware.html" />
+    <link rel="prev" title="Policies" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> CRI Resource Manager
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                devel
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Policies</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Memtier Policy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#activation-of-the-memtier-policy">Activation of the Memtier Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#cold-start">Cold Start</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#dynamic-page-demotion">Dynamic Page Demotion</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#container-memory-requests-and-limits">Container memory requests and limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#implicit-hardware-topology-hints">Implicit Hardware Topology Hints</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="topology-aware.html">Topology-Aware Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Policies</a> &raquo;</li>
+        
+      <li>Memtier Policy</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../../_sources/docs/policy/memtier.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="memtier-policy">
+<h1>Memtier Policy<a class="headerlink" href="#memtier-policy" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy extends the <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy. It supports
+the same features and configuration options, such as <code class="docutils literal notranslate"><span class="pre">topology</span> <span class="pre">hints</span></code>
+and <code class="docutils literal notranslate"><span class="pre">annotations</span></code>, which the <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy does. Please see
+the <a class="reference internal" href="topology-aware.html"><span class="doc">documentation for topology-aware
+policy</span></a> for the description of how
+<code class="docutils literal notranslate"><span class="pre">topology-aware</span></code>policy works and how it is configured.</p>
+<p>The main goal of <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy is to let workloads choose the kinds
+of memory it wants to use. The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy scoring algorithm
+for selecting topology nodes is changed so that a workload can belong to
+both a CPU node and a memory node in the topology tree – the CPU
+allocation is reserved from the CPU node and the memory controllers are
+selected from the memory node. Typically the aim is that the CPU and
+memory allocations are done from the same node so that the memory
+locality is as good as possible, but the memory allocation may happen
+also from a wider pool of memory controllers if the amount of free
+memory on a topology node is too low.</p>
+</div>
+<div class="section" id="activation-of-the-memtier-policy">
+<h2>Activation of the Memtier Policy<a class="headerlink" href="#activation-of-the-memtier-policy" title="Permalink to this headline">¶</a></h2>
+<p>You can activate the <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy by setting <code class="docutils literal notranslate"><span class="pre">--policy</span></code> parameter of
+<code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> to <code class="docutils literal notranslate"><span class="pre">memtier</span></code>. For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span> <span class="o">--</span><span class="n">policy</span> <span class="n">memtier</span> <span class="o">--</span><span class="n">reserved</span><span class="o">-</span><span class="n">resources</span> <span class="n">cpu</span><span class="o">=</span><span class="mi">750</span><span class="n">m</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy knows of three kinds of memory: <code class="docutils literal notranslate"><span class="pre">DRAM</span></code>, <code class="docutils literal notranslate"><span class="pre">PMEM</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">HBM</span></code>. The various memory types are accessed via separate memory controllers.</p>
+<ul class="simple">
+<li><p>DRAM (dynamic random-access memory) is regular system main memory.</p></li>
+<li><p>PMEM (persistent memory) is large-capacity memory, such as
+Intel® Optane™ memory.</p></li>
+<li><p>HBM (high-bandwidth memory) is high speed memory, typically found
+on some special-purpose computing systems.</p></li>
+</ul>
+<p>In order to configure a pod to use a certain memory type, use
+<code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/memory-type</span></code> annotation in the pod spec.
+For example, to make a container request both <code class="docutils literal notranslate"><span class="pre">PMEM</span></code> and <code class="docutils literal notranslate"><span class="pre">DRAM</span></code> memory
+types, you could use pod metadata such as this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
+  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">memory</span><span class="o">-</span><span class="nb">type</span><span class="p">:</span> <span class="o">|</span>
+      <span class="n">container1</span><span class="p">:</span> <span class="n">dram</span><span class="p">,</span><span class="n">pmem</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy will then aim to allocate resources from a topology
+node which can satisfy the memory requirements.</p>
+<div class="section" id="cold-start">
+<h3>Cold Start<a class="headerlink" href="#cold-start" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy supports “cold start” functionality. When cold start is
+enabled and the workload is allocated to a topology node with both DRAM and
+PMEM memory, the initial memory controller is only the PMEM controller. DRAM
+controller is added to the workload only after the cold start timeout is
+done. The effect of this is that allocated large unused memory areas of
+memory don’t need to be migrated to PMEM, because it was allocated there to
+begin with. Cold start is configured like this in the pod metadata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
+  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">memory</span><span class="o">-</span><span class="nb">type</span><span class="p">:</span> <span class="o">|</span>
+      <span class="n">container1</span><span class="p">:</span> <span class="n">dram</span><span class="p">,</span><span class="n">pmem</span>
+    <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">cold</span><span class="o">-</span><span class="n">start</span><span class="p">:</span> <span class="o">|</span>
+      <span class="n">container1</span><span class="p">:</span>
+        <span class="n">duration</span><span class="p">:</span> <span class="mi">60</span><span class="n">s</span>
+</pre></div>
+</div>
+<p>In the above example, <code class="docutils literal notranslate"><span class="pre">container1</span></code> would be initially granted only PMEM
+memory controller, but after 60 seconds the DRAM controller would be
+added to the container memset.</p>
+</div>
+<div class="section" id="dynamic-page-demotion">
+<h3>Dynamic Page Demotion<a class="headerlink" href="#dynamic-page-demotion" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy also supports dynamic page demotion. The idea is to move
+rarely-used pages from DRAM to PMEM for those workloads for which both DRAM
+and PMEM memory types have been assigned. The configuration for this feature
+is done on the memtier policy configuration using three configuration keys:
+<code class="docutils literal notranslate"><span class="pre">DirtyBitScanPeriod</span></code>, <code class="docutils literal notranslate"><span class="pre">PageMovePeriod</span></code>, and <code class="docutils literal notranslate"><span class="pre">PageMoveCount</span></code>. All of the three
+parameters need to be set to non-zero values in order for the dynamic page
+demotion feature to be enabled. See this configuration file fragment as an
+example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">policy</span><span class="p">:</span>
+  <span class="n">Active</span><span class="p">:</span> <span class="n">memtier</span>
+  <span class="n">memtier</span><span class="p">:</span>
+    <span class="n">DirtyBitScanPeriod</span><span class="p">:</span> <span class="mi">10</span><span class="n">s</span>
+    <span class="n">PageMovePeriod</span><span class="p">:</span> <span class="mi">2</span><span class="n">s</span>
+    <span class="n">PageMoveCount</span><span class="p">:</span> <span class="mi">1000</span>
+</pre></div>
+</div>
+<p>In this setup, every pid in every container in every non-system pod
+fulfilling the memory container requirements would have their page ranges
+scanned for non-accessed pages every ten seconds. The result of the scan
+would be fed to a page-moving loop, which would attempt to move 1000 pages
+every two seconds from DRAM to PMEM.</p>
+</div>
+</div>
+<div class="section" id="container-memory-requests-and-limits">
+<h2>Container memory requests and limits<a class="headerlink" href="#container-memory-requests-and-limits" title="Permalink to this headline">¶</a></h2>
+<p>Due to inaccuracies in how <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> calculates memory requests for
+pods in QoS class <code class="docutils literal notranslate"><span class="pre">Burstable</span></code>, you should either use <code class="docutils literal notranslate"><span class="pre">Limit</span></code> for setting
+the amount of memory for containers in <code class="docutils literal notranslate"><span class="pre">Burstable</span></code> pods or run the
+resource-annotating webhook as described in the top-level README file.</p>
+</div>
+<div class="section" id="implicit-hardware-topology-hints">
+<h2>Implicit Hardware Topology Hints<a class="headerlink" href="#implicit-hardware-topology-hints" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">CRI</span> <span class="pre">Resource</span> <span class="pre">Manager</span></code> automatically generates HW <code class="docutils literal notranslate"><span class="pre">Topology</span> <span class="pre">Hints</span></code> for
+containers before resource allocation by a policy. The <code class="docutils literal notranslate"><span class="pre">memtier</span></code> policy
+is hint-aware and takes these hints into account. Since hints indicate
+optimal or preferred <code class="docutils literal notranslate"><span class="pre">HW</span> <span class="pre">locality</span></code> for devices and potentially local
+volumes used by the container, they can alter significantly how resources
+are assigned to the container.</p>
+<p>Using the ‘topologyhints’ resource manager annotation key it is possible
+to opt out from automatic topology hint generation on a per pod or container
+basis.</p>
+<p>Use this annotation to opt out a full pod:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">topologyhints</span><span class="o">.</span><span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">pod</span><span class="p">:</span> <span class="s2">&quot;false&quot;</span>
+</pre></div>
+</div>
+<p>Use this annotation to opt out container ‘foo’ in the pod:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">topologyhints</span><span class="o">.</span><span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">container</span><span class="o">.</span><span class="n">foo</span><span class="p">:</span> <span class="s2">&quot;false&quot;</span>
+</pre></div>
+</div>
+<p>Currently topology hint generation is enabled by default, so using the
+annotation as opt in (setting it to “true”) should have no effect on the
+placement of containers of a pod. This might change in the future however.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="topology-aware.html" class="btn btn-neutral float-right" title="Topology-Aware Policy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral float-left" title="Policies" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, various
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+  
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> Read the Docs</span>
+        v: devel
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl>
+          <dt>Versions</dt>
+          
+          <dd><a href="/cri-resource-manager/devel">devel</a></dd>
+          
+        </dl>
+      </div>
+    </div>
+  
+
+
+</body>
+</html>

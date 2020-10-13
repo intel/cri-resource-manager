@@ -1,0 +1,524 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Container Affinity and Anti-Affinity &mdash; CRI Resource Manager 0.4.0-74-g318950e documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Block IO" href="blockio.html" />
+    <link rel="prev" title="Static-Pools (STP) Policy" href="static-pools.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home" alt="Documentation Home"> CRI Resource Manager
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                devel
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Policies</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="memtier.html">Memtier Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="topology-aware.html">Topology-Aware Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Container Affinity and Anti-Affinity</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#affinity-annotation-syntax">Affinity Annotation Syntax</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#affinity-semantics">Affinity Semantics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#examples">Examples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#shorthand-notation">Shorthand Notation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Policies</a> &raquo;</li>
+        
+      <li>Container Affinity and Anti-Affinity</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../../_sources/docs/policy/container-affinity.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="container-affinity-and-anti-affinity">
+<h1>Container Affinity and Anti-Affinity<a class="headerlink" href="#container-affinity-and-anti-affinity" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<p>Some policies allow the user to give hints about how particular containers
+should be <em>co-located</em> within a node. In particular these hints express whether
+containers should be located <em>‘close’</em> to each other or <em>‘far away’</em> from each
+other, in a hardware topology sense.</p>
+<p>Since these hints are interpreted always by a particular <em>policy implementation</em>,
+the exact definitions of ‘close’ and ‘far’ are also somewhat <em>policy-specific</em>.
+However as a general rule of thumb containers running</p>
+<ul class="simple">
+<li><p>on CPUs within the <em>same NUMA nodes</em> are considered <em>‘close’</em> to each other,</p></li>
+<li><p>on CPUs within <em>different NUMA nodes</em> in the <em>same socket</em> are <em>‘farther’</em>, and</p></li>
+<li><p>on CPUs within <em>different sockets</em> are <em>‘far’</em> from each other</p></li>
+</ul>
+<p>These hints are expressed by <code class="docutils literal notranslate"><span class="pre">container</span> <span class="pre">affinity</span> <span class="pre">annotations</span></code> on the Pod.
+There are two types of affinities:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">affinity</span></code> (or <code class="docutils literal notranslate"><span class="pre">positive</span> <span class="pre">affinty</span></code>): cause affected containers to <em>pull</em> each other closer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code> (or <code class="docutils literal notranslate"><span class="pre">negative</span> <span class="pre">affinity</span></code>): cause affected containers to <em>push</em> each other further away</p></li>
+</ul>
+<p>Policies try to place a container</p>
+<ul class="simple">
+<li><p>close to those the container has affinity towards</p></li>
+<li><p>far from those the container has anti-affinity towards.</p></li>
+</ul>
+</div>
+<div class="section" id="affinity-annotation-syntax">
+<h2>Affinity Annotation Syntax<a class="headerlink" href="#affinity-annotation-syntax" title="Permalink to this headline">¶</a></h2>
+<p><em>Affinities</em> are defined as the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/affinity</span></code> annotation.
+<em>Anti-affinities</em> are defined as the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/anti-affinity</span></code>
+annotation. They are specified in the <code class="docutils literal notranslate"><span class="pre">metadata</span></code> section of the <code class="docutils literal notranslate"><span class="pre">Pod</span> <span class="pre">YAML</span></code>, under
+<code class="docutils literal notranslate"><span class="pre">annotations</span></code> as a dictionary, with each dictionary key being the name of the
+<em>container</em> within the Pod to which the annotation belongs to.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">anotations</span><span class="p">:</span>
+    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">container1:</span>
+        <span class="no">- scope:</span>
+            <span class="no">key: key-ref</span>
+            <span class="no">operator: op</span>
+            <span class="no">values:</span>
+            <span class="no">- value1</span>
+            <span class="no">...</span>
+            <span class="no">- valueN</span>
+          <span class="no">match:</span>
+            <span class="no">key: key-ref</span>
+            <span class="no">operator: op</span>
+            <span class="no">values:</span>
+            <span class="no">- value1</span>
+            <span class="no">...</span>
+            <span class="no">- valueN</span>
+          <span class="no">weight: w</span>
+</pre></div>
+</div>
+<p>An anti-affinity is defined similarly but using <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/anti-affinity</span></code>
+as the annotation key.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">anotations</span><span class="p">:</span>
+    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">container1:</span>
+        <span class="no">- scope:</span>
+            <span class="no">key: key-ref</span>
+            <span class="no">operator: op</span>
+            <span class="no">values:</span>
+            <span class="no">- value1</span>
+            <span class="no">...</span>
+            <span class="no">- valueN</span>
+          <span class="no">match:</span>
+            <span class="no">key: key-ref</span>
+            <span class="no">operator: op</span>
+            <span class="no">values:</span>
+            <span class="no">- value1</span>
+            <span class="no">...</span>
+            <span class="no">- valueN</span>
+          <span class="no">weight: w</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="affinity-semantics">
+<h2>Affinity Semantics<a class="headerlink" href="#affinity-semantics" title="Permalink to this headline">¶</a></h2>
+<p>An affinity consists of three parts:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">scope</span> <span class="pre">expression</span></code>: defines which containers this affinity is evaluated against</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">match</span> <span class="pre">expression</span></code>: defines for which containers (within the scope) the affinity applies to</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">weight</span></code>: defines how <em>strong</em> a pull or a push the affinity causes</p></li>
+</ul>
+<p><em>Affinities</em> are also sometimes referred to as <em>positive affinities</em> while
+<em>anti-affinities</em> are referred to as <em>negative affinities</em>. The reason for this is
+that the only difference between these are that affinities have a <em>positive weight</em>
+while anti-affinities have a <em>negative weight</em>.</p>
+<p>The <em>scope</em> of an affinity defines the <em>bounding set of containers</em> the affinity can
+apply to. The affinity <em>expression</em> is evaluated against the containers <em>in scope</em> and
+it <em>selects the containers</em> the affinity really has an effect on. The <em>weight</em> specifies
+whether the effect is a <em>pull</em> or a <em>push</em>. <em>Positive</em> weights cause a <em>pull</em> while
+<em>negative</em> weights cause a <em>push</em>. Additionally, the <em>weight</em> specifies <em>how strong</em> the
+push or the pull is. This is useful in situations where the policy needs to make some
+compromises because an optimal placement is not possible. The weight then also acts as
+a way to specify preferences of priorities between the various compromises: the heavier
+the weight the stronger the pull or push and the larger the propbability that it will be
+honored, if this is possible at all.</p>
+<p>The scope can be omitted from an affinity in which case it implies <em>Pod scope</em>, in other
+words the scope of all containers that belong to the same Pod as the container for which
+which the affinity is defined.</p>
+<p>The weight can also be omitted in which case it defaults to -1 for anti-affinities
+and +1 for affinities. Weights are currently limited to the range [-1000,1000].</p>
+<p>Both the affinity scope and the expression select containers, therefore they are identical.
+Both of them are <em>expressions</em>. An expression consists of three parts:</p>
+<ul class="simple">
+<li><p>key: specifies what <em>metadata</em> to pick from a container for evaluation</p></li>
+<li><p>operation (op): specifies what <em>logical operation</em> the expression evaluates</p></li>
+<li><p>values: a set of <em>strings</em> to evaluate the the value of the key against</p></li>
+</ul>
+<p>The supported keys are:</p>
+<ul class="simple">
+<li><p>for pods:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">namespace</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qosclass</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">labels/&lt;label-key&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uid</span></code></p></li>
+</ul>
+</li>
+<li><p>for containers:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">pod/&lt;pod-key&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">namespace</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qosclass</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">labels/&lt;label-key&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tags/&lt;tag-key&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">id</span></code></p></li>
+</ul>
+</li>
+</ul>
+<p>Essentially an expression defines a logical operation of the form (key op values).
+Evaluating this logical expression will take the value of the key in  which
+either evaluates to true or false.
+a boolean true/false result. Currently the following operations are supported:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Equals</span></code>: equality, true if the <em>value of key</em> equals the single item in <em>values</em></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">NotEqual</span></code>: inequality, true if the <em>value of key</em> is not equal to the single item in <em>values</em></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">In</span></code>: membership, true if <em>value of key</em> equals to any among <em>values</em></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">NotIn</span></code>: negated membership, true if the <em>value of key</em> is not equal to any among <em>values</em></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Exists</span></code>: true if the given <em>key</em> exists with any value</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">NotExists</span></code>: true if the given <em>key</em> does not exist</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AlwaysTrue</span></code>: always evaluates to true, can be used to denote node-global scope (all containers)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Matches</span></code>: true if the <em>value of key</em> matches the globbing pattern in values</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MatchesNot</span></code>: true if the <em>value of key</em> does not match the globbing pattern in values</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MatchesAny</span></code>: true if the <em>value of key</em> matches any of the globbing patterns in values</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MatchesNone</span></code>: true if the <em>value of key</em> does not match any of the globbing patterns in values</p></li>
+</ul>
+<p>The effective affinity between containers C_1 and C_2, A(C_1, C_2) is the sum of the
+weights of all pairwise in-scope matching affinities W(C_1, C_2). To put it another way,
+evaluating an affinity for a container C_1 is done by first using the scope (expression)
+to determine which containers are in the scope of the affinity. Then, for each in-scope
+container C_2 for which the match expression evaluates to true, taking the weight of the
+affinity and adding it to the effective affinity A(C_1, C_2).</p>
+<p>Note that currently (for the topology-aware policy) this evaluation is asymmetric:
+A(C_1, C_2) and A(C_2, C_1) can and will be different unless the affinity annotations are
+crafted to prevent this (by making them fully symmetric). Moreover, A(C_1, C_2) is calculated
+and taken into consideration during resource allocation for C_1, while A(C_2, C_1)
+is calculated and taken into account during resource allocation for C_2. This might be
+changed in a future version.</p>
+<p>Currently affinity expressions lack support for boolean operators (and, or, not).
+Sometimes this limitation can be overcome by using joint keys, especially with
+matching operators. The joint key syntax allows joining the value of several keys
+with a separator into a single value. A joint key can be specified in a simple or
+full format:</p>
+<ul class="simple">
+<li><p>simple: “:<colon-separated-subkeys>”, this is equivalent to “:::<colon-separated-subkeys>”</p></li>
+<li><p>full:   “:<ksep><vsep><ksep-separated-keylist>”</p></li>
+</ul>
+<p>A joint key evaluates to the values of all subkeys joined by the <vsep>. A non-existent
+subkey evaluates to the empty string. For instance the joint key</p>
+<p>:pod/qosclass:pod/name:name</p>
+<p>evaluates to</p>
+<p>“<qosclass>:<pod name>:<container name>”</p>
+<p>For existence operators, a joint key is considered to exist if any of its subkeys exists.</p>
+</div>
+<div class="section" id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h2>
+<p>Put the container <code class="docutils literal notranslate"><span class="pre">peter</span></code> close to the container <code class="docutils literal notranslate"><span class="pre">sheep</span></code> but far away from the
+container <code class="docutils literal notranslate"><span class="pre">wolf</span></code>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">peter:</span>
+      <span class="no">- match:</span>
+          <span class="no">key: name</span>
+          <span class="no">operator: Equals</span>
+          <span class="no">values:</span>
+          <span class="no">- sheep</span>
+        <span class="no">weight: 5</span>
+    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">peter:</span>
+      <span class="no">- match:</span>
+          <span class="no">key: name</span>
+          <span class="no">operator: Equals</span>
+          <span class="no">values:</span>
+          <span class="no">- wolf</span>
+        <span class="no">weight: 5</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="shorthand-notation">
+<h2>Shorthand Notation<a class="headerlink" href="#shorthand-notation" title="Permalink to this headline">¶</a></h2>
+<p>There is an alternative shorthand syntax for what is considered to be the most common
+case: defining affinities between containers within the same pod. With this notation
+one needs to give just the names of the containers, like in the example below.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span>  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">container3: [ container1 ]</span>
+    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">container3: [ container2 ]</span>
+      <span class="no">container4: [ container2, container3 ]</span>
+</pre></div>
+</div>
+<p>This shorthand notation defines:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">container3</span></code> having</p>
+<ul>
+<li><p>affinity (weight 1) to <code class="docutils literal notranslate"><span class="pre">container1</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code> (weight -1) to <code class="docutils literal notranslate"><span class="pre">container2</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">container4</span></code> having</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">anti-affinity</span></code> (weight -1) to <code class="docutils literal notranslate"><span class="pre">container2</span></code>, and <code class="docutils literal notranslate"><span class="pre">container3</span></code></p></li>
+</ul>
+</li>
+</ul>
+<p>The equivalent annotation in full syntax would be</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|+</span>
+      <span class="no">container3:</span>
+      <span class="no">- match:</span>
+          <span class="no">key: labels/io.kubernetes.container.name</span>
+          <span class="no">operator: In</span>
+          <span class="no">values:</span>
+          <span class="no">- container1</span>
+    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|+</span>
+      <span class="no">container3:</span>
+      <span class="no">- match:</span>
+          <span class="no">key: labels/io.kubernetes.container.name</span>
+          <span class="no">operator: In</span>
+          <span class="no">values:</span>
+          <span class="no">- container2</span>
+      <span class="no">container4:</span>
+      <span class="no">- match:</span>
+          <span class="no">key: labels/io.kubernetes.container.name</span>
+          <span class="no">operator: In</span>
+          <span class="no">values:</span>
+          <span class="no">- container2</span>
+          <span class="no">- container3</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="blockio.html" class="btn btn-neutral float-right" title="Block IO" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="static-pools.html" class="btn btn-neutral float-left" title="Static-Pools (STP) Policy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2020, various
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+  
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> Read the Docs</span>
+        v: devel
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl>
+          <dt>Versions</dt>
+          
+          <dd><a href="/cri-resource-manager/devel">devel</a></dd>
+          
+        </dl>
+      </div>
+    </div>
+  
+
+
+</body>
+</html>
