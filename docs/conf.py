@@ -115,12 +115,24 @@ def setup(app):
 #
 ###############################################################################
 
+def isHTTPLink(uri):
+    return uri.startswith('http://') or uri.startswith('https://')
+
+def isMDFileLink(uri):
+    return uri.endswith('.md')
+
+def isRSTFileLink(uri):
+    return uri.endswith('.rst')
 
 # Callback registerd with 'missing-reference'.
 def fixRSTLinkInMD(app, env, node, contnode):
     refTarget = node.get('reftarget')
+
+    if isHTTPLink(refTarget):
+        return
+
     filePath = refTarget.lstrip("/")
-    if '.rst' in refTarget and "://" not in refTarget:
+    if isRSTFileLink(refTarget) and not isHTTPLink(refTarget):
     # This occurs when a .rst file is referenced from a .md file
     # Currently unable to check if file exists as no file
     # context is provided and links are relative.
@@ -162,13 +174,18 @@ def normalizePath(docPath,uriPath):
 def fixLocalMDAnchors(app, doctree, docname):
     for node in doctree.traverse(nodes.reference):
         uri = node.get('refuri')
+
+        if isHTTPLink(uri):
+            continue
+
         filePath = normalizePath(docname,uri)
+
         if isfile(filePath):
         # Only do this if the file exists.
         #
         # TODO: Pop a warning if the file doesn't exist.
         #
-            if '.md' in uri and '://' not in uri:
+            if isMDFileLink(uri) and not isHTTPLink(uri):
             # Make sure .md file links that weren't caught are converted.
             # These occur when creating an explicit link to an .md file
             # from an .rst file. By default these are not validated by Sphinx
