@@ -84,6 +84,30 @@ ubuntu-20_04-image-url() {
     echo "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img"
 }
 
+ubuntu-download-kernel() {
+    # Usage:
+    #   ubuntu-download-kernel list
+    #   ubuntu-download-kernel VERSION
+    #
+    # List or download Ubuntu kernel team kernels.
+    #
+    # Example:
+    #   ubuntu-download-kernel list | grep 5.9
+    #   ubuntu-download-kernel 5.9-rc8
+    #   vm-command "dpkg -i kernels/linux*rc8*deb"
+    #   vm-reboot
+    #   vm-command "uname -a"
+    local version=$1
+    [ -n "$version" ] ||
+        error "missing kernel version to install"
+    if [ "$version" == "list" ]; then
+        wget -q -O- https://kernel.ubuntu.com/~kernel-ppa/mainline/  | grep -E '^<tr>.*href="v[5-9]' | sed 's|^.*href="v\([0-9][^"]*\)/".*$|\1|g'
+        return 0
+    fi
+    vm-command "mkdir -p kernels; rm -f kernels/linux*$version*deb; for deb in \$(wget -q -O- https://kernel.ubuntu.com/~kernel-ppa/mainline/v$version/ | awk -F'\"' '/amd64.*deb/{print \$2}' | grep -v -E 'headers|lowlatency'); do ( cd kernels; wget -q https://kernel.ubuntu.com/~kernel-ppa/mainline/v$version/\$deb ); done; echo; echo 'Downloaded kernel packages:'; du -h kernels/*.deb" ||
+        command-error "downloading kernel $version failed"
+ }
+
 debian-10-image-url() {
     echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
 }
