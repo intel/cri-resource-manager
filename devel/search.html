@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Search &mdash; CRI Resource Manager 0.4.0-84-gf99b0e3 documentation</title>
+  <title>Search &mdash; CRI Resource Manager 0.4.0-87-g22f4039 documentation</title>
   
 
   
@@ -235,19 +235,24 @@
         <span class="fa fa-caret-down"></span>
       </span>
       <div class="rst-other-versions">
-        <dl>
+        <dl id="versions">
           <dt>Versions</dt>
-          
-          <dd><a href="/cri-resource-manager/devel">devel</a></dd>
-          
-          <dd><a href="/cri-resource-manager/stable">stable</a></dd>
-          
-          <dd><a href="/cri-resource-manager/v0.4">v0.4</a></dd>
-          
         </dl>
       </div>
     </div>
   
+  <script src="../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
 
 
 
