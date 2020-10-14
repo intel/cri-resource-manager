@@ -7,6 +7,13 @@ NUMA node group definitions:
                       The default is "0G".
 "nvmem"               nvmem (non-volatile RAM) size on each NUMA node
                       in this group. The default is "0G".
+"dimm"                "": the default, memory is there without pc-dimm defined.
+                      "plugged": start with cold plugged pc-dimm.
+                      "unplugged": start with free slot for hot plug.
+                        Add the dimm in Qemu monitor at runtime:
+                          device_add pc-dimm,id=dimmX,memdev=memX,node=X
+                        or
+                          device_add nvdimm,id=nvdimmX,memdev=nvmemX,node=X
 "cores"               number of CPU cores on each NUMA node in this group.
                       The default is 0.
 "threads"             number of threads on each CPU core.
@@ -88,10 +95,15 @@ def siadd(s1, s2):
         return str(int(s1[:-1]) + int(s2[:-1])) + "G"
     raise ValueError('supports only sizes in gigabytes, example: 2G')
 
+def sisub(s1, s2):
+    if s1.lower().endswith("g") and s2.lower().endswith("g"):
+        return str(int(s1[:-1]) - int(s2[:-1])) + "G"
+    raise ValueError('supports only sizes in gigabytes, example: 2G')
+
 def validate(numalist):
     if not isinstance(numalist, list):
         raise ValueError('expected list containing dicts, got %s' % (type(numalist,).__name__))
-    valid_keys = set(("mem", "nvmem",
+    valid_keys = set(("mem", "nvmem", "dimm",
                       "cores", "threads", "nodes", "dies", "packages",
                       "node-dist", "dist-all",
                       "dist-other-package", "dist-same-package", "dist-same-die"))
@@ -178,6 +190,9 @@ def qemuopts(numalist):
     lastnvmem = -1
     totalmem = "0G"
     totalnvmem = "0G"
+    unpluggedmem = "0G"
+    pluggedmem = "0G"
+    memslots = 0
     groupnodes = {} # groupnodes[NUMALISTINDEX] = (NODEID, ...)
     validate(numalist)
 
@@ -190,6 +205,7 @@ def qemuopts(numalist):
         diecount = int(numaspec.get("dies", 1))
         packagecount = int(numaspec.get("packages", 1))
         memsize = numaspec.get("mem", "0")
+        memdimm = numaspec.get("dimm", "")
         if memsize != "0":
             memcount = 1
         else:
@@ -209,19 +225,47 @@ def qemuopts(numalist):
                     lastnode += 1
                     for mem in range(memcount):
                         lastmem += 1
-                        objectparams.append("-object memory-backend-ram,size=%s,id=mem%s" % (memsize, lastmem))
-                        numaparams.append("-numa node,nodeid=%s,memdev=mem%s" % (lastnode, lastmem))
+                        if memdimm == "":
+                            objectparams.append("-object memory-backend-ram,size=%s,id=membuiltin_%s_node_%s" % (memsize, lastmem, lastnode))
+                            numaparams.append("-numa node,nodeid=%s,memdev=membuiltin_%s_node_%s" % (lastnode, lastmem, lastnode))
+                        elif memdimm == "plugged":
+                            objectparams.append("-object memory-backend-ram,size=%s,id=memdimm_%s_node_%s" % (memsize, lastmem, lastnode))
+                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            numaparams.append("-device pc-dimm,node=%s,id=dimm%s,memdev=memdimm_%s_node_%s" % (lastnode, lastmem, lastmem, lastnode))
+                            pluggedmem = siadd(pluggedmem, memsize)
+                            memslots += 1
+                        elif memdimm == "unplugged":
+                            objectparams.append("-object memory-backend-ram,size=%s,id=memdimm_%s_node_%s" % (memsize, lastmem, lastnode))
+                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            unpluggedmem = siadd(unpluggedmem, memsize)
+                            memslots += 1
+                        else:
+                            raise ValueError("unsupported dimm %r, expected 'plugged' or 'unplugged'" % (memdimm,))
                         totalmem = siadd(totalmem, memsize)
                     for nvmem in range(nvmemcount):
                         lastnvmem += 1
+                        lastmem += 1
                         if lastnvmem == 0:
                             machineparam += ",nvdimm=on"
                         # Don't use file-backed nvdimms because the file would
                         # need to be accessible from the govm VM
                         # container. Everything is ram-backed on host for now.
-                        objectparams.append("-object memory-backend-ram,size=%s,id=nvmem%s" % (nvmemsize, lastnvmem))
-                        # Currently nvdimm is not backed up by -device pair.
-                        numaparams.append("-numa node,nodeid=%s,memdev=nvmem%s" % (lastnode, lastnvmem))
+                        if memdimm == "":
+                            objectparams.append("-object memory-backend-ram,size=%s,id=memnvbuiltin_%s_node_%s" % (nvmemsize, lastmem, lastnode))
+                            numaparams.append("-numa node,nodeid=%s,memdev=memnvbuiltin_%s_node_%s" % (lastnode, lastmem, lastnode))
+                        elif memdimm == "plugged":
+                            objectparams.append("-object memory-backend-ram,size=%s,id=memnvdimm_%s_node_%s" % (nvmemsize, lastmem, lastnode))
+                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            numaparams.append("-device nvdimm,node=%s,id=nvdimm%s,memdev=memnvdimm_%s_node_%s" % (lastnode, lastmem, lastmem, lastnode))
+                            pluggedmem = siadd(pluggedmem, nvmemsize)
+                            memslots += 1
+                        elif memdimm == "unplugged":
+                            objectparams.append("-object memory-backend-ram,size=%s,id=memnvdimm_%s_node_%s" % (nvmemsize, lastmem, lastnode))
+                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            unpluggedmem = siadd(unpluggedmem, nvmemsize)
+                            memslots += 1
+                        else:
+                            raise ValueError("unsupported dimm %r, expected 'plugged' or 'unplugged'" % (memdimm,))
                         totalnvmem = siadd(totalnvmem, nvmemsize)
                     if cpucount > 0:
                         numaparams[-1] = numaparams[-1] + (",cpus=%s-%s" % (lastcpu + 1, lastcpu + cpucount))
@@ -240,7 +284,8 @@ def qemuopts(numalist):
         # because it requires Qemu >= 5.0.
         diesparam = ""
     cpuparam = "-smp cpus=%s,threads=%s%s,sockets=%s" % (lastcpu + 1, threadcount, diesparam, lastsocket + 1)
-    memparam = "-m %s" % (siadd(totalmem, totalnvmem),)
+    maxmem = siadd(totalmem, totalnvmem)
+    memparam = "-m size=%s,slots=%s,maxmem=%s" % (sisub(sisub(maxmem, unpluggedmem), pluggedmem), memslots, maxmem)
     return (machineparam + " " +
             cpuparam + " " +
             memparam + " " +

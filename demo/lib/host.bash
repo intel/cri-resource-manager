@@ -151,6 +151,7 @@ host-create-vm() {
         echo "Warning: cannot verify Qemu version on govm image. In case of failure, check it is >= 5.0" >&2
     fi
     echo "# VM Qemu monitor: docker exec -it $VM_CONTAINER_ID nc local:/data/monitor"
+    VM_MONITOR="docker exec -i $VM_CONTAINER_ID nc local:/data/monitor"
     host-wait-vm-ssh-server
 }
 

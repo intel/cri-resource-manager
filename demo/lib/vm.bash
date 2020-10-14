@@ -120,6 +120,121 @@ vm-command-q() {
     $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$1"
 }
 
+vm-mem-hotplug() { # script API
+    # Usage: vm-mem-hotplug MEMORY
+    #
+    # Hotplug currently unplugged MEMORY to VM.
+    # Find unplugged memory with "vm-mem-hw | grep unplugged".
+    #
+    # Examples:
+    #   vm-mem-hotplug mem2
+    local memmatch memline memid memdimm memnode memdriver
+    memmatch=$1
+    if [ -z "$memmatch" ]; then
+        error "missing MEMORY"
+        return 1
+    fi
+    memline="$(vm-mem-hw | grep unplugged | grep $memmatch)"
+    if [ -z "$memline" ]; then
+        error "unplugged memory matching '$memmatch' not found"
+        return 1
+    fi
+    memid="$(awk '{print $1}' <<< $memline)"
+    memid=${memid#mem}
+    memid=${memid%[: ]*}
+    memdimm="$(awk '{print $2}' <<< $memline)"
+    memnode="$(awk '{print $4}' <<< $memline)"
+    memnode=${memnode#node}
+    if [ "$memdimm" == "nvdimm" ]; then
+        memdriver="nvdimm"
+    else
+        memdriver="pc-dimm"
+    fi
+    vm-monitor "device_add ${memdriver},id=${memdimm}${memid},memdev=mem${memdimm}_${memid}_node_${memnode},node=${memnode}"
+}
+
+vm-mem-hotremove() { # script API
+    # Usage: vm-mem-hotremove MEMORY
+    #
+    # Hotremove currently plugged MEMORY from VM.
+    # Find plugged memory with "vm-mem-hw | grep ' plugged'".
+    #
+    # Examples:
+    #   vm-mem-hotremove mem2
+    local memmatch memline memid memdimm memnode memdriver
+    memmatch=$1
+    if [ -z "$memmatch" ]; then
+        error "missing MEMORY"
+        return 1
+    fi
+    memline="$(vm-mem-hw | grep \ plugged | grep $memmatch)"
+    if [ -z "$memline" ]; then
+        error "plugged memory matching '$memmatch' not found"
+        return 1
+    fi
+    memid="$(awk '{print $1}' <<< $memline)"
+    memid=${memid#mem}
+    memid=${memid%[: ]*}
+    memdimm="$(awk '{print $2}' <<< $memline)"
+    vm-monitor "device_del ${memdimm}${memid}"
+}
+
+vm-mem-hw() { # script API
+    # Usage: vm-mem-hw
+    #
+    # List VM memory hardware with current status.
+    # See also: vm-mem-hotplug, vm-mem-hotremove
+    vm-monitor "$(echo info memdev; echo info memory-devices)" | awk '
+      /memdev: /{
+          split($2,a,"_");
+          state[a[2]]="plugged  ";
+      }
+      /memory backend: membuiltin/{
+          split($3,a,"_"); backend=1;
+          type[a[2]]="ram    "; state[a[2]]="builtin  "; node[a[2]]=a[4];
+      }
+      /memory backend: memnvbuiltin/{
+          split($3,a,"_"); backend=1;
+          type[a[2]]="nvram  "; state[a[2]]="builtin  "; node[a[2]]=a[4];
+      }
+      /memory backend: memnvdimm/{
+          split($3,a,"_"); backend=1;
+          type[a[2]]="nvdimm "; state[a[2]]="unplugged"; node[a[2]]=a[4];
+      }
+      /memory backend: memdimm/{
+          split($3,a,"_"); backend=1;
+          type[a[2]]="dimm   "; state[a[2]]="unplugged"; node[a[2]]=a[4];
+      }
+      /size: /{sz=$2/1024/1024; if (backend==1) {size[a[2]]=sz;backend=0;}}
+      END{
+          for (m in node) print "mem"m": "type[m]" "state[m]" node"node[m]" size="size[m]"M";
+      }'
+}
+
+vm-monitor() { # script API
+    # Usage: vm-monitor COMMAND
+    #
+    # Execute COMMAND on Qemu monitor.
+    #
+    # Example: VM monitor help:
+    #  vm-monitor "help" | less
+    #
+    # Example: print memdev objects and plugged in memory devices:
+    #  vm-monitor "info memdev"
+    #  vm-monitor "info memory-devices"
+    #
+    # Example: hot plug a NVDIMM to NUMA node 1 when launched with topology
+    # topology='[{"cores":2,"mem":"2G"},{"nvmem":"4G","dimm":"unplugged"}]':
+    #   vm-monitor "device_add pc-dimm,id=nvdimm0,memdev=nvmem0,node=1"
+    [ -n "$VM_MONITOR" ] ||
+        error "VM is not running"
+    eval "$VM_MONITOR" <<< "$1" | sed 's/\r//g'
+    if [ "${PIPESTATUS[0]}" != "0" ]; then
+        error "sending command to Qemu monitor failed"
+    fi
+    echo ""
+}
+
 vm-wait-process() {
     # parameters: "process" and "timeout" (optional, default 30 seconds)
     process=$1

@@ -13,6 +13,19 @@ Options:
 EOF
 }
 
+# Helper function for detecting available versions from the current directory
+create_versions_js() {
+    _baseurl="/cri-resource-manager"
+
+    echo -e "function getVersionsMenuItems() {\n  return ["
+    # 'stable' is a symlink pointing to the latest version
+    [ -f stable ] && echo "    { name: 'stable', url: '$_baseurl/stable' },"
+    for f in `ls -d */  | tr -d /`; do
+        echo "    { name: '$f', url: '$_baseurl/$f' },"
+    done
+    echo -e "  ];\n}"
+}
+
 #
 # Argument parsing
 #
@@ -92,12 +105,7 @@ fi
 build_subdir=${build_subdir:-devel}
 echo "Updating site version subdir: '$build_subdir'"
 export SITE_BUILDDIR="$build_dir/$build_subdir"
-
-# Detect existing versions from the gh-pages branch
-# 'stable' is a symlink pointing to the latest version
-cd "$build_dir"
-export VERSIONS="$build_subdir ${_version:+stable} `ls -d */  | tr -d /`"
-cd -
+export VERSIONS_MENU=1
 
 make html
 
@@ -112,11 +120,14 @@ cd "$build_dir"
 # Add "const" files we need in root dir
 touch .nojekyll
 
-_stable=`ls -d1 v*/ || : | sort -n | tail -n1`
+_stable=`(ls -d1 v*/ || :) | sort -n | tail -n1`
 [ -n "$_stable" ] && ln -sfT "$_stable" stable
 
+# Detect existing versions from the gh-pages branch
+create_versions_js > versions.js
+
 cat > index.html << EOF
-<meta http-equiv="refresh" content="0; URL='devel'" />
+<meta http-equiv="refresh" content="0; URL='stable'" />
 EOF
 
 if [ -z "`git status --short`" ]; then

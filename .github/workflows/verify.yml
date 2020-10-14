@@ -46,4 +46,17 @@ jobs:
       run: bash <(curl -s https://codecov.io/bash)
 
     - name: Build docs
-      run: make site-build
+      run: |
+        make site-build
+        make clean-html
+
+    - name: Install gh-pages build dependencies
+      run: |
+        pip3 install --user -r docs/requirements.txt
+        echo "`python3 -m site --user-base`/bin" >> $GITHUB_PATH
+
+    - name: Verify update of gh-pages
+      run: |
+        git config user.name "Github"
+        git config user.email "no-reply@github.com"
+        ./scripts/build/update-gh-pages.sh
