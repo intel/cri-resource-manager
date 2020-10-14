@@ -77,8 +77,8 @@ else:
 release = getenv("BUILD_VERSION", default="unknown")
 
 # Versions to show in the version menu
-versions = getenv('VERSIONS', default="").split()
-html_context = {'versions': sorted(set(versions))}
+if getenv('VERSIONS_MENU'):
+    html_context = {'versions_menu': True}
 
 # -- General configuration ---------------------------------------------------
 
