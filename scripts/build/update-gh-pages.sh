@@ -120,7 +120,7 @@ cd "$build_dir"
 # Add "const" files we need in root dir
 touch .nojekyll
 
-_stable=`ls -d1 v*/ || : | sort -n | tail -n1`
+_stable=`(ls -d1 v*/ || :) | sort -n | tail -n1`
 [ -n "$_stable" ] && ln -sfT "$_stable" stable
 
 # Detect existing versions from the gh-pages branch
