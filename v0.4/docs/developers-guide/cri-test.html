@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>CRI Validation &mdash; CRI Resource Manager 0.4.0-82-gef3a137 documentation</title>
+  <title>CRI Validation &mdash; CRI Resource Manager 0.4.0-94-g4ef451a documentation</title>
   
 
   
@@ -186,7 +186,7 @@
             
   <div class="section" id="cri-validation">
 <h1>CRI Validation<a class="headerlink" href="#cri-validation" title="Permalink to this headline">¶</a></h1>
-<p><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/ef3a13795bc5650e7371b89eab34ddd409ba2cb5/test/critest">This test</a> runs
+<p><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4ef451a35df1ee486445a7434a2c25b4c7994578/test/critest">This test</a> runs
 <a class="reference external" href="https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/validation"><code class="docutils literal notranslate"><span class="pre">critest</span></code></a>
 from <a class="reference external" href="https://github.com/kubernetes-sigs/cri-tools/">cri-tools</a> to
 make sure that various <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> configurations do not break CRI
@@ -270,19 +270,24 @@ runtime conformance.</p>
         <span class="fa fa-caret-down"></span>
       </span>
       <div class="rst-other-versions">
-        <dl>
+        <dl id="versions">
           <dt>Versions</dt>
-          
-          <dd><a href="/cri-resource-manager/devel">devel</a></dd>
-          
-          <dd><a href="/cri-resource-manager/stable">stable</a></dd>
-          
-          <dd><a href="/cri-resource-manager/v0.4">v0.4</a></dd>
-          
         </dl>
       </div>
     </div>
   
+  <script src="../../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
 
 
 </body>
