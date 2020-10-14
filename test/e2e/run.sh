@@ -57,6 +57,7 @@ usage() {
     echo "             1: delete VM"
     echo "             2: stop VM, but do not delete it."
     echo "  Hook VARs:"
+    echo "    on_vm_online: code to be executed when SSH connection to VM works"
     echo "    on_verify_fail, on_create_fail: code to be executed in case"
     echo "             verify() or create() fails. Example: go to interactive"
     echo "             mode if a verification fails: on_verify_fail=interactive"
@@ -856,6 +857,8 @@ host-set-vm-config "$vm" "$distro" "$cri"
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
 fi
+
+is-hooked "on_vm_online" && run-hook "on_vm_online"
 
 if [ -n "$vm_files" ]; then
     install-files "$vm_files"
