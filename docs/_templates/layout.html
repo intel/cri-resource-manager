@@ -1,7 +1,7 @@
 {%- extends "!layout.html" %}
 
 {% block footer %}
-  {% if versions %}
+  {% if versions_menu %}
     <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
       <span class="rst-current-version" data-toggle="rst-current-version">
         <span class="fa fa-book"> GitHub Pages</span>
@@ -9,13 +9,22 @@
         <span class="fa fa-caret-down"></span>
       </span>
       <div class="rst-other-versions">
-        <dl>
+        <dl id="versions">
           <dt>{{ _('Versions') }}</dt>
-          {% for version in versions %}
-          <dd><a href="/cri-resource-manager/{{ version }}">{{ version }}</a></dd>
-          {% endfor %}
         </dl>
       </div>
     </div>
   {% endif %}
+  <script src="{{ pathto('../versions.js', 1) }}"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
 {% endblock %}
