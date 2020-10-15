@@ -15,8 +15,6 @@
 package memtier
 
 import (
-	"time"
-
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -102,12 +100,8 @@ func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 
 	config.GetModule(PolicyPath).AddNotify(p.configNotify)
 
-	p.dynamicDemoter = &demoter{
-		containerDemoters: make(map[string]chan interface{}, 0),
-		pageMoveDuration:  time.Duration(opt.PageMovePeriod),
-		pageMoveCount:     opt.PageMoveCount,
-		pageMover:         &linuxPageMover{},
-	}
+	p.dynamicDemoter = NewDemoter(p, &linuxPageMover{})
+
 	p.root.Dump("<pre-start>")
 
 	return p
@@ -137,14 +131,7 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 
 	// TODO: the dirty bit reset timer should only be started if there is a container
 	// for which there is a demotion possiblity.
-	if opt.DirtyBitScanPeriod > 0 && opt.PageMovePeriod > 0 && opt.PageMoveCount > 0 {
-		log.Debug("staring dirty bit -based page demotion: scan period %v, page move period %v, page move count %d",
-			opt.DirtyBitScanPeriod.String(), opt.PageMovePeriod.String(), opt.PageMoveCount)
-		p.dynamicDemoter.StartDirtyBitResetTimer(p, time.Duration(opt.DirtyBitScanPeriod))
-	} else {
-		log.Debug("not staring dirty bit -based page demotion due to missing or empty parameters: scan period %v, page move period %v, page move count %d",
-			opt.DirtyBitScanPeriod.String(), opt.PageMovePeriod.String(), opt.PageMoveCount)
-	}
+	p.dynamicDemoter.Reconfigure(opt.DirtyBitScanPeriod, opt.PageMovePeriod, opt.PageMoveCount)
 
 	p.root.Dump("<post-start>")
 
@@ -418,6 +405,11 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("  - pin containers to memory: %v", opt.PinMemory)
 	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
 	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
+	log.Info("  - page scan period: %s", opt.DirtyBitScanPeriod.String())
+	log.Info("  - page move period: %s", opt.PageMovePeriod.String())
+	log.Info("  - page move count: %d", opt.PageMoveCount)
+
+	p.dynamicDemoter.Reconfigure(opt.DirtyBitScanPeriod, opt.PageMovePeriod, opt.PageMoveCount)
 
 	// TODO: We probably should release and reallocate resources for all containers
 	//   to honor the latest configuration. Depending on the changes that might be

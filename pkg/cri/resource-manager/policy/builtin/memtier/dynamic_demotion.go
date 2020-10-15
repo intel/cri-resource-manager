@@ -79,10 +79,7 @@ type demoter struct {
 
 // Demoter dynamically demotes pages from DRAM to PMEM.
 type Demoter interface {
-	// StartDirtyBitResetTimer starts the timer for getting memory moving events.
-	StartDirtyBitResetTimer(policy *policy, timeout time.Duration)
-	// StopDirtyBitResetTimer stops the memory moving.
-	StopDirtyBitResetTimer()
+	Reconfigure(dirtyBitDuration, pageMoveDuration Duration, pageMoveCount uint)
 	// ResetDirtyBit resets soft-dirty bits for all processes in container c.
 	ResetDirtyBit(c cache.Container) error
 	// GetPagesForContainer gets pages which could be potentially moved from container c.
@@ -115,6 +112,28 @@ func copyPagePool(p pagePool) pagePool {
 		copy(c.pages[pid], pages)
 	}
 	return c
+}
+
+func NewDemoter(p *policy, pageMover PageMover) *demoter {
+	return &demoter{
+		policy:            p,
+		containerDemoters: make(map[string]chan interface{}, 0),
+		pageMover:         pageMover,
+	}
+}
+
+func (d *demoter) Reconfigure(dirtyBitDuration, pageMoveDuration Duration, pageMoveCount uint) {
+	log.Debug("stopping dirty bit -based page demotion")
+	d.stopDirtyBitResetTimer()
+	d.stopDemoters()
+	d.dirtyBitDuration = time.Duration(dirtyBitDuration)
+	d.pageMoveDuration = time.Duration(pageMoveDuration)
+	d.pageMoveCount = pageMoveCount
+	if d.dirtyBitDuration > 0 && d.pageMoveDuration > 0 && d.pageMoveCount > 0 {
+		log.Debug("staring dirty bit -based page demotion: scan period %v, page move period %v, page move count %d",
+			d.dirtyBitDuration, d.pageMoveDuration, d.pageMoveCount)
+		d.startDirtyBitResetTimer()
+	}
 }
 
 func (d *demoter) UpdateDemoter(cid string, p pagePool, targetNodes system.IDSet) {
@@ -191,23 +210,28 @@ func (d *demoter) UnusedDemoters(cs []cache.Container) []string {
 	return unused
 }
 
-func (d *demoter) StopDirtyBitResetTimer() {
+func (d *demoter) stopDemoters() {
+	for cid, channel := range d.containerDemoters {
+		channel <- "stop"
+		delete(d.containerDemoters, cid)
+	}
+}
+
+func (d *demoter) stopDirtyBitResetTimer() {
 	if d.dirtyBitStop != nil {
 		close(d.dirtyBitStop)
 		d.dirtyBitStop = nil
 	}
 }
 
-func (d *demoter) StartDirtyBitResetTimer(policy *policy, timeout time.Duration) {
+func (d *demoter) startDirtyBitResetTimer() {
 	if d.dirtyBitStop != nil {
 		return
 	}
 
-	d.policy = policy
-
 	stop := make(chan interface{})
 	go func() {
-		dirtyBitResetTimer := time.NewTicker(timeout)
+		dirtyBitResetTimer := time.NewTicker(d.dirtyBitDuration)
 		dirtyBitResetChan := dirtyBitResetTimer.C
 		for {
 			select {
