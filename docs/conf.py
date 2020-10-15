@@ -51,15 +51,21 @@ master_doc = 'docs/index'
 baseBranch = "master"
 useGitHubURL = True
 commitSHA = getenv('GITHUB_SHA')
-githubBaseURL = "https://github.com/intel/cri-resource-manager/"
-githubFileURL = githubBaseURL + "blob/"
-githubDirURL = githubBaseURL + "tree/"
-if commitSHA:
-    githubFileURL = githubFileURL + commitSHA + "/"
-    githubDirURL = githubDirURL + commitSHA + "/"
+githubServerURL = getenv('GITHUB_SERVER_URL')
+githubRepository = getenv('GITHUB_REPOSITORY')
+if githubServerURL and githubRepository:
+    githubBaseURL = join(githubServerURL, githubRepository)
 else:
-    githubFileURL = githubFileURL + baseBranch + "/"
-    githubDirURL = githubDirURL + baseBranch + "/"
+    githubBaseURL = "https://github.com/intel/cri-resource-manager/"
+
+githubFileURL = join(githubBaseURL, "blob/")
+githubDirURL = join(githubBaseURL, "tree/")
+if commitSHA:
+    githubFileURL = join(githubFileURL, commitSHA)
+    githubDirURL = join(githubDirURL, commitSHA)
+else:
+    githubFileURL = join(githubFileURL, baseBranch)
+    githubDirURL = join(githubDirURL, baseBranch)
 
 # Version displayed in the upper left corner of the site
 ref = getenv('GITHUB_REF', default="")
@@ -223,7 +229,7 @@ def fixLocalMDAnchors(app, doctree, docname):
                 if useGitHubURL:
                 # Replace references to local files with links to the GitHub repo
                 #
-                    newURI = githubFileURL + filePath
+                    newURI = join(githubFileURL, filePath)
                     print("new url: ", newURI)
                     node['refuri']=newURI
                 else:
@@ -245,5 +251,5 @@ def fixLocalMDAnchors(app, doctree, docname):
         elif "#" not in uri: # ignore anchors
         # turn links to directories into links to the repo
             if isdir(filePath):
-                newURI = githubDirURL + filePath
+                newURI = join(githubDirURL, filePath)
                 node['refuri']=newURI
