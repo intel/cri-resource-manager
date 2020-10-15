@@ -49,7 +49,7 @@ master_doc = 'docs/index'
 ##############################################################################
 
 baseBranch = "master"
-useGitHubURL = False
+useGitHubURL = True
 commitSHA = getenv('GITHUB_SHA')
 githubBaseURL = "https://github.com/intel/cri-resource-manager/"
 githubFileURL = githubBaseURL + "blob/"
@@ -147,7 +147,6 @@ def fixRSTLinkInMD(app, env, node, contnode):
     if isHTTPLink(refTarget):
         return
 
-    filePath = refTarget.lstrip("/")
     if isRSTFileLink(refTarget) and not isHTTPLink(refTarget):
     # This occurs when a .rst file is referenced from a .md file
     # Currently unable to check if file exists as no file
@@ -158,7 +157,7 @@ def fixRSTLinkInMD(app, env, node, contnode):
         contnode['refuri'] = contnode['refuri'].replace('.rst','.html')
         contnode['internal'] = "True"
         return contnode
-    else:
+    elif refTarget.startswith("/"):
     # This occurs when a file is referenced for download from an .md file.
     # Construct a list of them and short-circuit the warning. The files
     # are moved later (need file location context). To avoid warnings,
@@ -167,6 +166,7 @@ def fixRSTLinkInMD(app, env, node, contnode):
     #
     # Example: [Makefile](/Makefile)
     #
+        filePath = refTarget.lstrip("/")
         if isfile(filePath) or isdir(filePath):
             return contnode
 
