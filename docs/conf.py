@@ -49,17 +49,23 @@ master_doc = 'docs/index'
 ##############################################################################
 
 baseBranch = "master"
-useGitHubURL = False
+useGitHubURL = True
 commitSHA = getenv('GITHUB_SHA')
-githubBaseURL = "https://github.com/intel/cri-resource-manager/"
-githubFileURL = githubBaseURL + "blob/"
-githubDirURL = githubBaseURL + "tree/"
-if commitSHA:
-    githubFileURL = githubFileURL + commitSHA + "/"
-    githubDirURL = githubDirURL + commitSHA + "/"
+githubServerURL = getenv('GITHUB_SERVER_URL')
+githubRepository = getenv('GITHUB_REPOSITORY')
+if githubServerURL and githubRepository:
+    githubBaseURL = join(githubServerURL, githubRepository)
 else:
-    githubFileURL = githubFileURL + baseBranch + "/"
-    githubDirURL = githubDirURL + baseBranch + "/"
+    githubBaseURL = "https://github.com/intel/cri-resource-manager/"
+
+githubFileURL = join(githubBaseURL, "blob/")
+githubDirURL = join(githubBaseURL, "tree/")
+if commitSHA:
+    githubFileURL = join(githubFileURL, commitSHA)
+    githubDirURL = join(githubDirURL, commitSHA)
+else:
+    githubFileURL = join(githubFileURL, baseBranch)
+    githubDirURL = join(githubDirURL, baseBranch)
 
 # Version displayed in the upper left corner of the site
 ref = getenv('GITHUB_REF', default="")
@@ -95,7 +101,7 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', '_work', 'generate', 'README.md', 'RELEASE.md']
+exclude_patterns = ['_build', '_work', 'generate', 'README.md', 'RELEASE.md', 'docs/releases']
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -147,7 +153,6 @@ def fixRSTLinkInMD(app, env, node, contnode):
     if isHTTPLink(refTarget):
         return
 
-    filePath = refTarget.lstrip("/")
     if isRSTFileLink(refTarget) and not isHTTPLink(refTarget):
     # This occurs when a .rst file is referenced from a .md file
     # Currently unable to check if file exists as no file
@@ -158,7 +163,7 @@ def fixRSTLinkInMD(app, env, node, contnode):
         contnode['refuri'] = contnode['refuri'].replace('.rst','.html')
         contnode['internal'] = "True"
         return contnode
-    else:
+    elif refTarget.startswith("/"):
     # This occurs when a file is referenced for download from an .md file.
     # Construct a list of them and short-circuit the warning. The files
     # are moved later (need file location context). To avoid warnings,
@@ -167,6 +172,7 @@ def fixRSTLinkInMD(app, env, node, contnode):
     #
     # Example: [Makefile](/Makefile)
     #
+        filePath = refTarget.lstrip("/")
         if isfile(filePath) or isdir(filePath):
             return contnode
 
@@ -223,7 +229,7 @@ def fixLocalMDAnchors(app, doctree, docname):
                 if useGitHubURL:
                 # Replace references to local files with links to the GitHub repo
                 #
-                    newURI = githubFileURL + filePath
+                    newURI = join(githubFileURL, filePath)
                     print("new url: ", newURI)
                     node['refuri']=newURI
                 else:
@@ -245,5 +251,5 @@ def fixLocalMDAnchors(app, doctree, docname):
         elif "#" not in uri: # ignore anchors
         # turn links to directories into links to the repo
             if isdir(filePath):
-                newURI = githubDirURL + filePath
+                newURI = join(githubDirURL, filePath)
                 node['refuri']=newURI

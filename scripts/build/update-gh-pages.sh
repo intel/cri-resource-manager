@@ -20,8 +20,17 @@ create_versions_js() {
     echo -e "function getVersionsMenuItems() {\n  return ["
     # 'stable' is a symlink pointing to the latest version
     [ -f stable ] && echo "    { name: 'stable', url: '$_baseurl/stable' },"
-    for f in `ls -d */  | tr -d /`; do
+    for f in `ls -d */  | tr -d / | sed s'/releases//'`; do
         echo "    { name: '$f', url: '$_baseurl/$f' },"
+    done
+    echo -e "  ];\n}"
+}
+
+# Helper function for detecting archived releases from the current directory
+create_releases_js() {
+    echo -e "function getReleaseListItems() {\n  return ["
+    for f in `ls -d v*/  | tr -d /`; do
+        echo "    { name: '$f', url: '$f' },"
     done
     echo -e "  ];\n}"
 }
@@ -66,10 +75,12 @@ git worktree add "$build_dir" gh-pages
 trap "echo 'Removing Git worktree $build_dir'; git worktree remove --force '$build_dir'" EXIT
 
 # Parse subdir name from GITHUB_REF
+release_tag=
 if [ -z "$build_subdir" ]; then
     case "$GITHUB_REF" in
         refs/tags/*)
             _base_ref=${GITHUB_REF#refs/tags/}
+            release_tag=$_base_ref
             ;;
         refs/heads/*)
             _base_ref=${GITHUB_REF#refs/heads/}
@@ -109,13 +120,28 @@ export VERSIONS_MENU=1
 
 make html
 
+# Update releases/ subdir
+if [ "$release_tag" ]; then
+    echo "Building archived docs for release $release_tag"
+
+    export SITE_BUILDDIR="$build_dir/releases/$release_tag"
+    make html
+
+fi
+
+# Only update the releases "site" from master
+if [ "$GITHUB_REF" = "refs/heads/master" ]; then
+    echo "Building releases/"
+    sphinx-build docs/releases "$build_dir"/releases
+fi
+
 #
 # Update gh-pages branch
 #
 commit_hash=`git describe --dirty --always`
 
 # Switch to work in the gh-pages worktree
-cd "$build_dir"
+pushd "$build_dir"
 
 # Add "const" files we need in root dir
 touch .nojekyll
@@ -125,6 +151,13 @@ _stable=`(ls -d1 v*/ || :) | sort -n | tail -n1`
 
 # Detect existing versions from the gh-pages branch
 create_versions_js > versions.js
+
+# Update releases directory
+mkdir -p releases
+cp versions.js releases/
+pushd releases
+create_releases_js > releases.js
+popd
 
 cat > index.html << EOF
 <meta http-equiv="refresh" content="0; URL='stable'" />
@@ -143,6 +176,6 @@ echo "Committing changes..."
 git add -- ":!$build_subdir/.doctrees"
 git commit $amend -m "$commit_msg"
 
-cd -
+popd
 
 echo "gh-pages branch successfully updated"
