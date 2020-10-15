@@ -28,8 +28,8 @@ path.
 
 The choice of policy to use along with any potential parameters specific to that
 policy are taken from the configuration file. You can take a look at the
-[sample configurations](sample-configs) for some minimal/trivial examples. For instance,
-you can use [sample-configs/memtier-policy.cfg](sample-configs/memtier-policy.cfg)
+[sample configurations](/sample-configs) for some minimal/trivial examples. For instance,
+you can use [sample-configs/memtier-policy.cfg](/sample-configs/memtier-policy.cfg)
 as `<config-file>` to activate the topology aware policy with memory tiering support.
 
 **NOTE**: Currently the available policies are work in progress.
@@ -127,9 +127,9 @@ option `--reset-policy`. The whole sequence of switching policies this way is
 When the [agent][agent] is in use, it is also possible to `adjust` container `resource
 assignments` externally, using dedicated `Adjustment` `Custom Resources` in
 the `adjustments.criresmgr.intel.com` group. You can use the
-[provided schema](pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml) to define
+[provided schema](/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml) to define
 the `Adjustment` resource. Then you can copy and modify the
-[sample adjustment CR](sample-configs/external-adjustment.yaml) as a starting
+[sample adjustment CR](/sample-configs/external-adjustment.yaml) as a starting
 point to test some overrides.
 
 An `Adjustment` consists of a
@@ -282,7 +282,7 @@ kli@r640-1:~> kubectl get -n kube-system adjustments.criresmgr.intel.com -ojson 
 
 You can use CRI Resource Manager to simply inspect all proxied CRI requests and
 responses without applying any policy. Run CRI Resource Manager with the
-provided [sample configuration](sample-configs/cri-full-message-dump.cfg)
+provided [sample configuration](/sample-configs/cri-full-message-dump.cfg)
 for doing this.
 
 
