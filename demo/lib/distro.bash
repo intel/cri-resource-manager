@@ -353,6 +353,13 @@ default-setup-proxies() {
     if [ -z "$http_proxy$https_proxy$ftp_proxy$no_proxy" ]; then
         return 0
     fi
+    if vm-command-q "grep -q \"http_proxy=$http_proxy\" /etc/profile.d/proxy.sh && \
+                     grep -q \"https_proxy=$https_proxy\" /etc/profile.d/proxy.sh && \
+                     grep -q \"ftp_proxy=$ftp_proxy\" /etc/profile.d/proxy.sh && \
+                     grep -q \"no_proxy=$no_proxy\" /etc/profile.d/proxy.sh" 2>/dev/null; then
+        # No changes in proxy configuration
+        return 0
+    fi
 
     local file scope="" append="--append"
     local hn=$(vm-command-q hostname)
