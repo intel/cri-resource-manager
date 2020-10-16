@@ -362,11 +362,11 @@ default-setup-proxies() {
 ${scope}http_proxy=$http_proxy
 ${scope}https_proxy=$https_proxy
 ${scope}ftp_proxy=$ftp_proxy
-${scope}no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn
+${scope}no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc
 ${scope}HTTP_PROXY=$http_proxy
 ${scope}HTTPS_PROXY=$https_proxy
 ${scope}FTP_PROXY=$ftp_proxy
-${scope}NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn
+${scope}NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc
 EOF
       vm-pipe-to-file $append $file
       scope="export "
@@ -398,7 +398,7 @@ generic-setup-containerd() {
 [Service]
 Environment=HTTP_PROXY="$http_proxy"
 Environment=HTTPS_PROXY="$https_proxy"
-Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn"
+Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc"
 EOF
             vm-pipe-to-file /etc/systemd/system/containerd.service.d/proxy.conf
     fi
