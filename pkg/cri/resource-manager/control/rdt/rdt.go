@@ -20,22 +20,29 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
-	"github.com/intel/cri-resource-manager/pkg/rdt"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	"github.com/intel/goresctrl/pkg/rdt"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
 )
 
 const (
+	// ConfigModuleName is the configuration section for RDT
+	ConfigModuleName = "rdt"
+
 	// RDTController is the name of the RDT controller.
 	RDTController = cache.RDT
+
+	resctrlGroupPrefix = "cri-resmgr."
 )
 
 // rdtctl encapsulates the runtime state of our RTD enforcement/controller.
 type rdtctl struct {
 	cache cache.Cache // resource manager cache
 	idle  *bool       // true if we run without any classes configured
+	opt   *rdt.Config
 }
 
 // Our logger instance.
@@ -48,14 +55,28 @@ var singleton *rdtctl
 func getRDTController() *rdtctl {
 	if singleton == nil {
 		singleton = &rdtctl{}
+		singleton.opt = singleton.defaultOptions().(*rdt.Config)
 	}
 	return singleton
 }
 
 // Start initializes the controller for enforcing decisions.
 func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
-	if err := rdt.Initialize(); err != nil {
+	if err := rdt.Initialize(resctrlGroupPrefix); err != nil {
 		return rdtError("failed to initialize RDT controls: %v", err)
+	}
+
+	if err := rdt.SetConfig(ctl.opt); err != nil {
+		// Just print an error. A config update later on may be valid.
+		log.Error("failed apply initial configuration: %v", err)
+	}
+
+	config.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
+
+	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
+	err := metrics.RegisterCollector("rdt", rdt.NewCollector)
+	if err != nil {
+		log.Error("failed register rdt collector: %v", err)
 	}
 
 	ctl.cache = cache
@@ -209,10 +230,19 @@ func (ctl *rdtctl) stopMonitor(c cache.Container) error {
 
 // configNotify is our runtime configuration notification callback.
 func (ctl *rdtctl) configNotify(event config.Event, source config.Source) error {
-	log.Info("configuration updated")
+	log.Info("configuration update, applying new config")
 	// We'll re-check idleness at next operation/request.
 	ctl.idle = nil
-	return nil
+	return rdt.SetConfig(ctl.opt)
+}
+
+func (ctl *rdtctl) defaultOptions() interface{} {
+	return &rdt.Config{}
+}
+
+// GetClasses returns all available RDT classes
+func GetClasses() []rdt.CtrlGroup {
+	return rdt.GetClasses()
 }
 
 // rdtError creates an RDT-controller-specific formatted error message.
@@ -223,6 +253,5 @@ func rdtError(format string, args ...interface{}) error {
 // Register us as a controller.
 func init() {
 	control.Register(RDTController, "RDT controller", getRDTController())
-	config.GetModule(rdt.ConfigModuleName).AddNotify(getRDTController().configNotify)
-	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
+	config.Register(ConfigModuleName, "RDT control", getRDTController().opt, getRDTController().defaultOptions)
 }

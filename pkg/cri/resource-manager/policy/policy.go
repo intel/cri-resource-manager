@@ -27,10 +27,10 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/blockio"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/rdt"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	"github.com/intel/cri-resource-manager/pkg/rdt"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
