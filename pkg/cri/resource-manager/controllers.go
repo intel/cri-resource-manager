@@ -19,5 +19,6 @@ import (
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/blockio"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/cri"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/memory"
+	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/page-migrate"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/rdt"
 )

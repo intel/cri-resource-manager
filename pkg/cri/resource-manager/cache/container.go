@@ -811,6 +811,15 @@ func (c *container) GetToptierLimit() int64 {
 	return c.ToptierLimit
 }
 
+func (c *container) SetPageMigration(p *PageMigrate) {
+	c.PageMigrate = p
+	c.markPending(PageMigration)
+}
+
+func (c *container) GetPageMigration() *PageMigrate {
+	return c.PageMigrate
+}
+
 func (c *container) SetCRIRequest(req interface{}) error {
 	if c.req != nil {
 		return cacheError("can't set pending container request: another pending")
