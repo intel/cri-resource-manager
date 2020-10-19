@@ -80,16 +80,18 @@ fi
 
 # Find TESTS_DIR root by looking for POLICY_DIR/*.cfg. If TESTS_DIR was not the
 # root dir, then execute tests only under TESTS_DIR.
-if compgen -G "$TESTS_DIR/*/*.cfg" >/dev/null; then
+root_dir_glob="*.test-suite"
+# shellcheck disable=SC2053
+if [[ "$(basename "$TESTS_DIR")" == $root_dir_glob ]]; then
     TESTS_ROOT_DIR="$TESTS_DIR"
-elif compgen -G "$TESTS_DIR/../*/*.cfg" >/dev/null; then
+elif [[ "$(basename "$(realpath "$TESTS_DIR"/..)")" == $root_dir_glob ]]; then
     TESTS_ROOT_DIR=$(realpath "$TESTS_DIR/..")
     TESTS_POLICY_FILTER=$(basename "${TESTS_DIR}")
-elif compgen -G "$TESTS_DIR/../../*/*.cfg" >/dev/null; then
+elif [[ "$(basename "$(realpath "$TESTS_DIR"/../..)")" == $root_dir_glob ]]; then
     TESTS_ROOT_DIR=$(realpath "$TESTS_DIR/../..")
     TESTS_POLICY_FILTER=$(basename "$(dirname "${TESTS_DIR}")")
     TESTS_TOPOLOGY_FILTER=$(basename "${TESTS_DIR}")
-elif compgen -G "$TESTS_DIR/../../../*/*.cfg" >/dev/null; then
+elif [[ "$(basename "$(realpath "$TESTS_DIR"/../../..)")" == $root_dir_glob ]]; then
     TESTS_ROOT_DIR=$(realpath "$TESTS_DIR/../../..")
     TESTS_POLICY_FILTER=$(basename "$(dirname "$(dirname "${TESTS_DIR}")")")
     TESTS_TOPOLOGY_FILTER=$(basename "$(dirname "${TESTS_DIR}")")
