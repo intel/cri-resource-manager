@@ -235,18 +235,66 @@ vm-monitor() { # script API
     echo ""
 }
 
-vm-wait-process() {
-    # parameters: "process" and "timeout" (optional, default 30 seconds)
-    process=$1
-    timeout=${2-30}
-    if ! vm-command-q "retry=$timeout; until ps -A | grep -q $process; do retry=\$(( \$retry - 1 )); [ \"\$retry\" == \"0\" ] && exit 1; sleep 1; done"; then
-        error "waiting for process \"$process\" timed out"
+vm-wait-process() { # script API
+    # Usage: vm-wait-process [--timeout TIMEOUT] PROCESS
+    #
+    # Wait for a PROCESS (string) to appear in process list (ps -A output).
+    # The default TIMEOUT is 30 seconds.
+    local process timeout invalid
+    timeout=30
+    while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
+        case "$1" in
+            --timeout)
+                timeout="$2"
+                shift; shift
+                ;;
+            *)
+                invalid="${invalid}${invalid:+,}\"$1\""
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$invalid" ]; then
+        error "invalid options: $invalid"
+        return 1
+    fi
+    process="$1"
+    vm-run-until --timeout "$timeout" "ps -A | grep -q \"$process\""
+}
+
+vm-run-until() { # script API
+    # Usage: vm-run-until [--timeout TIMEOUT] CMD
+    #
+    # Keep running CMD (string) until it exits successfully.
+    # The default TIMEOUT is 30 seconds.
+    local cmd timeout invalid
+    timeout=30
+    while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
+        case "$1" in
+            --timeout)
+                timeout="$2"
+                shift; shift
+                ;;
+            *)
+                invalid="${invalid}${invalid:+,}\"$1\""
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$invalid" ]; then
+        error "invalid options: $invalid"
+        return 1
+    fi
+    cmd="$1"
+    if ! vm-command-q "retry=$timeout; until $cmd; do retry=\$(( \$retry - 1 )); [ \"\$retry\" == \"0\" ] && exit 1; sleep 1; done"; then
+        error "waiting for command \"$cmd\" to exit successfully timed out after $timeout s"
     fi
 }
 
 vm-write-file() {
     local vm_path_file="$1"
-    local file_content_b64="$(base64 <<<$2)"
+    local file_content_b64
+    file_content_b64="$(base64 <<<"$2")"
     vm-command-q "mkdir -p $(dirname "$vm_path_file"); echo -n \"$file_content_b64\" | base64 -d > \"$vm_path_file\""
 }
 
