@@ -15,15 +15,9 @@
 package memtier
 
 import (
-	"fmt"
-	"time"
-
 	config "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 )
-
-// Duration is an alias for time.Duration.
-type Duration time.Duration
 
 // Options captures our configurable policy parameters.
 type options struct {
@@ -38,32 +32,9 @@ type options struct {
 	// FakeHints are the set of fake TopologyHints to use for testing purposes.
 	FakeHints fakehints `json:",omitempty"`
 
-	DirtyBitScanPeriod Duration `json:"DirtyBitScanPeriod"`
-	PageMovePeriod     Duration `json:"PageMovePeriod"`
-	PageMoveCount      uint     `json:"PageMoveCount"`
-}
-
-// MarshalJSON converts Duration to JSON string.
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + time.Duration(d).String() + "\""), nil
-}
-
-// UnmarshalJSON converts JSON string to Duration.
-func (d *Duration) UnmarshalJSON(data []byte) error {
-	if len(data) < 2 {
-		return fmt.Errorf("invalid Duration data")
-	}
-	parsed, err := time.ParseDuration(string(data[1 : len(data)-1]))
-	if err != nil {
-		return err
-	}
-	*d = Duration(parsed)
-	return nil
-}
-
-// String returns the value of Duration as a string.
-func (d *Duration) String() string {
-	return time.Duration(*d).String()
+	DirtyBitScanPeriod config.Duration `json:"DirtyBitScanPeriod"`
+	PageMovePeriod     config.Duration `json:"PageMovePeriod"`
+	PageMoveCount      uint            `json:"PageMoveCount"`
 }
 
 // Our runtime configuration.
