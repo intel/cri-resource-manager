@@ -34,7 +34,45 @@ const (
 
 // migration implements the controller for memory page migration.
 type migration struct {
-	cache cache.Cache // resource manager cache
+	cache      cache.Cache           // resource manager cache
+	containers map[string]*container // containers we migrate
+}
+
+//
+// The resource manager serializes access to the cache during request
+// processing, event processing, and configuration updates by locking
+// the resource-manager for each of these. Since controller hooks are
+// invoked either as part of processing a request or an event, access
+// to the cache from hooks is properly serialized.
+//
+// Page scanning or migration on the other hand happen asynchronously
+// from dedicated goroutines. In order to avoid having to serialize
+// access to the cache for these, we track and cache locally just enough
+// data about containers that we can perform these actions completely on
+// our own, without the need to access the resource manager cache at all.
+//
+// An alternative would have been to duplicate what we had originally in
+// the policy:
+//  - introduce controller events akin to policy events
+//  - have the resource-manager call controller event handlers with the
+//    lock held
+//  - periodically inject a controller event when we want to scan pages
+//  - perform page scanning or demotion from the event handler with the
+//    resource-manager lock held
+//
+// However that would have destroyed one of the goals of splitting page
+// scanning and migration out to a controller of its own, which was to
+// perform these potentially time consuming actions without blocking
+// concurrent processing of requests or events.
+//
+
+// container is the per container data we track locally.
+type container struct {
+	cacheID    string
+	ID         string
+	prettyName string
+	parentDir  string
+	pm         *cache.PageMigrate
 }
 
 // Our logger instance.
@@ -46,7 +84,9 @@ var singleton *migration
 // getMigrationController returns our singleton controller instance.
 func getMigrationController() *migration {
 	if singleton == nil {
-		singleton = &migration{}
+		singleton = &migration{
+			containers: make(map[string]*container),
+		}
 	}
 	return singleton
 }
@@ -54,6 +94,7 @@ func getMigrationController() *migration {
 // Start prepares the controller for resource control/decision enforcement.
 func (m *migration) Start(cache cache.Cache, client client.Client) error {
 	m.cache = cache
+	m.syncWithCache()
 	return nil
 }
 
@@ -73,27 +114,118 @@ func (m *migration) PreStartHook(cache.Container) error {
 
 // PostStartHook is the controller's post-start hook.
 func (m *migration) PostStartHook(cc cache.Container) error {
+	err := m.insertContainer(cc)
 	cc.ClearPending(PageMigrationController)
-	return nil
+	return err
 }
 
 // PostUpdateHook is the controller's post-update hook.
 func (m *migration) PostUpdateHook(cc cache.Container) error {
+	m.updateContainer(cc)
 	cc.ClearPending(PageMigrationController)
 	return nil
 }
 
 // PostStopHook is the controller's post-stop hook.
 func (m *migration) PostStopHook(cc cache.Container) error {
+	m.deleteContainer(cc)
 	return nil
 }
 
-// migrationError creates a controller-specific formatted error message.
-func migrationError(format string, args ...interface{}) error {
-	return fmt.Errorf("page-migrate: "+format, args...)
+// syncWithCache synchronizes tracked containers with the cache.
+func (m *migration) syncWithCache() {
+	m.Lock()
+	defer m.Unlock()
+	m.containers = make(map[string]*container)
+	for _, cc := range m.cache.GetContainers() {
+		m.insertContainer(cc)
+	}
+}
+
+// insertContainer creates a local copy of the container.
+func (m *migration) insertContainer(cc cache.Container) error {
+	pm := cc.GetPageMigration()
+	if pm == nil {
+		return nil
+	}
+
+	pod, ok := cc.GetPod()
+	if !ok {
+		return migrationError("can't find pod for container %s",
+			cc.PrettyName())
+	}
+
+	c := &container{
+		cacheID:    cc.GetCacheID(),
+		ID:         cc.GetID(),
+		prettyName: cc.PrettyName(),
+		parentDir:  pod.GetCgroupParentDir(),
+		pm:         pm.Clone(),
+	}
+	if c.parentDir == "" {
+		return migrationError("can't find cgroup parent dir for container %s",
+			c.prettyName)
+	}
+
+	m.containers[c.cacheID] = c
+
+	return nil
+}
+
+// updateContainer updates the local copy of the container.
+func (m *migration) updateContainer(cc cache.Container) error {
+	pm := cc.GetPageMigration()
+	if pm == nil {
+		delete(m.containers, cc.GetCacheID())
+		return nil
+	}
+
+	c, ok := m.containers[cc.GetCacheID()]
+	if !ok {
+		return m.insertContainer(cc)
+	}
+
+	c.pm = pm.Clone()
+	return nil
+}
+
+// deleteContainer creates a local copy of the container.
+func (m *migration) deleteContainer(cc cache.Container) error {
+	delete(m.containers, cc.GetCacheID())
+	return nil
+}
+
+// GetCacheID replicates the respective cache.Container function.
+func (c *container) GetCacheID() string {
+	return c.cacheID
+}
+
+// GetID replicates the respective cache.Container function.
+func (c *container) GetID() string {
+	return c.id
+}
+
+// GetCgroupParentDir replicates the respective cache.Pod function.
+func (c *container) GetCgroupParentDir() string {
+	return c.parentDir
+}
+
+// GetPageMigration replicates the respective cache.Container function.
+func (c *container) GetPageMigration() *cache.PageMigrate {
+	return c.pm
+}
+
+// PrettyName replicates the respective cache.Container function.
+func (c *container) PrettyName() string {
+	return c.prettyName
 }
 
 // init registers this controller.
 func init() {
 	control.Register(PageMigrationController, "page migration controller", getMigrationController())
+}
+
+// migrationError creates a controller-specific formatted error message.
+func migrationError(format string, args ...interface{}) error {
+	return fmt.Errorf("page-migrate: "+format, args...)
 }
