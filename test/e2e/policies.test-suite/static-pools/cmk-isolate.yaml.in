@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  labels:
+    app: ${NAME}
+spec:
+  terminationGracePeriodSeconds: 1
+  tolerations:
+    - key: 'cmk'
+      operator: 'Equal'
+      value: 'true'
+      effect: 'NoSchedule'
+  containers:
+    - name: ${NAME}c0
+      image: busybox
+      env:
+$([ -z $STP_POOL ] || echo "
+        - name: STP_POOL
+          value: '${STP_POOL}'")
+$([ -z $STP_SOCKET_ID ] || echo "
+        - name: STP_SOCKET_ID
+          value: '${STP_SOCKET_ID}'")
+$([ "$CMDSPLIT" = "command_all" ] && echo "
+      command: ['cmk', 'isolate' $CMK_ISOLATE, 'sh', '-c', 'while :; do echo ${NAME}c0 CMK_CPUS_ASSIGNED=\"\$CMK_CPUS_ASSIGNED\"; sleep 1; done']"
+  [ "$CMDSPLIT" = "command_cmk_sh" ] && echo "
+      command: ['cmk', 'isolate' $CMK_ISOLATE, 'sh', '-c']
+      args: ['while :; do echo ${NAME}c0 CMK_CPUS_ASSIGNED=\"\$CMK_CPUS_ASSIGNED\"; sleep 1; done']"
+  [ "$CMDSPLIT" = "command_cmk" ] && echo "
+      command: ['cmk', 'isolate' $CMK_ISOLATE]
+      args: ['sh', '-c', 'while :; do echo ${NAME}c0 CMK_CPUS_ASSIGNED=\"\$CMK_CPUS_ASSIGNED\"; sleep 1; done']")
+      resources:
+        requests:
+          cpu: ${CPU}
+          $([ -z $EXCLCORES ] || echo "cmk.intel.com/exclusive-cores: '${EXCLCORES}'")
+        limits:
+          cpu: ${CPU}
+          $([ -z $EXCLCORES ] || echo "cmk.intel.com/exclusive-cores: '${EXCLCORES}'")

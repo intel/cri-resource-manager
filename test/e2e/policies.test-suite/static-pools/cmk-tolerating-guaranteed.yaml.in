@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  labels:
+    app: ${NAME}
+spec:
+  tolerations:
+    - {'key': 'cmk', 'operator': 'Equal', 'value': 'true', 'effect': 'NoSchedule'}
+  containers:
+  $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
+  - name: ${NAME}c$(( contnum - 1 ))
+    image: busybox
+    command:
+      - sh
+      - -c
+      - echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: ${CPU}
+        memory: '${MEM}'
+      limits:
+        cpu: ${CPU}
+        memory: '${MEM}'
+  "; done )
+  terminationGracePeriodSeconds: 1
