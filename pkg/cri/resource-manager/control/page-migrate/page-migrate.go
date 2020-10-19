@@ -89,9 +89,8 @@ func getMigrationController() *migration {
 	if singleton == nil {
 		singleton = &migration{
 			containers: make(map[string]*container),
-			demoter:    &demoter{pageMover: &linuxPageMover{}},
 		}
-		singleton.demoter.migration = singleton
+		singleton.demoter = newDemoter(singleton)
 	}
 	return singleton
 }
@@ -100,11 +99,13 @@ func getMigrationController() *migration {
 func (m *migration) Start(cache cache.Cache, client client.Client) error {
 	m.cache = cache
 	m.syncWithCache()
+	m.demoter.Reconfigure()
 	return nil
 }
 
 // Stop shuts down the controller.
 func (m *migration) Stop() {
+	m.demoter.Stop()
 }
 
 // PreCreateHook is the controller's pre-create hook.
