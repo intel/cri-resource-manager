@@ -10,9 +10,15 @@ BIN_DIR=${bindir-$(realpath "$SCRIPT_DIR/../../bin")}
 OUTPUT_DIR=${outdir-$SCRIPT_DIR/output}
 COMMAND_OUTPUT_DIR=$OUTPUT_DIR/commands
 
-source $LIB_DIR/command.bash
-source $LIB_DIR/host.bash
-source $LIB_DIR/vm.bash
+# shellcheck disable=SC1091
+# shellcheck source=../lib/command.bash
+source "$LIB_DIR/command.bash"
+# shellcheck disable=SC1091
+# shellcheck source=../lib/host.bash
+source "$LIB_DIR/host.bash"
+# shellcheck disable=SC1091
+# shellcheck source=../lib/vm.bash
+source "$LIB_DIR/vm.bash"
 
 usage() {
     echo "$DEMO_TITLE"
@@ -44,7 +50,7 @@ error() {
 out() {
     if [ -n "$PV" ]; then
         speed=${speed-10}
-        echo "$1" | $PV $speed
+        echo "$1" | $PV "$speed"
     else
         echo "$1"
     fi
@@ -59,7 +65,7 @@ record() {
 
 screen-create-vm() {
     speed=60 out "### Running the demo in VM \"$vm\"."
-    host-create-vm $vm
+    host-create-vm "$vm"
     vm-networking
     if [ -z "$VM_IP" ]; then
         error "creating VM failed"
@@ -168,11 +174,11 @@ else
 fi
 
 # Prepare for test/demo
-mkdir -p $OUTPUT_DIR
-mkdir -p $COMMAND_OUTPUT_DIR
-rm -f $COMMAND_OUTPUT_DIR/0*
-( echo x > $OUTPUT_DIR/x && rm -f $OUTPUT_DIR/x ) || {
-    error "output directory outdir=$OUTPUT_DIR is not writable"
+mkdir -p "$OUTPUT_DIR"
+mkdir -p "$COMMAND_OUTPUT_DIR"
+rm -f "$COMMAND_OUTPUT_DIR"/0*
+( echo x > "$OUTPUT_DIR"/x && rm -f "$OUTPUT_DIR"/x ) || {
+    error "output directory outdir=\"$OUTPUT_DIR\" is not writable"
 }
 
 if [ "$binsrc" == "local" ]; then
@@ -227,8 +233,8 @@ fi
 # Summarize results
 SUMMARY_FILE="$OUTPUT_DIR/summary.txt"
 echo -n "" > "$SUMMARY_FILE" || error "cannot write summary to \"$SUMMARY_FILE\""
-first_speed=$(grep "^md5sum read speed:" $COMMAND_OUTPUT_DIR/0* | head -n 1 | awk '{print $4}')
-last_speed=$(grep "^md5sum read speed:" $COMMAND_OUTPUT_DIR/0* | tail -n 1 | awk '{print $4}')
+first_speed="$(grep "^md5sum read speed:" "$COMMAND_OUTPUT_DIR"/0* | head -n 1 | awk '{print $4}')"
+last_speed="$(grep "^md5sum read speed:" "$COMMAND_OUTPUT_DIR"/0* | tail -n 1 | awk '{print $4}')"
 echo "First md5sum read speed (512 kBps throttling): $first_speed kBps" >> "$SUMMARY_FILE"
 echo "Last  md5sum read speed (2 MBps throttling): $last_speed kBps" >> "$SUMMARY_FILE"
 # Declare verdict in test mode
