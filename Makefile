@@ -266,7 +266,8 @@ install-systemd-%:
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    df=$${f##*/}; df=$${df%.in}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(UNITDIR)/$$df; \
-	    sed -E -i "s:__DEFAULTDIR__:$(DEFAULTDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
+	    sed -E -i -e "s:__DEFAULTDIR__:$(DEFAULTDIR):g" \
+	              -e "s:__BINDIR__:$(BINDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
 	done
 
 install-sysconf-%:
