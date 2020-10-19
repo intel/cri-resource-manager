@@ -24,7 +24,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -40,8 +39,6 @@ const (
 
 	// ColdStartDone is the event generated for the end of a container cold start period.
 	ColdStartDone = "cold-start-done"
-	// DirtyBitReset is the event generated for the reseting of the soft-dirty bits for all processes in the containers.
-	DirtyBitReset = "dirty-bit-reset"
 )
 
 // allocations is our cache.Cachable for saving resource allocations in the cache.
@@ -52,22 +49,21 @@ type allocations struct {
 
 // policy is our runtime state for the memtier policy.
 type policy struct {
-	options        policyapi.BackendOptions  // options we were created or reconfigured with
-	cache          cache.Cache               // pod/container cache
-	sys            system.System             // system/HW topology info
-	allowed        cpuset.CPUSet             // bounding set of CPUs we're allowed to use
-	reserved       cpuset.CPUSet             // system-/kube-reserved CPUs
-	reserveCnt     int                       // number of CPUs to reserve if given as resource.Quantity
-	isolated       cpuset.CPUSet             // (our allowed set of) isolated CPUs
-	nodes          map[string]Node           // pool nodes by name
-	pools          []Node                    // pre-populated node slice for scoring, etc...
-	root           Node                      // root of our pool/partition tree
-	nodeCnt        int                       // number of pools
-	depth          int                       // tree depth
-	allocations    allocations               // container pool assignments
-	cpuAllocator   cpuallocator.CPUAllocator // CPU allocator used by the policy
-	dynamicDemoter Demoter                   // Dynamic demoter for moving memory pages
-	coldstartOff   bool                      // coldstart forced off (have movable PMEM zones)
+	options      policyapi.BackendOptions  // options we were created or reconfigured with
+	cache        cache.Cache               // pod/container cache
+	sys          system.System             // system/HW topology info
+	allowed      cpuset.CPUSet             // bounding set of CPUs we're allowed to use
+	reserved     cpuset.CPUSet             // system-/kube-reserved CPUs
+	reserveCnt   int                       // number of CPUs to reserve if given as resource.Quantity
+	isolated     cpuset.CPUSet             // (our allowed set of) isolated CPUs
+	nodes        map[string]Node           // pool nodes by name
+	pools        []Node                    // pre-populated node slice for scoring, etc...
+	root         Node                      // root of our pool/partition tree
+	nodeCnt      int                       // number of pools
+	depth        int                       // tree depth
+	allocations  allocations               // container pool assignments
+	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
+	coldstartOff bool                      // coldstart forced off (have movable PMEM zones)
 }
 
 // Make sure policy implements the policy.Backend interface.
@@ -100,8 +96,6 @@ func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 
 	config.GetModule(PolicyPath).AddNotify(p.configNotify)
 
-	p.dynamicDemoter = NewDemoter(p, &linuxPageMover{})
-
 	p.root.Dump("<pre-start>")
 
 	return p
@@ -128,10 +122,6 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	// during startup and trust users to either not fiddle with memory
 	// or restart us if they do.
 	p.checkColdstartOff()
-
-	// TODO: the dirty bit reset timer should only be started if there is a container
-	// for which there is a demotion possiblity.
-	p.dynamicDemoter.Reconfigure(opt.DirtyBitScanPeriod, opt.PageMovePeriod, opt.PageMoveCount)
 
 	p.root.Dump("<post-start>")
 
@@ -259,50 +249,6 @@ func (p *policy) HandleEvent(e *events.Policy) (bool, error) {
 		}
 		log.Info("finishing coldstart period for %s", c.PrettyName())
 		return p.finishColdStart(c)
-	case DirtyBitReset:
-		for _, container := range p.cache.GetContainers() {
-			if container.GetNamespace() == kubernetes.NamespaceSystem {
-				// The system containers should not be moved.
-				continue
-			}
-			grant, ok := p.allocations.grants[container.GetCacheID()]
-			if !ok {
-				log.Info("%s event: no grant found for container %s", e.Type, container.GetCacheID())
-				continue
-			}
-			memType := grant.GetMemoryNode().GetMemoryType()
-			if memType&memoryDRAM == 0 || memType&memoryPMEM == 0 {
-				log.Info("%s event: not demoting pages, memory type %v for container %v", e.Type, memType, container.GetCacheID())
-				// No demotion possibility.
-				continue
-			}
-			pmemNodes := grant.GetMemoryNode().GetMemset(memoryPMEM)
-			dramNodes := grant.GetMemoryNode().GetMemset(memoryDRAM)
-
-			// Gather the known pages which need to be moved.
-			pagePool, err := p.dynamicDemoter.GetPagesForContainer(container, dramNodes)
-			if err != nil {
-				log.Error("%s event: failed to get pages for container %v", e.Type, container.GetCacheID())
-				continue
-			}
-
-			count := 0
-			for _, pages := range pagePool.pages {
-				count += len(pages)
-			}
-			log.Debug("%s event: %d pages for (maybe) demoting for %v", e.Type, count, container.GetCacheID())
-
-			// Reset the dirty bit from all pages.
-			p.dynamicDemoter.ResetDirtyBit(container)
-
-			// Give the pages to the page moving goroutine. Copy the page pool so that there's no race.
-			p.dynamicDemoter.UpdateDemoter(container.GetCacheID(), copyPagePool(pagePool), pmemNodes.Clone())
-		}
-		cids := p.dynamicDemoter.UnusedDemoters(p.cache.GetContainers())
-		for _, cid := range cids {
-			p.dynamicDemoter.StopDemoter(cid)
-		}
-		return false, nil
 	}
 	return false, nil
 }
@@ -405,11 +351,6 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("  - pin containers to memory: %v", opt.PinMemory)
 	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
 	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
-	log.Info("  - page scan period: %s", opt.DirtyBitScanPeriod.String())
-	log.Info("  - page move period: %s", opt.PageMovePeriod.String())
-	log.Info("  - page move count: %d", opt.PageMoveCount)
-
-	p.dynamicDemoter.Reconfigure(opt.DirtyBitScanPeriod, opt.PageMovePeriod, opt.PageMoveCount)
 
 	// TODO: We probably should release and reallocate resources for all containers
 	//   to honor the latest configuration. Depending on the changes that might be

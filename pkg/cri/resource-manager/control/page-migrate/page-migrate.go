@@ -16,6 +16,7 @@ package pagemigrate
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -35,7 +36,9 @@ const (
 // migration implements the controller for memory page migration.
 type migration struct {
 	cache      cache.Cache           // resource manager cache
+	sync.Mutex                       // protect access from multiple goroutines
 	containers map[string]*container // containers we migrate
+	demoter    *demoter              // demoter adopted from memtier policy
 }
 
 //
@@ -69,7 +72,7 @@ type migration struct {
 // container is the per container data we track locally.
 type container struct {
 	cacheID    string
-	ID         string
+	id         string
 	prettyName string
 	parentDir  string
 	pm         *cache.PageMigrate
@@ -86,7 +89,9 @@ func getMigrationController() *migration {
 	if singleton == nil {
 		singleton = &migration{
 			containers: make(map[string]*container),
+			demoter:    &demoter{pageMover: &linuxPageMover{}},
 		}
+		singleton.demoter.migration = singleton
 	}
 	return singleton
 }
@@ -114,6 +119,8 @@ func (m *migration) PreStartHook(cache.Container) error {
 
 // PostStartHook is the controller's post-start hook.
 func (m *migration) PostStartHook(cc cache.Container) error {
+	m.Lock()
+	defer m.Unlock()
 	err := m.insertContainer(cc)
 	cc.ClearPending(PageMigrationController)
 	return err
@@ -121,6 +128,8 @@ func (m *migration) PostStartHook(cc cache.Container) error {
 
 // PostUpdateHook is the controller's post-update hook.
 func (m *migration) PostUpdateHook(cc cache.Container) error {
+	m.Lock()
+	defer m.Unlock()
 	m.updateContainer(cc)
 	cc.ClearPending(PageMigrationController)
 	return nil
@@ -128,6 +137,8 @@ func (m *migration) PostUpdateHook(cc cache.Container) error {
 
 // PostStopHook is the controller's post-stop hook.
 func (m *migration) PostStopHook(cc cache.Container) error {
+	m.Lock()
+	defer m.Unlock()
 	m.deleteContainer(cc)
 	return nil
 }
@@ -157,7 +168,7 @@ func (m *migration) insertContainer(cc cache.Container) error {
 
 	c := &container{
 		cacheID:    cc.GetCacheID(),
-		ID:         cc.GetID(),
+		id:         cc.GetID(),
 		prettyName: cc.PrettyName(),
 		parentDir:  pod.GetCgroupParentDir(),
 		pm:         pm.Clone(),
