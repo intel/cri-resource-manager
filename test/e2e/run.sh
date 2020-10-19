@@ -446,6 +446,40 @@ sleep() { # script API
     host-command "sleep $*"
 }
 
+extended-resources() { # script API
+    # Usage: extended-resources <add|remove> RESOURCE [VALUE]
+    #
+    # Examples:
+    #   extended-resources remove cmk.intel.com/exclusive-cpus
+    #   extended-resources add cmk.intel.com/exclusive-cpus 4
+    local action="$1"
+    local resource="$2"
+    local value="$3"
+    local resource_escaped="${resource/\//~1}"
+    if [ -z "$resource" ]; then
+        error "extended-resource: missing resource"
+        return 1
+    fi
+    # make sure kubectl proxy is running
+    vm-command-q "ss -ltn | grep -q 127.0.0.1:8001 || { kubectl proxy &>/dev/null </dev/null & sleep 2 ; }"
+    case $action in
+        add)
+            if [ -z "$value" ]; then
+                error "extended-resource: missing value to add to resource $resource"
+                return 1
+            fi
+            vm-command "curl --header 'Content-Type: application/json-patch+json' --request PATCH --data '[{\"op\": \"add\", \"path\": \"/status/capacity/$resource_escaped\", \"value\": \"$value\"}]' http://localhost:8001/api/v1/nodes/\$(hostname)/status"
+            ;;
+        remove)
+            vm-command "curl --header 'Content-Type: application/json-patch+json' --request PATCH --data '[{\"op\": \"remove\", \"path\": \"/status/capacity/$resource_escaped\"}]' http://localhost:8001/api/v1/nodes/\$(hostname)/status"
+            ;;
+        *)
+            error "extended-resource: invalid action \"$action\""
+            return 1
+            ;;
+    esac
+}
+
 pyexec() { # script API
     # Usage: pyexec [PYTHONCODE...]
     #
