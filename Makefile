@@ -261,7 +261,7 @@ install-systemd-%:
 	for f in $$(find $$dir -name \*.service -o -name \*.socket); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f.in; \
-	done
+	done; \
 	for f in $$(find $$dir -name \*.service.in -o -name \*.socket.in); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    df=$${f##*/}; df=$${df%.in}; \
