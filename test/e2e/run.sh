@@ -71,6 +71,8 @@ usage() {
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
     echo "    cri_resmgr_extra_args: arguments to be added on cri-resmgr"
     echo "             command line when launched"
+    echo "    cri_resmgr_agent_extra_args: arguments to be added on"
+    echo "              cri-resmgr-agent command line when launched"
     echo "    vm_files: \"serialized\" associative array of files to be created on vm"
     echo "             associative array syntax:"
     echo "             vm_files['/path/file']=file:/path/on/host"
@@ -82,6 +84,7 @@ usage() {
     echo "             vm_files=\$(declare -p vm_files) ./run.sh"
     echo "    code:    Variable that contains test script code to be run"
     echo "             if SCRIPT is not given."
+    echo "    py_consts: Python code that runs always before pyexec in SCRIPT."
     echo ""
     echo "Default test input VARs: ./run.sh help defaults"
     echo ""
@@ -464,6 +467,8 @@ pyexec() { # script API
     # Note that variables are *not* updated when pyexec is called.
     # You can update the variables by running "verify" without expressions.
     #
+    # Code in environment variable py_consts runs before PYTHONCODE.
+    #
     # Example:
     #   verify ; pyexec 'import pprint; pprint.pprint(allowed)'
     PYEXEC_STATE_PY="$OUTPUT_DIR/pyexec_state.py"
@@ -472,8 +477,12 @@ pyexec() { # script API
     local last_exit_status=0
     {
         echo "import pprint; pp=pprint.pprint"
+        echo "# \$py_allowed:"
         echo -e "$py_allowed"
+        echo "# \$py_cache:"
         echo -e "$py_cache"
+        echo "# \$py_consts:"
+        echo -e "$py_consts"
     } > "$PYEXEC_STATE_PY"
     for PYTHONCODE in "$@"; do
         {
@@ -738,6 +747,8 @@ test-user-code() {
 }
 
 # Validate parameters
+input_var_names="mode user_script_file vm speed binsrc reinstall_cri_resmgr outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
+
 INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
@@ -745,17 +756,19 @@ distro=${distro:=$DEFAULT_DISTRO}
 cri=${cri:=containerd}
 TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
 vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
-vm_files=${vm_files-""}
-cri_resmgr_cfg=${cri_resmgr_cfg-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
-cri_resmgr_extra_args=${cri_resmgr_extra_args-""}
-cleanup=${cleanup-0}
-reinstall_cri_resmgr=${reinstall_cri_resmgr-0}
-topology=${topology-'[
+vm_files=${vm_files:-""}
+cri_resmgr_cfg=${cri_resmgr_cfg:-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
+cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
+cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
+cleanup=${cleanup:-0}
+reinstall_cri_resmgr=${reinstall_cri_resmgr:-0}
+py_consts="${py_consts:-''}"
+topology=${topology:-'[
     {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
     {"nvmem": "8G", "node-dist": {"5": 28, "0": 17}},
     {"nvmem": "8G", "node-dist": {"2": 17}}
     ]'}
-code=${code-"
+code=${code:-"
 CPU=1 create guaranteed # creates pod 0, 1 CPU taken
 report allowed
 CPU=2 create guaranteed # creates pod 1, 3 CPUs taken
@@ -779,7 +792,7 @@ CPU=2 n=2 create guaranteed # creates pod 8 and 9, 7 CPUs taken
 verify \\
     'len(set.union(cpus[\"pod0c0\"], cpus[\"pod1c0\"], cpus[\"pod8c0\"], cpus[\"pod9c0\"])) == 7'
 "}
-warning_delay=${warning_delay-5}
+warning_delay=${warning_delay:-5}
 
 yaml_in_defaults="CPU=1 MEM=100M ISO=true CPUREQ=1 CPULIM=2 MEMREQ=100M MEMLIM=200M CONTCOUNT=1"
 
@@ -846,6 +859,14 @@ rm -f "$COMMAND_OUTPUT_DIR"/0*
 
 SUMMARY_FILE="$OUTPUT_DIR/summary.txt"
 echo -n "" > "$SUMMARY_FILE" || error "cannot write summary to \"$SUMMARY_FILE\""
+
+## Save test inputs and defaults for the record
+mkdir -p "$OUTPUT_DIR/input"; rm -f "$OUTPUT_DIR/input/*"
+for var in $input_var_names; do
+    if [ -n "${!var}" ]; then
+        echo -e "${!var}" > "$OUTPUT_DIR/input/${var}.var"
+    fi
+done
 
 if [ "$binsrc" == "local" ]; then
     [ -f "${BIN_DIR}/cri-resmgr" ] || error "missing \"${BIN_DIR}/cri-resmgr\""
