@@ -39,6 +39,7 @@ INSTALL    := install
 PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 UNITDIR    ?= $(PREFIX)/lib/systemd/system
+DOCDIR     ?= $(PREFIX)/share/doc/cri-resource-manager
 SYSCONFDIR ?= /etc
 CONFIGDIR  ?= /etc/cri-resmgr
 DEFAULTDIR ?= $(shell \
@@ -290,6 +291,15 @@ install-config-%:
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df}; \
 	done
 
+install-minimal-docs:
+	$(Q)echo "Installing minimal documentation to $(DOCDIR)..."; \
+	$(INSTALL) -d $(DESTDIR)$(DOCDIR) && \
+	for f in LICENSE docs/security.md; do \
+	    echo "  $$f in $(DESTDIR)$(DOCDIR)..."; \
+	    df=$${f##*/}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(DOCDIR)/$${df}; \
+	done
+
 clean-%:
 	$(Q)bin=$(patsubst clean-%,%,$@); src=cmd/$$bin; \
 	echo "Cleaning up $$bin..."; \
@@ -453,6 +463,19 @@ vendored-dist: dist
 	rm -f vendored-$$tarball* && \
 	$(TAR) -cf vendored-$$tarball $$tardir && \
 	$(GZIP) vendored-$$tarball && \
+	rm -fr $$tardir
+
+binary-dist: build
+	$(Q)tarball=cri-resource-manager-$(TAR_VERSION).$$(uname -m).tar; \
+	echo "Creating binary dist tarball $$tarball..."; \
+	tardir=binary-dist; \
+	rm -fr $$tarball* $$tardir && \
+	$(MAKE) DESTDIR=$$tardir \
+	        PREFIX=/opt/intel \
+	        DEFAULTDIR=/etc/default \
+	        UNITDIR=$(SYSCONFDIR)/systemd/system install install-minimal-docs && \
+	$(TAR) -C $$tardir -cf $$tarball . && \
+	$(GZIP) $$tarball && \
 	rm -fr $$tardir
 
 spec: clean-spec $(SPEC_FILES)
