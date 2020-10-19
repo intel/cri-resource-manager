@@ -31,10 +31,6 @@ type options struct {
 	PreferShared bool `json:"PreferSharedCPUs"`
 	// FakeHints are the set of fake TopologyHints to use for testing purposes.
 	FakeHints fakehints `json:",omitempty"`
-
-	DirtyBitScanPeriod config.Duration `json:"DirtyBitScanPeriod"`
-	PageMovePeriod     config.Duration `json:"PageMovePeriod"`
-	PageMoveCount      uint            `json:"PageMoveCount"`
 }
 
 // Our runtime configuration.
@@ -58,14 +54,11 @@ func (fh *fakehints) merge(hints fakehints) {
 // defaultOptions returns a new options instance, all initialized to defaults.
 func defaultOptions() interface{} {
 	return &options{
-		PinCPU:             true,
-		PinMemory:          true,
-		PreferIsolated:     true,
-		PreferShared:       false,
-		FakeHints:          make(fakehints),
-		DirtyBitScanPeriod: 0,
-		PageMovePeriod:     0,
-		PageMoveCount:      0,
+		PinCPU:         true,
+		PinMemory:      true,
+		PreferIsolated: true,
+		PreferShared:   false,
+		FakeHints:      make(fakehints),
 	}
 }
 

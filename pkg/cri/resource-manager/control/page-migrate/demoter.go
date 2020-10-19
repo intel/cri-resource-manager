@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memtier
+package pagemigrate
 
 import (
 	"encoding/binary"
@@ -25,8 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
@@ -63,7 +61,7 @@ type addrRange struct {
 }
 
 type demoter struct {
-	policy *policy // Policy backpointer, needed for sending events
+	migration *migration // controller backpointer
 
 	// Finding pages
 	dirtyBitReset    time.Ticker      // Ticker for resetting the dirty bits.
@@ -75,21 +73,6 @@ type demoter struct {
 	containerDemoters map[string]chan interface{} // Channel for sending pagemap updates to demoters.
 	pageMoveDuration  time.Duration               // How often should we move pages for a container.
 	pageMoveCount     uint                        // How many pages to move at once.
-}
-
-// Demoter dynamically demotes pages from DRAM to PMEM.
-type Demoter interface {
-	Reconfigure(dirtyBitDuration, pageMoveDuration Duration, pageMoveCount uint)
-	// ResetDirtyBit resets soft-dirty bits for all processes in container c.
-	ResetDirtyBit(c cache.Container) error
-	// GetPagesForContainer gets pages which could be potentially moved from container c.
-	GetPagesForContainer(c cache.Container, sourceNodes system.IDSet) (pagePool, error)
-	// MovePages moves at most 'count' pages in page pool to a memory node.
-	MovePages(p pagePool, count uint, targetNodes system.IDSet) error
-
-	UpdateDemoter(cid string, p pagePool, targetNodes system.IDSet)
-	StopDemoter(cid string)
-	UnusedDemoters(cs []cache.Container) []string
 }
 
 type pagePool struct {
@@ -112,28 +95,6 @@ func copyPagePool(p pagePool) pagePool {
 		copy(c.pages[pid], pages)
 	}
 	return c
-}
-
-func NewDemoter(p *policy, pageMover PageMover) *demoter {
-	return &demoter{
-		policy:            p,
-		containerDemoters: make(map[string]chan interface{}, 0),
-		pageMover:         pageMover,
-	}
-}
-
-func (d *demoter) Reconfigure(dirtyBitDuration, pageMoveDuration Duration, pageMoveCount uint) {
-	log.Debug("stopping dirty bit -based page demotion")
-	d.stopDirtyBitResetTimer()
-	d.stopDemoters()
-	d.dirtyBitDuration = time.Duration(dirtyBitDuration)
-	d.pageMoveDuration = time.Duration(pageMoveDuration)
-	d.pageMoveCount = pageMoveCount
-	if d.dirtyBitDuration > 0 && d.pageMoveDuration > 0 && d.pageMoveCount > 0 {
-		log.Debug("staring dirty bit -based page demotion: scan period %v, page move period %v, page move count %d",
-			d.dirtyBitDuration, d.pageMoveDuration, d.pageMoveCount)
-		d.startDirtyBitResetTimer()
-	}
 }
 
 func (d *demoter) UpdateDemoter(cid string, p pagePool, targetNodes system.IDSet) {
@@ -193,7 +154,7 @@ func (d *demoter) StopDemoter(cid string) {
 	}
 }
 
-func (d *demoter) UnusedDemoters(cs []cache.Container) []string {
+func (d *demoter) UnusedDemoters(cs map[string]*container) []string {
 	unused := make([]string, 0)
 	for key := range d.containerDemoters {
 		found := false
@@ -241,14 +202,7 @@ func (d *demoter) startDirtyBitResetTimer() {
 				}
 				return
 			case _ = <-dirtyBitResetChan:
-				e := &events.Policy{
-					Type:   DirtyBitReset,
-					Source: PolicyName,
-					Data:   "tick",
-				}
-				if err := d.policy.options.SendEvent(e); err != nil {
-					log.Error("Failed to send event.")
-				}
+				d.ScanPages()
 			}
 		}
 	}()
@@ -263,14 +217,8 @@ func resetDirtyBit(pid string) error {
 }
 
 // ResetDirtyBit unsets soft-dirty bits for all processes in a container.
-func (d *demoter) ResetDirtyBit(c cache.Container) error {
-	parentDir := ""
-	pod, isPod := c.GetPod()
-	if isPod {
-		parentDir = pod.GetCgroupParentDir()
-	}
-
-	pids, err := utils.GetProcessesInContainer(parentDir, c.GetID())
+func (d *demoter) ResetDirtyBit(c *container) error {
+	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetID())
 	if err != nil {
 		return err
 	}
@@ -285,18 +233,54 @@ func (d *demoter) ResetDirtyBit(c cache.Container) error {
 	return nil
 }
 
-func (d *demoter) GetPagesForContainer(c cache.Container, sourceNodes system.IDSet) (pagePool, error) {
+// ScanPages scans pages of tracked containers to detect idle ones.
+func (d *demoter) ScanPages() {
+	d.migration.Lock()
+	defer d.migration.Unlock()
+
+	for _, container := range d.migration.containers {
+		pm := container.GetPageMigration()
+		if pm == nil {
+			continue
+		}
+		dramNodes := pm.SourceNodes
+		pmemNodes := pm.TargetNodes
+		if dramNodes.Size() == 0 || pmemNodes.Size() == 0 {
+			continue
+		}
+
+		// Gather the known pages which need to be moved.
+		pagePool, err := d.GetPagesForContainer(container, dramNodes)
+		if err != nil {
+			log.Error("failed to get pages for container %v", container.prettyName)
+			continue
+		}
+
+		count := 0
+		for _, pages := range pagePool.pages {
+			count += len(pages)
+		}
+		log.Debug("%d pages for (maybe) demoting for %v", count, container.prettyName)
+
+		// Reset the dirty bit from all pages.
+		d.ResetDirtyBit(container)
+
+		// Give the pages to the page moving goroutine. Copy the page pool so that there's no race.
+		d.UpdateDemoter(container.GetCacheID(), copyPagePool(pagePool), pmemNodes.Clone())
+	}
+
+	cids := d.UnusedDemoters(d.migration.containers)
+	for _, cid := range cids {
+		d.StopDemoter(cid)
+	}
+}
+
+func (d *demoter) GetPagesForContainer(c *container, sourceNodes system.IDSet) (pagePool, error) {
 	pool := pagePool{
 		pages:        make(map[int][]page, 0),
 		longestRange: 0,
 	}
-	parentDir := ""
-	pod, isPod := c.GetPod()
-	if isPod {
-		parentDir = pod.GetCgroupParentDir()
-	}
-
-	pids, err := utils.GetProcessesInContainer(parentDir, c.GetID())
+	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetID())
 	if err != nil {
 		return pagePool{}, err
 	}
