@@ -45,7 +45,7 @@ distro-resolve() {
     local apifn="${FUNCNAME[1]}" fallbacks fn
     case $apifn in
         distro-*) apifn="${apifn#distro-}";;
-        *) error "internal error: $FUNCNAME called by non-API $apifn";;
+        *) error "internal error: ${FUNCNAME[0]} called by non-API $apifn";;
     esac
     case $VM_DISTRO in
         ubuntu*) fallbacks="debian-$apifn";;
@@ -56,7 +56,7 @@ distro-resolve() {
     fallbacks="$fallbacks default-$apifn distro-unresolved"
     # try version-based resolution first, then derivative fallbacks
     for fn in "${VM_DISTRO/./_}-$apifn" "${VM_DISTRO%-*}-$apifn" $fallbacks; do
-        if [ "$(type -t -- $fn)" = "function" ]; then
+        if [ "$(type -t -- "$fn")" = "function" ]; then
             $fn "$@"
             return $?
         fi
@@ -138,7 +138,7 @@ debian-install-repo() {
             command-error "failed to install software-properties-common"
     }
     vm-command "add-apt-repository \"$*\"" ||
-        command-error "failed to install apt repository $@"
+        command-error "failed to install apt repository $*"
     debian-refresh-pkg-db
 }
 
@@ -192,7 +192,7 @@ debian-install-k8s() {
 }
 
 debian-set-kernel-cmdline() {
-    local e2e_defaults="$@"
+    local e2e_defaults="$*"
     vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\"' > /etc/default/grub.d/60-e2e-defaults.cfg" || {
         command-error "writing new command line parameters failed"
     }
@@ -212,7 +212,7 @@ YUM_INSTALL="yum install --disableplugin=fastestmirror -y"
 YUM_REMOVE="yum remove --disableplugin=fastestmirror -y"
 
 centos-7-image-url() {
-    echo ="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-1503.qcow2.xz"
+    echo "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-1503.qcow2.xz"
 }
 
 centos-8-image-url() {
@@ -224,7 +224,7 @@ centos-ssh-user() {
 }
 
 centos-7-install-repo() {
-    vm-command-q "$type -t yum-config-manager >&/dev/null" || {
+    vm-command-q "type -t yum-config-manager >&/dev/null" || {
         distro-install-pkg yum-utils
     }
     vm-command "yum-config-manager --add-repo $*" ||
@@ -331,7 +331,7 @@ rpm-pkg-type() {
 
 rpm-install-repo-key() {
     local key
-    for key in $@; do
+    for key in "$@"; do
         vm-command "rpm --import $key" ||
             command-error "failed to import repo key $key"
     done
@@ -350,6 +350,7 @@ rpm-refresh-pkg-db() {
 default-setup-proxies() {
     # Notes:
     #   We blindly assume that upper- vs. lower-case env vars are identical.
+    # shellcheck disable=SC2154
     if [ -z "$http_proxy$https_proxy$ftp_proxy$no_proxy" ]; then
         return 0
     fi
@@ -361,8 +362,8 @@ default-setup-proxies() {
         return 0
     fi
 
-    local file scope="" append="--append"
-    local hn=$(vm-command-q hostname)
+    local file scope="" append="--append" hn
+    hn="$(vm-command-q hostname)"
 
     for file in /etc/environment /etc/profile.d/proxy.sh; do
         cat <<EOF |
@@ -393,14 +394,15 @@ from-tarball-install-golang() {
     vm-command-q "go version | grep -q go$GOLANG_VERSION" || {
         vm-command "wget --progress=dot:giga $GOLANG_URL -O go.tgz" && \
             vm-command "tar -C /usr/local -xvzf go.tgz && rm go.tgz" && \
-            vm-command "echo "PATH=/usr/local/go/bin:\$PATH" > /etc/profile.d/go.sh" && \
+            vm-command "echo \"PATH=/usr/local/go/bin:\$PATH\" > /etc/profile.d/go.sh" && \
             vm-command "* installed \$(go version)"
     }
 }
 
 generic-setup-containerd() {
     if [ -n "$http_proxy" ] || [ -n "$https_proxy" ] || [ -n "$no_proxy" ]; then
-        local hn=$(vm-command-q hostname)
+        local hn
+        hn="$(vm-command-q hostname)"
         cat <<EOF |
 [Service]
 Environment=HTTP_PROXY="$http_proxy"
