@@ -1,4 +1,8 @@
+# shellcheck disable=SC1091
+# shellcheck source=command.bash
 source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
+# shellcheck disable=SC1091
+# shellcheck source=distro.bash
 source "$(dirname "${BASH_SOURCE[0]}")/distro.bash"
 
 VM_PROMPT=${VM_PROMPT-"\e[38;5;11mroot@vm>\e[0m "}
@@ -17,10 +21,12 @@ vms:
       #!/bin/bash
       set -e
 "
-    (if [ -n "$VM_EXTRA_BOOTSTRAP_COMMANDS" ]; then
-         sed 's/^/      /g' <<< "${VM_EXTRA_BOOTSTRAP_COMMANDS}"
+     (if [ -n "$VM_EXTRA_BOOTSTRAP_COMMANDS" ]; then
+          # shellcheck disable=SC2001
+          sed 's/^/      /g' <<< "${VM_EXTRA_BOOTSTRAP_COMMANDS}"
      fi
-     sed 's/^/      /g' <<< $(distro-bootstrap-commands))) |
+      # shellcheck disable=SC2001
+      sed 's/^/      /g' <<< "$(distro-bootstrap-commands)")) |
         grep -E -v '^ *$'
 }
 
@@ -63,7 +69,7 @@ vm-check-env() {
         echo "ERROR:"
         return 1
     }
-    if [ ! -e ${HOME}/.ssh/id_rsa.pub ]; then
+    if [ ! -e "${HOME}/.ssh/id_rsa.pub" ]; then
         echo "ERROR:"
         echo "ERROR: environment check failed:"
         echo "ERROR:   id_rsa.pub SSH public key not found (but govm needs it)."
@@ -79,6 +85,7 @@ vm-check-env() {
 vm-check-binary-cri-resmgr() {
     # Check running cri-resmgr version, print warning if it is not
     # the latest local build.
+    # shellcheck disable=SC2016
     if [ -f "$BIN_DIR/cri-resmgr" ] && [ "$(vm-command-q 'md5sum < /proc/$(pidof cri-resmgr)/exe')" != "$(md5sum < "$BIN_DIR/cri-resmgr")" ]; then
         echo "WARNING:"
         echo "WARNING: Running cri-resmgr binary is different from"
@@ -86,7 +93,7 @@ vm-check-binary-cri-resmgr() {
         echo "WARNING: Consider restarting with \"reinstall_cri_resmgr=1\" or"
         echo "WARNING: run.sh> uninstall cri-resmgr; install cri-resmgr; launch cri-resmgr"
         echo "WARNING:"
-        sleep ${warning_delay}
+        sleep "${warning_delay:-0}"
         return 1
     fi
     return 0
@@ -105,19 +112,19 @@ vm-command() { # script API
     #   vm-command "whoami | grep myuser" || command-error "user is not myuser"
     command-start "vm" "$VM_PROMPT" "$1"
     if [ "$2" == "bg" ]; then
-        ( $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
-          command-end ${PIPESTATUS[0]}
+        ( $SSH "${VM_SSH_USER}@${VM_IP}" sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
+          command-end "${PIPESTATUS[0]}"
         ) &
         command-runs-in-bg
     else
-        $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
-        command-end ${PIPESTATUS[0]}
+        $SSH "${VM_SSH_USER}@${VM_IP}" sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
+        command-end "${PIPESTATUS[0]}"
     fi
-    return $COMMAND_STATUS
+    return "$COMMAND_STATUS"
 }
 
 vm-command-q() {
-    $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$1"
+    $SSH "${VM_SSH_USER}@${VM_IP}" sudo bash -l <<<"$1"
 }
 
 vm-mem-hotplug() { # script API
@@ -134,16 +141,16 @@ vm-mem-hotplug() { # script API
         error "missing MEMORY"
         return 1
     fi
-    memline="$(vm-mem-hw | grep unplugged | grep $memmatch)"
+    memline="$(vm-mem-hw | grep unplugged | grep "$memmatch")"
     if [ -z "$memline" ]; then
         error "unplugged memory matching '$memmatch' not found"
         return 1
     fi
-    memid="$(awk '{print $1}' <<< $memline)"
+    memid="$(awk '{print $1}' <<< "$memline")"
     memid=${memid#mem}
     memid=${memid%[: ]*}
-    memdimm="$(awk '{print $2}' <<< $memline)"
-    memnode="$(awk '{print $4}' <<< $memline)"
+    memdimm="$(awk '{print $2}' <<< "$memline")"
+    memnode="$(awk '{print $4}' <<< "$memline")"
     memnode=${memnode#node}
     if [ "$memdimm" == "nvdimm" ]; then
         memdriver="nvdimm"
@@ -167,15 +174,15 @@ vm-mem-hotremove() { # script API
         error "missing MEMORY"
         return 1
     fi
-    memline="$(vm-mem-hw | grep \ plugged | grep $memmatch)"
+    memline="$(vm-mem-hw | grep \ plugged | grep "$memmatch")"
     if [ -z "$memline" ]; then
         error "plugged memory matching '$memmatch' not found"
         return 1
     fi
-    memid="$(awk '{print $1}' <<< $memline)"
+    memid="$(awk '{print $1}' <<< "$memline")"
     memid=${memid#mem}
     memid=${memid%[: ]*}
-    memdimm="$(awk '{print $2}' <<< $memline)"
+    memdimm="$(awk '{print $2}' <<< "$memline")"
     vm-monitor "device_del ${memdimm}${memid}"
 }
 
@@ -263,7 +270,7 @@ vm-put-file() { # script API
     #       echo 'Ahoy, Matey...' > $src && \
     #       vm-put-file --cleanup $src /etc/motd
     local cleanup append invalid
-    while [ "${1#-}" != "$1" -a -n "$1" ]; do
+    while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
         case "$1" in
             --cleanup)
                 cleanup=1
@@ -279,23 +286,24 @@ vm-put-file() { # script API
                 ;;
         esac
     done
-    if [ -n "$cleanup" -a -n "$1" ]; then
-        trap "rm -f $1" RETURN EXIT
+    if [ -n "$cleanup" ] && [ -n "$1" ]; then
+        # shellcheck disable=SC2064
+        trap "rm -f \"$1\"" RETURN EXIT
     fi
     if [ -n "$invalid" ]; then
         error "invalid options: $invalid"
         return 1
     fi
-    host-command "$SCP $1 ${VM_SSH_USER}@${VM_IP}:" ||
-        error "failed to scp file $1 to ${VM_SSH_USER}@${VM_IP}:"
-    vm-command "mkdir -p \"$(dirname $2)\""
+    [ "$(dirname "$2")" == "." ] || vm-command-q "[ -d \"$(dirname "$2")\" ]" || vm-command "mkdir -p \"$(dirname "$2")\"" ||
+        command-error "cannot create vm-put-file destination directory to VM"
+    host-command "$SCP \"$1\" ${VM_SSH_USER}@${VM_IP}:\"vm-put-file.${1##*/}\"" ||
+        command-error "failed to copy file to VM"
     if [ -z "$append" ]; then
-        vm-command "mv -v ${1##*/} $2" ||
-            error "failed to copy file $1 as $2"
+        vm-command "mv \"vm-put-file.${1##*/}\" \"$2\"" ||
+            command-error "failed to rename file"
     else
-        vm-command "touch $2 && cat ${1##*/} >> $2 && rm -f ${1##*/}" ||
-            error "failed to append file $1 as $2"
-
+        vm-command "touch \"$2\" && cat \"vm-put-file.${1##*/}\" >> \"$2\" && rm -f \"vm-put-file.${1##*/}\"" ||
+            command-error "failed to append file"
     fi
 }
 
@@ -307,13 +315,14 @@ vm-pipe-to-file() { # script API
     #
     # Example:
     #   echo 'Ahoy, Matey...' | vm-pipe-to-file /etc/motd
-    local tmp=$(mktemp) append
+    local tmp append
+    tmp="$(mktemp vm-pipe-to-file.XXXXXX)"
     if [ "$1" = "--append" ]; then
         append="--append"
         shift
     fi
-    cat > $tmp
-    vm-put-file --cleanup $append $tmp $1
+    cat > "$tmp"
+    vm-put-file --cleanup "$append" "$tmp" "$1"
 }
 
 vm-sed-file() { # script API
@@ -328,7 +337,7 @@ vm-sed-file() { # script API
     shift
     for cmd in "$@"; do
         vm-command "sed -E -i \"$cmd\" $file" ||
-            command-error "failed to edit $file with sed commands $@"
+            command-error "failed to edit $file with sed"
     done
 }
 
@@ -369,6 +378,7 @@ vm-networking() {
 
 vm-install-cri-resmgr() {
     prefix=/usr/local
+    # shellcheck disable=SC2154
     if [ "$binsrc" == "github" ]; then
         vm-install-golang
         vm-install-pkg make
@@ -379,10 +389,11 @@ vm-install-cri-resmgr() {
         suf=$(vm-pkg-type)
         vm-command "rm -f *.$suf"
         local pkg_count
-        pkg_count=$(ls "$HOST_PROJECT_DIR/$binsrc"/cri-resource-manager*.$suf | grep -v dbg | wc -l)
+        # shellcheck disable=SC2010,SC2126
+        pkg_count="$(ls "$HOST_PROJECT_DIR/$binsrc"/cri-resource-manager*."$suf" | grep -v dbg | wc -l)"
         if [ "$pkg_count" == "0" ]; then
             error "installing from $binsrc failed: cannot find cri-resource-manager_*.$suf from $HOST_PROJECT_DIR/$binsrc"
-        elif [[ "$pkg_count" > "1" ]]; then
+        elif [[ "$pkg_count" -gt 1 ]]; then
             error "installing from $binsrc failed: expected exactly one cri-resource-manager*.$suf in $HOST_PROJECT_DIR/$binsrc, found $pkg_count alternatives."
         fi
         host-command "$SCP $HOST_PROJECT_DIR/$binsrc/*.$suf $VM_SSH_USER@$VM_IP:/tmp" || {
@@ -402,7 +413,7 @@ vm-install-cri-resmgr() {
             echo "WARNING: Source files changed - installing possibly outdated binaries from"
             echo "WARNING: $BIN_DIR/"
             echo "WARNING:"
-            sleep ${warning_delay}
+            sleep "${warning_delay:-0}"
         fi
         host-command "$SCP \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying local cri-resmgr to VM failed"
@@ -444,7 +455,7 @@ vm-install-cri() {
 vm-install-containernetworking() {
     vm-install-golang
     vm-command "go get -d github.com/containernetworking/plugins"
-    CNI_PLUGINS_SOURCE_DIR=$(awk '/package.*plugins/{print $NF}' <<< $COMMAND_OUTPUT)
+    CNI_PLUGINS_SOURCE_DIR="$(awk '/package.*plugins/{print $NF}' <<< "$COMMAND_OUTPUT")"
     [ -n "$CNI_PLUGINS_SOURCE_DIR" ] || {
         command-error "downloading containernetworking plugins failed"
     }
