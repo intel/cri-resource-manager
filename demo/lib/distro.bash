@@ -84,6 +84,18 @@ ubuntu-20_04-image-url() {
     echo "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img"
 }
 
+ubuntu-20_10-image-url() {
+    echo "https://cloud-images.ubuntu.com/groovy/current/groovy-server-cloudimg-amd64.img"
+}
+
+debian-10-image-url() {
+    echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
+}
+
+debian-sid-image-url() {
+    echo "https://cloud.debian.org/images/cloud/sid/daily/20201013-422/debian-sid-generic-amd64-daily-20201013-422.qcow2"
+}
+
 ubuntu-download-kernel() {
     # Usage:
     #   ubuntu-download-kernel list
@@ -106,10 +118,6 @@ ubuntu-download-kernel() {
     fi
     vm-command "mkdir -p kernels; rm -f kernels/linux*$version*deb; for deb in \$(wget -q -O- https://kernel.ubuntu.com/~kernel-ppa/mainline/v$version/ | awk -F'\"' '/amd64.*deb/{print \$2}' | grep -v -E 'headers|lowlatency'); do ( cd kernels; wget -q https://kernel.ubuntu.com/~kernel-ppa/mainline/v$version/\$deb ); done; echo; echo 'Downloaded kernel packages:'; du -h kernels/*.deb" ||
         command-error "downloading kernel $version failed"
- }
-
-debian-10-image-url() {
-    echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
 }
 
 ubuntu-ssh-user() {
@@ -126,7 +134,9 @@ debian-pkg-type() {
 
 debian-install-repo-key() {
     local key
-    for key in $@; do
+    # apt-key needs gnupg2, that might not be available by default
+    vm-command "command -v gpg >/dev/null 2>&1" || debian-install-pkg gnupg2
+    for key in "$@"; do
         vm-command "curl -s $key | apt-key add -" ||
             command-error "failed to install repo key $key"
     done
@@ -164,7 +174,6 @@ debian-install-golang() {
 debian-10-install-containerd() {
     vm-command-q "[ -f /usr/bin/containerd ]" || {
         debian-refresh-pkg-db
-        debian-install-pkg gnupg2
         debian-install-repo-key https://download.docker.com/linux/debian/gpg
         debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
         debian-refresh-pkg-db
@@ -177,6 +186,9 @@ debian-install-containerd() {
     vm-command-q "[ -f /usr/bin/containerd ]" || {
         debian-refresh-pkg-db
         debian-install-pkg containerd
+        # The default Debian containerd expects CNI binaries in /usr/lib/cni,
+        # but kubernetes-cni.deb (debian-install-k8s) installs to /opt/cni/bin.
+        vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
         generic-setup-containerd
     }
 }
