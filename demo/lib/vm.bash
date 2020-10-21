@@ -69,16 +69,45 @@ vm-check-env() {
         echo "ERROR:"
         return 1
     }
-    if [ ! -e "${HOME}/.ssh/id_rsa.pub" ]; then
+    if [ ! -e "$SSH_KEY".pub ]; then
         echo "ERROR:"
         echo "ERROR: environment check failed:"
-        echo "ERROR:   id_rsa.pub SSH public key not found (but govm needs it)."
+        echo "ERROR:   $SSH_KEY.pub SSH public key not found (but govm needs it)."
         echo "ERROR:"
         echo "ERROR: You can generate it using the following command:"
         echo "ERROR:"
         echo "ERROR:     ssh-keygen"
         echo "ERROR:"
         return 1
+    fi
+    if [ -n "$SSH_AUTH_SOCK" ] && [ -e "$SSH_AUTH_SOCK" ]; then
+        if ! ssh-add -l | grep -q "$(ssh-keygen -l -f "$SSH_KEY" < /dev/null 2>/dev/null)"; then
+            if ! ssh-add "$SSH_KEY" < /dev/null; then
+                echo "ERROR:"
+                echo "ERROR: environment setup failed:"
+                echo "ERROR:   Failed to load $SSH_KEY SSH key to agent."
+                echo "ERROR:"
+                echo "ERROR: Please make sure an SSH agent is running, then"
+                echo "ERROR: try loading the key using the following command:"
+                echo "ERROR:"
+                echo "ERROR:     ssh-add $SSH_KEY"
+                echo "ERROR:"
+                return 1
+            fi
+        fi
+    else
+        if host-is-encrypted-ssh-key "$SSH_KEY"; then
+            echo "ERROR:"
+            echo "ERROR: environment setup failed:"
+            echo "ERROR:   $SSH_KEY SSH key is encrypted, but agent is not running."
+            echo "ERROR:"
+            echo "ERROR: Please make sure an SSH agent is running, then"
+            echo "ERROR: try loading the key using the following command:"
+            echo "ERROR:"
+            echo "ERROR:     ssh-add $SSH_KEY"
+            echo "ERROR:"
+            return 1
+        fi
     fi
 }
 

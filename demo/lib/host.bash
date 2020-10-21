@@ -204,3 +204,12 @@ host-delete-vm() {
         command-error "deleting govm \"$VM_NAME\" failed"
     }
 }
+
+host-is-encrypted-ssh-key() {
+    ssh-keygen -y -f "$1" < /dev/null >& /dev/null
+    if [ $? != 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
