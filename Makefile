@@ -378,7 +378,7 @@ endif
 release-tests: e2e-tests
 
 e2e-tests: build
-	$(Q)tests="$(if $(E2E_TESTS),$(E2E_TESTS),test/e2e/policies)"; \
+	$(Q)tests="$(if $(E2E_TESTS),$(E2E_TESTS),test/e2e/policies.test-suite)"; \
 	$(E2E_RUN) $$tests; \
 	if [ "$$?" != "0" ]; then \
 	    echo "You drop into interactive mode upon failures if you run e2e tests as"; \
@@ -387,7 +387,7 @@ e2e-tests: build
 	fi
 
 packaging-tests: cross-deb cross-rpm
-	$(Q)for dir in test/e2e/packages/*; do \
+	$(Q)for dir in test/e2e/packages.test-suite/*; do \
 	    [ "$${dir%centos-7}" != "$$dir" ] && continue; \
 	    distro=$${dir##*/} $(E2E_RUN) $$dir; \
 	done
