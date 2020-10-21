@@ -10,6 +10,10 @@
 # command-start and command-end set environment variables:
 # COMMAND, COMMAND_STATUS, COMMAND_OUTPUT
 
+# These exports force ssh-* to fail instead of prompting for a passphrase.
+export DISPLAY=bogus-none
+export SSH_ASKPASS=/bin/false
+SSH_KEY="${HOME}/.ssh/id_rsa"
 SSH_OPTS="-o StrictHostKeyChecking=No"
 SSH="ssh $SSH_OPTS"
 SCP="scp $SSH_OPTS"
