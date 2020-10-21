@@ -34,8 +34,20 @@ export-var-files() {
         fi
         var_file_name=$(basename "$var_filepath")
         var_name=${var_file_name%%.var*}
-        echo "exporting $var_name from $var_filepath"
-        export "$var_name"="$(< "$var_filepath")"
+        if [ "$var_name" == "code" ] || [ "$var_name" == "py_consts" ]; then
+            # append values in code variables
+            echo "exporting $var_name - appending from $var_filepath"
+            export "$var_name"="${!var_name}""
+$(< "$var_filepath")"
+        else
+            # creating / replace other variables
+            if [ -z "${!var_name}" ]; then
+                echo "exporting $var_name - creating from $var_filepath"
+            else
+                echo "exporting $var_name - overriding from $var_filepath"
+            fi
+            export "$var_name"="$(< "$var_filepath")"
+        fi
     done
 }
 
@@ -67,6 +79,31 @@ export-vm-files() {
     local serialized_vm_files
     serialized_vm_files="$(declare -p vm_files_aa)"
     export vm_files="declare -A vm_files${serialized_vm_files#declare -A vm_files_aa}"
+}
+
+source-source-files() {
+    # Test execution will source *.source.* files before it executes
+    # the real test code. The files will be sourced starting from the
+    # test suite (root) directory and ending up to the test directory,
+    # which enables overriding inherited functions and variables.
+    local src_file_dir="$1"
+    local src_filepath
+    for src_filepath in "$src_file_dir"/*.source "$src_file_dir"/*.source.*; do
+        if ! [ -f "$src_filepath" ] || [[ "$src_filepath" == *"~" ]]; then
+            continue
+        fi
+        echo "sourcing $src_filepath before running test code"
+        source_libs="${source_libs}""
+source \"$src_filepath\"
+"
+    done
+}
+
+export-and-source-dir() {
+    local dir="$1"
+    export-var-files "$dir"
+    export-vm-files "$dir/vm-files"
+    source-source-files "$dir"
 }
 
 if [ -z "$TESTS_DIR" ] || [ "$TESTS_DIR" == "help" ] || [ "$TESTS_DIR" == "--help" ]; then
@@ -115,6 +152,8 @@ trap cleanup TERM EXIT QUIT
 summary_file="$summary_dir/summary.txt"
 echo -n "" > "$summary_file"
 
+export-and-source-dir "$TESTS_ROOT_DIR"
+
 for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
     if ! [ -d "$POLICY_DIR" ]; then
         continue
@@ -131,8 +170,7 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
             fi
             export cri_resmgr_cfg=$CFG_FILE
         done
-        export-var-files "$POLICY_DIR"
-        export-vm-files "$POLICY_DIR/vm-files"
+        export-and-source-dir "$POLICY_DIR"
         for TOPOLOGY_DIR in "$POLICY_DIR"/*; do
             if ! [ -d "$TOPOLOGY_DIR" ]; then
                 continue
@@ -144,14 +182,13 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
                 continue
             fi
             (
-                export-var-files "$TOPOLOGY_DIR"
-                export-vm-files "$TOPOLOGY_DIR/vm-files"
                 distro=${distro:=$DEFAULT_DISTRO}
                 export distro
                 cri=${cri:=containerd}
                 export cri
                 vm="$(basename "$TOPOLOGY_DIR")-${distro}-${cri}"
                 export vm
+                export-and-source-dir "$TOPOLOGY_DIR"
                 for TEST_DIR in "$TOPOLOGY_DIR"/*; do
                     if ! [ -d "$TEST_DIR" ]; then
                         continue
@@ -163,9 +200,10 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
                         continue
                     fi
                     (
-                        export-var-files "$TEST_DIR"
-                        export-vm-files "$TEST_DIR/vm-files"
                         export outdir="$TEST_DIR/output"
+                        export-and-source-dir "$TEST_DIR"
+                        export code="${source_libs}""
+${code}"
                         mkdir -p "$outdir"
                         echo "Run $(basename "$TEST_DIR")"
                         TEST_DIR=$TEST_DIR TOPOLOGY_DIR=$TOPOLOGY_DIR POLICY_DIR=$POLICY_DIR \
