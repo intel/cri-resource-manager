@@ -50,7 +50,7 @@ func (stp *stp) updateNode(conf conf) error {
 	}
 
 	// Manage legacy node label
-	if opt.createNodeLabel {
+	if conf.LabelNode {
 		stp.Info("creating CMK node label")
 		err := stp.agent.SetLabels(map[string]string{cmkLegacyNodeLabelName: "true"}, -1)
 		if err != nil {
@@ -77,12 +77,12 @@ func (stp *stp) updateNode(conf conf) error {
 	cmkTaints := []core_v1.Taint{legacyTaint}
 	_, tainted := stp.agent.FindTaintIndex(nodeTaints, &legacyTaint)
 
-	if !tainted && opt.createNodeTaint {
+	if !tainted && conf.TaintNode {
 		if err := stp.agent.SetTaints(cmkTaints, -1); err != nil {
 			return stpError("failed to set legacy node taint: %v", err)
 		}
 	}
-	if tainted && !opt.createNodeTaint {
+	if tainted && !conf.TaintNode {
 		if err := stp.agent.RemoveTaints(cmkTaints, -1); err != nil {
 			return stpError("failed to clear legacy node taint: %v", err)
 		}

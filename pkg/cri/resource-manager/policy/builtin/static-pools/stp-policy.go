@@ -92,17 +92,18 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	stp.Info("creating policy...")
 
 	// Read STP configuration
-	if len(opt.confDir) > 0 {
-		stp.conf, err = readConfDir(opt.confDir)
+	if len(cfg.ConfDirPath) > 0 {
+		stp.conf, err = readConfDir(cfg.ConfDirPath)
 		if err != nil {
 			stp.Warn("failed to read configuration directory: %v", err)
 		}
 	}
-	if len(opt.confFile) > 0 {
+	if len(cfg.ConfFilePath) > 0 {
 		if stp.conf != nil {
-			stp.Info("Overriding configuration from -static-pools-conf-dir with -static-pools-conf-file")
+			stp.Info("Overriding configuration from %q with configuration from %q",
+				cfg.ConfDirPath, cfg.ConfFilePath)
 		}
-		stp.conf, err = readConfFile(opt.confFile)
+		stp.conf, err = readConfFile(cfg.ConfFilePath)
 		if err != nil {
 			stp.Warn("failed to read configuration directory: %v", err)
 		}
@@ -280,8 +281,6 @@ func (stp *stp) configNotify(event config.Event, source config.Source) error {
 		return err
 	}
 
-	opt.createNodeLabel = cfg.LabelNode
-	opt.createNodeTaint = cfg.TaintNode
 	stp.conf = cfg
 	stp.Info("config updated successfully")
 	stp.Debug("new policy configuration:\n%s", utils.DumpJSON(stp.conf))
