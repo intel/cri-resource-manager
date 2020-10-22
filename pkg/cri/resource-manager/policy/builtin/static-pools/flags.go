@@ -21,7 +21,7 @@ import (
 // conf captures our runtime configurable parameters.
 type conf struct {
 	// Pools defines our set of pools in use.
-	Pools map[string]poolConfig `json:"pools,omitempty"`
+	Pools pools `json:"pools,omitempty"`
 	// ConfDirPath is the filesystem path to the legacy configuration directry structure.
 	ConfDirPath string
 	// ConfFilePath is the filesystem path to the legacy configuration file.
@@ -38,7 +38,7 @@ var cfg = defaultConfig().(*conf)
 // defaultConfig returns a new conf instance, all initialized to defaults.
 func defaultConfig() interface{} {
 	return &conf{
-		Pools:       make(map[string]poolConfig),
+		Pools:       make(pools),
 		ConfDirPath: "/etc/cmk",
 	}
 }

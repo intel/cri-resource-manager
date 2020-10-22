@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+type pools map[string]poolConfig
+
 type cpuList struct {
 	Socket     uint64
 	Cpuset     string // TODO: might want to use cpuset from kubelet
@@ -81,17 +83,19 @@ var (
 	cpusetValidationRe = regexp.MustCompile(`^(([\d]+)|([\d]+-[\d]+))(,(([\d]+)|([\d]+-[\d]+)))*$`)
 )
 
-func parseConfData(raw []byte) (*conf, error) {
-	conf := &conf{}
+func parseConfData(raw []byte) (pools, error) {
+	conf := &struct {
+		Pools pools
+	}{}
 
 	err := yaml.Unmarshal(raw, &conf)
 	if err != nil {
 		return nil, stpError("Failed to parse config file: %v", err)
 	}
-	return conf, nil
+	return conf.Pools, nil
 }
 
-func readConfFile(filepath string) (*conf, error) {
+func readConfFile(filepath string) (pools, error) {
 	// Read config data
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -101,8 +105,8 @@ func readConfFile(filepath string) (*conf, error) {
 	return parseConfData(data)
 }
 
-func readConfDir(confDir string) (*conf, error) {
-	conf := &conf{Pools: map[string]poolConfig{}}
+func readConfDir(confDir string) (pools, error) {
+	conf := pools{}
 
 	// List pools in the pools configuration directory
 	poolsDir := path.Join(confDir, "pools")
@@ -117,7 +121,7 @@ func readConfDir(confDir string) (*conf, error) {
 		if err != nil {
 			return nil, stpError("Failed to read pool çonfiguration: %v", err)
 		}
-		conf.Pools[pool.Name()] = poolConf
+		conf[pool.Name()] = poolConf
 	}
 
 	return conf, nil
