@@ -314,7 +314,7 @@ func (stp *stp) initializeState() error {
 // Verify configuration against the existing set of containers
 func (stp *stp) verifyConfig(cfg *conf) error {
 	//  Sanity check for config
-	if cfg == nil || cfg.Pools == nil {
+	if cfg == nil || cfg.Pools == nil || len(cfg.Pools) == 0 {
 		return stpError("invalid config, no pools configured")
 	}
 
