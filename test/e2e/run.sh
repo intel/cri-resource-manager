@@ -244,7 +244,10 @@ get-py-cache() {
     py_cache="
 import json
 cache=json.load(open(\"${OUTPUT_DIR}/cache\"))
-allocations=json.loads(cache['PolicyJSON']['allocations'])
+try:
+    allocations=json.loads(cache['PolicyJSON']['allocations'])
+except KeyError:
+    allocations=None
 containers=cache['Containers']
 pods=cache['Pods']
 for _contid in list(containers.keys()):
@@ -258,7 +261,7 @@ for _contid in list(containers.keys()):
         _contname = _cmd.split()[3] # _contname is podXcY
         _podid = containers[_contid]['PodID']
         _podname = pods[_podid]['Name'] # _podname is podX
-        if _contid in allocations:
+        if not allocations is None and _contid in allocations:
             allocations[_contname] = allocations[_contid]
         containers[_contname] = containers[_contid]
         pods[_podname] = pods[_podid]
