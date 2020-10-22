@@ -31,8 +31,17 @@ data:
     static:
       RelaxedIsolation: true
     static-pools:
-      # This is an example configuration for static-pools policy.
-      # The imaginary example system here consists of 4 sockets, 4 cores, 2 threads each.
+      # Filesystem path to legacy configuration directory structure
+      ConfDirPath: "/etc/cmk"
+      # Filesystem path to legacy configuration file
+      ConfFilePath: ""
+      # Whether to create CMK node label
+      LabelNode: false
+      # Whether to create CMK node taint
+      TaintNode: false
+      # Pool configuration.
+      # The imaginary example system below consists of 4 sockets, 4 cores, 2
+      # threads each.
       pools:
         exclusive:
           # 6 exclusive cores, 3 on sockets 1, 2 and 3 each
