@@ -30,7 +30,7 @@ type options struct {
 // conf captures our runtime configurable parameters.
 type conf struct {
 	// Pools defines our set of pools in use.
-	Pools map[string]poolConfig `json:"pools,omitempty"`
+	Pools pools `json:"pools,omitempty"`
 	// LabelNode controls whether backwards-compatible CMK node label is created.
 	LabelNode bool
 	// TaintNode controls whether backwards-compatible CMK node taint is created.
@@ -54,7 +54,7 @@ func defaultOptions() interface{} {
 // defaultConfig returns a new conf instance, all initialized to defaults.
 func defaultConfig() interface{} {
 	return &conf{
-		Pools:     make(map[string]poolConfig),
+		Pools:     make(pools),
 		LabelNode: false,
 		TaintNode: false,
 	}

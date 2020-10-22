@@ -82,7 +82,6 @@ var _ policy.Backend = &stp{}
 
 // CreateStpPolicy creates a new policy instance.
 func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
-	var err error
 	stp := &stp{
 		Logger: logger.NewLogger(PolicyName),
 		agent:  opts.AgentCli,
@@ -93,20 +92,27 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 
 	// Read STP configuration
 	if len(opt.confDir) > 0 {
-		stp.conf, err = readConfDir(opt.confDir)
+		p, err := readConfDir(opt.confDir)
 		if err != nil {
 			stp.Warn("failed to read configuration directory: %v", err)
+		} else {
+			cfg.Pools = p
 		}
 	}
 	if len(opt.confFile) > 0 {
-		if stp.conf != nil {
-			stp.Info("Overriding configuration from -static-pools-conf-dir with -static-pools-conf-file")
-		}
-		stp.conf, err = readConfFile(opt.confFile)
+		p, err := readConfFile(opt.confFile)
 		if err != nil {
-			stp.Warn("failed to read configuration directory: %v", err)
+			stp.Warn("failed to read configuration file: %v", err)
+		} else {
+			if cfg.Pools != nil || len(cfg.Pools) > 0 {
+				stp.Info("Overriding pool configuration from %q with configuration from %q",
+					opt.confDir, opt.confFile)
+			}
+			cfg.Pools = p
 		}
 	}
+
+	stp.conf = cfg
 
 	config.GetModule(PolicyPath).AddNotify(stp.configNotify)
 
