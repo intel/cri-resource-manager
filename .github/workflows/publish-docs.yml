@@ -14,6 +14,14 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
+    - name: Turnstyle
+      uses: softprops/turnstyle@v1
+      with:
+        abort-after-seconds: 600
+        same-branch-only: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Fetch gh-pages
       run: git fetch --no-tags --prune --depth=1 origin refs/heads/gh-pages:refs/heads/gh-pages
 
