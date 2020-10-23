@@ -392,8 +392,32 @@ EOF
       scope="export "
       append=""
     done
+    # Setup proxies for systemd services that might be installed later
+    for file in /etc/systemd/system/{containerd,docker}.service.d/proxy.conf; do
+        cat <<EOF |
+[Service]
+Environment=HTTP_PROXY="$http_proxy"
+Environment=HTTPS_PROXY="$https_proxy"
+Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc"
+EOF
+        vm-pipe-to-file $file
+    done
+    # Setup proxies inside docker containers
+    for file in /{root,home/$VM_SSH_USER}/.docker/config.json; do
+        cat <<EOF |
+{
+    "proxies": {
+        "default": {
+            "httpProxy": "$http_proxy",
+            "httpsProxy": "$https_proxy",
+            "noProxy": "$no_proxy,$VM_IP,$hn"
+        }
+    }
 }
-
+EOF
+        vm-pipe-to-file $file
+    done
+}
 
 
 ###########################################################################
@@ -412,17 +436,6 @@ from-tarball-install-golang() {
 }
 
 generic-setup-containerd() {
-    if [ -n "$http_proxy" ] || [ -n "$https_proxy" ] || [ -n "$no_proxy" ]; then
-        local hn
-        hn="$(vm-command-q hostname)"
-        cat <<EOF |
-[Service]
-Environment=HTTP_PROXY="$http_proxy"
-Environment=HTTPS_PROXY="$https_proxy"
-Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc"
-EOF
-            vm-pipe-to-file /etc/systemd/system/containerd.service.d/proxy.conf
-    fi
     if vm-command-q "[ -f /etc/containerd/config.toml ]"; then
         vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
     fi
