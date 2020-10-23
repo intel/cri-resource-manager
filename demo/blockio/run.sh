@@ -127,7 +127,7 @@ demo-blockio() {
     vm-command "kubectl create -f bb-scanner.yaml"
 
     out "### Now bb-scanner is running md5sum to all mounted directories, non-stop."
-    vm-wait-process md5sum 60
+    vm-wait-process --timeout 60 md5sum
 
     screen-measure-io-speed md5sum
 
