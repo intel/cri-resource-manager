@@ -90,34 +90,6 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 
 	stp.Info("creating policy...")
 
-	// Read STP configuration
-	if len(opt.confDir) > 0 {
-		p, err := readConfDir(opt.confDir)
-		if err != nil {
-			stp.Warn("failed to read configuration directory: %v", err)
-		} else {
-			cfg.Pools = p
-		}
-	}
-	if len(opt.confFile) > 0 {
-		p, err := readConfFile(opt.confFile)
-		if err != nil {
-			stp.Warn("failed to read configuration file: %v", err)
-		} else {
-			if cfg.Pools != nil || len(cfg.Pools) > 0 {
-				stp.Info("Overriding pool configuration from %q with configuration from %q",
-					opt.confDir, opt.confFile)
-			}
-			cfg.Pools = p
-		}
-	}
-
-	stp.conf = cfg
-
-	config.GetModule(PolicyPath).AddNotify(stp.configNotify)
-
-	stp.DebugBlock("  configuration ", "%s", utils.DumpJSON(stp.conf))
-
 	return stp
 }
 
@@ -133,14 +105,13 @@ func (stp *stp) Description() string {
 
 // Start prepares this policy for accepting allocation/release requests.
 func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
-	var err error
-
 	if stp.conf == nil {
-		return stpError("cannot start without any configuration")
+		if err := stp.setConfig(cfg); err != nil {
+			return err
+		}
 	}
 
-	err = stp.updateNode(*stp.conf)
-	if err != nil {
+	if err := stp.updateNode(*stp.conf); err != nil {
 		stp.Fatal("%v", err)
 	}
 
@@ -149,7 +120,7 @@ func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
 	}
 	stp.Debug("retrieved stp container states from cache:\n%s", utils.DumpJSON(*stp.getContainerRegistry()))
 
-	if err = stp.Sync(add, del); err != nil {
+	if err := stp.Sync(add, del); err != nil {
 		return err
 	}
 
@@ -282,6 +253,42 @@ func (stp *stp) Introspect(*introspect.State) {
 func (stp *stp) configNotify(event config.Event, source config.Source) error {
 	stp.Info("configuration %s", event)
 
+	if err := stp.setConfig(cfg); err != nil {
+		return err
+	}
+
+	stp.Info("config updated successfully")
+
+	return nil
+}
+
+func (stp *stp) setConfig(cfg *conf) error {
+	// Read legacy pools configuration if the given config has no pools configured
+	if cfg.Pools == nil || len(cfg.Pools) == 0 {
+		if len(opt.confDir) > 0 {
+			stp.Debug("Reading legacy configuration directory tree %q", opt.confDir)
+			p, err := readConfDir(opt.confDir)
+			if err != nil {
+				stp.Warn("failed to read configuration directory: %v", err)
+			} else {
+				cfg.Pools = p
+			}
+		}
+		if len(opt.confFile) > 0 {
+			stp.Debug("Reading legacy configuration file %q", opt.confFile)
+			p, err := readConfFile(opt.confFile)
+			if err != nil {
+				stp.Warn("failed to read configuration file: %v", err)
+			} else {
+				if cfg.Pools != nil || len(cfg.Pools) > 0 {
+					stp.Info("Overriding pool configuration from %q with configuration from %q",
+						opt.confDir, opt.confFile)
+				}
+				cfg.Pools = p
+			}
+		}
+	}
+
 	if err := stp.verifyConfig(cfg); err != nil {
 		return err
 	}
@@ -289,8 +296,7 @@ func (stp *stp) configNotify(event config.Event, source config.Source) error {
 	opt.createNodeLabel = cfg.LabelNode
 	opt.createNodeTaint = cfg.TaintNode
 	stp.conf = cfg
-	stp.Info("config updated successfully")
-	stp.Debug("new policy configuration:\n%s", utils.DumpJSON(stp.conf))
+	stp.Debug("policy configuration:\n%s", utils.DumpJSON(stp.conf))
 
 	return nil
 }
