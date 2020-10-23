@@ -370,7 +370,7 @@ vm-pipe-to-file() { # script API
         shift
     fi
     cat > "$tmp"
-    vm-put-file --cleanup "$append" "$tmp" "$1"
+    vm-put-file --cleanup $append "$tmp" "$1"
 }
 
 vm-sed-file() { # script API
