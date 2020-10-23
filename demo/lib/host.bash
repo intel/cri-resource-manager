@@ -165,6 +165,13 @@ host-wait-vm-ssh-server() {
     done
     echo "# VM SSH server  : ssh $VM_SSH_USER@$VM_IP"
 
+    if [ -d "$HOME/vms/data/$VM_NAME" ]; then
+        SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPath=$HOME/vms/data/$VM_NAME/ssh -o ControlPersist=30"
+        SSH="${SSH%% *} $SSH_OPTS"
+        SCP="${SCP%% *} $SSH_OPTS"
+        export SSH SSH_OPTS SCP
+    fi
+
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP" >/dev/null 2>&1
     retries=60
     retries_left=$retries

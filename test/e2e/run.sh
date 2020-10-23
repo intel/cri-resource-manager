@@ -408,7 +408,7 @@ launch() { # script API
     target="$1"
     case $target in
         "cri-resmgr")
-            host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+            host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
             }
             vm-command "cat $(basename "$cri_resmgr_cfg")"
@@ -422,7 +422,7 @@ launch() { # script API
             }
             ;;
         "cri-resmgr-systemd")
-            host-command "scp \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+            host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
             }
             vm-command "cp \"$(basename "$cri_resmgr_cfg")\" /etc/cri-resmgr/fallback.cfg"
@@ -690,7 +690,7 @@ create() { # script API
         kind_count[$template_kind]=$(( ${kind_count[$template_kind]} + 1 ))
         local NAME="${template_kind}$(( ${kind_count[$template_kind]} - 1 ))" # the first pod is pod0
         eval "echo -e \"$(<"${template_file}")\"" | grep -v '^ *$' > "$OUTPUT_DIR/$NAME.yaml"
-        host-command "scp \"$OUTPUT_DIR/$NAME.yaml\" $VM_SSH_USER@$VM_IP:" || {
+        host-command "$SCP \"$OUTPUT_DIR/$NAME.yaml\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying \"$OUTPUT_DIR/$NAME.yaml\" to VM failed"
         }
         vm-command "cat $NAME.yaml"
@@ -970,7 +970,7 @@ else
 fi
 
 # Save logs
-host-command "scp $VM_SSH_USER@$VM_IP:cri-resmgr.output.txt \"$OUTPUT_DIR/\""
+host-command "$SCP $VM_SSH_USER@$VM_IP:cri-resmgr.output.txt \"$OUTPUT_DIR/\""
 
 # Cleanup
 if [ "$cleanup" == "0" ]; then
