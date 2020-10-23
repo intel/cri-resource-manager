@@ -39,6 +39,7 @@ INSTALL    := install
 PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 UNITDIR    ?= $(PREFIX)/lib/systemd/system
+DOCDIR     ?= $(PREFIX)/share/doc/cri-resource-manager
 SYSCONFDIR ?= /etc
 CONFIGDIR  ?= /etc/cri-resmgr
 DEFAULTDIR ?= $(shell \
@@ -261,12 +262,13 @@ install-systemd-%:
 	for f in $$(find $$dir -name \*.service -o -name \*.socket); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f.in; \
-	done
+	done; \
 	for f in $$(find $$dir -name \*.service.in -o -name \*.socket.in); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    df=$${f##*/}; df=$${df%.in}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(UNITDIR)/$$df; \
-	    sed -E -i "s:__DEFAULTDIR__:$(DEFAULTDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
+	    sed -E -i -e "s:__DEFAULTDIR__:$(DEFAULTDIR):g" \
+	              -e "s:__BINDIR__:$(BINDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
 	done
 
 install-sysconf-%:
@@ -287,6 +289,15 @@ install-config-%:
 	    echo "  $$f in $(DESTDIR)$(CONFIGDIR)..."; \
 	    df=$${f##*/}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df}; \
+	done
+
+install-minimal-docs:
+	$(Q)echo "Installing minimal documentation to $(DOCDIR)..."; \
+	$(INSTALL) -d $(DESTDIR)$(DOCDIR) && \
+	for f in LICENSE docs/security.md; do \
+	    echo "  $$f in $(DESTDIR)$(DOCDIR)..."; \
+	    df=$${f##*/}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(DOCDIR)/$${df}; \
 	done
 
 clean-%:
@@ -452,6 +463,19 @@ vendored-dist: dist
 	rm -f vendored-$$tarball* && \
 	$(TAR) -cf vendored-$$tarball $$tardir && \
 	$(GZIP) vendored-$$tarball && \
+	rm -fr $$tardir
+
+binary-dist: build
+	$(Q)tarball=cri-resource-manager-$(TAR_VERSION).$$(uname -m).tar; \
+	echo "Creating binary dist tarball $$tarball..."; \
+	tardir=binary-dist; \
+	rm -fr $$tarball* $$tardir && \
+	$(MAKE) DESTDIR=$$tardir \
+	        PREFIX=/opt/intel \
+	        DEFAULTDIR=/etc/default \
+	        UNITDIR=$(SYSCONFDIR)/systemd/system install install-minimal-docs && \
+	$(TAR) -C $$tardir -cf $$tarball . && \
+	$(GZIP) $$tarball && \
 	rm -fr $$tardir
 
 spec: clean-spec $(SPEC_FILES)
