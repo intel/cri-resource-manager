@@ -34,6 +34,9 @@ import (
 var log = logger.Default()
 
 func main() {
+	rate := logger.Rate{Limit: logger.Every(1 * time.Minute)}
+	logger.SetGrpcLogger("grpc", &rate)
+
 	printConfig := flag.Bool("print-config", false, "Print configuration and exit.")
 	listPolicies := flag.Bool("list-policies", false, "List available policies.")
 	flag.Parse()
