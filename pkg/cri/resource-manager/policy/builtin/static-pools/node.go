@@ -18,8 +18,12 @@ package stp
 
 import (
 	"strconv"
+	"time"
 
 	core_v1 "k8s.io/api/core/v1"
+
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
+	"github.com/intel/cri-resource-manager/pkg/log"
 )
 
 const (
@@ -27,13 +31,68 @@ const (
 	cmkLegacyNodeLabelName    = "cmk.intel.com/cmk-node"
 )
 
-// Update Node object with STP/CMK-specific things
-func (stp *stp) updateNode(conf conf) error {
-	// We require an agent connection
-	if stp.agent == nil {
-		return stpError("stp requires cri-resource-manageent-agent connection")
+type nodeUpdater struct {
+	log.Logger
+	agent agent.Interface
+	conf  chan conf
+}
+
+func newNodeUpdater(agent agent.Interface) *nodeUpdater {
+	return &nodeUpdater{
+		Logger: log.NewLogger("static-pools-nu"),
+		agent:  agent,
+		conf:   make(chan conf, 1),
+	}
+}
+
+func (u *nodeUpdater) start() error {
+	u.Info("starting node updater")
+
+	if u.agent == nil {
+		return stpError("cri-resmgr-agent connection required")
 	}
 
+	go func() {
+		var pending *conf
+		var retry <-chan time.Time
+
+		for {
+			select {
+			case c := <-u.conf:
+				pending = &c
+				retry = time.After(0)
+			case _ = <-retry:
+				if pending != nil {
+					err := u.updateNode(pending, -1)
+					if err != nil {
+						u.Info("node update failed: %v", err)
+						retry = time.After(5 * time.Second)
+					} else {
+						u.Info("node successfully updated")
+						pending = nil
+						retry = nil
+					}
+				} else {
+					u.Panic("BUG: node update with nil config requested")
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (u *nodeUpdater) update(c conf) {
+	// Pop possibly pending value from the channel
+	select {
+	case <-u.conf:
+	default:
+	}
+	u.conf <- c
+}
+
+// Update Node object with STP/CMK-specific things
+func (u *nodeUpdater) updateNode(conf *conf, opTimeout time.Duration) error {
 	// Count total number of cpu lists of all exclusive pools
 	numExclusiveCPULists := 0
 	for _, pool := range conf.Pools {
@@ -45,26 +104,28 @@ func (stp *stp) updateNode(conf conf) error {
 	// Update extended resources
 	resources := map[string]string{
 		exclusiveCoreResourceName: strconv.Itoa(numExclusiveCPULists)}
-	if err := stp.agent.UpdateNodeCapacity(resources, -1); err != nil {
+	u.Info("updating node capacity (extended resources)")
+	if err := u.agent.UpdateNodeCapacity(resources, opTimeout); err != nil {
 		return err
 	}
 
 	// Manage legacy node label
 	if conf.LabelNode {
-		stp.Info("creating CMK node label")
-		err := stp.agent.SetLabels(map[string]string{cmkLegacyNodeLabelName: "true"}, -1)
+		u.Info("creating CMK node label")
+		err := u.agent.SetLabels(map[string]string{cmkLegacyNodeLabelName: "true"}, opTimeout)
 		if err != nil {
 			return stpError("failed to update legacy node label: %v", err)
 		}
 	} else {
-		err := stp.agent.RemoveLabels([]string{cmkLegacyNodeLabelName}, -1)
+		u.Info("removing CMK node label")
+		err := u.agent.RemoveLabels([]string{cmkLegacyNodeLabelName}, opTimeout)
 		if err != nil {
 			return stpError("failed to update legacy node label: %v", err)
 		}
 	}
 
 	// Manage legacy node taint
-	nodeTaints, err := stp.agent.GetTaints(-1)
+	nodeTaints, err := u.agent.GetTaints(opTimeout)
 	if err != nil {
 		return stpError("failed to fetch node taints: %v", err)
 	}
@@ -75,15 +136,17 @@ func (stp *stp) updateNode(conf conf) error {
 		Effect: core_v1.TaintEffectNoSchedule,
 	}
 	cmkTaints := []core_v1.Taint{legacyTaint}
-	_, tainted := stp.agent.FindTaintIndex(nodeTaints, &legacyTaint)
+	_, tainted := u.agent.FindTaintIndex(nodeTaints, &legacyTaint)
 
 	if !tainted && conf.TaintNode {
-		if err := stp.agent.SetTaints(cmkTaints, -1); err != nil {
+		u.Info("creating CMK node taint")
+		if err := u.agent.SetTaints(cmkTaints, opTimeout); err != nil {
 			return stpError("failed to set legacy node taint: %v", err)
 		}
 	}
 	if tainted && !conf.TaintNode {
-		if err := stp.agent.RemoveTaints(cmkTaints, -1); err != nil {
+		u.Debug("removing CMK node taint")
+		if err := u.agent.RemoveTaints(cmkTaints, opTimeout); err != nil {
 			return stpError("failed to clear legacy node taint: %v", err)
 		}
 	}

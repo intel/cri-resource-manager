@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
@@ -69,9 +68,9 @@ const (
 type stp struct {
 	logger.Logger
 
-	conf  *conf           // STP policy configuration
-	state cache.Cache     // state cache
-	agent agent.Interface // client connection to cri-resmgr agent gRPC server
+	conf        *conf        // STP policy configuration
+	nodeUpdater *nodeUpdater // node updater thread
+	state       cache.Cache  // state cache
 }
 
 var _ policy.Backend = &stp{}
@@ -83,9 +82,9 @@ var _ policy.Backend = &stp{}
 // CreateStpPolicy creates a new policy instance.
 func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	stp := &stp{
-		Logger: logger.NewLogger(PolicyName),
-		agent:  opts.AgentCli,
-		state:  opts.Cache,
+		Logger:      logger.NewLogger(PolicyName),
+		state:       opts.Cache,
+		nodeUpdater: newNodeUpdater(opts.AgentCli),
 	}
 
 	stp.Info("creating policy...")
@@ -107,14 +106,14 @@ func (stp *stp) Description() string {
 
 // Start prepares this policy for accepting allocation/release requests.
 func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
+	if err := stp.nodeUpdater.start(); err != nil {
+		return err
+	}
+
 	if stp.conf == nil {
 		if err := stp.setConfig(cfg); err != nil {
 			return err
 		}
-	}
-
-	if err := stp.updateNode(*stp.conf); err != nil {
-		stp.Fatal("%v", err)
 	}
 
 	if err := stp.initializeState(); err != nil {
@@ -297,6 +296,8 @@ func (stp *stp) setConfig(cfg *conf) error {
 
 	stp.conf = cfg
 	stp.Debug("policy configuration:\n%s", utils.DumpJSON(stp.conf))
+
+	stp.nodeUpdater.update(*stp.conf)
 
 	return nil
 }
