@@ -3,6 +3,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
 HOST_PROMPT=${HOST_PROMPT-"\e[38;5;11mhost>\e[0m "}
 HOST_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")"
 HOST_PROJECT_DIR="$(dirname "$(dirname "$(realpath "$HOST_LIB_DIR")")")"
+HOST_VM_IMAGE_DIR=~/vms/images
+HOST_VM_DATA_DIR_TEMPLATE="~/vms/data/\${VM_NAME}"
 GOVM=${GOVM-govm}
 
 host-command() {
@@ -29,13 +31,17 @@ host-set-vm-config() {
     VM_NAME="$1"
     VM_DISTRO="$2"
     VM_CRI="$3"
-    VM_SSH_USER=$(vm-ssh-user)
+    VM_SSH_USER="$(vm-ssh-user)"
+    HOST_VM_DATA_DIR="$(eval "echo $HOST_VM_DATA_DIR_TEMPLATE")"
+    VM_COMPOSE_YAML="$HOST_VM_DATA_DIR/govm-compose.yaml"
 }
 
 host-fetch-vm-image() {
     local url=$(vm-image-url)
     local file=$(basename $url)
     local image decompress
+    [ -d "$HOST_VM_IMAGE_DIR" ] || mkdir -p "$HOST_VM_IMAGE_DIR" ||
+        error "cannot create directory for VM images: $HOST_VM_IMAGE_DIR"
     case $file in
         *.xz)
             image=${file%.xz}
@@ -54,22 +60,23 @@ host-fetch-vm-image() {
             decompress=":"
             ;;
     esac
-    [ -f "$image" ] || {
-        echo "VM image $image not found..."
-        [ -f "$file" ] || {
+    [ -f "$HOST_VM_IMAGE_DIR/$image" ] || {
+        echo "VM image $HOST_VM_IMAGE_DIR/$image not found..."
+        [ -f "$HOST_VM_IMAGE_DIR/$file" ] || {
             echo "downloading VM image $image..."
-            host-command "wget --progress=dot:giga \"$url\"" ||
+            host-command "wget --progress=dot:giga -O \"$HOST_VM_IMAGE_DIR/$file\" \"$url\"" ||
                 error "failed to download VM image ($url)"
         }
         if [ -n "$decompress" ]; then
             echo "decompressing VM image $file..."
-            $decompress $file || error "failed to decompress $file to $image using $decompress"
+            ( cd "$HOST_VM_IMAGE_DIR" && $decompress $file ) ||
+                error "failed to decompress $file to $image using $decompress"
         fi
-        if [ ! -f "$image" ]; then
-            error "internal error, fetching+decompressing $url did not produce $image"
+        if [ ! -f "$HOST_VM_IMAGE_DIR/$image" ]; then
+            error "internal error, fetching+decompressing $url did not produce $HOST_VM_IMAGE_DIR/$image"
         fi
     }
-    VM_IMAGE=$image
+    VM_IMAGE="$HOST_VM_IMAGE_DIR/$image"
 }
 
 host-create-vm() {
@@ -122,18 +129,24 @@ host-create-vm() {
     # If VM does not exist, create it from scrach
     ${GOVM} ls | grep -q "$VM_NAME" || {
         host-fetch-vm-image
-        vm-compose-govm-template > $vm.yaml
-        host-command "${GOVM} compose -f $vm.yaml"
+        mkdir -p "$(dirname "$VM_COMPOSE_YAML")"
+        vm-compose-govm-template > "$VM_COMPOSE_YAML"
+        host-command "${GOVM} compose -f \"$VM_COMPOSE_YAML\""
+        echo "# VM base image  : $VM_IMAGE"
+        echo "# VM govm yaml   : $VM_COMPOSE_YAML"
     }
 
     sleep 1
     VM_CONTAINER_ID=$(${GOVM} ls | awk "/$VM_NAME/{print \$1}")
-    echo "# VM Docker container: $VM_CONTAINER_ID"
     # Verify Qemu version. Refuse to run if Qemu < 5.0.
     # Use "docker run IMAGE" instead of "docker exec CONTAINER",
     # because the container may have already failed.
     VM_CONTAINER_IMAGE=$(docker inspect $VM_CONTAINER_ID | jq '.[0].Image' -r | awk -F: '{print $2}')
+    echo "# VM name        : $VM_NAME"
+    echo "# VM Linux distro: $VM_DISTRO"
+    echo "# VM CRI         : $VM_CRI"
     echo "# VM Docker image: $VM_CONTAINER_IMAGE"
+    echo "# VM Docker cntnr: $VM_CONTAINER_ID"
     if [ -n "$VM_CONTAINER_IMAGE" ]; then
         VM_CONTAINER_QEMU_VERSION=$(docker run --entrypoint=/usr/bin/qemu-system-x86_64 $VM_CONTAINER_IMAGE -version | awk '/QEMU emulator version/{print $4}')
     fi
