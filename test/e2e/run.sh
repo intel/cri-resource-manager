@@ -61,8 +61,8 @@ usage() {
     echo "    on_verify_fail, on_create_fail: code to be executed in case"
     echo "             verify() or create() fails. Example: go to interactive"
     echo "             mode if a verification fails: on_verify_fail=interactive"
-    echo "    on_verify, on_create: code to be executed every time after"
-    echo "             verify and create"
+    echo "    on_verify, on_create, on_launch: code to be executed every time"
+    echo "             after verify/create/launch function"
     echo ""
     echo "  Test input VARs:"
     echo "    topology: JSON to override NUMA node list used in tests."
@@ -163,7 +163,7 @@ screen-create-singlenode-cluster() {
 screen-launch-cri-resmgr-agent() {
     speed=60 out "### Launching cri-resmgr-agent."
     speed=60 out "### The agent will make cri-resmgr configurable with ConfigMaps."
-    vm-command "NODE_NAME=\$(hostname) cri-resmgr-agent -kubeconfig \$HOME/.kube/config >cri-resmgr-agent.output.txt 2>&1 &"
+    launch cri-resmgr-agent
 }
 
 get-py-allowed() {
@@ -370,16 +370,25 @@ install() { # script API
     #                 $ install cri-resmgr
     #               Fetch github master to VM, build and install on VM:
     #                 $ binsrc=github install cri-resmgr
+    #   cri-resmgr-webhook: install cri-resmgr-webhook to VM.
+    #               Installs from the latest webhook Docker image on the host.
     #
     # Example:
     #   uninstall cri-resmgr
     #   install cri-resmgr
     #   launch cri-resmgr
-    if [ "$1" == "cri-resmgr" ]; then
-        vm-install-cri-resmgr
-    else
-        error "unknown target to install \"$1\""
-    fi
+    local target="$1"
+    case "$target" in
+        "cri-resmgr")
+            vm-install-cri-resmgr
+            ;;
+        "cri-resmgr-webhook")
+            vm-install-cri-resmgr-webhook
+            ;;
+        *)
+            error "unknown target to install \"$1\""
+            ;;
+    esac
 }
 
 uninstall() { # script API
@@ -387,9 +396,23 @@ uninstall() { # script API
     #
     # Supported TARGETs:
     #   cri-resmgr: stop (kill) cri-resmgr and purge all files from VM.
-    vm-command "kill -9 \$(pgrep cri-resmgr) 2>/dev/null"
-    distro-remove-pkg cri-resource-manager
-    vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr /etc/cri-resmgr"
+    #   cri-resmgr-webhook: stop cri-resmgr-webhook and delete webhook files from VM.
+    local target="$1"
+    case $target in
+        "cri-resmgr")
+            terminate cri-resmgr
+            terminate cri-resmgr-agent
+            distro-remove-pkg cri-resource-manager
+            vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr /etc/cri-resmgr"
+            ;;
+        "cri-resmgr-webhook")
+            terminate cri-resmgr-webhook
+            vm-command "rm -rf webhook"
+            ;;
+        *)
+            error "uninstall: invalid target \"$target\""
+            ;;
+    esac
 }
 
 launch() { # script API
@@ -406,16 +429,27 @@ launch() { # script API
     #                Environment variables:
     #                cri_resmgr_cfg: configuration filepath (on host)
     #
+    #   cri-resmgr-agent:
+    #                launch cri-resmgr-agent on VM. Environment variables:
+    #                cri_resmgr_agent_extra_args: extra arguments on command line
+    #
+    #   cri-resmgr-webhook:
+    #                deploy cri-resmgr-webhook from the image on VM.
+    #
     # Example:
     #   cri_resmgr_cfg=/tmp/memtier.cfg launch cri-resmgr
-    target="$1"
+    local target="$1"
+    local launch_cmd
+    local adjustment_schema="$HOST_PROJECT_DIR/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml"
     case $target in
         "cri-resmgr")
             host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
             }
             vm-command "cat $(basename "$cri_resmgr_cfg")"
-            vm-command "cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args >cri-resmgr.output.txt 2>&1 &"
+            launch_cmd="cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
+            vm-command-q "echo '$launch_cmd' > cri-resmgr.launch.sh ; rm -f cri-resmgr.output.txt"
+            vm-command "$launch_cmd  >cri-resmgr.output.txt 2>&1 &"
             sleep 2 >/dev/null 2>&1
             vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
                 command-error "launching cri-resmgr failed with FATAL ERROR"
@@ -424,25 +458,71 @@ launch() { # script API
                 command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
             }
             ;;
+
+        "cri-resmgr-agent")
+            host-command "$SCP \"$adjustment_schema\" $VM_SSH_USER@$VM_IP:" ||
+                command-error "copying \"$adjustment_schema\" to VM failed"
+            vm-command "kubectl delete -f $(basename "$adjustment_schema"); kubectl create -f $(basename "$adjustment_schema")"
+            launch_cmd="NODE_NAME=\$(hostname) cri-resmgr-agent -kubeconfig /root/.kube/config $cri_resmgr_agent_extra_args"
+            vm-command-q "echo '$launch_cmd' >cri-resmgr-agent.launch.sh; rm -f cri-resmgr-agent.output.txt"
+            vm-command "$launch_cmd >cri-resmgr-agent.output.txt 2>&1 &"
+            sleep 2 >/dev/null 2>&1
+            vm-command "grep 'FATAL ERROR' cri-resmgr-agent.output.txt" >/dev/null 2>&1 &&
+                command-error "launching cri-resmgr-agent failed with FATAL ERROR"
+            vm-command "pidof cri-resmgr-agent" >/dev/null 2>&1 ||
+                command-error "launching cri-resmgr-agent failed, cannot find cri-resmgr-agent PID"
+            ;;
+
         "cri-resmgr-systemd")
-            host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+            host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" ||
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
-            }
             vm-command "cp \"$(basename "$cri_resmgr_cfg")\" /etc/cri-resmgr/fallback.cfg"
-            vm-command "systemctl daemon-reload ; systemctl start cri-resource-manager" || {
+            vm-command "systemctl daemon-reload ; systemctl start cri-resource-manager" ||
                 command-error "systemd failed to start cri-resource-manager"
-            }
             sleep 5
             vm-command "systemctl is-active cri-resource-manager" || {
                 vm-command "systemctl status cri-resource-manager"
                 command-error "cri-resource-manager did not become active after systemctl start"
             }
             ;;
+
+        "cri-resmgr-webhook")
+            kubectl apply -f webhook/webhook-deployment.yaml
+            kubectl wait --for=condition=Available -n cri-resmgr deployments/cri-resmgr-webhook ||
+                error "cri-resmgr-webhook deployment did not become Available"
+            kubectl apply -f webhook/mutating-webhook-config.yaml
+            ;;
+
         *)
             error "launch: invalid target \"$1\""
             ;;
     esac
+    is-hooked on_launch && run-hook on_launch
+    return 0
+}
 
+terminate() { # script API
+    # Usage: terminate TARGET
+    #
+    # Supported TARGETs:
+    #   cri-resmgr: stop (kill) cri-resmgr.
+    #   cri-resmgr-agent: stop (kill) cri-resmgr-agent.
+    #   cri-resmgr-webhook: delete cri-resmgr-webhook from k8s.
+    local target="$1"
+    case $target in
+        "cri-resmgr")
+            vm-command "kill -9 \$(pidof cri-resmgr) 2>/dev/null"
+            ;;
+        "cri-resmgr-agent")
+            vm-command "kill -9 \$(pidof cri-resmgr-agent) 2>/dev/null"
+            ;;
+        "cri-resmgr-webhook")
+            vm-command "kubectl delete -f webhook/mutating-webhook-config.yaml; kubectl delete -f webhook/webhook-deployment.yaml"
+            ;;
+        *)
+            error "terminate: invalid target \"$target\""
+            ;;
+    esac
 }
 
 sleep() { # script API
@@ -949,6 +1029,11 @@ else
     vm-wait-process kube-apiserver
 fi
 
+# Start cri-resmgr-agent if not already running
+if ! vm-command-q "pidof cri-resmgr-agent" >/dev/null; then
+    screen-launch-cri-resmgr-agent
+fi
+
 if [ "$mode" == "debug" ]; then
     screen-install-cri-resmgr-debugging
     echo "How to debug cri-resmgr:"
@@ -973,7 +1058,7 @@ else
 fi
 
 # Save logs
-host-command "$SCP $VM_SSH_USER@$VM_IP:cri-resmgr.output.txt \"$OUTPUT_DIR/\""
+host-command "$SCP $VM_SSH_USER@$VM_IP:cri-resmgr*.output.txt \"$OUTPUT_DIR/\""
 
 # Cleanup
 if [ "$cleanup" == "0" ]; then
