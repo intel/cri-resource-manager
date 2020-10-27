@@ -34,14 +34,14 @@ const (
 type nodeUpdater struct {
 	log.Logger
 	agent agent.Interface
-	conf  chan conf
+	conf  chan config
 }
 
 func newNodeUpdater(agent agent.Interface) *nodeUpdater {
 	return &nodeUpdater{
 		Logger: log.NewLogger("static-pools-nu"),
 		agent:  agent,
-		conf:   make(chan conf, 1),
+		conf:   make(chan config, 1),
 	}
 }
 
@@ -53,7 +53,7 @@ func (u *nodeUpdater) start() error {
 	}
 
 	go func() {
-		var pending *conf
+		var pending *config
 		var retry <-chan time.Time
 
 		for {
@@ -82,7 +82,7 @@ func (u *nodeUpdater) start() error {
 	return nil
 }
 
-func (u *nodeUpdater) update(c conf) {
+func (u *nodeUpdater) update(c config) {
 	// Pop possibly pending value from the channel
 	select {
 	case <-u.conf:
@@ -92,7 +92,7 @@ func (u *nodeUpdater) update(c conf) {
 }
 
 // Update Node object with STP/CMK-specific things
-func (u *nodeUpdater) updateNode(conf *conf, opTimeout time.Duration) error {
+func (u *nodeUpdater) updateNode(conf *config, opTimeout time.Duration) error {
 	// Count total number of cpu lists of all exclusive pools
 	numExclusiveCPULists := 0
 	for _, pool := range conf.Pools {

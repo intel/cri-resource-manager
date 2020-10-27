@@ -25,7 +25,23 @@ import (
 	"strings"
 
 	"sigs.k8s.io/yaml"
+
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 )
+
+// config captures our runtime configurable parameters.
+type config struct {
+	// Pools defines our set of pools in use.
+	Pools pools `json:"pools,omitempty"`
+	// ConfDirPath is the filesystem path to the legacy configuration directry structure.
+	ConfDirPath string
+	// ConfFilePath is the filesystem path to the legacy configuration file.
+	ConfFilePath string
+	// LabelNode controls whether backwards-compatible CMK node label is created.
+	LabelNode bool
+	// TaintNode controls whether backwards-compatible CMK node taint is created.
+	TaintNode bool
+}
 
 type pools map[string]poolConfig
 
@@ -33,6 +49,17 @@ type cpuList struct {
 	Socket     uint64
 	Cpuset     string // TODO: might want to use cpuset from kubelet
 	containers map[string]struct{}
+}
+
+// STP policy runtime configuration with their defaults.
+var conf = defaultConfig().(*config)
+
+// defaultConfig returns a new conf instance, all initialized to defaults.
+func defaultConfig() interface{} {
+	return &config{
+		Pools:       make(pools),
+		ConfDirPath: "/etc/cmk",
+	}
 }
 
 func (c *cpuList) addContainer(id string) {
@@ -217,4 +244,9 @@ func parseCPUListName(name string) ([]uint, error) {
 		cpus[i] = uint(cpu)
 	}
 	return cpus, nil
+}
+
+// Register us for command line option processing and configuration management.
+func init() {
+	pkgcfg.Register(PolicyPath, PolicyDescription, conf, defaultConfig)
 }
