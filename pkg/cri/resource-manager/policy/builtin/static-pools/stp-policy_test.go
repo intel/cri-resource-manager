@@ -60,6 +60,12 @@ func TestParseContainerCmdline(t *testing.T) {
 	if args == nil || !cmp.Equal(expected, *args) {
 		t.Errorf("Exptected %v but got %v", expected, *args)
 	}
+
+	// 6. Only _cmk_ isolate should be accepted
+	args = stp.parseContainerCmdline([]string{"bash"}, []string{"-c", "dmk isolate --pool=foo cmd --arg"})
+	if args != nil {
+		t.Errorf("Exptected <nil> but got %v", *args)
+	}
 }
 
 func TestCachableData(t *testing.T) {

@@ -413,7 +413,7 @@ func parseCmkCmdline(args []string) *cmkLegacyArgs {
 	// Args that we're not really interested in
 	_ = cmkCmd.String("conf-dir", "", "CMK configuration directory")
 
-	if len(args) > 1 && args[1] == "isolate" {
+	if len(args) > 1 && args[0] == "cmk" && args[1] == "isolate" {
 		err := cmkCmd.Parse(args[2:])
 		// Parse out (i.e. ignore) all unknown args
 		for err != nil {
