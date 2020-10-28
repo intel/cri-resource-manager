@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/intel/cri-resource-manager/pkg/config"
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
@@ -68,7 +68,7 @@ const (
 type stp struct {
 	logger.Logger
 
-	conf        *conf        // STP policy configuration
+	conf        *config      // STP policy configuration
 	nodeUpdater *nodeUpdater // node updater thread
 	state       cache.Cache  // state cache
 }
@@ -89,7 +89,7 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 
 	stp.Info("creating policy...")
 
-	config.GetModule(PolicyPath).AddNotify(stp.configNotify)
+	pkgcfg.GetModule(PolicyPath).AddNotify(stp.configNotify)
 
 	return stp
 }
@@ -111,7 +111,7 @@ func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
 	}
 
 	if stp.conf == nil {
-		if err := stp.setConfig(cfg); err != nil {
+		if err := stp.setConfig(conf); err != nil {
 			return err
 		}
 	}
@@ -251,10 +251,10 @@ func (stp *stp) Introspect(*introspect.State) {
 	return
 }
 
-func (stp *stp) configNotify(event config.Event, source config.Source) error {
+func (stp *stp) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	stp.Info("configuration %s", event)
 
-	if err := stp.setConfig(cfg); err != nil {
+	if err := stp.setConfig(conf); err != nil {
 		return err
 	}
 
@@ -263,7 +263,7 @@ func (stp *stp) configNotify(event config.Event, source config.Source) error {
 	return nil
 }
 
-func (stp *stp) setConfig(cfg *conf) error {
+func (stp *stp) setConfig(cfg *config) error {
 	// Read legacy pools configuration if the given config has no pools configured
 	if cfg.Pools == nil || len(cfg.Pools) == 0 {
 		if len(cfg.ConfDirPath) > 0 {
@@ -325,7 +325,7 @@ func (stp *stp) initializeState() error {
 }
 
 // Verify configuration against the existing set of containers
-func (stp *stp) verifyConfig(cfg *conf) error {
+func (stp *stp) verifyConfig(cfg *config) error {
 	//  Sanity check for config
 	if cfg == nil || cfg.Pools == nil || len(cfg.Pools) == 0 {
 		return stpError("invalid config, no pools configured")
