@@ -1,3 +1,4 @@
+# shellcheck disable=SC2120
 GO_URLDIR=https://golang.org/dl
 GO_VERSION=1.14.9
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
@@ -26,6 +27,7 @@ distro-remove-pkg()         { distro-resolve "$@"; }
 distro-setup-proxies()      { distro-resolve "$@"; }
 distro-install-golang()     { distro-resolve "$@"; }
 distro-install-containerd() { distro-resolve "$@"; }
+distro-config-containerd()  { distro-resolve "$@"; }
 distro-install-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
@@ -203,8 +205,9 @@ debian-10-install-containerd() {
         debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
         debian-refresh-pkg-db
         debian-install-pkg containerd
-        generic-setup-containerd
     }
+    distro-config-containerd
+    systemd-restart-containerd
 }
 
 debian-install-containerd() {
@@ -214,8 +217,9 @@ debian-install-containerd() {
         # The default Debian containerd expects CNI binaries in /usr/lib/cni,
         # but kubernetes-cni.deb (debian-install-k8s) installs to /opt/cni/bin.
         vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
-        generic-setup-containerd
     }
+    distro-config-containerd
+    systemd-restart-containerd
 }
 
 debian-install-k8s() {
@@ -249,7 +253,7 @@ YUM_INSTALL="yum install --disableplugin=fastestmirror -y"
 YUM_REMOVE="yum remove --disableplugin=fastestmirror -y"
 
 centos-7-image-url() {
-    echo "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-1503.qcow2.xz"
+    echo "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-2003.qcow2.xz"
 }
 
 centos-8-image-url() {
@@ -278,17 +282,26 @@ centos-7-remove-pkg() {
         command-error "failed to remove package(s) $*"
 }
 
+centos-7-install-containerd-pre() {
+    create-ext4-var-lib-containerd
+    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
+}
+
+centos-8-install-containerd-pre() {
+    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
+}
+
+centos-7-install-k8s-post() {
+    vm-sed-file /etc/sysconfig/kubelet 's/^KUBELET_EXTRA_ARGS=/KUBELET_EXTRA_ARGS="--feature-gates=SupportNodePidsLimit=false,SupportPodPidsLimit=false"/'
+}
+
+centos-7-k8s-cni() {
+    echo "weavenet"
+}
+
 centos-install-golang() {
     distro-install-pkg wget tar gzip
     from-tarball-install-golang
-}
-
-centos-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
-        distro-install-pkg containerd
-    }
-    generic-setup-containerd
 }
 
 fedora-image-url() {
@@ -320,12 +333,57 @@ fedora-install-golang() {
     from-tarball-install-golang
 }
 
+fedora-install-containerd-pre() {
+    distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
+}
+
 fedora-install-containerd() {
     vm-command-q "[ -f /usr/bin/containerd ]" || {
-        distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
-        distro-install-pkg containerd
+        distro-install-pkg containerd containernetworking-plugins
     }
-    generic-setup-containerd
+    distro-config-containerd
+    systemd-restart-containerd
+}
+
+fedora-config-containerd-post() {
+    vm-command 'cat >> /etc/containerd/config.toml <<EOF
+[plugins.cri.cni]
+  bin_dir = "/usr/libexec/cni"
+  conf_dir = "/etc/cni/net.d"
+  conf_template = ""
+EOF'
+    vm-command "mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
+{
+  \"cniVersion\": \"0.4.0\",
+  \"name\": \"mynet\",
+  \"type\": \"bridge\",
+  \"bridge\": \"cni0\",
+  \"isGateway\": true,
+  \"ipMasq\": true,
+  \"ipam\": {
+    \"type\": \"host-local\",
+    \"subnet\": \"$CNI_SUBNET\",
+    \"routes\": [
+      { \"dst\": \"0.0.0.0/0\" }
+    ]
+  }
+}
+EOF"
+    vm-command 'cat > /etc/cni/net.d/20-portmap.conf <<EOF
+{
+    "cniVersion": "0.4.0",
+    "type": "portmap",
+    "capabilities": {"portMappings": true},
+    "snat": true
+}
+EOF'
+    vm-command 'cat > /etc/cni/net.d/99-loopback.conf <<EOF
+{
+  "cniVersion": "0.4.0",
+  "name": "lo",
+  "type": "loopback"
+}
+EOF'
 }
 
 fedora-install-k8s() {
@@ -359,6 +417,18 @@ mkdir -p /etc/sudoers.d
 echo 'Defaults !requiretty' > /etc/sudoers.d/10-norequiretty
 setenforce 0
 sed -E -i 's/^SELINUX=.*$/SELINUX=permissive/' /etc/selinux/config
+
+modprobe bridge
+modprobe nf-tables-bridge || :
+modprobe br_netfilter || :
+echo -e 'bridge\nnf-tables-bridge\nbr_netfilter' > /etc/modules-load.d/kubelet.conf
+
+if grep -q NAME=Fedora /etc/os-release; then
+    if ! grep -q systemd.unified_cgroup_hierarchy=0 /proc/cmdline; then
+        sed -i -E 's/^kernelopts=(.*)/kernelopts=\1 systemd.unified_cgroup_hierarchy=0/' /boot/grub2/grubenv
+        shutdown -r now
+    fi
+fi
 EOF
 }
 
@@ -448,6 +518,12 @@ default-k8s-cni() {
     echo cilium
 }
 
+default-config-containerd() {
+    if vm-command-q "[ -f /etc/containerd/config.toml ]"; then
+        vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
+    fi
+}
+
 ###########################################################################
 
 #
@@ -463,10 +539,58 @@ from-tarball-install-golang() {
     }
 }
 
-generic-setup-containerd() {
-    if vm-command-q "[ -f /etc/containerd/config.toml ]"; then
-        vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
+create-ext4-var-lib-containerd() {
+    local dir="/var/lib/containerd" file="/loop-ext4.dsk" dev
+
+    echo "Creating loopback-mounted ext4 $dir..."
+
+    if ! dev="$(vm-command-q "losetup -f")" || [ -z "$dev" ]; then
+        command-error "failed to find unused loopback device"
     fi
+    vm-command "dd if=/dev/zero of=$file bs=$((1024*1000)) count=$((1000*5))" ||
+        command-error "failed to create file for ext4 loopback mount"
+    vm-command "losetup $dev $file" ||
+        command-error "failed to attach $file to $dev"
+    vm-command "mkfs.ext4 $dev" ||
+        command-error "failed to create ext4 filesystem on $dev ($file)"
+    if vm-command "[ -d $dir ]"; then
+        vm-command "mv $dir $dir.orig" ||
+            command-error "failed to rename original $dir to $dir.orig"
+    fi
+    vm-command "mkdir -p $dir" ||
+        command-error "failed to create $dir"
+
+    cat <<EOF |
+[Unit]
+Description=Activate loop device
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Service]
+ExecStart=/sbin/losetup $dev $file
+Type=oneshot
+
+[Install]
+WantedBy=local-fs.target
+EOF
+    vm-pipe-to-file /etc/systemd/system/attach-loop-devices.service
+    vm-command "systemctl enable attach-loop-devices.service"
+
+    cat <<EOF |
+$dev    $dir    ext4    defaults    1 2
+EOF
+    vm-pipe-to-file --append /etc/fstab
+
+    vm-command "mount $dir" ||
+        command-error "failed to mount new ext4 $dir"
+    if vm-command "[ -d $dir.orig ]"; then
+        vm-command "tar -C $dir.orig -cf - . | tar -C $dir -xf -" ||
+            command-error "failed to copy $dir.orig to $dir"
+    fi
+}
+
+systemd-restart-containerd() {
     vm-command "systemctl daemon-reload && systemctl restart containerd" ||
         command-error "failed to restart containerd systemd service"
 }
