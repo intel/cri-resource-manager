@@ -81,7 +81,7 @@ vm-check-env() {
         return 1
     fi
     if [ -n "$SSH_AUTH_SOCK" ] && [ -e "$SSH_AUTH_SOCK" ]; then
-        if ! ssh-add -l | grep -q "$(ssh-keygen -l -f "$SSH_KEY" < /dev/null 2>/dev/null)"; then
+        if ! ssh-add -l | grep -q "$(ssh-keygen -l -f "$SSH_KEY" < /dev/null 2>/dev/null | awk '{print $2}')"; then
             if ! ssh-add "$SSH_KEY" < /dev/null; then
                 echo "ERROR:"
                 echo "ERROR: environment setup failed:"
