@@ -604,6 +604,13 @@ vm-install-cni-cilium() {
     fi
 }
 
+vm-install-cni-weavenet() {
+    vm-command "kubectl apply -f \"https://cloud.weave.works/k8s/net?k8s-version=\$(kubectl version | base64 | tr -d '\n')\""
+    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/weave-net"; then
+        command-error "installing weavenet CNI to Kubernetes failed/timed out"
+    fi
+}
+
 vm-print-usage() {
     echo "- Login VM:     ssh $VM_SSH_USER@$VM_IP"
     echo "- Stop VM:      govm stop $VM_NAME"
