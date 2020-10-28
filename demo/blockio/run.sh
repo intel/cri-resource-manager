@@ -93,7 +93,7 @@ screen-launch-cri-resmgr() {
 screen-create-singlenode-cluster() {
     speed=60 out "### Setting up single-node Kubernetes cluster."
     speed=60 out "### CRI Resource Manager + containerd will act as the container runtime."
-    vm-create-singlenode-cluster-cilium
+    vm-create-singlenode-cluster
 }
 
 screen-launch-cri-resmgr-agent() {

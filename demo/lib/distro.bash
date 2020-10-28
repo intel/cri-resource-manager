@@ -1,6 +1,7 @@
 GO_URLDIR=https://golang.org/dl
 GO_VERSION=1.14.9
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
+CNI_SUBNET=10.217.0.0/16
 
 ###########################################################################
 
@@ -27,6 +28,7 @@ distro-install-golang()     { distro-resolve "$@"; }
 distro-install-containerd() { distro-resolve "$@"; }
 distro-install-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
+distro-k8s-cni()            { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
 
@@ -382,11 +384,11 @@ default-setup-proxies() {
 ${scope}http_proxy=$http_proxy
 ${scope}https_proxy=$https_proxy
 ${scope}ftp_proxy=$ftp_proxy
-${scope}no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc
+${scope}no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
 ${scope}HTTP_PROXY=$http_proxy
 ${scope}HTTPS_PROXY=$https_proxy
 ${scope}FTP_PROXY=$ftp_proxy
-${scope}NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc
+${scope}NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
 EOF
       vm-pipe-to-file $append $file
       scope="export "
@@ -398,7 +400,7 @@ EOF
 [Service]
 Environment=HTTP_PROXY="$http_proxy"
 Environment=HTTPS_PROXY="$https_proxy"
-Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn,.svc"
+Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc"
 EOF
         vm-pipe-to-file $file
     done
@@ -419,6 +421,9 @@ EOF
     done
 }
 
+default-k8s-cni() {
+    echo cilium
+}
 
 ###########################################################################
 
