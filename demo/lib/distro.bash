@@ -39,28 +39,52 @@ default-bootstrap-commands() { :; }
 
 # distro-specific function resolution
 distro-resolve() {
-    # We dig out the distro-* API function name from stack of callers,
-    # then try resolving it to an implementation. The resolution
-    # process goes through a list of potential implementation names in
-    # decreasing order of distro/version-specificity, then tries a few
-    # fallbacks based on known distro relations and properties.
-    local apifn="${FUNCNAME[1]}" fallbacks fn
+    local apifn="${FUNCNAME[1]}" fn prefn postfn
+    # shellcheck disable=SC2086
+    {
+        fn="$(distro-resolve-fn $apifn)"
+        prefn="$(distro-resolve-fn $apifn-pre)"
+        postfn="$(distro-resolve-fn $apifn-post)"
+        command-debug-log "$VM_DISTRO/${FUNCNAME[1]}: pre: ${prefn:--}, fn: ${fn:--}, post: ${postfn:--}"
+    }
+    [ -n "$prefn" ] && { $prefn "$@" || return $?; }
+    $fn "$@" || return $?
+    [ -n "$postfn" ] && { $postfn "$@" || return $?; }
+    return 0
+}
+
+distro-resolve-fn() {
+    # We try resolving distro-agnostic implementations by looping through
+    # a list of candidate function names in decreasing order of precedence
+    # and returning the first one found. The candidate list has version-
+    # exact and unversioned distro-specific functions and a set fallbacks
+    # based on known distro, derivative, and package type relations.
+    #
+    # For normal functions the last fallback is 'distro-unresolved' which
+    # prints and returns an error. For pre- and post-functions there is no
+    # similar setup. IOW, unresolved normal distro functions fail while
+    # unresolved pre- and post-functions get ignored (in distro-resolve).
+    local apifn="$1" candidates fn
+
     case $apifn in
         distro-*) apifn="${apifn#distro-}";;
-        *) error "internal error: ${FUNCNAME[0]} called by non-API $apifn";;
+        *) error "internal error: can't resolve non-API function $apifn";;
     esac
+    candidates="${VM_DISTRO/./_}-$apifn ${VM_DISTRO%%-*}-$apifn"
     case $VM_DISTRO in
-        ubuntu*) fallbacks="debian-$apifn";;
-        centos*) fallbacks="fedora-$apifn rpm-$apifn";;
-        fedora*) fallbacks="rpm-$apifn";;
-        *suse*)  fallbacks="rpm-$apifn";;
+        ubuntu*) candidates="$candidates debian-$apifn";;
+        centos*) candidates="$candidates fedora-$apifn rpm-$apifn";;
+        fedora*) candidates="$candidates rpm-$apifn";;
+        *suse*)  candidates="$candidates rpm-$apifn";;
     esac
-    fallbacks="$fallbacks default-$apifn distro-unresolved"
-    # try version-based resolution first, then derivative fallbacks
-    for fn in "${VM_DISTRO/./_}-$apifn" "${VM_DISTRO%-*}-$apifn" $fallbacks; do
+    case $apifn in
+        *-pre|*-post) ;;
+        *) candidates="$candidates default-$apifn distro-unresolved";;
+    esac
+    for fn in $candidates; do
         if [ "$(type -t -- "$fn")" = "function" ]; then
-            $fn "$@"
-            return $?
+            echo "$fn"
+            return 0
         fi
     done
 }
