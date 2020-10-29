@@ -28,7 +28,10 @@ distro-setup-proxies()      { distro-resolve "$@"; }
 distro-install-golang()     { distro-resolve "$@"; }
 distro-install-containerd() { distro-resolve "$@"; }
 distro-config-containerd()  { distro-resolve "$@"; }
+distro-restart-containerd() { distro-resolve "$@"; }
 distro-install-crio()       { distro-resolve "$@"; }
+distro-config-crio()        { distro-resolve "$@"; }
+distro-restart-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
@@ -486,6 +489,11 @@ default-config-containerd() {
     if vm-command-q "[ -f /etc/containerd/config.toml ]"; then
         vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
     fi
+}
+
+default-restart-containerd() {
+    vm-command "systemctl daemon-reload && systemctl restart containerd" ||
+        command-error "failed to restart containerd systemd service"
 }
 
 ###########################################################################
