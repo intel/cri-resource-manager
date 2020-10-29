@@ -442,14 +442,9 @@ vm-reboot() { # script API
 }
 
 vm-networking() {
-    vm-command-q "grep -q 1 /proc/sys/net/ipv4/ip_forward" || vm-command "sysctl -w net.ipv4.ip_forward=1"
-    vm-command-q "grep -q ^net.ipv4.ip_forward=1 /etc/sysctl.conf" || vm-command "echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf"
-    vm-command-q "grep -q 1 /proc/sys/net/bridge/bridge-nf-call-iptables 2>/dev/null" || {
-        vm-command "modprobe br_netfilter"
-        vm-command "echo br_netfilter > /etc/modules-load.d/br_netfilter.conf"
+    vm-command-q "touch /etc/hosts; grep -q \$(hostname) /etc/hosts" || {
+        vm-command "echo \"$VM_IP \$(hostname)\" >>/etc/hosts"
     }
-    vm-command-q "grep -q \$(hostname) /etc/hosts" || vm-command "echo \"$VM_IP \$(hostname)\" >/etc/hosts"
-
     distro-setup-proxies
 }
 
