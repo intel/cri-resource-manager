@@ -566,6 +566,7 @@ EOF'
 
 vm-install-k8s() {
     distro-install-k8s
+    distro-restart-$VM_CRI
 }
 
 vm-create-singlenode-cluster() {
