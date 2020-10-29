@@ -584,17 +584,8 @@ vm-install-golang() {
 }
 
 vm-install-cri() {
-    case "${VM_CRI}" in
-        containerd)
-            distro-install-containerd
-            ;;
-        crio)
-            distro-install-crio
-            ;;
-        *)
-            command-error "unsupported CRI runtime \"$VM_CRI\" requested"
-            ;;
-    esac
+    distro-install-"$VM_CRI"
+    distro-config-"$VM_CRI"
 }
 
 vm-install-containernetworking() {
