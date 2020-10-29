@@ -660,7 +660,9 @@ vm-create-cluster() {
         command-error "kubeadm init failed"
     fi
     vm-command "mkdir -p \$HOME/.kube"
-    vm-command "cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
+    vm-command "cp /etc/kubernetes/admin.conf \$HOME/.kube/config"
+    vm-command "mkdir -p ~root/.kube"
+    vm-command "cp /etc/kubernetes/admin.conf ~root/.kube/config"
 }
 
 vm-install-cni-cilium() {
