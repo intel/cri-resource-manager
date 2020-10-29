@@ -145,13 +145,12 @@ debian-install-repo-key() {
 }
 
 debian-install-repo() {
-    vm-command-q "type -t add-apt-repository >& /dev/null" || {
-        vm-command "apt-get update && apt-get install -y software-properties-common" ||
-            command-error "failed to install software-properties-common"
-    }
-    vm-command "add-apt-repository \"$*\"" ||
+    if [ $# = 1 ]; then
+        # shellcheck disable=SC2048
+        set -- $*
+    fi
+    vm-command "echo $* > /etc/apt/sources.list.d/$3-$4.list && apt-get update" ||
         command-error "failed to install apt repository $*"
-    debian-refresh-pkg-db
 }
 
 debian-refresh-pkg-db() {
