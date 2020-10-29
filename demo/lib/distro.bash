@@ -34,9 +34,6 @@ distro-k8s-cni()            { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
 
-# default no-op fallbacks for optional API functions
-default-bootstrap-commands() { :; }
-
 ###########################################################################
 
 # distro-specific function resolution
@@ -163,7 +160,9 @@ debian-pkg-type() {
 debian-install-repo-key() {
     local key
     # apt-key needs gnupg2, that might not be available by default
-    vm-command "command -v gpg >/dev/null 2>&1" || debian-install-pkg gnupg2
+    vm-command "command -v gpg >/dev/null 2>&1" || {
+        vm-command "apt-get update && apt-get install -y gnupg2"
+    }
     for key in "$@"; do
         vm-command "curl -s $key | apt-key add -" ||
             command-error "failed to install repo key $key"
@@ -172,7 +171,7 @@ debian-install-repo-key() {
 
 debian-install-repo() {
     if [ $# = 1 ]; then
-        # shellcheck disable=SC2048
+        # shellcheck disable=SC2086,SC2048
         set -- $*
     fi
     vm-command "echo $* > /etc/apt/sources.list.d/$3-$4.list && apt-get update" ||
@@ -198,28 +197,14 @@ debian-install-golang() {
     debian-install-pkg golang
 }
 
-debian-10-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        debian-refresh-pkg-db
-        debian-install-repo-key https://download.docker.com/linux/debian/gpg
-        debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
-        debian-refresh-pkg-db
-        debian-install-pkg containerd
-    }
-    distro-config-containerd
-    systemd-restart-containerd
+debian-10-install-containerd-pre() {
+    debian-install-repo-key https://download.docker.com/linux/debian/gpg
+    debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
+
 }
 
-debian-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        debian-refresh-pkg-db
-        debian-install-pkg containerd
-        # The default Debian containerd expects CNI binaries in /usr/lib/cni,
-        # but kubernetes-cni.deb (debian-install-k8s) installs to /opt/cni/bin.
-        vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
-    }
-    distro-config-containerd
-    systemd-restart-containerd
+debian-sid-install-containerd-post() {
+    vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
 }
 
 debian-install-k8s() {
@@ -337,53 +322,15 @@ fedora-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
 }
 
-fedora-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        distro-install-pkg containerd containernetworking-plugins
-    }
-    distro-config-containerd
-    systemd-restart-containerd
+fedora-install-containerd-post() {
+    distro-install-pkg containernetworking-plugins
 }
 
 fedora-config-containerd-post() {
-    vm-command 'cat >> /etc/containerd/config.toml <<EOF
-[plugins.cri.cni]
-  bin_dir = "/usr/libexec/cni"
-  conf_dir = "/etc/cni/net.d"
-  conf_template = ""
-EOF'
-    vm-command "mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
-{
-  \"cniVersion\": \"0.4.0\",
-  \"name\": \"mynet\",
-  \"type\": \"bridge\",
-  \"bridge\": \"cni0\",
-  \"isGateway\": true,
-  \"ipMasq\": true,
-  \"ipam\": {
-    \"type\": \"host-local\",
-    \"subnet\": \"$CNI_SUBNET\",
-    \"routes\": [
-      { \"dst\": \"0.0.0.0/0\" }
-    ]
-  }
-}
-EOF"
-    vm-command 'cat > /etc/cni/net.d/20-portmap.conf <<EOF
-{
-    "cniVersion": "0.4.0",
-    "type": "portmap",
-    "capabilities": {"portMappings": true},
-    "snat": true
-}
-EOF'
-    vm-command 'cat > /etc/cni/net.d/99-loopback.conf <<EOF
-{
-  "cniVersion": "0.4.0",
-  "name": "lo",
-  "type": "loopback"
-}
-EOF'
+    if [ "$VM_DISTRO" = "fedora" ]; then
+        vm-command "mkdir -p /opt/cni/bin && mount --bind /usr/libexec/cni /opt/cni/bin"
+        vm-command "echo /usr/libexec/cni /opt/cni/bin none defaults,bind,nofail 0 0 >> /etc/fstab"
+    fi
 }
 
 fedora-install-k8s() {
@@ -403,25 +350,18 @@ gpgkey=$yumkey $rpmkey
 EOF
       vm-pipe-to-file $repo
 
-    vm-command "setenforce 0" ||
-        command-error "failed to runtime-disable selinux"
-    vm-sed-file /etc/selinux/config 's/^SELINUX=.*$/SELINUX=permissive/'
     distro-install-pkg tc kubelet kubeadm kubectl
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
 }
 
-fedora-bootstrap-commands() {
+fedora-bootstrap-commands-pre() {
     cat <<EOF
 mkdir -p /etc/sudoers.d
 echo 'Defaults !requiretty' > /etc/sudoers.d/10-norequiretty
+
 setenforce 0
 sed -E -i 's/^SELINUX=.*$/SELINUX=permissive/' /etc/selinux/config
-
-modprobe bridge
-modprobe nf-tables-bridge || :
-modprobe br_netfilter || :
-echo -e 'bridge\nnf-tables-bridge\nbr_netfilter' > /etc/modules-load.d/kubelet.conf
 
 if grep -q NAME=Fedora /etc/os-release; then
     if ! grep -q systemd.unified_cgroup_hierarchy=0 /proc/cmdline; then
@@ -429,6 +369,8 @@ if grep -q NAME=Fedora /etc/os-release; then
         shutdown -r now
     fi
 fi
+
+echo PATH="\$PATH:/usr/local/bin:/usr/local/sbin" > /etc/profile.d/usr-local-path.sh
 EOF
 }
 
@@ -453,6 +395,21 @@ rpm-refresh-pkg-db() {
 #
 # default implementations
 #
+
+default-bootstrap-commands() {
+    cat <<EOF
+touch /etc/modules-load.d/k8s.conf
+modprobe bridge && echo bridge >> /etc/modules-load.d/k8s.conf || :
+modprobe nf-tables-bridge && echo nf-tables-bridge >> /etc/modules-load.d/k8s.conf || :
+modprobe br_netfilter && echo br_netfilter >> /etc/modules-load.d/k8s.conf || :
+
+touch /etc/sysctl.d/k8s.conf
+echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/k8s.conf
+echo "net.bridge.bridge-nf-call-iptables = 1" >> /etc/sysctl.d/k8s.conf
+echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.d/k8s.conf
+/sbin/sysctl -p /etc/sysctl.d/k8s.conf
+EOF
+}
 
 default-setup-proxies() {
     # Notes:
@@ -491,9 +448,9 @@ EOF
     for file in /etc/systemd/system/{containerd,docker}.service.d/proxy.conf; do
         cat <<EOF |
 [Service]
-Environment=HTTP_PROXY="$http_proxy"
-Environment=HTTPS_PROXY="$https_proxy"
-Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc"
+Environment=HTTP_PROXY=$http_proxy
+Environment=HTTPS_PROXY=$https_proxy
+Environment=NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
 EOF
         vm-pipe-to-file $file
     done
@@ -516,6 +473,13 @@ EOF
 
 default-k8s-cni() {
     echo cilium
+}
+
+default-install-containerd() {
+    vm-command-q "[ -f /usr/bin/containerd ]" || {
+        distro-refresh-pkg-db
+        distro-install-pkg containerd
+    }
 }
 
 default-config-containerd() {
@@ -588,9 +552,4 @@ EOF
         vm-command "tar -C $dir.orig -cf - . | tar -C $dir -xf -" ||
             command-error "failed to copy $dir.orig to $dir"
     fi
-}
-
-systemd-restart-containerd() {
-    vm-command "systemctl daemon-reload && systemctl restart containerd" ||
-        command-error "failed to restart containerd systemd service"
 }
