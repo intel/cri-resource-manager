@@ -50,6 +50,7 @@ usage() {
     echo "    reinstall_cri_resmgr: If 1, stop running cri-resmgr, reinstall,"
     echo "             and restart it on the VM before starting test run."
     echo "             The default is 0."
+    echo "    omit_agent: if 1, omit installing/starting/cleaning up cri-resmgr-agent."
     echo "    outdir:  Save output under given directory."
     echo "             The default is \"${SCRIPT_DIR}/output\"."
     echo "    cleanup: Level of cleanup after a test run:"
@@ -876,6 +877,7 @@ cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
 cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
 cleanup=${cleanup:-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr:-0}
+omit_agent=${omit_agent:-0}
 py_consts="${py_consts:-''}"
 topology=${topology:-'[
     {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
@@ -984,7 +986,9 @@ done
 
 if [ "$binsrc" == "local" ]; then
     [ -f "${BIN_DIR}/cri-resmgr" ] || error "missing \"${BIN_DIR}/cri-resmgr\""
-    [ -f "${BIN_DIR}/cri-resmgr-agent" ] || error "missing \"${BIN_DIR}/cri-resmgr-agent\""
+    if [ "$omit_agent" != "1" ]; then
+        [ -f "${BIN_DIR}/cri-resmgr-agent" ] || error "missing \"${BIN_DIR}/cri-resmgr-agent\""
+    fi
 fi
 
 host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri"
@@ -1027,8 +1031,10 @@ else
 fi
 
 # Start cri-resmgr-agent if not already running
-if ! vm-command-q "pidof cri-resmgr-agent" >/dev/null; then
-    screen-launch-cri-resmgr-agent
+if [ "$omit_agent" != "1" ]; then
+    if ! vm-command-q "pidof cri-resmgr-agent" >/dev/null; then
+        screen-launch-cri-resmgr-agent
+    fi
 fi
 
 if [ "$mode" == "debug" ]; then
