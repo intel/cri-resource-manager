@@ -990,7 +990,7 @@ if [ "$binsrc" == "local" ]; then
     [ -f "${BIN_DIR}/cri-resmgr-agent" ] || error "missing \"${BIN_DIR}/cri-resmgr-agent\""
 fi
 
-host-set-vm-config "$vm" "$distro" "$cri"
+host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri"
 
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm

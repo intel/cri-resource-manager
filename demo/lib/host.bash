@@ -18,6 +18,22 @@ host-require-govm() {
     command -v "$GOVM" >/dev/null || error "cannot run govm \"$GOVM\". Check PATH or set GOVM=/path/to/govm."
 }
 
+host-get-vm-config() {
+    if [ -z "$1" ]; then
+        error "can't get VM configuration, name not set"
+    fi
+    VM_NAME="$1"
+    HOST_VM_DATA_DIR="$(eval "echo $HOST_VM_DATA_DIR_TEMPLATE")"
+    VM_DATA_CONFIG="$HOST_VM_DATA_DIR/vm-config"
+    if ! [ -f "$VM_DATA_CONFIG" ]; then
+        return 1
+    fi
+    source "$VM_DATA_CONFIG"
+    if [ -z "$VM_NAME" ] || [ -z "$VM_DISTRO" ] || [ -z "$VM_CRI" ] || [ -z "$VM_SSH_USER" ]; then
+        return 1
+    fi
+}
+
 host-set-vm-config() {
     if [ -z "$1" ]; then
         error "can't configure VM, name not set"
@@ -33,7 +49,15 @@ host-set-vm-config() {
     VM_CRI="$3"
     VM_SSH_USER="$(vm-ssh-user)"
     HOST_VM_DATA_DIR="$(eval "echo $HOST_VM_DATA_DIR_TEMPLATE")"
+    mkdir -p "$HOST_VM_DATA_DIR"
     VM_COMPOSE_YAML="$HOST_VM_DATA_DIR/govm-compose.yaml"
+    VM_DATA_CONFIG="$HOST_VM_DATA_DIR/vm-config"
+    cat > "$VM_DATA_CONFIG" <<EOF
+VM_NAME="$VM_NAME"
+VM_DISTRO="$VM_DISTRO"
+VM_CRI="$VM_CRI"
+VM_SSH_USER="$VM_SSH_USER"
+EOF
 }
 
 host-fetch-vm-image() {
