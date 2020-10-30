@@ -399,9 +399,22 @@ e2e-tests: build
 
 packaging-tests: cross-deb cross-rpm
 	$(Q)for dir in test/e2e/packages.test-suite/*; do \
-	    [ "$${dir%centos-7}" != "$$dir" ] && continue; \
-	    distro=$${dir##*/} $(E2E_RUN) $$dir; \
-	done
+	    cleanup=1 omit_agent=1 $(E2E_RUN) $$dir; \
+	    echo "--------------------------------------"; \
+	    for r in $(find $$dir -name summary.txt); do \
+	        t="$${r#*.test-suite/}"; t="$${t%/output/summary.txt}"; \
+	        echo "$$t:"; \
+	        cat $$r | sed 's/^/    /g'; \
+	    done; \
+	    echo "======================================"; \
+	done; \
+	for dir in test/e2e/packages.test-suite/*; do \
+	    for r in $(find $$dir -name summary.txt); do \
+	        t="$${r#*.test-suite/}"; t="$${t%/output/summary.txt}"; \
+	        echo "$$t:"; \
+	        cat $$r | sed 's/^/    /g'; \
+	    done; \
+	done;
 
 #
 # Rules for building distro packages.
