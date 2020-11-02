@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Webhook &mdash; CRI Resource Manager 0.4.0-173-g9df2831 documentation</title>
+  <title>Webhook &mdash; CRI Resource Manager 0.4.0-175-ga2a164f documentation</title>
   
 
   
@@ -178,15 +178,51 @@ these parameters to estimate <code class="docutils literal notranslate"><span cl
 <em>resource requirement</em>s, you need to duplicate these as <em>annotations</em> on the Pod.
 This is necessary if you plan using or writing a policy which needs <em>extended
 resource</em>s.</p>
-<p>This process can be fully automated using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/9df2831093cb94b995fb8426737e8c97bd5a4812/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating
+<p>This process can be fully automated using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/a2a164f13a8fb1798ae0c67d75d81bdf5563a2a3/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating
 Webhook</a>. Once you built the docker image for it using
-the [provided Dockerfile][/cmd/cri-resmgr-webhook/Dockerfile] and published it,
-you can set up the webhook with these commands:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">kubectl</span> <span class="n">apply</span> <span class="o">-</span><span class="n">f</span> <span class="n">cmd</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">-</span><span class="n">webhook</span><span class="o">/</span><span class="n">webhook</span><span class="o">-</span><span class="n">deployment</span><span class="o">.</span><span class="n">yaml</span>
-  <span class="n">kubectl</span> <span class="n">wait</span> <span class="o">--</span><span class="k">for</span><span class="o">=</span><span class="n">condition</span><span class="o">=</span><span class="n">Available</span> <span class="o">-</span><span class="n">n</span> <span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span> <span class="n">deployments</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">-</span><span class="n">webhook</span>
-  <span class="n">kubectl</span> <span class="n">apply</span> <span class="o">-</span><span class="n">f</span> <span class="n">cmd</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">-</span><span class="n">webhook</span><span class="o">/</span><span class="n">mutating</span><span class="o">-</span><span class="n">webhook</span><span class="o">-</span><span class="n">config</span><span class="o">.</span><span class="n">yaml</span>
+the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/a2a164f13a8fb1798ae0c67d75d81bdf5563a2a3/cmd/cri-resmgr-webhook/Dockerfile">provided Dockerfile</a> and published it,
+you can set up the webhook as follows:</p>
+<ul>
+<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">IMAGE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/a2a164f13a8fb1798ae0c67d75d81bdf5563a2a3/cmd/cri-resmgr-webhook/webhook-deployment.yaml">webhook-deployment.yaml</a> to match the image.</p></li>
+<li><p>Create a <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook-secret</span></code> that carries a key and a certificate to <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook</span></code>. You can create a key, a self-signed certificate and the secret that holds them with commands:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SVC</span><span class="o">=</span>cri-resmgr-webhook <span class="nv">NS</span><span class="o">=</span>cri-resmgr
+openssl req -x509 -newkey rsa:2048 -sha256 -days <span class="m">365</span> -nodes <span class="se">\</span>
+  -keyout cmd/cri-resmgr-webhook/server-key.pem <span class="se">\</span>
+  -out cmd/cri-resmgr-webhook/server-crt.pem <span class="se">\</span>
+  -subj <span class="s2">&quot;/CN=</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span> <span class="se">\</span>
+  -addext <span class="s2">&quot;subjectAltName=DNS:</span><span class="nv">$SVC</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span>
+cat &gt;cmd/cri-resmgr-webhook/webhook-secret.yaml <span class="s">&lt;&lt;EOF</span>
+<span class="s">apiVersion: v1</span>
+<span class="s">kind: Secret</span>
+<span class="s">metadata:</span>
+<span class="s">  name: cri-resmgr-webhook-secret</span>
+<span class="s">  namespace: $NS</span>
+<span class="s">data:</span>
+<span class="s">  svc.crt: $(base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem)</span>
+<span class="s">  svc.key: $(base64 -w0 &lt; cmd/cri-resmgr-webhook/server-key.pem)</span>
+<span class="s">type: Opaque</span>
+<span class="s">EOF</span>
+kubectl create namespace <span class="nv">$NS</span>
+kubectl create -f cmd/cri-resmgr-webhook/webhook-secret.yaml
 </pre></div>
 </div>
+</li>
+<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">CA_BUNDLE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/a2a164f13a8fb1798ae0c67d75d81bdf5563a2a3/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml">mutating-webhook-config.yaml</a>.
+If you created the key and the certificate with the commands above,
+you can do this with command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sed -e <span class="s2">&quot;s/CA_BUNDLE_PLACEHOLDER/</span><span class="k">$(</span>base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem<span class="k">)</span><span class="s2">/&quot;</span> <span class="se">\</span>
+    -i cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
+</pre></div>
+</div>
+</li>
+<li><p>Finally set up the webhook with these commands:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl apply -f cmd/cri-resmgr-webhook/webhook-deployment.yaml
+kubectl <span class="nb">wait</span> --for<span class="o">=</span><span class="nv">condition</span><span class="o">=</span>Available -n cri-resmgr deployments/cri-resmgr-webhook
+kubectl apply -f cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
+</pre></div>
+</div>
+</li>
+</ul>
 </div>
 
 
