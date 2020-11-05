@@ -28,6 +28,16 @@ out "Failed as expected"
 kubectl delete pods --all --now || error "failed to delete pods"
 
 out ""
+out "### Request exclusive pool but do not mention exclusive-cores"
+( CPU=1000m STP_SOCKET_ID=0 EXCLCORES='omit' wait_t=5s create cmk-exclusive )  &&
+    error "expected timeout, but pod launched without mentioning exclusive cores from the exclusive pool"
+vm-run-until "kubectl describe pods/pod0 | grep '$errmsg_zero_cores'" ||
+    error "cannot find expected error message from pod description"
+out "Failed as expected"
+
+kubectl delete pods --all --now || error "failed to delete pods"
+
+out ""
 out "### Request 0 cores from exclusive pool"
 ( CPU=1000m STP_SOCKET_ID=0 EXCLCORES=0 wait_t=5s create cmk-exclusive )  &&
     error "expected timeout, but pod launched with 0 cores from the exclusive pool"

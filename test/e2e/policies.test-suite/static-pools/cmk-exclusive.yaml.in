@@ -27,7 +27,9 @@ $([ -z $STP_SOCKET_ID ] || echo "
       resources:
         requests:
           cpu: ${CPU}
-          cmk.intel.com/exclusive-cores: '${EXCLCORES}'
+$([ "$EXCLCORES" = "omit" ] || echo "
+          cmk.intel.com/exclusive-cores: '${EXCLCORES}'")
         limits:
           cpu: ${CPU}
-          cmk.intel.com/exclusive-cores: '${EXCLCORES}'
+$([ "$EXCLCORES" = "omit" ] || echo "
+          cmk.intel.com/exclusive-cores: '${EXCLCORES}'")
