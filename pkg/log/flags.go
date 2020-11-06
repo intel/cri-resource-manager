@@ -64,15 +64,21 @@ func (m *srcmap) parse(value string) error {
 	if *m == nil {
 		*m = make(srcmap)
 	}
+	if value = strings.TrimSpace(value); value == "" {
+		return nil
+	}
 
 	prev, state, src := "", "", ""
 	for _, entry := range strings.Split(value, ",") {
+		if entry = strings.TrimSpace(entry); entry == "" {
+			continue
+		}
 		statesrc := strings.Split(entry, ":")
 		switch len(statesrc) {
 		case 2:
-			state, src = statesrc[0], statesrc[1]
+			state, src = statesrc[0], strings.TrimSpace(statesrc[1])
 		case 1:
-			state, src = "", statesrc[0]
+			state, src = "", strings.TrimSpace(statesrc[0])
 		default:
 			return loggerError("invalid state spec '%s' in source map", entry)
 		}
