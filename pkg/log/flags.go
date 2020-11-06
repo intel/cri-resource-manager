@@ -205,8 +205,9 @@ func (o *options) configNotify(event pkgcfg.Event, src pkgcfg.Source) error {
 		o.Klog = make(klogcontrol.Options)
 	}
 
-	// XXX TODO Hmmm... maybe this is not necessary ever since
-	// 53bac137e97d515329ffc50a1ad918fb8b9f8dac got merged.
+	// The behavior of the options.Klog map across updates is difficult
+	// to understand. To make it more user friendly we fill in runtime
+	// defaults for each unset entry (klog flags) here.
 	for flag, value := range defaultKlogFlags {
 		if _, ok := o.Klog[flag]; !ok {
 			o.Klog[flag] = value
