@@ -442,14 +442,9 @@ vm-reboot() { # script API
 }
 
 vm-networking() {
-    vm-command-q "grep -q 1 /proc/sys/net/ipv4/ip_forward" || vm-command "sysctl -w net.ipv4.ip_forward=1"
-    vm-command-q "grep -q ^net.ipv4.ip_forward=1 /etc/sysctl.conf" || vm-command "echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf"
-    vm-command-q "grep -q 1 /proc/sys/net/bridge/bridge-nf-call-iptables 2>/dev/null" || {
-        vm-command "modprobe br_netfilter"
-        vm-command "echo br_netfilter > /etc/modules-load.d/br_netfilter.conf"
+    vm-command-q "touch /etc/hosts; grep -q \$(hostname) /etc/hosts" || {
+        vm-command "echo \"$VM_IP \$(hostname)\" >>/etc/hosts"
     }
-    vm-command-q "grep -q \$(hostname) /etc/hosts" || vm-command "echo \"$VM_IP \$(hostname)\" >/etc/hosts"
-
     distro-setup-proxies
 }
 
@@ -584,17 +579,8 @@ vm-install-golang() {
 }
 
 vm-install-cri() {
-    case "${VM_CRI}" in
-        containerd)
-            distro-install-containerd
-            ;;
-        crio)
-            distro-install-crio
-            ;;
-        *)
-            command-error "unsupported CRI runtime \"$VM_CRI\" requested"
-            ;;
-    esac
+    distro-install-"$VM_CRI"
+    distro-config-"$VM_CRI"
 }
 
 vm-install-containernetworking() {
@@ -607,23 +593,23 @@ vm-install-containernetworking() {
     vm-command "pushd \"$CNI_PLUGINS_SOURCE_DIR\" && ./build_linux.sh && mkdir -p /opt/cni && cp -rv bin /opt/cni && popd" || {
         command-error "building and installing cri-tools failed"
     }
-    vm-command 'rm -rf /etc/cni/net.d && mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
+    vm-command "rm -rf /etc/cni/net.d && mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
 {
-  "cniVersion": "0.4.0",
-  "name": "mynet",
-  "type": "bridge",
-  "bridge": "cni0",
-  "isGateway": true,
-  "ipMasq": true,
-  "ipam": {
-    "type": "host-local",
-    "subnet": "10.217.0.0/16",
-    "routes": [
-      { "dst": "0.0.0.0/0" }
+  \"cniVersion\": \"0.4.0\",
+  \"name\": \"mynet\",
+  \"type\": \"bridge\",
+  \"bridge\": \"cni0\",
+  \"isGateway\": true,
+  \"ipMasq\": true,
+  \"ipam\": {
+    \"type\": \"host-local\",
+    \"subnet\": \"$CNI_SUBNET\",
+    \"routes\": [
+      { \"dst\": \"0.0.0.0/0\" }
     ]
   }
 }
-EOF'
+EOF"
     vm-command 'cat > /etc/cni/net.d/20-portmap.conf <<EOF
 {
     "cniVersion": "0.4.0",
@@ -643,30 +629,40 @@ EOF'
 
 vm-install-k8s() {
     distro-install-k8s
+    distro-restart-$VM_CRI
 }
 
-vm-create-singlenode-cluster-cilium() {
-    vm-create-singlenode-cluster
-    vm-install-cni-cilium
+vm-create-singlenode-cluster() {
+    vm-create-cluster
+    vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
+    vm-install-cni-"$(distro-k8s-cni)"
     if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=120s"; then
         command-error "kubectl waiting for node readiness timed out"
     fi
 }
 
-vm-create-singlenode-cluster() {
-    vm-command "kubeadm init --pod-network-cidr=10.217.0.0/16 --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
+vm-create-cluster() {
+    vm-command "kubeadm init --pod-network-cidr=$CNI_SUBNET --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
         command-error "kubeadm init failed"
     fi
     vm-command "mkdir -p \$HOME/.kube"
-    vm-command "cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
-    vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
+    vm-command "cp /etc/kubernetes/admin.conf \$HOME/.kube/config"
+    vm-command "mkdir -p ~root/.kube"
+    vm-command "cp /etc/kubernetes/admin.conf ~root/.kube/config"
 }
 
 vm-install-cni-cilium() {
     vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.8/install/kubernetes/quick-install.yaml"
     if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
         command-error "installing cilium CNI to Kubernetes timed out"
+    fi
+}
+
+vm-install-cni-weavenet() {
+    vm-command "kubectl apply -f \"https://cloud.weave.works/k8s/net?k8s-version=\$(kubectl version | base64 | tr -d '\n')\""
+    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/weave-net"; then
+        command-error "installing weavenet CNI to Kubernetes failed/timed out"
     fi
 }
 

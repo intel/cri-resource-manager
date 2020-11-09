@@ -97,3 +97,17 @@ command-exit-if-not-interactive() {
         exit ${1:-1}
     fi
 }
+
+command-debug-log() {
+    if [ "$(type -t -- debug-log)" = "function" ]; then
+        debug-log "$@"
+        return 0
+    else
+        if [ -n "$OUTPUT_DIR" ] && [ -d "$OUTPUT_DIR" ]; then
+            touch "$OUTPUT_DIR"/debug-log
+            echo "$@" >> "$OUTPUT_DIR"/debug-log
+            return 0
+        fi
+    fi
+    echo "$@" 1>&2
+}
