@@ -37,7 +37,7 @@ echo "  - options   : " "${PASSTHROUGH[@]}"
 docker build . \
        -f "$DOCKERFILE" -t "$IMAGE" \
        --build-arg "CREATE_USER=$USER" \
-       --build-arg USER_OPTIONS="-u__$(id -u)" \
+       --build-arg USER_OPTIONS="-u $(id -u)" \
        "${PASSTHROUGH[@]}" || exit 1
 
 if [ -n "$CONTAINER" ]; then

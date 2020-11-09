@@ -39,4 +39,4 @@ RUN mkdir /git && cd /git && wget $GIT_URLDIR/v$GIT_VERSION.tar.gz && \
     make -j8 NO_TCLTK=1 NO_GETTEXT=1 prefix=/usr install
 
 RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
-    useradd -m -s /bin/bash $CREATE_USER $(echo $USER_OPTIONS | sed 's/__/ /g') || :
+    useradd -m -s /bin/bash $CREATE_USER $USER_OPTIONS
