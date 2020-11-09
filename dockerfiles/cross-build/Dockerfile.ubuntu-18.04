@@ -31,4 +31,4 @@ RUN arch="$(dpkg --print-architecture)"; \
     go version
 
 RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
-    useradd -m -s /bin/bash $CREATE_USER $(echo $USER_OPTIONS | sed 's/__/ /g') || :
+    useradd -m -s /bin/bash $CREATE_USER $USER_OPTIONS
