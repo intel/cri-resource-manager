@@ -68,7 +68,7 @@ usage() {
     echo "  Test input VARs:"
     echo "    topology: JSON to override NUMA node list used in tests."
     echo "             Effective only if \"vm\" does not exist."
-    echo "             See: python3 ${DEMO_LIB_DIR}/numajson2qemuopts.py --help"
+    echo "             See: python3 ${DEMO_LIB_DIR}/topology2qemuopts.py --help"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
     echo "    cri_resmgr_extra_args: arguments to be added on cri-resmgr"
     echo "             command line when launched"
