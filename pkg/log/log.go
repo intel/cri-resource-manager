@@ -402,7 +402,9 @@ func (l logger) Panic(format string, args ...interface{}) {
 }
 
 func (l logger) DebugBlock(prefix string, format string, args ...interface{}) {
-	l.block(LevelDebug, prefix, format, args...)
+	if l.DebugEnabled() {
+		l.block(LevelDebug, prefix, format, args...)
+	}
 }
 
 func (l logger) InfoBlock(prefix string, format string, args ...interface{}) {
