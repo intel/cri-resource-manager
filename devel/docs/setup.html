@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Setup and Usage &mdash; CRI Resource Manager 0.4.0-203-g9f70d79 documentation</title>
+  <title>Setup and Usage &mdash; CRI Resource Manager 0.4.0-205-g30ce960 documentation</title>
   
 
   
@@ -208,8 +208,8 @@ path.</p>
 </div>
 <p>The choice of policy to use along with any potential parameters specific to that
 policy are taken from the configuration file. You can take a look at the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/9f70d790f3136c055cc8f844fe95d8a321683cd2/sample-configs">sample configurations</a> for some minimal/trivial examples. For instance,
-you can use <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9f70d790f3136c055cc8f844fe95d8a321683cd2/sample-configs/memtier-policy.cfg">sample-configs/memtier-policy.cfg</a>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/30ce960fa49812a06e0d6fde4bcdffbf47139d5c/sample-configs">sample configurations</a> for some minimal/trivial examples. For instance,
+you can use <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/30ce960fa49812a06e0d6fde4bcdffbf47139d5c/sample-configs/memtier-policy.cfg">sample-configs/memtier-policy.cfg</a>
 as <code class="docutils literal notranslate"><span class="pre">&lt;config-file&gt;</span></code> to activate the topology aware policy with memory tiering support.</p>
 <p><strong>NOTE</strong>: Currently the available policies are work in progress.</p>
 <div class="section" id="setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime">
@@ -295,9 +295,9 @@ option <code class="docutils literal notranslate"><span class="pre">--reset-poli
 <h3>Container Adjustments<a class="headerlink" href="#container-adjustments" title="Permalink to this headline">¶</a></h3>
 <p>When the <a class="reference internal" href="node-agent.html"><span class="doc">agent</span></a> is in use, it is also possible to <code class="docutils literal notranslate"><span class="pre">adjust</span></code> container <code class="docutils literal notranslate"><span class="pre">resource</span> <span class="pre">assignments</span></code> externally, using dedicated <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code> <code class="docutils literal notranslate"><span class="pre">Custom</span> <span class="pre">Resources</span></code> in
 the <code class="docutils literal notranslate"><span class="pre">adjustments.criresmgr.intel.com</span></code> group. You can use the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9f70d790f3136c055cc8f844fe95d8a321683cd2/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml">provided schema</a> to define
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/30ce960fa49812a06e0d6fde4bcdffbf47139d5c/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml">provided schema</a> to define
 the <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code> resource. Then you can copy and modify the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9f70d790f3136c055cc8f844fe95d8a321683cd2/sample-configs/external-adjustment.yaml">sample adjustment CR</a> as a starting
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/30ce960fa49812a06e0d6fde4bcdffbf47139d5c/sample-configs/external-adjustment.yaml">sample adjustment CR</a> as a starting
 point to test some overrides.</p>
 <p>An <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code> consists of a</p>
 <ul class="simple">
@@ -435,7 +435,7 @@ kli@r640-1:~&gt; kubectl get -n kube-system adjustments.criresmgr.intel.com -ojs
 <h2>Using CRI Resource Manager as a Message Dumper<a class="headerlink" href="#using-cri-resource-manager-as-a-message-dumper" title="Permalink to this headline">¶</a></h2>
 <p>You can use CRI Resource Manager to simply inspect all proxied CRI requests and
 responses without applying any policy. Run CRI Resource Manager with the
-provided <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9f70d790f3136c055cc8f844fe95d8a321683cd2/sample-configs/cri-full-message-dump.cfg">sample configuration</a>
+provided <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/30ce960fa49812a06e0d6fde4bcdffbf47139d5c/sample-configs/cri-full-message-dump.cfg">sample configuration</a>
 for doing this.</p>
 </div>
 <div class="section" id="using-docker-as-the-runtime">
