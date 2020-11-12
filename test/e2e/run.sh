@@ -760,6 +760,7 @@ create() { # script API
     local wait_t=${wait_t-60s}
     local images
     local image
+    local tag
     local errormsg
     if [ -z "$n" ]; then
         local n=1
@@ -776,6 +777,20 @@ create() { # script API
         }
         vm-command "cat $NAME.yaml"
         images="$(grep -E '^ *image: .*$' "$OUTPUT_DIR/$NAME.yaml" | sed -E 's/^ *image: *([^ ]*)$/\1/g' | sort -u)"
+        if [ "${#pulled_images_on_vm[@]}" = "0" ]; then
+            # Initialize pulled images available on VM
+            vm-command "crictl -i unix:///var/run/cri-resmgr/cri-resmgr.sock images" >/dev/null &&
+            while read -r image tag _; do
+                if [ "$image" = "IMAGE" ]; then
+                    continue
+                fi
+                image="${image##*/}"
+                if [ "$tag" = "latest" ]; then
+                    pulled_images_on_vm+=("$image")
+                fi
+                pulled_images_on_vm+=("$image:$tag")
+            done <<< "$COMMAND_OUTPUT"
+        fi
         for image in $images; do
             if ! [[ " ${pulled_images_on_vm[*]} " == *" ${image} "* ]]; then
                 vm-command "crictl -i unix:///var/run/cri-resmgr/cri-resmgr.sock pull \"$image\"" || {
