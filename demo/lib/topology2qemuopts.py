@@ -87,7 +87,7 @@ DEFAULT_DIST_SAME_NODE = 10
 
 def error(msg, exitstatus=1):
     sys.stderr.write("topology2qemuopts: %s\n" % (msg,))
-    if not exitstatus is None:
+    if exitstatus is not None:
         sys.exit(exitstatus)
 
 def siadd(s1, s2):
@@ -107,10 +107,35 @@ def validate(numalist):
                       "cores", "threads", "nodes", "dies", "packages",
                       "node-dist", "dist-all",
                       "dist-other-package", "dist-same-package", "dist-same-die"))
+    int_range_keys = {'cores': ('>= 0', lambda v: v >= 0),
+                      'threads': ('> 0', lambda v: v > 0),
+                      'nodes': ('> 0', lambda v: v > 0),
+                      'dies': ('> 0', lambda v: v > 0),
+                      'packages': ('> 0', lambda v: v > 0)}
     for numalistindex, numaspec in enumerate(numalist):
         for key in numaspec:
             if not key in valid_keys:
-                raise ValueError('invalid property name in numalist: %r' % (key,))
+                raise ValueError('invalid name %r in node %r' % (key, numaspec))
+            if key in ["mem", "nvmem"]:
+                val = numaspec.get(key)
+                if val == "0":
+                    continue
+                errmsg = 'invalid %s in node %r, expected string like "2G"' % (key, numaspec)
+                if not isinstance(val, str):
+                    raise ValueError(errmsg)
+                try:
+                    siadd(val, "0G")
+                except ValueError:
+                    raise ValueError(errmsg)
+            if key in int_range_keys:
+                try:
+                    val = int(numaspec[key])
+                    if not int_range_keys[key][1](val):
+                        raise Exception()
+                except:
+                    raise ValueError('invalid %s in node %r, expected integer %s' % (key, numaspec, int_range_keys[key][0]))
+        if 'threads' in numaspec and int(numaspec.get('cores', 0)) == 0:
+            raise ValueError('threads set to %s but "cores" is 0 in node %r' % (numaspec["threads"], numaspec))
 
 def dists(numalist):
     dist_dict = {} # Return value: {sourcenode: {destnode: dist}}, fully defined for all nodes
@@ -122,6 +147,7 @@ def dists(numalist):
     node_package_die = {} # topology {node: (package, die)}
     dist_matrix = None # numalist "dist_matrix", if defined
     node_node_dist = {} # numalist {sourcenode: {destnode: dist}}, if defined for sourcenode
+    lastnode_in_group = -1
     for groupindex, numaspec in enumerate(numalist):
         nodecount = int(numaspec.get("nodes", 1))
         corecount = int(numaspec.get("cores", 0))
@@ -148,8 +174,10 @@ def dists(numalist):
         if "node-dist" in numaspec:
             for n in range(first_node_in_group, lastnode_in_group):
                 node_node_dist[n] = {int(nodename): value for nodename, value in numaspec["node-dist"].items()}
+    if lastnode_in_group < 0:
+        raise ValueError('no NUMA nodes found')
     lastnode = lastnode_in_group - 1
-    if not dist_matrix is None:
+    if dist_matrix is not None:
         # Fill the dist_dict directly from dist_matrix.
         # It must cover all distances.
         if len(dist_matrix) != lastnode + 1:
@@ -182,6 +210,7 @@ def qemuopts(numalist):
     machineparam = "-machine pc"
     numaparams = []
     objectparams = []
+    deviceparams = []
     lastnode = -1
     lastcpu = -1
     lastdie = -1
@@ -197,10 +226,23 @@ def qemuopts(numalist):
     validate(numalist)
 
     # Read cpu counts, and "mem" and "nvmem" sizes for all nodes.
+    threadcount = -1
     for numalistindex, numaspec in enumerate(numalist):
         nodecount = int(numaspec.get("nodes", 1))
         groupnodes[numalistindex] = tuple(range(lastnode + 1, lastnode + 1 + nodecount))
-        threadcount = int(numaspec.get("threads", 2)) # threads per cpu
+        corecount = int(numaspec.get("cores", 0))
+        if corecount > 0:
+            if threadcount < 0:
+                # threads per cpu, set only once based on the first cpu-ful numa node
+                threadcount = int(numaspec.get("threads", 2))
+                threads_set_node = numaspec
+            else:
+                # threadcount already set, only check that there is no mismatch
+                if (numaspec.get("threads", None) is not None and
+                    threadcount != int(numaspec.get("threads"))):
+                    raise ValueError('all CPUs must have the same number of threads, '
+                                     'but %r had %s threads (the default) which contradicts %r' %
+                                     (threads_set_node, threadcount, numaspec))
         cpucount = int(numaspec.get("cores", 0)) * threadcount # logical cpus per numa node (cores * threads)
         diecount = int(numaspec.get("dies", 1))
         packagecount = int(numaspec.get("packages", 1))
@@ -223,20 +265,21 @@ def qemuopts(numalist):
                     lastdie += 1
                 for node in range(nodecount):
                     lastnode += 1
+                    currentnumaparams = []
                     for mem in range(memcount):
                         lastmem += 1
                         if memdimm == "":
                             objectparams.append("-object memory-backend-ram,size=%s,id=membuiltin_%s_node_%s" % (memsize, lastmem, lastnode))
-                            numaparams.append("-numa node,nodeid=%s,memdev=membuiltin_%s_node_%s" % (lastnode, lastmem, lastnode))
+                            currentnumaparams.append("-numa node,nodeid=%s,memdev=membuiltin_%s_node_%s" % (lastnode, lastmem, lastnode))
                         elif memdimm == "plugged":
                             objectparams.append("-object memory-backend-ram,size=%s,id=memdimm_%s_node_%s" % (memsize, lastmem, lastnode))
-                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
-                            numaparams.append("-device pc-dimm,node=%s,id=dimm%s,memdev=memdimm_%s_node_%s" % (lastnode, lastmem, lastmem, lastnode))
+                            currentnumaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            deviceparams.append("-device pc-dimm,node=%s,id=dimm%s,memdev=memdimm_%s_node_%s" % (lastnode, lastmem, lastmem, lastnode))
                             pluggedmem = siadd(pluggedmem, memsize)
                             memslots += 1
                         elif memdimm == "unplugged":
                             objectparams.append("-object memory-backend-ram,size=%s,id=memdimm_%s_node_%s" % (memsize, lastmem, lastnode))
-                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            currentnumaparams.append("-numa node,nodeid=%s" % (lastnode,))
                             unpluggedmem = siadd(unpluggedmem, memsize)
                             memslots += 1
                         else:
@@ -252,24 +295,27 @@ def qemuopts(numalist):
                         # container. Everything is ram-backed on host for now.
                         if memdimm == "":
                             objectparams.append("-object memory-backend-ram,size=%s,id=memnvbuiltin_%s_node_%s" % (nvmemsize, lastmem, lastnode))
-                            numaparams.append("-numa node,nodeid=%s,memdev=memnvbuiltin_%s_node_%s" % (lastnode, lastmem, lastnode))
+                            currentnumaparams.append("-numa node,nodeid=%s,memdev=memnvbuiltin_%s_node_%s" % (lastnode, lastmem, lastnode))
                         elif memdimm == "plugged":
                             objectparams.append("-object memory-backend-ram,size=%s,id=memnvdimm_%s_node_%s" % (nvmemsize, lastmem, lastnode))
-                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
-                            numaparams.append("-device nvdimm,node=%s,id=nvdimm%s,memdev=memnvdimm_%s_node_%s" % (lastnode, lastmem, lastmem, lastnode))
+                            currentnumaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            deviceparams.append("-device nvdimm,node=%s,id=nvdimm%s,memdev=memnvdimm_%s_node_%s" % (lastnode, lastmem, lastmem, lastnode))
                             pluggedmem = siadd(pluggedmem, nvmemsize)
                             memslots += 1
                         elif memdimm == "unplugged":
                             objectparams.append("-object memory-backend-ram,size=%s,id=memnvdimm_%s_node_%s" % (nvmemsize, lastmem, lastnode))
-                            numaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                            currentnumaparams.append("-numa node,nodeid=%s" % (lastnode,))
                             unpluggedmem = siadd(unpluggedmem, nvmemsize)
                             memslots += 1
                         else:
                             raise ValueError("unsupported dimm %r, expected 'plugged' or 'unplugged'" % (memdimm,))
                         totalnvmem = siadd(totalnvmem, nvmemsize)
                     if cpucount > 0:
-                        numaparams[-1] = numaparams[-1] + (",cpus=%s-%s" % (lastcpu + 1, lastcpu + cpucount))
+                        if not currentnumaparams:
+                            currentnumaparams.append("-numa node,nodeid=%s" % (lastnode,))
+                        currentnumaparams[-1] = currentnumaparams[-1] + (",cpus=%s-%s" % (lastcpu + 1, lastcpu + cpucount))
                         lastcpu += cpucount
+                    numaparams.extend(currentnumaparams)
     node_node_dist = dists(numalist)
     for sourcenode in sorted(node_node_dist.keys()):
         for destnode in sorted(node_node_dist[sourcenode].keys()):
@@ -277,6 +323,8 @@ def qemuopts(numalist):
                 continue
             numaparams.append("-numa dist,src=%s,dst=%s,val=%s" % (
                 sourcenode, destnode, node_node_dist[sourcenode][destnode]))
+    if lastcpu == -1:
+        raise ValueError('no CPUs found, make sure at least one NUMA node has "cores" > 0')
     if (lastdie + 1) // (lastsocket + 1) > 1:
         diesparam = ",dies=%s" % ((lastdie + 1) // (lastsocket + 1),)
     else:
@@ -285,18 +333,27 @@ def qemuopts(numalist):
         diesparam = ""
     cpuparam = "-smp cpus=%s,threads=%s%s,sockets=%s" % (lastcpu + 1, threadcount, diesparam, lastsocket + 1)
     maxmem = siadd(totalmem, totalnvmem)
-    memparam = "-m size=%s,slots=%s,maxmem=%s" % (sisub(sisub(maxmem, unpluggedmem), pluggedmem), memslots, maxmem)
+    startmem = sisub(sisub(maxmem, unpluggedmem), pluggedmem)
+    memparam = "-m size=%s,slots=%s,maxmem=%s" % (startmem, memslots, maxmem)
+    if startmem.startswith("0"):
+        if pluggedmem.startswith("0"):
+            raise ValueError('no memory in any NUMA node')
+        raise ValueError("no initial memory in any NUMA node - cannot boot with hotpluggable memory")
     return (machineparam + " " +
             cpuparam + " " +
             memparam + " " +
-            " ".join(numaparams) + " " +
-            " ".join(objectparams))
+            " ".join(numaparams) +
+            " " +
+            " ".join(deviceparams) +
+            " " +
+            " ".join(objectparams)
+            )
 
-def main():
+def main(input_file):
     try:
-        numalist = json.loads(sys.stdin.read())
+        numalist = json.loads(input_file.read())
     except Exception as e:
-        error("error reading JSON from stdin: %s" % (e,))
+        error("error reading JSON: %s" % (e,))
     try:
         print(qemuopts(numalist))
     except Exception as e:
@@ -304,6 +361,11 @@ def main():
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        print(__doc__)
-        sys.exit(0)
-    main()
+        if sys.argv[1] in ["-h", "--help"]:
+            print(__doc__)
+            sys.exit(0)
+        else:
+            input_file = open(sys.argv[1])
+    else:
+        input_file = sys.stdin
+    main(input_file)
