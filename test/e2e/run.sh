@@ -703,7 +703,13 @@ except IndexError as e:
     time.sleep(5)
     raise e
 " ) || {
-                out "### The assertion FAILED"
+                out "### The assertion FAILED
+### post-mortem debug help begin ###
+cd $OUTPUT_DIR
+python3
+from pyexec_state import *
+$py_assertion
+### post-mortem debug help end ###"
                 echo "verify: assertion '$py_assertion' failed." >> "$SUMMARY_FILE"
                 if is-hooked on_verify_fail; then
                     run-hook on_verify_fail
