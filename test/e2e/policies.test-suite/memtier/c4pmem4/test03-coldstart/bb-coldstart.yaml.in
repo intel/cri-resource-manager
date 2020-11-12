@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  annotations:
+    cri-resource-manager.intel.com/memory-type: |
+      ${NAME}c0: dram,pmem
+    cri-resource-manager.intel.com/cold-start: |
+      ${NAME}c0:
+        duration: ${DURATION}
+spec:
+  containers:
+    - name: ${NAME}c0
+      image: busybox
+      command:
+        - sh
+        - -c
+        - 'cold_alloc=\$(dd if=/dev/zero bs=${COLD_ALLOC} count=1 | tr \"\\\0\" \"x\");
+           sh -c \"paused after cold_alloc \\\$(sleep inf)\";
+           warm_alloc=\$(dd if=/dev/zero bs=${WARM_ALLOC} count=1 | tr \"\\\0\" \"x\");
+           sh -c \"paused after warm_alloc \\\$(sleep inf)\";
+           echo ${NAME}c0 \$(sleep inf); # needed for pod resource discovery'
+      resources:
+        requests:
+          cpu: 500m
+          memory: ${MEM}
+        limits:
+          cpu: 500m
+          memory: ${MEM}

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  annotations:
+    cri-resource-manager.intel.com/memory-type: |
+      ${NAME}c0: ${MEMTYPEC0}
+      ${NAME}c1: ${MEMTYPEC1}
+      ${NAME}c2: ${MEMTYPEC2}
+spec:
+  containers:
+    $(for CONT in 0 1 2; do echo "
+    - name: ${NAME}c${CONT}
+      image: busybox
+      command: ['sh', '-c', 'echo ${NAME}c${CONT} \$(sleep inf)']
+      resources:
+        requests:
+          cpu: 500m
+          memory: ${MEM}
+        limits:
+          cpu: 500m
+          memory: ${MEM}
+    "; done)
+    - name: ${NAME}c9
+      image: busybox
+      command: ['sh', '-c', 'echo ${NAME}c9 \$(sleep inf)']
+      resources:
+        requests:
+          cpu: 500m
+          memory: ${MEM}
+        limits:
+          cpu: 500m
+          memory: ${MEM}
