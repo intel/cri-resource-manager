@@ -29,7 +29,7 @@ export-var-files() {
     local var_file_name
     local var_name
     for var_filepath in "$var_file_dir"/*.var "$var_file_dir"/*.var.*; do
-        if ! [ -f "$var_filepath" ] || [[ "$var_filepath" == *"~" ]]; then
+        if ! [ -f "$var_filepath" ] || [[ "$var_filepath" == *"~" ]] || [[ "$var_filepath" == *"#"* ]]; then
             continue
         fi
         var_file_name=$(basename "$var_filepath")
