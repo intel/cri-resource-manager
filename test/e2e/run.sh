@@ -138,6 +138,8 @@ screen-install-cri-resmgr() {
 screen-install-cri-resmgr-debugging() {
     speed=60 out "### Installing cri-resmgr debugging enablers"
     vm-install-golang
+    vm-install-pkg git
+    vm-install-pkg rsync
     vm-command "go get github.com/go-delve/delve/cmd/dlv" || {
         command-error "installing delve failed"
     }
