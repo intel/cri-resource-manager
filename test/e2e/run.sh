@@ -192,10 +192,20 @@ _branch_pod=[(p, d, n, c, t, cpu, pod.rsplit('/', 1)[0])
              for t in allowed[p][d][n][c]
              for cpu in allowed[p][d][n][c][t]
              for pod in allowed[p][d][n][c][t][cpu]]
+# cpu resources allowed for a pod:
 packages, dies, nodes, cores, threads, cpus = {}, {}, {}, {}, {}, {}
+# mem resources allowed for a pod:
+mems = {}
 for p, d, n, c, t, cpu, pod in _branch_pod:
-    if not c.startswith('core'):
+    if c == 'mem': # this _branch_pod entry is about memory
+        if not pod in mems:
+            mems[pod] = set()
+        # topology.py can print memory nodes as children of cpu-ful nodes
+        # if distance looks like they are behind the same memory controller.
+        # The thread field, however, is the true node who contains the memory.
+        mems[pod].add(t)
         continue
+    # this _branch_pod entry is about cpu
     if not pod in packages:
         packages[pod] = set()
         dies[pod] = set()
