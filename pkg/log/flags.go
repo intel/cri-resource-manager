@@ -16,7 +16,7 @@ package log
 
 import (
 	"encoding/json"
-	"flag"
+	"os"
 	"strings"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
@@ -27,12 +27,10 @@ import (
 const (
 	// DefaultLevel is the default logging severity level.
 	DefaultLevel = LevelInfo
-	// command-line argument prefix.
-	optPrefix = "logger"
-	// Flag for enabling/disabling debug logging for sources.
-	optDebug = optPrefix + "-debug"
+	// debugEnvVar is the environment variable used to seed debugging flags.
+	debugEnvVar = "LOGGER_DEBUG"
 	// configModule is our module name in the runtime configuration.
-	configModule = optPrefix
+	configModule = "logger"
 )
 
 // options capture our runtime configuration.
@@ -134,17 +132,6 @@ func (m *srcmap) String() string {
 		return "off:" + off
 	}
 	return "on:" + on + "," + "off:" + off
-}
-
-// Set sets entries of srcmap by parsing the given value.
-func (m *srcmap) Set(value string) error {
-	log.Lock()
-	defer log.Unlock()
-	if err := m.parse(value); err != nil {
-		return err
-	}
-	log.setDbgMap(*m)
-	return nil
 }
 
 // MarshalJSON is the JSON marshaller for srcmap.
@@ -266,10 +253,17 @@ func init() {
 		Panic:        cfglog.Panic,
 	})
 
-	flag.Var(&defaultDebugFlags, optDebug,
-		"comma-separated list of source names to enable debug messages for.\n"+
-			"Specify '*' or 'all' to enable all sources.\n"+
-			"Prefix a source or list with 'off:' to disable, which is also the default state.")
+	defaultDebugFlags = make(srcmap)
+	if value, ok := os.LookupEnv(debugEnvVar); ok {
+		if err := defaultDebugFlags.parse(value); err != nil {
+			Default().Error("failed to parse %s %q: %v", debugEnvVar,
+				value, err)
+		} else {
+			log.setDbgMap(defaultDebugFlags)
+			Default().Info("seeded debug flags ($%s): %s", debugEnvVar,
+				defaultDebugFlags.String())
+		}
+	}
 
 	pkgcfg.Register(configModule, "logging control", opt, defaultOptions,
 		pkgcfg.WithNotify(opt.configNotify))

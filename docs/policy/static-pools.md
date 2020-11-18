@@ -165,8 +165,9 @@ policy:
 
 ### Debugging
 
-In order to enable more verbose logging for the STP policy specify
-`-logger-debug stp` on the command line or enable debug from the CRI-RM global config:
+In order to enable more verbose logging for the STP policy set the
+`LOGGER_DEBUG=stp` environment variable or enable debug from the CRI-RM
+global config:
 
 ```yaml
 logger:
