@@ -465,6 +465,8 @@ launch() { # script API
                 command-error "launching cri-resmgr failed with FATAL ERROR"
             }
             vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
+                echo "cri-resmgr last output line:"
+                vm-command-q "tail -n 1 cri-resmgr.output.txt"
                 command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
             }
             ;;
