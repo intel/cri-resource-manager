@@ -451,7 +451,7 @@ func (n *numanode) GetPhysicalNodeIDs() []system.ID {
 func (n *numanode) DiscoverSupply() Supply {
 	log.Debug("discovering CPU available at node %s...", n.Name())
 
-	noderes := n.sysnode.CPUSet()
+	noderes := n.sysnode.CPUSet().Intersection(n.policy.allowed)
 	meminfo, err := n.sysnode.MemoryInfo()
 	if err != nil {
 		log.Error("Couldn't get memory info for node %s", n.Name())
@@ -595,7 +595,7 @@ func (n *dienode) DiscoverSupply() Supply {
 				log.Error("node has an unknown memory type/combination")
 			}
 		}
-		diecpus := n.syspkg.DieCPUSet(n.id)
+		diecpus := n.syspkg.DieCPUSet(n.id).Intersection(n.policy.allowed)
 		isolated := diecpus.Intersection(n.policy.isolated)
 		sharable := diecpus.Difference(isolated)
 		n.noderes = newSupply(n, isolated, sharable, 0, mem, createMemoryMap(0, 0, 0))
@@ -714,7 +714,7 @@ func (n *socketnode) DiscoverSupply() Supply {
 				log.Error("node has an unknown memory type/combination")
 			}
 		}
-		sockcpus := n.syspkg.CPUSet()
+		sockcpus := n.syspkg.CPUSet().Intersection(n.policy.allowed)
 		isolated := sockcpus.Intersection(n.policy.isolated)
 		sharable := sockcpus.Difference(isolated)
 		n.noderes = newSupply(n, isolated, sharable, 0, mem, createMemoryMap(0, 0, 0))
