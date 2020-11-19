@@ -1,0 +1,8 @@
+policy:
+  Active: memtier
+  AvailableResources:
+    cpu: ${AVAILABLE_CPU}
+  ReservedResources:
+    cpu: cpuset:11
+logger:
+  Debug: cri-resmgr,resource-manager,cache,policy
