@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
@@ -400,19 +401,22 @@ func TestPoolCreation(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
-			}
-			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
-
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
+				},
 			}
 
-			if policy.root.GetSupply().SharableCPUs().Size() != tc.expectedRootNodeCPUs {
-				t.Errorf("Expected %d CPUs, got %d", tc.expectedRootNodeCPUs, policy.root.GetSupply().SharableCPUs().Size())
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
+
+			if policy.root.GetSupply().SharableCPUs().Size()+policy.root.GetSupply().IsolatedCPUs().Size() != tc.expectedRootNodeCPUs {
+				t.Errorf("Expected %d CPUs, got %d", tc.expectedRootNodeCPUs,
+					policy.root.GetSupply().SharableCPUs().Size()+policy.root.GetSupply().IsolatedCPUs().Size())
 			}
 
 			for _, p := range policy.pools {
@@ -421,7 +425,9 @@ func TestPoolCreation(t *testing.T) {
 						t.Errorf("Leaf node %v had %d children", p, len(p.Children()))
 					}
 					if p.GetSupply().SharableCPUs().Size()+p.GetSupply().IsolatedCPUs().Size() != tc.expectedLeafNodeCPUs {
-						t.Errorf("Expected %d CPUs, got %d (%s)", tc.expectedLeafNodeCPUs, p.GetSupply().SharableCPUs().Size()+p.GetSupply().IsolatedCPUs().Size(), p.GetSupply())
+						t.Errorf("Expected %d CPUs, got %d (%s)", tc.expectedLeafNodeCPUs,
+							p.GetSupply().SharableCPUs().Size()+p.GetSupply().IsolatedCPUs().Size(),
+							p.GetSupply().DumpCapacity())
 					}
 				}
 			}
