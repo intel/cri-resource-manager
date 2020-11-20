@@ -657,7 +657,7 @@ func (m *mockCache) EvaluateAffinity(*cache.Affinity) map[string]int32 {
 	}
 }
 func (m *mockCache) AddImplicitAffinities(map[string]*cache.ImplicitAffinity) error {
-	panic("unimplemented")
+	return nil
 }
 func (m *mockCache) GetActivePolicy() string {
 	panic("unimplemented")
