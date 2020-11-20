@@ -365,8 +365,11 @@ ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
 	    $(GO_MODULES)
 else
-	$(Q)cd $(WHAT) && \
-            $(GO_TEST) -v -cover -coverprofile cover.out || rc=1; \
+	$(Q)if [ -n '$(TESTS)' ]; then \
+	        run="-run $(TESTS)"; \
+	    fi; \
+	cd $(WHAT) && \
+            $(GO_TEST) $$run -v -cover -coverprofile cover.out || rc=1; \
             $(GO_CMD) tool cover -html=cover.out -o coverage.html; \
             rm cover.out; \
             echo "Coverage report: file://$$(realpath coverage.html)"; \
