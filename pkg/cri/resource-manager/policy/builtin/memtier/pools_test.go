@@ -953,16 +953,18 @@ func TestAffinities(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
+				},
 			}
-			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
 
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
-			}
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
 
 			affinities := map[int]int32{}
 			for name, weight := range tc.affinities {
