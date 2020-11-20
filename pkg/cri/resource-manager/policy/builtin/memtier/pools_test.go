@@ -693,21 +693,19 @@ func TestContainerMove(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
-				allocations: allocations{
-					grants: make(map[string]Grant),
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
 				},
 			}
-			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
 
-			policy.allocations.policy = policy
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
 
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
-			}
 			grant1, err := policy.allocatePool(tc.container1)
 			if err != nil {
 				panic(err)
