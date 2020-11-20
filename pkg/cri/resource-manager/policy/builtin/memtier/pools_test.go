@@ -404,6 +404,7 @@ func TestPoolCreation(t *testing.T) {
 				sys:   sys,
 				cache: &mockCache{},
 			}
+			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
 
 			err = policy.buildPoolsByTopology()
 			if err != nil {
@@ -486,11 +487,12 @@ func TestWorkloadPlacement(t *testing.T) {
 			path: path.Join(dir, "sysfs", "server", "sys"),
 			name: "workload placement on a server system leaf node",
 			req: &request{
-				memReq:    10000,
-				memLim:    10000,
-				memType:   memoryUnspec,
-				isolate:   false,
-				full:      27, // 28: fully exhaustin the shared CPU subpool is is disallowed
+				memReq:  10000,
+				memLim:  10000,
+				memType: memoryUnspec,
+				isolate: false,
+				full:    27, // 28: fully exhausting the shared CPU subpool is disallowed
+
 				container: &mockContainer{},
 			},
 			expectedRemainingNodes: []int{0, 1, 2, 3, 4, 5, 6},
@@ -536,6 +538,7 @@ func TestWorkloadPlacement(t *testing.T) {
 				sys:   sys,
 				cache: &mockCache{},
 			}
+			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
 
 			err = policy.buildPoolsByTopology()
 			if err != nil {
@@ -689,6 +692,8 @@ func TestContainerMove(t *testing.T) {
 					grants: make(map[string]Grant),
 				},
 			}
+			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
+
 			policy.allocations.policy = policy
 
 			err = policy.buildPoolsByTopology()
@@ -946,6 +951,7 @@ func TestAffinities(t *testing.T) {
 				sys:   sys,
 				cache: &mockCache{},
 			}
+			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
 
 			err = policy.buildPoolsByTopology()
 			if err != nil {
