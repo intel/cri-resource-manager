@@ -497,7 +497,7 @@ func TestWorkloadPlacement(t *testing.T) {
 				memLim:  10000,
 				memType: memoryUnspec,
 				isolate: false,
-				full:    27, // 28: fully exhausting the shared CPU subpool is disallowed
+				full:    25, // 28 - 2 isolated = 26: but fully exhausting the shared CPU subpool is disallowed
 
 				container: &mockContainer{},
 			},
@@ -540,16 +540,18 @@ func TestWorkloadPlacement(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
+				},
 			}
-			policy.allowed = policy.sys.CPUSet().Difference(policy.sys.Offlined())
 
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
-			}
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
 
 			scores, filteredPools := policy.sortPoolsByScore(tc.req, tc.affinities)
 			fmt.Printf("scores: %v, remaining pools: %v\n", scores, filteredPools)
