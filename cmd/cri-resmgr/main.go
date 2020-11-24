@@ -22,6 +22,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/intel/goresctrl/pkg/rdt"
+
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
@@ -37,6 +39,7 @@ func main() {
 	rate := logger.Rate{Limit: logger.Every(1 * time.Minute)}
 	logger.SetGrpcLogger("grpc", &rate)
 	logger.SetStdLogger("stdlog")
+	rdt.SetLogger(logger.Get("rdt"))
 
 	printConfig := flag.Bool("print-config", false, "Print configuration and exit.")
 	listPolicies := flag.Bool("list-policies", false, "List available policies.")
