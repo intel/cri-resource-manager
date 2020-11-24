@@ -234,7 +234,7 @@ debian-set-kernel-cmdline() {
 ###########################################################################
 
 #
-# Centos 7, 8, generic Fedora, generic rpm functions
+# Centos 7, 8, generic Fedora
 #
 
 YUM_INSTALL="yum install --disableplugin=fastestmirror -y"
@@ -376,6 +376,116 @@ fi
 echo PATH="\$PATH:/usr/local/bin:/usr/local/sbin" > /etc/profile.d/usr-local-path.sh
 EOF
 }
+
+
+###########################################################################
+
+#
+# OpenSUSE 15.2
+#
+
+ZYPPER="zypper --non-interactive --no-gpg-checks"
+
+opensuse-image-url() {
+    echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
+}
+
+opensuse-ssh-user() {
+    echo "opensuse"
+}
+
+opensuse-pkg-type() {
+    echo "rpm"
+}
+
+opensuse-install-repo() {
+    opensuse-wait-for-zypper
+    vm-command "$ZYPPER addrepo $* && $ZYPPER refresh" ||
+        command-error "failed to add zypper repository $*"
+}
+
+opensuse-refresh-pkg-db() {
+    vm-command "$ZYPPER refresh" ||
+        command-err "failed to refresh zypper package DB"
+}
+
+opensuse-install-pkg() {
+    vm-command "$ZYPPER install $*" ||
+        command-error "failed to install $*"
+}
+
+opensuse-remove-pkg() {
+    vm-command 'for i in $*; do rpm -q --quiet $i || continue; $ZYPPER remove $i || exit 1; done' ||
+        command-error "failed to remove package(s) $*"
+}
+
+opensuse-install-golang() {
+    opensuse-install-pkg wget tar gzip
+    from-tarball-install-golang
+}
+
+opensuse-wait-for-zypper() {
+    vm-command 'cnt=0; while ps axuw | grep zypper | grep -qv grep; do if [ $cnt -lt 5 ]; then echo "Waiting for zypper to exit..."; sleep 1; let cnt=$cnt+1; else echo "Killing running zypper..."; killall zypper; sleep 1; fi; done'
+}
+
+opensuse-install-containerd() {
+    opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/openSUSE_Leap_15.2/Virtualization:containers.repo
+    opensuse-install-pkg containerd
+
+cat <<EOF |
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target
+
+[Service]
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/sbin/containerd
+
+Delegate=yes
+KillMode=process
+Restart=always
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=1048576
+TasksMax=infinity
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    vm-pipe-to-file /etc/systemd/system/containerd.service
+
+    cat <<EOF |
+disabled_plugins = []
+EOF
+    vm-pipe-to-file /etc/containerd/config.toml
+    vm-command "systemctl daemon-reload" ||
+        command-error "failed to reload systemd daemon"
+}
+
+opensuse-install-k8s() {
+    opensuse-install-pkg "kubernetes1.18-kubeadm kubernetes1.18-kubelet kubernetes1.18-client"
+    # remove original options to use crio as runtime
+    vm-command "mv /etc/sysconfig/kubelet /etc/sysconfig/kubelet.orig && cat /etc/sysconfig/kubelet.orig | sed -E 's:--container-runtime=remote::g;s:--container-runtime-endpoint=[^ ]* ::g' > /etc/sysconfig/kubelet" ||
+        command-error "failed to update kubelet configuration"
+    vm-command "systemctl enable --now kubelet" ||
+        command-error "failed to enable kubelet"
+}
+
+opensuse-bootstrap-commands() {
+    cat <<EOF
+export HTTP_PROXY="$http_proxy"
+export HTTPS_PROXY="$http_proxy"
+zypper refresh && zypper install ssh && systemctl enable ssh && systemctl start ssh
+EOF
+}
+
+
+###########################################################################
+
+#
+# Generic rpm functions
+#
 
 rpm-pkg-type() {
     echo rpm
