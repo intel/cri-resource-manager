@@ -317,9 +317,30 @@ to your real kubelet instance's configuration:
 
 ## Logging and Debugging
 
-You can control logging and debugging with the `--logger-*` command line options. By
-default debug logs are globally disabled. You can turn on full debug logs with the
-`--logger-debug '*'` command line option.
+You can control logging with the klog command line options or by setting the
+corresponding environment variables. You can get the name of the environment
+variable for a command line option by prepending the `LOGGER_` prefix to the
+capitalized option name without any leading dashes. For instance, setting the
+environment variable `LOGGER_SKIP_HEADERS=true` has the same effect as using
+the `-skip_headers` command line option.
+
+Additionally, the `LOGGER_DEBUG` environment variable controls debug logs.
+These are globally disabled by default. You can turn on full debugging by
+setting `LOGGER_DEBUG='*'`.
+
+When using environment variables be careful what configuration you pass to
+CRI Resource Manager using a file or ConfigMap. The environment is treated
+as default configuration but a file or a ConfigMap has higher precedence.
+If something is configured in both, the environment will only be in effect
+until the configuration is applied. However, in such a case if you later
+push an updated configuration to CRI Resource Manager with the overlapping
+settings removed, the original ones from the environment will be in effect
+again.
+
+For debug logs, the settings from the configuration are applied in addition
+to any settings in the environment. That said, if you turn something on in
+the environment but off in the configuration, it will be eventually turned
+off.
 
 <!-- Links -->
 [agent]: node-agent.md

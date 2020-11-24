@@ -83,9 +83,6 @@ func (env *testEnv) Run(name string, testFunction func(context.Context, *testEnv
 		if err := flag.Set("config-socket", filepath.Join(tmpDir, "config.sock")); err != nil {
 			t.Fatalf("unable to set config-socket")
 		}
-		if err := flag.Set("logger-debug", "*"); err != nil {
-			t.Fatalf("unable to set logger-debug")
-		}
 
 		if env.forceConfig != "" {
 			path := filepath.Join(tmpDir, "forcedconfig.cfg")

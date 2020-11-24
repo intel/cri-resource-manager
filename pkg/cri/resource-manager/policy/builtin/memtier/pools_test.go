@@ -17,7 +17,6 @@ package memtier
 import (
 	"archive/tar"
 	"compress/bzip2"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -971,10 +970,10 @@ func TestAffinities(t *testing.T) {
 				affinities[findNodeWithName(name, policy.pools).NodeID()] = weight
 			}
 
-			flag.CommandLine.Parse([]string{"--logger-debug", "*"})
+			log.EnableDebug(true)
 			scores, filteredPools := policy.sortPoolsByScore(tc.req, affinities)
 			fmt.Printf("scores: %v, remaining pools: %v\n", scores, filteredPools)
-			flag.CommandLine.Parse([]string{"--logger-debug", "off:*"})
+			log.EnableDebug(false)
 
 			if len(filteredPools) < 1 {
 				t.Errorf("pool scoring failed to find any pools")

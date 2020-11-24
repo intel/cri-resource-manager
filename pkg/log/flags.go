@@ -16,135 +16,70 @@ package log
 
 import (
 	"encoding/json"
-	"flag"
+	"os"
 	"strings"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
+	"github.com/intel/cri-resource-manager/pkg/log/klogcontrol"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
 	// DefaultLevel is the default logging severity level.
 	DefaultLevel = LevelInfo
-	// command-line argument prefix.
-	optPrefix = "logger"
-	// Flag for enabling/disabling normal non-debug logging for sources.
-	optEnable = optPrefix + "-sources"
-	// Flag for enabling/disabling debug logging for sources.
-	optDebug = optPrefix + "-debug"
-	// Flag for selecting logging level.
-	optLevel = optPrefix + "-level"
-	// Flag for selecting logging backend.
-	optLogger = optPrefix
+	// debugEnvVar is the environment variable used to seed debugging flags.
+	debugEnvVar = "LOGGER_DEBUG"
 	// configModule is our module name in the runtime configuration.
-	configModule = optPrefix
+	configModule = "logger"
 )
 
-// Logger options configurable via the command line or pkg/config.
+// options capture our runtime configuration.
 type options struct {
-	// Level is the logging severity/level.
-	Level Level
-	// Enable is a map for enabling/disabling normal logging for sources.
-	Enable srcmap
-	// Debug is a map for enabling/disabling debug logging for sources.
+	// Klog contains klog-specific options.
+	Klog klogcontrol.Options
+	// Debug defines which sources produce debug messages.
 	Debug srcmap
-	// Logger is the name of the logger backend to use.
-	Logger backendName
+	// LogSource determines if messages are prefixed with the logger source
+	LogSource bool
 }
 
-// srcmap tracks logging or debugging settings for sources.
+// srcmap tracks debugging settings for sources.
 type srcmap map[string]bool
 
-// backendName is a name for a Backend.
-type backendName string
+var (
+	// Runtime logging configuration.
+	opt *options
+	// Default debugging configuration.
+	defaultDebugFlags srcmap
+	// Default klog configuration.
+	defaultKlogFlags klogcontrol.Options
+	// klog control
+	klogctl *klogcontrol.Control
+)
 
-// Default configuration given on the command line (or set via pkg/flag).
-var defaults = &options{
-	Logger: FmtBackendName,
-	Level:  DefaultLevel,
-	Enable: make(srcmap),
-	Debug:  make(srcmap),
-}
-
-// Runtime configuration, from an agent, fallback, or forced configuration file.
-var opt = &options{
-	Logger: FmtBackendName,
-	Level:  DefaultLevel,
-	Enable: make(srcmap),
-	Debug:  make(srcmap),
-}
-
-// Set sets the level from the given name.
-func (l *Level) Set(value string) error {
-	levels := map[string]Level{
-		"debug":   LevelDebug,
-		"info":    LevelInfo,
-		"warning": LevelWarn,
-		"error":   LevelError,
-		"fatal":   LevelFatal,
-		"panic":   LevelPanic,
+// parse parses the given string and updates the srcmap accordingly.
+func (m *srcmap) parse(value string) error {
+	if *m == nil {
+		*m = make(srcmap)
 	}
-	level, ok := levels[strings.ToLower(value)]
-	if !ok {
-		return loggerError("invalid logging level %s", value)
+	if value = strings.TrimSpace(value); value == "" {
+		return nil
 	}
 
-	*l = level
-	opt.Level = level
-	SetLevel(level)
-
-	return nil
-}
-
-// String returns the name of the level.
-func (l Level) String() string {
-	names := map[Level]string{
-		LevelDebug: "debug",
-		LevelInfo:  "info",
-		LevelWarn:  "warning",
-		LevelError: "error",
-		LevelFatal: "fatal",
-		LevelPanic: "panic",
-	}
-	if level, ok := names[l]; ok {
-		return level
-	}
-
-	return names[LevelInfo]
-}
-
-// Set sets the name of the active Backend.
-func (n *backendName) Set(value string) error {
-	if err := SetBackend(value); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// String returns the name of the active backend.
-func (n backendName) String() string {
-	return string(n)
-}
-
-// Set sets entries of srcmap by parsing the given value.
-func (m *srcmap) Set(value string) error {
-	log.Lock()
-	defer log.Unlock()
-
-	sm := *m
 	prev, state, src := "", "", ""
 	for _, entry := range strings.Split(value, ",") {
+		if entry = strings.TrimSpace(entry); entry == "" {
+			continue
+		}
 		statesrc := strings.Split(entry, ":")
 		switch len(statesrc) {
 		case 2:
-			state, src = statesrc[0], statesrc[1]
+			state, src = statesrc[0], strings.TrimSpace(statesrc[1])
 		case 1:
-			state, src = "", statesrc[0]
+			state, src = "", strings.TrimSpace(statesrc[0])
 		default:
 			return loggerError("invalid state spec '%s' in source map", entry)
 		}
-
 		if state != "" {
 			prev = state
 		} else {
@@ -153,6 +88,7 @@ func (m *srcmap) Set(value string) error {
 				state = "on"
 			}
 		}
+
 		if src == "all" {
 			src = "*"
 		}
@@ -161,17 +97,7 @@ func (m *srcmap) Set(value string) error {
 		if err != nil {
 			return loggerError("invalid state '%s' in source map", state)
 		}
-		sm[src] = enabled
-	}
-
-	// propagate command-line to runtime defaults, reconfigure loggers
-	if m == &defaults.Enable {
-		opt.Enable.copy(sm)
-		log.update(sm, nil)
-	}
-	if m == &defaults.Debug {
-		opt.Debug.copy(sm)
-		log.update(nil, sm)
+		(*m)[src] = enabled
 	}
 
 	return nil
@@ -179,9 +105,6 @@ func (m *srcmap) Set(value string) error {
 
 // String returns a string representation of the srcmap.
 func (m *srcmap) String() string {
-	log.RLock()
-	defer log.RUnlock()
-
 	off := ""
 	on := ""
 	for src, state := range *m {
@@ -200,128 +123,125 @@ func (m *srcmap) String() string {
 		}
 	}
 
-	if off == "" {
+	switch {
+	case on == "" && off == "":
+		return ""
+	case off == "":
 		return "on:" + on
-	}
-	if on == "" {
+	case on == "":
 		return "off:" + off
 	}
-
 	return "on:" + on + "," + "off:" + off
 }
 
 // MarshalJSON is the JSON marshaller for srcmap.
 func (m srcmap) MarshalJSON() ([]byte, error) {
-	raw := map[string][]string{"on": {}, "off": {}}
-	which := map[bool][]string{false: raw["off"], true: raw["on"]}
-
-	for src, state := range m {
-		which[state] = append(which[state], src)
-	}
-
-	return json.Marshal(raw)
+	return json.Marshal(m.String())
 }
 
 // UnmarshalJSON is the JSON unmarshaller for srcmap.
 func (m *srcmap) UnmarshalJSON(raw []byte) error {
-	var err error
-
-	*m = make(map[string]bool)
-
-	boolmap := map[bool][]string{}
-	if err := json.Unmarshal(raw, &boolmap); err == nil {
-		for state, sources := range boolmap {
-			for _, src := range sources {
-				if src == "all" {
-					src = "*"
-				}
-				(*m)[src] = state
-			}
-		}
-		return nil
-	}
-
-	rawmap := map[string][]string{}
-	if err = json.Unmarshal(raw, &rawmap); err == nil {
-		for state, sources := range rawmap {
-			for _, src := range sources {
-				if src == "all" {
-					src = "*"
-				}
-				(*m)[src], err = utils.ParseEnabled(state)
-				if err != nil {
-					return loggerError("source '%s' has invalid state '%s' in logger source map",
-						src, state)
-				}
-			}
-		}
-		return nil
-	}
-
 	cfgstr := ""
-	if err = json.Unmarshal(raw, &cfgstr); err == nil {
-		if err := m.Set(cfgstr); err != nil {
-			return loggerError("failed to unmarshal logger source map/configuration '%s': %v",
-				string(raw), err)
-		}
-		return nil
+	if err := json.Unmarshal(raw, &cfgstr); err != nil {
+		return loggerError("failed to unmarshal source map '%s': %v", string(raw), err)
 	}
-
-	return loggerError("failed to unmarshal logger source map '%s': %v",
-		string(raw), err)
+	if err := m.parse(cfgstr); err != nil {
+		return loggerError("failed to unmarshal source map '%s': %v", string(raw), err)
+	}
+	return nil
 }
 
-// copy state from another srcmap.
-func (m srcmap) copy(o srcmap) {
+// cloneFrom state from another srcmap.
+func (m *srcmap) cloneFrom(o srcmap) {
+	*m = make(srcmap)
 	for src, state := range o {
-		m[src] = state
+		(*m)[src] = state
 	}
+}
+
+// clone returns a copy of the srcmap.
+func (m srcmap) clone() srcmap {
+	if m == nil {
+		return nil
+	}
+	o := make(srcmap)
+	for src, state := range m {
+		o[src] = state
+	}
+	return o
 }
 
 // configNotify is the configuration change notification callback for options.
 func (o *options) configNotify(event pkgcfg.Event, src pkgcfg.Source) error {
-	deflog.Info("logger configuration event %v", event)
+	deflog.Info("logger configuration %v", event)
+	deflog.Info(" * debugging: %s", o.Debug.String())
+	deflog.Info(" * log source: %v", o.LogSource)
+	deflog.InfoBlock(" * klog: ", "%s", o.Klog.String())
 
-	deflog.Info("*  log level: %v", opt.Level)
-	deflog.Info("*    logging: %v", opt.Enable.String())
-	deflog.Info("*  debugging: %v", opt.Debug.String())
+	// On the first configuration update event, we record the current values
+	// of klog flags as the runtime defaults. Effectively this allows one to
+	// override the built-in defaults using klog command line options (or
+	// environment variables as interpreted by klogcontrol). The recorded
+	// defaults will also reflect any potential programmatic changes done by
+	// (mis-)using flag.Set() but there's not much we can do about that.
+	if defaultKlogFlags == nil {
+		defaultKlogFlags = klogctl.CurrentOptions()
+	}
 
+	if o.Klog == nil {
+		o.Klog = make(klogcontrol.Options)
+	}
+
+	// The behavior of the options.Klog map across updates is difficult
+	// to understand. To make it more user friendly we fill in runtime
+	// defaults for each unset entry (klog flags) here.
+	for flag, value := range defaultKlogFlags {
+		if _, ok := o.Klog[flag]; !ok {
+			o.Klog[flag] = value
+		}
+	}
+
+	return o.apply()
+}
+
+// apply applies the options to logging.
+func (o *options) apply() error {
 	log.Lock()
 	defer log.Unlock()
 
-	log.setLevel(opt.Level)
-	log.setBackend(opt.Logger.String())
-
-	if len(opt.Enable) == 0 {
-		opt.Enable.copy(defaults.Enable)
+	prefix := o.LogSource
+	if logToStderr, ok := o.Klog["logtostderr"]; ok && logToStderr.(bool) {
+		if skipHeaders, ok := o.Klog["skip_headers"]; ok && skipHeaders.(bool) {
+			prefix = true
+		}
 	}
-	if len(opt.Debug) == 0 {
-		opt.Debug.copy(defaults.Debug)
-	}
-	log.update(opt.Enable, opt.Debug)
 
-	return nil
+	log.setDbgMap(o.Debug.clone())
+	log.setPrefix(prefix)
+
+	return klogctl.Configure(o.Klog)
 }
 
+// defaultOptions returns our current default runtime options.
 func defaultOptions() interface{} {
-	o := &options{
-		Logger: defaults.Logger,
-		Level:  defaults.Level,
-		Enable: make(srcmap),
-		Debug:  make(srcmap),
-	}
-	for key, value := range defaults.Enable {
-		o.Enable[key] = value
-	}
-	for key, value := range defaults.Debug {
-		o.Debug[key] = value
+	o := &options{}
+
+	o.Debug.cloneFrom(defaultDebugFlags)
+	if defaultKlogFlags != nil {
+		o.Klog.CloneFrom(defaultKlogFlags)
+	} else {
+		o.Klog = klogctl.CurrentOptions()
 	}
 
 	return o
 }
 
-// Register us for command line parsing and configuration handling.
+// Set up klog control, set pkg/config logger, register us for configuration handling.
 func init() {
+	klogctl = klogcontrol.Get()
+	opt = defaultOptions().(*options)
+	opt.apply()
+
 	cfglog := log.get("config")
 	pkgcfg.SetLogger(pkgcfg.Logger{
 		DebugEnabled: cfglog.DebugEnabled,
@@ -333,19 +253,18 @@ func init() {
 		Panic:        cfglog.Panic,
 	})
 
-	flag.Var(&defaults.Logger, optLogger,
-		"override logger backend to use.")
-	flag.Var(&defaults.Level, optLevel,
-		"lowest severity level to pass through (info, warning, error)")
-	flag.Var(&defaults.Enable, optEnable,
-		"comma-separated list of source names to enable/disable.\n"+
-			"Specify '*' or 'all' to enable all sources, which is also the default.\n"+
-			"Prefix a source or list with 'off:' to disable.")
-	flag.Var(&defaults.Debug, optDebug,
-		"comma-separated list of source names to enable debug messages for.\n"+
-			"Specify '*' or 'all' to enable all sources.\n"+
-			"Prefix a source or list with 'off:' to disable, which is also the default state.")
+	defaultDebugFlags = make(srcmap)
+	if value, ok := os.LookupEnv(debugEnvVar); ok {
+		if err := defaultDebugFlags.parse(value); err != nil {
+			Default().Error("failed to parse %s %q: %v", debugEnvVar,
+				value, err)
+		} else {
+			log.setDbgMap(defaultDebugFlags)
+			Default().Info("seeded debug flags ($%s): %s", debugEnvVar,
+				defaultDebugFlags.String())
+		}
+	}
 
-	pkgcfg.Register(configModule, configHelp, opt, defaultOptions,
+	pkgcfg.Register(configModule, "logging control", opt, defaultOptions,
 		pkgcfg.WithNotify(opt.configNotify))
 }

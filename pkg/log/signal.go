@@ -41,14 +41,8 @@ func SetupDebugToggleSignal(sig os.Signal) {
 					return
 				}
 			}
-			forced := log.debugForced()
-			deflog.Info("toggling forced full debugging %s...", state[!forced])
-			log.forceDebug(!forced)
-			if log.forced {
-				deflog.Debug("forced full debugging is now %s...", state[forced])
-			} else {
-				deflog.Info("forced full debugging is now %s...", state[forced])
-			}
+			log.forced = !log.forced
+			deflog.Warn("forced full debugging is now %s...", state[log.forced])
 		}
 	}(signals)
 }

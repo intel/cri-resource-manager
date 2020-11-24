@@ -15,7 +15,6 @@
 package instrumentation
 
 import (
-	"flag"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -41,7 +40,7 @@ func TestSamplingIdempotency(t *testing.T) {
 }
 
 func TestPrometheusConfiguration(t *testing.T) {
-	flag.Set("logger-debug", "all")
+	log.EnableDebug(true)
 
 	if opt.HTTPEndpoint == "" {
 		opt.HTTPEndpoint = ":0"
