@@ -557,16 +557,27 @@ func (p *policy) updateSharedAllocations(grant Grant) error {
 	log.Debug("* updating shared allocations affected by %s", grant)
 
 	for _, other := range p.allocations.grants {
+		if other.GetContainer().GetCacheID() == grant.GetContainer().GetCacheID() {
+			continue
+		}
+
 		if other.SharedPortion() == 0 && !other.ExclusiveCPUs().IsEmpty() {
 			log.Debug("  => %s not affected (only exclusive CPUs)...", other)
 			continue
 		}
 
 		if opt.PinCPU {
-			shared := other.GetCPUNode().FreeSupply().SharableCPUs().String()
-			log.Debug("  => updating %s with shared CPUs of %s: %s...",
-				other, other.GetCPUNode().Name(), shared)
-			other.GetContainer().SetCpusetCpus(shared)
+			shared := other.GetCPUNode().FreeSupply().SharableCPUs()
+			exclusive := other.ExclusiveCPUs()
+			if exclusive.IsEmpty() {
+				log.Debug("  => updating %s with shared CPUs of %s: %s...",
+					other, other.GetCPUNode().Name(), shared.String())
+				other.GetContainer().SetCpusetCpus(shared.String())
+			} else {
+				log.Debug("  => updating %s with exclusive+shared CPUs of %s: %s+%s...",
+					other, other.GetCPUNode().Name(), exclusive.String(), shared.String())
+				other.GetContainer().SetCpusetCpus(exclusive.Union(shared).String())
+			}
 		}
 	}
 
