@@ -316,7 +316,11 @@ func TestCpuAllocationPreferences(t *testing.T) {
 					},
 				},
 			},
-			pod: &mockPod{},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction: 1000,
+			expectedIsolate:  false,
 		},
 		{
 			name: "return request's value for system container",
@@ -328,7 +332,9 @@ func TestCpuAllocationPreferences(t *testing.T) {
 					},
 				},
 			},
-			pod:              &mockPod{},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
 			expectedFraction: 2000,
 			expectedCpuType:  cpuReserved,
 		},
@@ -358,7 +364,8 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			pod: &mockPod{
 				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
 			},
-			expectedFull: 2,
+			expectedFull:    2,
+			expectedIsolate: opt.PreferIsolated,
 		},
 		{
 			name: "return request's value for guaranteed QoS and isolate",
