@@ -17,7 +17,6 @@ package memtier
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -118,47 +117,33 @@ func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, boo
 // The first return value indicates if the container prefers to opt-out from
 // exclusive (sliced-off or isolated) CPU allocation even if it was otherwise
 // eligible for it.
-// The second return value, elevate, indicates how much to elevate the actual
-// allocation of the container in the tree of pools. Or in other words how many
-// levels to go up in the tree starting at the best fitting pool, before
-// assigning the container to an actual pool.
-func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, int) {
+func podSharedCPUPreference(pod cache.Pod, container cache.Container) bool {
 	value, ok := pod.GetResmgrAnnotation(keySharedCPUPreference)
 	if !ok {
-		return opt.PreferShared, 0
+		return opt.PreferShared
 	}
 	if value == "false" || value == "true" {
-		return value[0] == 't', 0
+		return value[0] == 't'
 	}
 
 	preferences := map[string]string{}
 	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
 		log.Error("failed to parse shared CPU preference %s = '%s': %v",
 			keySharedCPUPreference, value, err)
-		return opt.PreferShared, 0
+		return opt.PreferShared
 	}
 
 	name := container.GetName()
 	pref, ok := preferences[name]
 	if !ok {
-		return opt.PreferShared, 0
+		return opt.PreferShared
 	}
 	if pref == "false" || pref == "true" {
-		return pref[0] == 't', 0
+		return pref[0] == 't'
 	}
 
-	elevate, err := strconv.ParseInt(pref, 0, 8)
-	if err != nil {
-		log.Error("invalid shared CPU preference for container %s (%s): %v", name, pref, err)
-		return opt.PreferShared, 0
-	}
-
-	if elevate > 0 {
-		log.Error("invalid (> 0) node displacement for container %s: %d", name, elevate)
-		return opt.PreferShared, 0
-	}
-
-	return true, int(elevate)
+	log.Error("invalid shared CPU boolean preference for container %s: %s", name, pref)
+	return opt.PreferShared
 }
 
 // ColdStartPreference lists the various ways the container can be configured to trigger
@@ -217,8 +202,7 @@ func coldStartPreference(pod cache.Pod, container cache.Container) (ColdStartPre
 // 2. fraction: number of milli-CPUs
 // 3. isolate: (bool) isolate full CPUs
 // 4. cpuType: (cpuClass) the type of preferred of CPUs
-// 5. elevate: assign (int) steps above the best-fit-node in topology tree
-func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, int, bool, cpuClass, int) {
+func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, int, bool, cpuClass) {
 	cpuType := cpuNormal
 	if container.GetNamespace() == metav1.NamespaceSystem {
 		cpuType = cpuReserved
@@ -226,13 +210,13 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 
 	req, ok := container.GetResourceRequirements().Requests[corev1.ResourceCPU]
 	if !ok {
-		return 0, 0, false, cpuType, 0
+		return 0, 0, false, cpuType
 	}
 
 	qos := pod.GetQOSClass()
 
 	preferIsol, explicit := podIsolationPreference(pod, container)
-	preferShared, elevate := podSharedCPUPreference(pod, container)
+	preferShared := podSharedCPUPreference(pod, container)
 
 	full, fraction, isolate := 0, 0, false
 	switch {
@@ -258,11 +242,9 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 		case full > 1:
 			isolate = preferIsol && explicit
 		}
-	} else {
-		elevate = -elevate
 	}
 
-	return full, fraction, isolate, cpuType, elevate
+	return full, fraction, isolate, cpuType
 }
 
 // podMemoryTypePreference returns what type of memory should be allocated for the container.

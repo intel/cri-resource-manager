@@ -102,12 +102,11 @@ func TestPodIsolationPreference(t *testing.T) {
 
 func TestPodSharedCPUPreference(t *testing.T) {
 	tcases := []struct {
-		name            string
-		pod             *mockPod
-		container       *mockContainer
-		expectedShared  bool
-		expectedElevate int
-		disabled        bool
+		name           string
+		pod            *mockPod
+		container      *mockContainer
+		expectedShared bool
+		disabled       bool
 	}{
 		{
 			name:     "podSharedCPUPreference() should handle nil pod arg gracefully",
@@ -172,38 +171,15 @@ func TestPodSharedCPUPreference(t *testing.T) {
 			},
 			expectedShared: opt.PreferShared,
 		},
-		{
-			name: "return defaults for elevate gt 0", // FIXME(rojkov): what ever that means... This looks strange the value can be of either bool or int type
-			pod: &mockPod{
-				returnValue1FotGetResmgrAnnotation: "testcontainer: 12",
-				returnValue2FotGetResmgrAnnotation: true,
-			},
-			container: &mockContainer{
-				name: "testcontainer",
-			},
-			expectedShared: opt.PreferShared,
-		},
-		{
-			name: "return negative annotation value",
-			pod: &mockPod{
-				returnValue1FotGetResmgrAnnotation: "testcontainer: -9",
-				returnValue2FotGetResmgrAnnotation: true,
-			},
-			container: &mockContainer{
-				name: "testcontainer",
-			},
-			expectedShared:  true,
-			expectedElevate: -9,
-		},
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			shared, elevate := podSharedCPUPreference(tc.pod, tc.container)
-			if shared != tc.expectedShared || elevate != tc.expectedElevate {
-				t.Errorf("Expected (%v, %v), but got (%v, %v)", tc.expectedShared, tc.expectedElevate, shared, elevate)
+			shared := podSharedCPUPreference(tc.pod, tc.container)
+			if shared != tc.expectedShared {
+				t.Errorf("Expected %v, but got %v", tc.expectedShared, shared)
 			}
 		})
 	}
@@ -218,7 +194,6 @@ func TestCpuAllocationPreferences(t *testing.T) {
 		expectedFraction int
 		expectedIsolate  bool
 		expectedCpuType  cpuClass
-		expectedElevate  int
 		disabled         bool
 	}{
 		{
@@ -337,12 +312,11 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			},
 			pod: &mockPod{
 				returnValueFotGetQOSClass:          corev1.PodQOSGuaranteed,
-				returnValue1FotGetResmgrAnnotation: "testcontainer: -9",
+				returnValue1FotGetResmgrAnnotation: "testcontainer: true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
 			expectedFull:     0,
 			expectedFraction: 2000,
-			expectedElevate:  9,
 		},
 	}
 	for _, tc := range tcases {
@@ -350,13 +324,12 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			full, fraction, isolate, cpuType, elevate := cpuAllocationPreferences(tc.pod, tc.container)
+			full, fraction, isolate, cpuType := cpuAllocationPreferences(tc.pod, tc.container)
 			if full != tc.expectedFull || fraction != tc.expectedFraction ||
-				isolate != tc.expectedIsolate || elevate != tc.expectedElevate ||
-				cpuType != tc.expectedCpuType {
-				t.Errorf("Expected (%v, %v, %v, %v, %v), but got (%v, %v, %v, %v, %v)",
-					tc.expectedFull, tc.expectedFraction, tc.expectedIsolate, tc.expectedCpuType, tc.expectedElevate,
-					full, fraction, isolate, cpuType, elevate)
+				isolate != tc.expectedIsolate || cpuType != tc.expectedCpuType {
+				t.Errorf("Expected (%v, %v, %v, %s), but got (%v, %v, %v, %s)",
+					tc.expectedFull, tc.expectedFraction, tc.expectedIsolate, tc.expectedCpuType,
+					full, fraction, isolate, cpuType)
 			}
 		})
 	}

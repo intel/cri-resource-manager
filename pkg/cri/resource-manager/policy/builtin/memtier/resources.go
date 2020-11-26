@@ -100,8 +100,6 @@ type Request interface {
 	CPUFraction() int
 	// Isolate returns whether isolated CPUs are preferred for this request.
 	Isolate() bool
-	// Elevate returns the requested elevation/allocation displacement for this request.
-	Elevate() int
 	// MemoryType returns the type(s) of requested memory.
 	MemoryType() memoryType
 	// MemAmountToAllocate retuns how much memory we need to reserve for a request.
@@ -222,12 +220,6 @@ type request struct {
 	memReq  uint64     // memory request
 	memLim  uint64     // memory limit
 	memType memoryType // requested types of memory
-
-	// elevate indicates how much to elevate the actual allocation of the
-	// container in the tree of pools. Or in other words how many levels to
-	// go up in the tree starting at the best fitting pool, before assigning
-	// the container to an actual pool. Currently ignored.
-	elevate int
 
 	// coldStart tells the timeout (in milliseconds) how long to wait until
 	// a DRAM memory controller should be added to a container asking for a
@@ -841,7 +833,7 @@ func (cs *supply) DumpAllocatable() string {
 // newRequest creates a new request for the given container.
 func newRequest(container cache.Container) Request {
 	pod, _ := container.GetPod()
-	full, fraction, isolate, cpuType, elevate := cpuAllocationPreferences(pod, container)
+	full, fraction, isolate, cpuType := cpuAllocationPreferences(pod, container)
 	req, lim, mtype := memoryAllocationPreference(pod, container)
 	coldStart := time.Duration(0)
 
@@ -882,7 +874,6 @@ func newRequest(container cache.Container) Request {
 		memReq:    req,
 		memLim:    lim,
 		memType:   mtype,
-		elevate:   elevate,
 		coldStart: coldStart,
 	}
 }
@@ -937,11 +928,6 @@ func (cr *request) CPUFraction() int {
 // Isolate returns whether isolated CPUs are preferred for this request.
 func (cr *request) Isolate() bool {
 	return cr.isolate
-}
-
-// Elevate returns the requested elevation/allocation displacement for this request.
-func (cr *request) Elevate() int {
-	return cr.elevate
 }
 
 // MemAmountToAllocate retuns how much memory we need to reserve for a request.
