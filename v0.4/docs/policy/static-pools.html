@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.4.0-186-g2095782 documentation</title>
+  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.4.0-188-gac055d0 documentation</title>
   
 
   
@@ -260,7 +260,7 @@ cores) requested by containers.</p>
 <div class="section" id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
 <p>The policy is configured using the yaml-based configuration system of CRI-RM.
-See <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/20957826701574daafc2d3259839715bab5d6a1c/docs/policy/../setup.md">setup and usage</a> for more
+See <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/ac055d06596da71e394a0604b0c4f584fb0e0c7d/docs/policy/../setup.md">setup and usage</a> for more
 details on managing the configuration.</p>
 <p>At minimum, you need to specify the active policy in the configuration.
 Policy-specific options control the pool configuration and legacy node label
@@ -275,7 +275,7 @@ and taint.</p>
   <span class="l l-Scalar l-Scalar-Plain">...</span>
 </pre></div>
 </div>
-<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/20957826701574daafc2d3259839715bab5d6a1c/sample-configs/cri-resmgr-configmap.example.yaml">sample configmap</a>
+<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/ac055d06596da71e394a0604b0c4f584fb0e0c7d/sample-configs/cri-resmgr-configmap.example.yaml">sample configmap</a>
 for a complete example containing all available configuration options.</p>
 <p>If dynamic configuration via the <a class="reference internal" href="../node-agent.html"><span class="doc">node agent</span></a> is in use the
 pools configuration may be altered at runtime.</p>
@@ -324,30 +324,18 @@ specified (under <code class="docutils literal notranslate"><span class="pre">po
 </div>
 <div class="section" id="stand-alone-yaml-file">
 <h4>Stand-alone YAML File<a class="headerlink" href="#stand-alone-yaml-file" title="Permalink to this headline">¶</a></h4>
-<p>Path to a stand-alone configuration file can be specified by the
-<code class="docutils literal notranslate"><span class="pre">policy.static-pools.ConfFilePath</span></code> option (empty by default) in the CRI-RM
-global config:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
-  <span class="nt">static-pools</span><span class="p">:</span>
-    <span class="nt">ConfFilePath</span><span class="p">:</span> <span class="s">&quot;/path/to/conf.yaml&quot;</span>
-</pre></div>
-</div>
+<p>The path to a stand-alone configuration file can be specified using the
+<code class="docutils literal notranslate"><span class="pre">-static-pools-conf-file</span></code> command line flag of cri-resmgr.</p>
 <p>Format of the configuration file is similar to the pools config used in the
 global CRI-RM config. You can also see the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/20957826701574daafc2d3259839715bab5d6a1c/sample-configs/static-pools-policy.conf.example">example config file</a>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/ac055d06596da71e394a0604b0c4f584fb0e0c7d/sample-configs/static-pools-policy.conf.example">example config file</a>
 for a starting point.</p>
 </div>
 <div class="section" id="cmk-directory-tree">
 <h4>CMK Directory Tree<a class="headerlink" href="#cmk-directory-tree" title="Permalink to this headline">¶</a></h4>
-<p>The STP policy also supports configuration directory format of the original
-CMK. It reads the configuration from a location specified by the
-<code class="docutils literal notranslate"><span class="pre">policy.static-pools.ConfFileDir</span></code> field (<code class="docutils literal notranslate"><span class="pre">/etc/cmk</span></code> by default) in the CRI-RM
-global config:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
-  <span class="nt">static-pools</span><span class="p">:</span>
-    <span class="nt">ConfFileDir</span><span class="p">:</span> <span class="s">&quot;/etc/cmk&quot;</span>
-</pre></div>
-</div>
+<p>The STP policy also supports the configuration directory format of the
+original CMK. The location of this directory can be specified using
+the <code class="docutils literal notranslate"><span class="pre">-static-pools-conf-dir</span></code> command line flag of cri-resmgr.</p>
 </div>
 </div>
 <div class="section" id="command-line-flags">
