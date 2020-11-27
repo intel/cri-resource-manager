@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memtier
+package pagemigrate
 
 import (
 	"fmt"
@@ -237,11 +237,11 @@ func TestMovePages(t *testing.T) {
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			dynamicDemoter := &demoter{
-				pageMoveCount: tc.pageCount,
-				pageMover:     tc.pageMover,
+				maxPageMoveCount: tc.pageCount,
+				pageMover:        tc.pageMover,
 			}
 
-			err := dynamicDemoter.MovePages(tc.pool, tc.pageCount, tc.targetNodes)
+			err := dynamicDemoter.movePages(tc.pool, tc.pageCount, tc.targetNodes)
 			if err != nil {
 				if err.Error() != "Fake error" {
 					t.Errorf("Non-fake error: %v", err)

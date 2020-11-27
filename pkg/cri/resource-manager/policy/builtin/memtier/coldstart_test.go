@@ -24,7 +24,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 var globalPolicy *policy
@@ -49,11 +48,9 @@ func TestColdStart(t *testing.T) {
 
 	tcases := []struct {
 		name                     string
-		nodes                    []Node
 		numaNodes                []system.Node
 		req                      Request
 		affinities               map[int]int32
-		tree                     map[int][]int
 		container                cache.Container
 		expectedColdStartTimeout time.Duration
 		expectedDRAMNodeID       int
@@ -63,39 +60,6 @@ func TestColdStart(t *testing.T) {
 	}{
 		{
 			name: "three node cold start",
-			nodes: []Node{
-				&socketnode{
-					node: node{
-						id:      100,
-						name:    "testnode-root",
-						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, createMemoryMap(10000, 50000, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, createMemoryMap(10000, 50000, 0), createMemoryMap(0, 0, 0)),
-					},
-				},
-				&numanode{
-					node: node{
-						id:      101,
-						name:    "testnode-dram",
-						kind:    UnknownNode,
-						mem:     system.NewIDSet(11),
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, createMemoryMap(10000, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, createMemoryMap(10000, 0, 0), createMemoryMap(0, 0, 0)),
-					},
-					id: 1, // system node id
-				},
-				&numanode{
-					node: node{
-						id:      102,
-						name:    "testnode-pmem",
-						kind:    UnknownNode,
-						pMem:    system.NewIDSet(12),
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, createMemoryMap(0, 50000, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, createMemoryMap(0, 50000, 0), createMemoryMap(0, 0, 0)),
-					},
-					id: 2, // system node id
-				},
-			},
 			numaNodes: []system.Node{
 				&mockSystemNode{id: 1, memFree: 10000, memTotal: 10000, memType: system.MemoryTypeDRAM, distance: []int{5, 5, 1}},
 				&mockSystemNode{id: 2, memFree: 50000, memTotal: 50000, memType: system.MemoryTypePMEM, distance: []int{5, 1, 5}},
@@ -110,7 +74,6 @@ func TestColdStart(t *testing.T) {
 					coldStartContainerName:             "demo-coldstart-container",
 				},
 			},
-			tree:                     map[int][]int{100: {101, 102}, 101: {}, 102: {}},
 			expectedColdStartTimeout: 1000 * time.Millisecond,
 			expectedDRAMNodeID:       101,
 			expectedDRAMSystemNodeID: system.ID(1),
@@ -120,69 +83,25 @@ func TestColdStart(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			setLinks(tc.nodes, tc.tree)
 			policy := &policy{
 				sys: &mockSystem{
 					nodes: tc.numaNodes,
 				},
-				pools: tc.nodes,
 				cache: &mockCache{
 					returnValue1ForLookupContainer: tc.container,
 					returnValue2ForLookupContainer: true,
 				},
-				root:    tc.nodes[0],
-				nodeCnt: len(tc.nodes),
 				allocations: allocations{
 					grants: make(map[string]Grant, 0),
 				},
 				options: policyapi.BackendOptions{},
 			}
-			// back pointers
-			for _, node := range tc.nodes {
-				switch node.(type) {
-				case *numanode:
-					numaNode := node.(*numanode)
-					numaNode.self.node = numaNode
-					noderes := numaNode.noderes.(*supply)
-					noderes.node = node
-					freeres := numaNode.freeres.(*supply)
-					freeres.node = node
-					numaNode.policy = policy
-					if node.NodeID() == tc.expectedPMEMNodeID {
-						for _, sysnode := range tc.numaNodes {
-							if sysnode.ID() == tc.expectedPMEMSystemNodeID {
-								numaNode.sysnode = sysnode
-							}
-						}
-					} else if node.NodeID() == tc.expectedDRAMNodeID {
-						for _, sysnode := range tc.numaNodes {
-							if sysnode.ID() == tc.expectedDRAMSystemNodeID {
-								numaNode.sysnode = sysnode
-							}
-						}
-					}
-				case *virtualnode:
-					virtualNode := node.(*virtualnode)
-					virtualNode.self.node = virtualNode
-					noderes := virtualNode.noderes.(*supply)
-					noderes.node = node
-					freeres := virtualNode.freeres.(*supply)
-					freeres.node = node
-					virtualNode.policy = policy
-				case *socketnode:
-					socketNode := node.(*socketnode)
-					socketNode.self.node = socketNode
-					noderes := socketNode.noderes.(*supply)
-					noderes.node = node
-					freeres := socketNode.freeres.(*supply)
-					freeres.node = node
-					socketNode.policy = policy
-				}
-			}
 			policy.allocations.policy = policy
 			policy.options.SendEvent = sendEvent
-			tc.nodes[1].DiscoverMemset()
-			tc.nodes[2].DiscoverMemset()
+
+			if err := policy.buildPoolsByTopology(); err != nil {
+				t.Errorf("failed to build topology pool")
+			}
 
 			grant, err := policy.allocatePool(tc.container)
 			if err != nil {

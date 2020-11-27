@@ -10,6 +10,10 @@
 # command-start and command-end set environment variables:
 # COMMAND, COMMAND_STATUS, COMMAND_OUTPUT
 
+# These exports force ssh-* to fail instead of prompting for a passphrase.
+export DISPLAY=bogus-none
+export SSH_ASKPASS=/bin/false
+SSH_KEY="${HOME}/.ssh/id_rsa"
 SSH_OPTS="-o StrictHostKeyChecking=No"
 SSH="ssh $SSH_OPTS"
 SCP="scp $SSH_OPTS"
@@ -92,4 +96,18 @@ command-exit-if-not-interactive() {
     if [ -z "$INTERACTIVE_MODE" ] || [ "$INTERACTIVE_MODE" == "0" ]; then
         exit ${1:-1}
     fi
+}
+
+command-debug-log() {
+    if [ "$(type -t -- debug-log)" = "function" ]; then
+        debug-log "$@"
+        return 0
+    else
+        if [ -n "$OUTPUT_DIR" ] && [ -d "$OUTPUT_DIR" ]; then
+            touch "$OUTPUT_DIR"/debug-log
+            echo "$@" >> "$OUTPUT_DIR"/debug-log
+            return 0
+        fi
+    fi
+    echo "$@" 1>&2
 }

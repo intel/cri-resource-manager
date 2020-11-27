@@ -1,11 +1,19 @@
-# Release Process
+---
+name: New release
+about: Propose a new release
+title: Release v0.0.0
+labels: ''
+assignees: ''
 
-The process to release a new version of cri-resource-manager is:
+---
 
-- [ ] File [a new issue](https://github.com/intel/cri-resource-manager/issues/new)
-  to propose a new release. Copy this checklist into the issue description.
-- [ ] In the issue description, add a changelog section, describing changes
-  since the last release.
+## Release Process
+i<!--
+If making adjustments to the checklist please also file a PR against this issue
+template (.github/ISSUE_TEMPLATE/new-release.md) to incorporate the changes for
+future releases.
+-->
+- [ ] In the issue description, add a changelog section, describing changes since the last release.
 - Local release preparations
   - [ ] Mandatory internal release checks and preparations.
   - [ ] Run `make release-tests` to run an extended set of tests prior to a release
@@ -27,3 +35,13 @@ The process to release a new version of cri-resource-manager is:
   [Github release info](https://github.com/intel/cri-resource-manager/releases).
   - [ ] Add a link to the tagged release in this issue.
 - [ ] Close this issue.
+
+
+## Changelog
+<!--
+Capture changes since the last release here.
+For major releases have separate sections for major changes and a more detailed changelog.
+-->
+### Major changes
+
+### Detailed changelog

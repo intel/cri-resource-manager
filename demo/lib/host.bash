@@ -3,6 +3,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
 HOST_PROMPT=${HOST_PROMPT-"\e[38;5;11mhost>\e[0m "}
 HOST_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")"
 HOST_PROJECT_DIR="$(dirname "$(dirname "$(realpath "$HOST_LIB_DIR")")")"
+HOST_VM_IMAGE_DIR=~/vms/images
+HOST_VM_DATA_DIR_TEMPLATE="~/vms/data/\${VM_NAME}"
 GOVM=${GOVM-govm}
 
 host-command() {
@@ -14,6 +16,22 @@ host-command() {
 
 host-require-govm() {
     command -v "$GOVM" >/dev/null || error "cannot run govm \"$GOVM\". Check PATH or set GOVM=/path/to/govm."
+}
+
+host-get-vm-config() {
+    if [ -z "$1" ]; then
+        error "can't get VM configuration, name not set"
+    fi
+    VM_NAME="$1"
+    HOST_VM_DATA_DIR="$(eval "echo $HOST_VM_DATA_DIR_TEMPLATE")"
+    VM_DATA_CONFIG="$HOST_VM_DATA_DIR/vm-config"
+    if ! [ -f "$VM_DATA_CONFIG" ]; then
+        return 1
+    fi
+    source "$VM_DATA_CONFIG"
+    if [ -z "$VM_NAME" ] || [ -z "$VM_DISTRO" ] || [ -z "$VM_CRI" ] || [ -z "$VM_SSH_USER" ]; then
+        return 1
+    fi
 }
 
 host-set-vm-config() {
@@ -29,13 +47,25 @@ host-set-vm-config() {
     VM_NAME="$1"
     VM_DISTRO="$2"
     VM_CRI="$3"
-    VM_SSH_USER=$(vm-ssh-user)
+    VM_SSH_USER="$(vm-ssh-user)"
+    HOST_VM_DATA_DIR="$(eval "echo $HOST_VM_DATA_DIR_TEMPLATE")"
+    mkdir -p "$HOST_VM_DATA_DIR"
+    VM_COMPOSE_YAML="$HOST_VM_DATA_DIR/govm-compose.yaml"
+    VM_DATA_CONFIG="$HOST_VM_DATA_DIR/vm-config"
+    cat > "$VM_DATA_CONFIG" <<EOF
+VM_NAME="$VM_NAME"
+VM_DISTRO="$VM_DISTRO"
+VM_CRI="$VM_CRI"
+VM_SSH_USER="$VM_SSH_USER"
+EOF
 }
 
 host-fetch-vm-image() {
     local url=$(vm-image-url)
     local file=$(basename $url)
     local image decompress
+    [ -d "$HOST_VM_IMAGE_DIR" ] || mkdir -p "$HOST_VM_IMAGE_DIR" ||
+        error "cannot create directory for VM images: $HOST_VM_IMAGE_DIR"
     case $file in
         *.xz)
             image=${file%.xz}
@@ -54,22 +84,23 @@ host-fetch-vm-image() {
             decompress=":"
             ;;
     esac
-    [ -f "$image" ] || {
-        echo "VM image $image not found..."
-        [ -f "$file" ] || {
+    [ -f "$HOST_VM_IMAGE_DIR/$image" ] || {
+        echo "VM image $HOST_VM_IMAGE_DIR/$image not found..."
+        [ -f "$HOST_VM_IMAGE_DIR/$file" ] || {
             echo "downloading VM image $image..."
-            host-command "wget --progress=dot:giga \"$url\"" ||
+            host-command "wget --progress=dot:giga -O \"$HOST_VM_IMAGE_DIR/$file\" \"$url\"" ||
                 error "failed to download VM image ($url)"
         }
         if [ -n "$decompress" ]; then
             echo "decompressing VM image $file..."
-            $decompress $file || error "failed to decompress $file to $image using $decompress"
+            ( cd "$HOST_VM_IMAGE_DIR" && $decompress $file ) ||
+                error "failed to decompress $file to $image using $decompress"
         fi
-        if [ ! -f "$image" ]; then
-            error "internal error, fetching+decompressing $url did not produce $image"
+        if [ ! -f "$HOST_VM_IMAGE_DIR/$image" ]; then
+            error "internal error, fetching+decompressing $url did not produce $HOST_VM_IMAGE_DIR/$image"
         fi
     }
-    VM_IMAGE=$image
+    VM_IMAGE="$HOST_VM_IMAGE_DIR/$image"
 }
 
 host-create-vm() {
@@ -122,18 +153,24 @@ host-create-vm() {
     # If VM does not exist, create it from scrach
     ${GOVM} ls | grep -q "$VM_NAME" || {
         host-fetch-vm-image
-        vm-compose-govm-template > $vm.yaml
-        host-command "${GOVM} compose -f $vm.yaml"
+        mkdir -p "$(dirname "$VM_COMPOSE_YAML")"
+        vm-compose-govm-template > "$VM_COMPOSE_YAML"
+        host-command "${GOVM} compose -f \"$VM_COMPOSE_YAML\""
+        echo "# VM base image  : $VM_IMAGE"
+        echo "# VM govm yaml   : $VM_COMPOSE_YAML"
     }
 
     sleep 1
     VM_CONTAINER_ID=$(${GOVM} ls | awk "/$VM_NAME/{print \$1}")
-    echo "# VM Docker container: $VM_CONTAINER_ID"
     # Verify Qemu version. Refuse to run if Qemu < 5.0.
     # Use "docker run IMAGE" instead of "docker exec CONTAINER",
     # because the container may have already failed.
     VM_CONTAINER_IMAGE=$(docker inspect $VM_CONTAINER_ID | jq '.[0].Image' -r | awk -F: '{print $2}')
+    echo "# VM name        : $VM_NAME"
+    echo "# VM Linux distro: $VM_DISTRO"
+    echo "# VM CRI         : $VM_CRI"
     echo "# VM Docker image: $VM_CONTAINER_IMAGE"
+    echo "# VM Docker cntnr: $VM_CONTAINER_ID"
     if [ -n "$VM_CONTAINER_IMAGE" ]; then
         VM_CONTAINER_QEMU_VERSION=$(docker run --entrypoint=/usr/bin/qemu-system-x86_64 $VM_CONTAINER_IMAGE -version | awk '/QEMU emulator version/{print $4}')
     fi
@@ -150,6 +187,7 @@ host-create-vm() {
     else
         echo "Warning: cannot verify Qemu version on govm image. In case of failure, check it is >= 5.0" >&2
     fi
+    echo "# VM Qemu output : docker logs $VM_CONTAINER_ID"
     echo "# VM Qemu monitor: docker exec -it $VM_CONTAINER_ID nc local:/data/monitor"
     VM_MONITOR="docker exec -i $VM_CONTAINER_ID nc local:/data/monitor"
     host-wait-vm-ssh-server
@@ -163,6 +201,13 @@ host-wait-vm-ssh-server() {
         VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
     done
     echo "# VM SSH server  : ssh $VM_SSH_USER@$VM_IP"
+
+    if [ -d "$HOME/vms/data/$VM_NAME" ]; then
+        SSH_OPTS="$SSH_OPTS -o ControlMaster=auto -o ControlPath=$HOME/vms/data/$VM_NAME/ssh -o ControlPersist=30"
+        SSH="${SSH%% *} $SSH_OPTS"
+        SCP="${SCP%% *} $SSH_OPTS"
+        export SSH SSH_OPTS SCP
+    fi
 
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP" >/dev/null 2>&1
     retries=60
@@ -195,4 +240,13 @@ host-delete-vm() {
     host-command "${GOVM} delete $VM_NAME" || {
         command-error "deleting govm \"$VM_NAME\" failed"
     }
+}
+
+host-is-encrypted-ssh-key() {
+    ssh-keygen -y -f "$1" < /dev/null >& /dev/null
+    if [ $? != 0 ]; then
+        return 0
+    else
+        return 1
+    fi
 }

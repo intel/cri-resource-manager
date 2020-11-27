@@ -181,6 +181,10 @@ func (n *node) init(p *policy, name string, kind NodeKind, parent Node) {
 	n.parent = parent
 
 	n.LinkParent(parent)
+
+	n.mem = system.NewIDSet()
+	n.pMem = system.NewIDSet()
+	n.hbm = system.NewIDSet()
 }
 
 // IsNil tests if a node
@@ -447,7 +451,7 @@ func (n *numanode) GetPhysicalNodeIDs() []system.ID {
 func (n *numanode) DiscoverSupply() Supply {
 	log.Debug("discovering CPU available at node %s...", n.Name())
 
-	noderes := n.sysnode.CPUSet()
+	noderes := n.sysnode.CPUSet().Intersection(n.policy.allowed)
 	meminfo, err := n.sysnode.MemoryInfo()
 	if err != nil {
 		log.Error("Couldn't get memory info for node %s", n.Name())
@@ -503,40 +507,12 @@ func (n *numanode) GetMemset(mtype memoryType) system.IDSet {
 
 // DiscoverMemset discovers the set of memory attached to this node.
 func (n *numanode) DiscoverMemset() {
-	nID := n.sysnode.ID()
-	n.mem = system.NewIDSet(nID)
-	n.hbm = system.NewIDSet()
-	n.pMem = system.NewIDSet()
+	n.mem.Add(n.sysnode.ID())
+}
 
-	if !n.IsLeafNode() {
-		return
-	}
-
-	// take the CPU-less nodes that are uniquely the closest to this node
-	for _, nodeID := range n.System().NodeIDs() {
-		node := n.System().Node(nodeID)
-		if node.GetMemoryType() != system.MemoryTypePMEM {
-			continue
-		}
-
-		distances := node.Distance()
-		nDist := distances[nID]
-		take := true
-
-		for id, dist := range distances {
-			if id == int(nodeID) {
-				continue
-			}
-			if dist <= nDist && id != int(nID) {
-				take = false
-			}
-		}
-
-		if take {
-			n.pMem.Add(system.ID(nodeID))
-			log.Info("*** %v: PMEM node %d assigned to %s", distances, nodeID, n.name)
-		}
-	}
+// AssignPMEMNodes assigns the given (CPU-less) PMEM NUMA nodes to this one.
+func (n *numanode) AssignPMEMNodes(ids []system.ID) {
+	n.pMem.Add(ids...)
 }
 
 // HintScore calculates the (CPU) score of the node for the given topology hint.
@@ -619,7 +595,7 @@ func (n *dienode) DiscoverSupply() Supply {
 				log.Error("node has an unknown memory type/combination")
 			}
 		}
-		diecpus := n.syspkg.DieCPUSet(n.id)
+		diecpus := n.syspkg.DieCPUSet(n.id).Intersection(n.policy.allowed)
 		isolated := diecpus.Intersection(n.policy.isolated)
 		sharable := diecpus.Difference(isolated)
 		n.noderes = newSupply(n, isolated, sharable, 0, mem, createMemoryMap(0, 0, 0))
@@ -653,9 +629,6 @@ func (n *dienode) GetMemset(mtype memoryType) system.IDSet {
 
 // DiscoverMemset discovers the set of memory attached to this socket.
 func (n *dienode) DiscoverMemset() {
-	n.mem = system.NewIDSet()
-	n.hbm = system.NewIDSet()
-	n.pMem = system.NewIDSet()
 	for _, c := range n.children {
 		n.mem.Add(c.GetMemset(memoryDRAM).Members()...)
 		n.hbm.Add(c.GetMemset(memoryHBM).Members()...)
@@ -741,7 +714,7 @@ func (n *socketnode) DiscoverSupply() Supply {
 				log.Error("node has an unknown memory type/combination")
 			}
 		}
-		sockcpus := n.syspkg.CPUSet()
+		sockcpus := n.syspkg.CPUSet().Intersection(n.policy.allowed)
 		isolated := sockcpus.Intersection(n.policy.isolated)
 		sharable := sockcpus.Difference(isolated)
 		n.noderes = newSupply(n, isolated, sharable, 0, mem, createMemoryMap(0, 0, 0))
@@ -775,9 +748,6 @@ func (n *socketnode) GetMemset(mtype memoryType) system.IDSet {
 
 // DiscoverMemset discovers the set of memory attached to this socket.
 func (n *socketnode) DiscoverMemset() {
-	n.mem = system.NewIDSet()
-	n.hbm = system.NewIDSet()
-	n.pMem = system.NewIDSet()
 	for _, c := range n.children {
 		n.mem.Add(c.GetMemset(memoryDRAM).Members()...)
 		n.hbm.Add(c.GetMemset(memoryHBM).Members()...)
@@ -852,9 +822,6 @@ func (n *virtualnode) GetMemset(mtype memoryType) system.IDSet {
 
 // DiscoverMemset discovers the set of memory attached to this socket.
 func (n *virtualnode) DiscoverMemset() {
-	n.mem = system.NewIDSet()
-	n.hbm = system.NewIDSet()
-	n.pMem = system.NewIDSet()
 	for _, c := range n.children {
 		n.mem.Add(c.GetMemset(memoryDRAM).Members()...)
 		n.hbm.Add(c.GetMemset(memoryHBM).Members()...)

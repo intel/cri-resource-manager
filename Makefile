@@ -39,6 +39,7 @@ INSTALL    := install
 PREFIX     ?= /usr
 BINDIR     ?= $(PREFIX)/bin
 UNITDIR    ?= $(PREFIX)/lib/systemd/system
+DOCDIR     ?= $(PREFIX)/share/doc/cri-resource-manager
 SYSCONFDIR ?= /etc
 CONFIGDIR  ?= /etc/cri-resmgr
 DEFAULTDIR ?= $(shell \
@@ -261,12 +262,13 @@ install-systemd-%:
 	for f in $$(find $$dir -name \*.service -o -name \*.socket); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    $(INSTALL) -m 0644 -t $(DESTDIR)$(UNITDIR) $$f.in; \
-	done
+	done; \
 	for f in $$(find $$dir -name \*.service.in -o -name \*.socket.in); do \
 	    echo "  $$f in $(DESTDIR)$(UNITDIR)..."; \
 	    df=$${f##*/}; df=$${df%.in}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(UNITDIR)/$$df; \
-	    sed -E -i "s:__DEFAULTDIR__:$(DEFAULTDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
+	    sed -E -i -e "s:__DEFAULTDIR__:$(DEFAULTDIR):g" \
+	              -e "s:__BINDIR__:$(BINDIR):g" $(DESTDIR)$(UNITDIR)/$$df; \
 	done
 
 install-sysconf-%:
@@ -287,6 +289,15 @@ install-config-%:
 	    echo "  $$f in $(DESTDIR)$(CONFIGDIR)..."; \
 	    df=$${f##*/}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(CONFIGDIR)/$${df}; \
+	done
+
+install-minimal-docs:
+	$(Q)echo "Installing minimal documentation to $(DOCDIR)..."; \
+	$(INSTALL) -d $(DESTDIR)$(DOCDIR) && \
+	for f in LICENSE docs/security.md; do \
+	    echo "  $$f in $(DESTDIR)$(DOCDIR)..."; \
+	    df=$${f##*/}; \
+	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(DOCDIR)/$${df}; \
 	done
 
 clean-%:
@@ -354,8 +365,11 @@ ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
 	    $(GO_MODULES)
 else
-	$(Q)cd $(WHAT) && \
-            $(GO_TEST) -v -cover -coverprofile cover.out || rc=1; \
+	$(Q)if [ -n '$(TESTS)' ]; then \
+	        run="-run $(TESTS)"; \
+	    fi; \
+	cd $(WHAT) && \
+            $(GO_TEST) $$run -v -cover -coverprofile cover.out || rc=1; \
             $(GO_CMD) tool cover -html=cover.out -o coverage.html; \
             rm cover.out; \
             echo "Coverage report: file://$$(realpath coverage.html)"; \
@@ -378,7 +392,7 @@ endif
 release-tests: e2e-tests
 
 e2e-tests: build
-	$(Q)tests="$(if $(E2E_TESTS),$(E2E_TESTS),test/e2e/policies)"; \
+	$(Q)tests="$(if $(E2E_TESTS),$(E2E_TESTS),test/e2e/policies.test-suite)"; \
 	$(E2E_RUN) $$tests; \
 	if [ "$$?" != "0" ]; then \
 	    echo "You drop into interactive mode upon failures if you run e2e tests as"; \
@@ -387,10 +401,23 @@ e2e-tests: build
 	fi
 
 packaging-tests: cross-deb cross-rpm
-	$(Q)for dir in test/e2e/packages/*; do \
-	    [ "$${dir%centos-7}" != "$$dir" ] && continue; \
-	    distro=$${dir##*/} $(E2E_RUN) $$dir; \
-	done
+	$(Q)for dir in test/e2e/packages.test-suite/*; do \
+	    cleanup=1 omit_agent=1 $(E2E_RUN) $$dir; \
+	    echo "--------------------------------------"; \
+	    for r in $(find $$dir -name summary.txt); do \
+	        t="$${r#*.test-suite/}"; t="$${t%/output/summary.txt}"; \
+	        echo "$$t:"; \
+	        cat $$r | sed 's/^/    /g'; \
+	    done; \
+	    echo "======================================"; \
+	done; \
+	for dir in test/e2e/packages.test-suite/*; do \
+	    for r in $(find $$dir -name summary.txt); do \
+	        t="$${r#*.test-suite/}"; t="$${t%/output/summary.txt}"; \
+	        echo "$$t:"; \
+	        cat $$r | sed 's/^/    /g'; \
+	    done; \
+	done;
 
 #
 # Rules for building distro packages.
@@ -452,6 +479,20 @@ vendored-dist: dist
 	rm -f vendored-$$tarball* && \
 	$(TAR) -cf vendored-$$tarball $$tardir && \
 	$(GZIP) vendored-$$tarball && \
+	rm -fr $$tardir
+
+binary-dist: build
+	$(Q)tarball=cri-resource-manager-$(TAR_VERSION).$$(uname -m).tar; \
+	echo "Creating binary dist tarball $$tarball..."; \
+	tardir=binary-dist; \
+	rm -fr $$tarball* $$tardir && \
+	$(MAKE) DESTDIR=$$tardir \
+	        BUILD_DIRS=cri-resmgr \
+	        PREFIX=/opt/intel \
+	        DEFAULTDIR=/etc/default \
+	        UNITDIR=$(SYSCONFDIR)/systemd/system install install-minimal-docs && \
+	$(TAR) -C $$tardir -cf $$tarball . && \
+	$(GZIP) $$tarball && \
 	rm -fr $$tardir
 
 spec: clean-spec $(SPEC_FILES)

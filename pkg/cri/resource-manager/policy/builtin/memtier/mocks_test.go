@@ -463,6 +463,12 @@ func (m *mockContainer) SetToptierLimit(int64) {
 func (m *mockContainer) GetToptierLimit() int64 {
 	panic("unimplemented")
 }
+func (m *mockContainer) SetPageMigration(*cache.PageMigrate) {
+	return
+}
+func (m *mockContainer) GetPageMigration() *cache.PageMigrate {
+	return nil
+}
 func (m *mockContainer) SetCRIRequest(req interface{}) error {
 	panic("unimplemented")
 }
@@ -651,7 +657,7 @@ func (m *mockCache) EvaluateAffinity(*cache.Affinity) map[string]int32 {
 	}
 }
 func (m *mockCache) AddImplicitAffinities(map[string]*cache.ImplicitAffinity) error {
-	panic("unimplemented")
+	return nil
 }
 func (m *mockCache) GetActivePolicy() string {
 	panic("unimplemented")

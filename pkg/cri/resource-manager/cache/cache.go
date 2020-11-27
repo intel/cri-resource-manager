@@ -33,6 +33,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 )
 
@@ -45,6 +46,8 @@ const (
 	BlockIO = "blockio"
 	// Memory marks changes that can be applied by the Memory controller.
 	Memory = "memory"
+	// PageMigration marks changes that can be applied by the PageMigration controller.
+	PageMigration = "page-migration"
 
 	// TagAVX512 tags containers that use AVX512 instructions.
 	TagAVX512 = "AVX512"
@@ -347,6 +350,11 @@ type Container interface {
 	// GetToptierLimit returns the top tier memory limit for the container.
 	GetToptierLimit() int64
 
+	// SetPageMigration sets the page migration policy/options for the container.
+	SetPageMigration(*PageMigrate)
+	// GetPageMigration returns the current page migration policy/options for the container.
+	GetPageMigration() *PageMigrate
+
 	// SetCRIRequest sets the current pending CRI request of the container.
 	SetCRIRequest(req interface{}) error
 	// GetCRIRequest returns the current pending CRI request of the container.
@@ -401,9 +409,10 @@ type container struct {
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 	req       *interface{}                 // pending CRI request
 
-	RDTClass     string // RDT class this container is assigned to.
-	BlockIOClass string // Block I/O class this container is assigned to.
-	ToptierLimit int64  // Top tier memory limit.
+	RDTClass     string       // RDT class this container is assigned to.
+	BlockIOClass string       // Block I/O class this container is assigned to.
+	ToptierLimit int64        // Top tier memory limit.
+	PageMigrate  *PageMigrate // Page migration policy/options for this container.
 
 	pending map[string]struct{} // controllers with pending changes for this container
 
@@ -444,6 +453,27 @@ type Device struct {
 	Host string
 	// Permissions specify the device permissions for the container.
 	Permissions string
+}
+
+// PageMigrate contains the policy/preferences for container page migration.
+type PageMigrate struct {
+	SourceNodes system.IDSet // idle memory pages on these NUMA nodes
+	TargetNodes system.IDSet // should be migrated to these NUMA nodes
+}
+
+// Clone creates a copy of the page migration policy/preferences.
+func (pm *PageMigrate) Clone() *PageMigrate {
+	if pm == nil {
+		return nil
+	}
+	c := &PageMigrate{}
+	if pm.SourceNodes != nil {
+		c.SourceNodes = pm.SourceNodes.Clone()
+	}
+	if pm.TargetNodes != nil {
+		c.TargetNodes = pm.TargetNodes.Clone()
+	}
+	return c
 }
 
 //

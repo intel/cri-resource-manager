@@ -90,13 +90,21 @@ func (p *policy) buildPoolsByTopology() error {
 		}
 	}
 
+	pmemNodes := map[system.ID]system.Node{}
+	dramNodes := map[system.ID]system.Node{}
+
 	// create nodes for NUMA nodes
 	if nodeCnt > 0 {
 		for _, id := range p.sys.NodeIDs() {
 			var parent Node
 
-			if p.sys.Node(id).GetMemoryType() == system.MemoryTypePMEM {
-				continue
+			sysnode := p.sys.Node(id)
+			switch sysnode.GetMemoryType() {
+			case system.MemoryTypePMEM:
+				pmemNodes[id] = sysnode
+				continue // don't create pool nodes for CPU-less NUMA nodes
+			case system.MemoryTypeDRAM:
+				dramNodes[id] = sysnode
 			}
 
 			if len(dies) > 0 {
@@ -108,6 +116,54 @@ func (p *policy) buildPoolsByTopology() error {
 			n = p.NewNumaNode(id, parent)
 			p.nodes[n.Name()] = n
 		}
+	}
+
+	// get closest per-PMEM DRAM nodes (sorted by system.ID if there are multiple)
+	pmemClosest := map[system.ID][]system.Node{}
+	for id, sysnode := range pmemNodes {
+		var closest []system.Node
+		for _, dram := range dramNodes {
+			if len(closest) < 1 {
+				closest = []system.Node{dram}
+			} else {
+				curr := closest[0]
+				currDist := sysnode.DistanceFrom(curr.ID())
+				dramDist := sysnode.DistanceFrom(dram.ID())
+				switch {
+				case currDist == dramDist:
+					closest = append(closest, dram)
+				case dramDist < currDist:
+					closest = []system.Node{dram}
+				}
+			}
+		}
+		sort.Slice(closest, func(i, j int) bool {
+			iid := closest[i].ID()
+			jid := closest[j].ID()
+			return iid < jid
+		})
+		pmemClosest[id] = closest
+	}
+
+	// assign PMEM nodes to closest DRAM node with least PMEM assigned
+	assigned := map[system.ID][]system.ID{}
+	for id, closest := range pmemClosest {
+		var taker system.Node
+		for _, dram := range closest {
+			if taker == nil {
+				taker = dram
+			} else {
+				if len(assigned[taker.ID()]) > len(assigned[dram.ID()]) {
+					taker = dram
+				}
+			}
+		}
+		if taker == nil {
+			log.Panic("failed to assign CPU-less PMEM node #%d to any DRAM node with CPUs", id)
+		}
+		assigned[taker.ID()] = append(assigned[taker.ID()], id)
+		log.Info("*** PMEM node #%d assigned to #%d (distance %v)", id, taker.ID(),
+			taker.DistanceFrom(id))
 	}
 
 	// enumerate nodes, calculate tree depth, discover node resource capacity
@@ -122,6 +178,13 @@ func (p *policy) buildPoolsByTopology() error {
 
 		n.DiscoverSupply()
 		n.DiscoverMemset()
+
+		// assign CPU-less PMEM nodes if we have any
+		if n.Kind() == NumaNode {
+			// gosh, this whole Node/*node is seriously fscked up...
+			numa := n.(*node).self.node.(*numanode)
+			numa.AssignPMEMNodes(assigned[numa.id])
+		}
 
 		return nil
 	})
@@ -460,6 +523,7 @@ func (p *policy) applyGrant(grant Grant) error {
 	if mems != "" {
 		log.Debug("  => pinning to memory %s", mems)
 		container.SetCpusetMems(mems)
+		p.setDemotionPreferences(container, grant)
 	} else {
 		log.Debug("  => not pinning memory, memory set is empty...")
 	}
@@ -493,20 +557,59 @@ func (p *policy) updateSharedAllocations(grant Grant) error {
 	log.Debug("* updating shared allocations affected by %s", grant)
 
 	for _, other := range p.allocations.grants {
+		if other.GetContainer().GetCacheID() == grant.GetContainer().GetCacheID() {
+			continue
+		}
+
 		if other.SharedPortion() == 0 && !other.ExclusiveCPUs().IsEmpty() {
 			log.Debug("  => %s not affected (only exclusive CPUs)...", other)
 			continue
 		}
 
 		if opt.PinCPU {
-			shared := other.GetCPUNode().FreeSupply().SharableCPUs().String()
-			log.Debug("  => updating %s with shared CPUs of %s: %s...",
-				other, other.GetCPUNode().Name(), shared)
-			other.GetContainer().SetCpusetCpus(shared)
+			shared := other.GetCPUNode().FreeSupply().SharableCPUs()
+			exclusive := other.ExclusiveCPUs()
+			if exclusive.IsEmpty() {
+				log.Debug("  => updating %s with shared CPUs of %s: %s...",
+					other, other.GetCPUNode().Name(), shared.String())
+				other.GetContainer().SetCpusetCpus(shared.String())
+			} else {
+				log.Debug("  => updating %s with exclusive+shared CPUs of %s: %s+%s...",
+					other, other.GetCPUNode().Name(), exclusive.String(), shared.String())
+				other.GetContainer().SetCpusetCpus(exclusive.Union(shared).String())
+			}
 		}
 	}
 
 	return nil
+}
+
+// setDemotionPreferences sets the dynamic demotion preferences a container.
+func (p *policy) setDemotionPreferences(c cache.Container, g Grant) {
+	log.Debug("%s: setting demotion preferences...", c.PrettyName())
+
+	// System containers should not be demoted.
+	if c.GetNamespace() == kubernetes.NamespaceSystem {
+		c.SetPageMigration(nil)
+		return
+	}
+
+	memType := g.GetMemoryNode().GetMemoryType()
+	if memType&memoryDRAM == 0 || memType&memoryPMEM == 0 {
+		c.SetPageMigration(nil)
+		return
+	}
+
+	dram := g.GetMemoryNode().GetMemset(memoryDRAM)
+	pmem := g.GetMemoryNode().GetMemset(memoryPMEM)
+
+	log.Debug("%s: eligible for demotion from %s to %s NUMA node(s)",
+		c.PrettyName(), dram, pmem)
+
+	c.SetPageMigration(&cache.PageMigrate{
+		SourceNodes: dram,
+		TargetNodes: pmem,
+	})
 }
 
 // addImplicitAffinities adds our set of policy-specific implicit affinities.

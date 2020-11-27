@@ -462,7 +462,7 @@ func (cs *supply) Allocate(r Request) (Grant, error) {
 
 	// allocate isolated exclusive CPUs or slice them off the sharable set
 	switch {
-	case cr.full > 0 && cs.isolated.Size() >= cr.full:
+	case cr.full > 0 && cs.isolated.Size() >= cr.full && cr.isolate:
 		exclusive, err = cs.takeCPUs(&cs.isolated, nil, cr.full)
 		if err != nil {
 			return nil, policyError("internal error: "+
@@ -733,6 +733,9 @@ func newRequest(container cache.Container) Request {
 	full, fraction, isolate, elevate := cpuAllocationPreferences(pod, container)
 	req, lim, mtype := memoryAllocationPreference(pod, container)
 	coldStart := time.Duration(0)
+
+	log.Debug("%s: CPU preferences: full=%v, fraction=%v, isolate=%v",
+		container.PrettyName(), full, fraction, isolate)
 
 	if mtype == memoryUnspec {
 		mtype = defaultMemoryType
@@ -1029,7 +1032,7 @@ func (cg *grant) ExclusiveCPUs() cpuset.CPUSet {
 
 // SharedCPUs returns the shared CPUSet in this grant.
 func (cg *grant) SharedCPUs() cpuset.CPUSet {
-	return cg.node.GetSupply().SharableCPUs()
+	return cg.node.FreeSupply().SharableCPUs()
 }
 
 // SharedPortion returns the milli-CPU allocation for the shared CPUSet in this grant.

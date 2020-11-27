@@ -1,4 +1,8 @@
+# shellcheck disable=SC1091
+# shellcheck source=command.bash
 source "$(dirname "${BASH_SOURCE[0]}")/command.bash"
+# shellcheck disable=SC1091
+# shellcheck source=distro.bash
 source "$(dirname "${BASH_SOURCE[0]}")/distro.bash"
 
 VM_PROMPT=${VM_PROMPT-"\e[38;5;11mroot@vm>\e[0m "}
@@ -17,10 +21,12 @@ vms:
       #!/bin/bash
       set -e
 "
-    (if [ -n "$VM_EXTRA_BOOTSTRAP_COMMANDS" ]; then
-         sed 's/^/      /g' <<< "${VM_EXTRA_BOOTSTRAP_COMMANDS}"
+     (if [ -n "$VM_EXTRA_BOOTSTRAP_COMMANDS" ]; then
+          # shellcheck disable=SC2001
+          sed 's/^/      /g' <<< "${VM_EXTRA_BOOTSTRAP_COMMANDS}"
      fi
-     sed 's/^/      /g' <<< $(distro-bootstrap-commands))) |
+      # shellcheck disable=SC2001
+      sed 's/^/      /g' <<< "$(distro-bootstrap-commands)")) |
         grep -E -v '^ *$'
 }
 
@@ -63,10 +69,10 @@ vm-check-env() {
         echo "ERROR:"
         return 1
     }
-    if [ ! -e ${HOME}/.ssh/id_rsa.pub ]; then
+    if [ ! -e "$SSH_KEY".pub ]; then
         echo "ERROR:"
         echo "ERROR: environment check failed:"
-        echo "ERROR:   id_rsa.pub SSH public key not found (but govm needs it)."
+        echo "ERROR:   $SSH_KEY.pub SSH public key not found (but govm needs it)."
         echo "ERROR:"
         echo "ERROR: You can generate it using the following command:"
         echo "ERROR:"
@@ -74,11 +80,41 @@ vm-check-env() {
         echo "ERROR:"
         return 1
     fi
+    if [ -n "$SSH_AUTH_SOCK" ] && [ -e "$SSH_AUTH_SOCK" ]; then
+        if ! ssh-add -l | grep -q "$(ssh-keygen -l -f "$SSH_KEY" < /dev/null 2>/dev/null | awk '{print $2}')"; then
+            if ! ssh-add "$SSH_KEY" < /dev/null; then
+                echo "ERROR:"
+                echo "ERROR: environment setup failed:"
+                echo "ERROR:   Failed to load $SSH_KEY SSH key to agent."
+                echo "ERROR:"
+                echo "ERROR: Please make sure an SSH agent is running, then"
+                echo "ERROR: try loading the key using the following command:"
+                echo "ERROR:"
+                echo "ERROR:     ssh-add $SSH_KEY"
+                echo "ERROR:"
+                return 1
+            fi
+        fi
+    else
+        if host-is-encrypted-ssh-key "$SSH_KEY"; then
+            echo "ERROR:"
+            echo "ERROR: environment setup failed:"
+            echo "ERROR:   $SSH_KEY SSH key is encrypted, but agent is not running."
+            echo "ERROR:"
+            echo "ERROR: Please make sure an SSH agent is running, then"
+            echo "ERROR: try loading the key using the following command:"
+            echo "ERROR:"
+            echo "ERROR:     ssh-add $SSH_KEY"
+            echo "ERROR:"
+            return 1
+        fi
+    fi
 }
 
 vm-check-binary-cri-resmgr() {
     # Check running cri-resmgr version, print warning if it is not
     # the latest local build.
+    # shellcheck disable=SC2016
     if [ -f "$BIN_DIR/cri-resmgr" ] && [ "$(vm-command-q 'md5sum < /proc/$(pidof cri-resmgr)/exe')" != "$(md5sum < "$BIN_DIR/cri-resmgr")" ]; then
         echo "WARNING:"
         echo "WARNING: Running cri-resmgr binary is different from"
@@ -86,7 +122,7 @@ vm-check-binary-cri-resmgr() {
         echo "WARNING: Consider restarting with \"reinstall_cri_resmgr=1\" or"
         echo "WARNING: run.sh> uninstall cri-resmgr; install cri-resmgr; launch cri-resmgr"
         echo "WARNING:"
-        sleep ${warning_delay}
+        sleep "${warning_delay:-0}"
         return 1
     fi
     return 0
@@ -105,19 +141,19 @@ vm-command() { # script API
     #   vm-command "whoami | grep myuser" || command-error "user is not myuser"
     command-start "vm" "$VM_PROMPT" "$1"
     if [ "$2" == "bg" ]; then
-        ( $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
-          command-end ${PIPESTATUS[0]}
+        ( $SSH "${VM_SSH_USER}@${VM_IP}" sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
+          command-end "${PIPESTATUS[0]}"
         ) &
         command-runs-in-bg
     else
-        $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
-        command-end ${PIPESTATUS[0]}
+        $SSH "${VM_SSH_USER}@${VM_IP}" sudo bash -l <<<"$COMMAND" 2>&1 | command-handle-output ;
+        command-end "${PIPESTATUS[0]}"
     fi
-    return $COMMAND_STATUS
+    return "$COMMAND_STATUS"
 }
 
 vm-command-q() {
-    $SSH ${VM_SSH_USER}@${VM_IP} sudo bash -l <<<"$1"
+    $SSH "${VM_SSH_USER}@${VM_IP}" sudo bash -l <<<"$1"
 }
 
 vm-mem-hotplug() { # script API
@@ -134,16 +170,16 @@ vm-mem-hotplug() { # script API
         error "missing MEMORY"
         return 1
     fi
-    memline="$(vm-mem-hw | grep unplugged | grep $memmatch)"
+    memline="$(vm-mem-hw | grep unplugged | grep "$memmatch")"
     if [ -z "$memline" ]; then
         error "unplugged memory matching '$memmatch' not found"
         return 1
     fi
-    memid="$(awk '{print $1}' <<< $memline)"
+    memid="$(awk '{print $1}' <<< "$memline")"
     memid=${memid#mem}
     memid=${memid%[: ]*}
-    memdimm="$(awk '{print $2}' <<< $memline)"
-    memnode="$(awk '{print $4}' <<< $memline)"
+    memdimm="$(awk '{print $2}' <<< "$memline")"
+    memnode="$(awk '{print $4}' <<< "$memline")"
     memnode=${memnode#node}
     if [ "$memdimm" == "nvdimm" ]; then
         memdriver="nvdimm"
@@ -167,15 +203,15 @@ vm-mem-hotremove() { # script API
         error "missing MEMORY"
         return 1
     fi
-    memline="$(vm-mem-hw | grep \ plugged | grep $memmatch)"
+    memline="$(vm-mem-hw | grep \ plugged | grep "$memmatch")"
     if [ -z "$memline" ]; then
         error "plugged memory matching '$memmatch' not found"
         return 1
     fi
-    memid="$(awk '{print $1}' <<< $memline)"
+    memid="$(awk '{print $1}' <<< "$memline")"
     memid=${memid#mem}
     memid=${memid%[: ]*}
-    memdimm="$(awk '{print $2}' <<< $memline)"
+    memdimm="$(awk '{print $2}' <<< "$memline")"
     vm-monitor "device_del ${memdimm}${memid}"
 }
 
@@ -235,18 +271,66 @@ vm-monitor() { # script API
     echo ""
 }
 
-vm-wait-process() {
-    # parameters: "process" and "timeout" (optional, default 30 seconds)
-    process=$1
-    timeout=${2-30}
-    if ! vm-command-q "retry=$timeout; until ps -A | grep -q $process; do retry=\$(( \$retry - 1 )); [ \"\$retry\" == \"0\" ] && exit 1; sleep 1; done"; then
-        error "waiting for process \"$process\" timed out"
+vm-wait-process() { # script API
+    # Usage: vm-wait-process [--timeout TIMEOUT] PROCESS
+    #
+    # Wait for a PROCESS (string) to appear in process list (ps -A output).
+    # The default TIMEOUT is 30 seconds.
+    local process timeout invalid
+    timeout=30
+    while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
+        case "$1" in
+            --timeout)
+                timeout="$2"
+                shift; shift
+                ;;
+            *)
+                invalid="${invalid}${invalid:+,}\"$1\""
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$invalid" ]; then
+        error "invalid options: $invalid"
+        return 1
+    fi
+    process="$1"
+    vm-run-until --timeout "$timeout" "ps -A | grep -q \"$process\""
+}
+
+vm-run-until() { # script API
+    # Usage: vm-run-until [--timeout TIMEOUT] CMD
+    #
+    # Keep running CMD (string) until it exits successfully.
+    # The default TIMEOUT is 30 seconds.
+    local cmd timeout invalid
+    timeout=30
+    while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
+        case "$1" in
+            --timeout)
+                timeout="$2"
+                shift; shift
+                ;;
+            *)
+                invalid="${invalid}${invalid:+,}\"$1\""
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$invalid" ]; then
+        error "invalid options: $invalid"
+        return 1
+    fi
+    cmd="$1"
+    if ! vm-command-q "retry=$timeout; until $cmd; do retry=\$(( \$retry - 1 )); [ \"\$retry\" == \"0\" ] && exit 1; sleep 1; done"; then
+        error "waiting for command \"$cmd\" to exit successfully timed out after $timeout s"
     fi
 }
 
 vm-write-file() {
     local vm_path_file="$1"
-    local file_content_b64="$(base64 <<<$2)"
+    local file_content_b64
+    file_content_b64="$(base64 <<<"$2")"
     vm-command-q "mkdir -p $(dirname "$vm_path_file"); echo -n \"$file_content_b64\" | base64 -d > \"$vm_path_file\""
 }
 
@@ -263,7 +347,7 @@ vm-put-file() { # script API
     #       echo 'Ahoy, Matey...' > $src && \
     #       vm-put-file --cleanup $src /etc/motd
     local cleanup append invalid
-    while [ "${1#-}" != "$1" -a -n "$1" ]; do
+    while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
         case "$1" in
             --cleanup)
                 cleanup=1
@@ -279,23 +363,24 @@ vm-put-file() { # script API
                 ;;
         esac
     done
-    if [ -n "$cleanup" -a -n "$1" ]; then
-        trap "rm -f $1" RETURN EXIT
+    if [ -n "$cleanup" ] && [ -n "$1" ]; then
+        # shellcheck disable=SC2064
+        trap "rm -f \"$1\"" RETURN EXIT
     fi
     if [ -n "$invalid" ]; then
         error "invalid options: $invalid"
         return 1
     fi
-    host-command "$SCP $1 ${VM_SSH_USER}@${VM_IP}:" ||
-        error "failed to scp file $1 to ${VM_SSH_USER}@${VM_IP}:"
-    vm-command "mkdir -p \"$(dirname $2)\""
+    [ "$(dirname "$2")" == "." ] || vm-command-q "[ -d \"$(dirname "$2")\" ]" || vm-command "mkdir -p \"$(dirname "$2")\"" ||
+        command-error "cannot create vm-put-file destination directory to VM"
+    host-command "$SCP \"$1\" ${VM_SSH_USER}@${VM_IP}:\"vm-put-file.${1##*/}\"" ||
+        command-error "failed to copy file to VM"
     if [ -z "$append" ]; then
-        vm-command "mv -v ${1##*/} $2" ||
-            error "failed to copy file $1 as $2"
+        vm-command "mv \"vm-put-file.${1##*/}\" \"$2\"" ||
+            command-error "failed to rename file"
     else
-        vm-command "touch $2 && cat ${1##*/} >> $2 && rm -f ${1##*/}" ||
-            error "failed to append file $1 as $2"
-
+        vm-command "touch \"$2\" && cat \"vm-put-file.${1##*/}\" >> \"$2\" && rm -f \"vm-put-file.${1##*/}\"" ||
+            command-error "failed to append file"
     fi
 }
 
@@ -307,13 +392,14 @@ vm-pipe-to-file() { # script API
     #
     # Example:
     #   echo 'Ahoy, Matey...' | vm-pipe-to-file /etc/motd
-    local tmp=$(mktemp) append
+    local tmp append
+    tmp="$(mktemp vm-pipe-to-file.XXXXXX)"
     if [ "$1" = "--append" ]; then
         append="--append"
         shift
     fi
-    cat > $tmp
-    vm-put-file --cleanup $append $tmp $1
+    cat > "$tmp"
+    vm-put-file --cleanup $append "$tmp" "$1"
 }
 
 vm-sed-file() { # script API
@@ -328,7 +414,7 @@ vm-sed-file() { # script API
     shift
     for cmd in "$@"; do
         vm-command "sed -E -i \"$cmd\" $file" ||
-            command-error "failed to edit $file with sed commands $@"
+            command-error "failed to edit $file with sed"
     done
 }
 
@@ -356,19 +442,15 @@ vm-reboot() { # script API
 }
 
 vm-networking() {
-    vm-command-q "grep -q 1 /proc/sys/net/ipv4/ip_forward" || vm-command "sysctl -w net.ipv4.ip_forward=1"
-    vm-command-q "grep -q ^net.ipv4.ip_forward=1 /etc/sysctl.conf" || vm-command "echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf"
-    vm-command-q "grep -q 1 /proc/sys/net/bridge/bridge-nf-call-iptables 2>/dev/null" || {
-        vm-command "modprobe br_netfilter"
-        vm-command "echo br_netfilter > /etc/modules-load.d/br_netfilter.conf"
+    vm-command-q "touch /etc/hosts; grep -q \$(hostname) /etc/hosts" || {
+        vm-command "echo \"$VM_IP \$(hostname)\" >>/etc/hosts"
     }
-    vm-command-q "grep -q \$(hostname) /etc/hosts" || vm-command "echo \"$VM_IP \$(hostname)\" >/etc/hosts"
-
     distro-setup-proxies
 }
 
 vm-install-cri-resmgr() {
     prefix=/usr/local
+    # shellcheck disable=SC2154
     if [ "$binsrc" == "github" ]; then
         vm-install-golang
         vm-install-pkg make
@@ -379,10 +461,11 @@ vm-install-cri-resmgr() {
         suf=$(vm-pkg-type)
         vm-command "rm -f *.$suf"
         local pkg_count
-        pkg_count=$(ls "$HOST_PROJECT_DIR/$binsrc"/cri-resource-manager*.$suf | grep -v dbg | wc -l)
+        # shellcheck disable=SC2010,SC2126
+        pkg_count="$(ls "$HOST_PROJECT_DIR/$binsrc"/cri-resource-manager*."$suf" | grep -v dbg | wc -l)"
         if [ "$pkg_count" == "0" ]; then
             error "installing from $binsrc failed: cannot find cri-resource-manager_*.$suf from $HOST_PROJECT_DIR/$binsrc"
-        elif [[ "$pkg_count" > "1" ]]; then
+        elif [[ "$pkg_count" -gt 1 ]]; then
             error "installing from $binsrc failed: expected exactly one cri-resource-manager*.$suf in $HOST_PROJECT_DIR/$binsrc, found $pkg_count alternatives."
         fi
         host-command "$SCP $HOST_PROJECT_DIR/$binsrc/*.$suf $VM_SSH_USER@$VM_IP:/tmp" || {
@@ -396,23 +479,91 @@ vm-install-cri-resmgr() {
         local bin_change
         local src_change
         bin_change=$(stat --format "%Z" "$BIN_DIR/cri-resmgr")
-        src_change=$(find "$HOST_PROJECT_DIR" -name '*.go' -type f | xargs stat --format "%Z" | sort -n | tail -n 1)
+        src_change=$(find "$HOST_PROJECT_DIR" -name '*.go' -type f -print0 | xargs -0 stat --format "%Z" | sort -n | tail -n 1)
         if [[ "$src_change" > "$bin_change" ]]; then
             echo "WARNING:"
             echo "WARNING: Source files changed - installing possibly outdated binaries from"
             echo "WARNING: $BIN_DIR/"
             echo "WARNING:"
-            sleep ${warning_delay}
+            sleep "${warning_delay:-0}"
         fi
-        host-command "$SCP \"$BIN_DIR/cri-resmgr\" \"$BIN_DIR/cri-resmgr-agent\" $VM_SSH_USER@$VM_IP:" || {
-            command-error "copying local cri-resmgr to VM failed"
-        }
-        vm-command "mv cri-resmgr cri-resmgr-agent $prefix/bin" || {
-            command-error "installing cri-resmgr to $prefix/bin failed"
-        }
+        vm-put-file "$BIN_DIR/cri-resmgr" "$prefix/bin/cri-resmgr"
+        vm-put-file "$BIN_DIR/cri-resmgr-agent" "$prefix/bin/cri-resmgr-agent"
     else
         error "vm-install-cri-resmgr: unknown binsrc=\"$binsrc\""
     fi
+}
+
+vm-cri-import-image() {
+    local image_name="$1"
+    local image_tar="$2"
+    case "$VM_CRI" in
+        containerd)
+            vm-command "ctr -n k8s.io images import '$image_tar'" ||
+                command-error "failed to import \"$image_tar\" on VM"
+            ;;
+        *)
+            error "vm-cri-import-image unsupported container runtime: \"$VM_CRI\""
+    esac
+}
+
+vm-install-cri-resmgr-webhook() {
+    local service=cri-resmgr-webhook
+    local namespace=cri-resmgr
+    vm-command-q "\
+        kubectl delete secret -n ${namespace} cri-resmgr-webhook-secret 2>/dev/null; \
+        kubectl delete csr ${service}.${namespace} 2>/dev/null; \
+        kubectl delete -f webhook/mutating-webhook-config.yaml 2>/dev/null; \
+        kubectl delete -f webhook/webhook-deployment.yaml 2>/dev/null; \
+        "
+    local webhook_image_info webhook_image_id webhook_image_repotag webhook_image_tar
+    webhook_image_info="$(docker images --filter=reference=cri-resmgr-webhook --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+    if [ -z "$webhook_image_info" ]; then
+        error "cannot find cri-resmgr-webhook image on host, run \"make images\" and check \"docker images --filter=reference=cri-resmgr-webhook\""
+    fi
+    echo "installing webhook to VM from image: $webhook_image_info"
+    sleep 2
+    webhook_image_id="$(awk '{print $1}' <<< "$webhook_image_info")"
+    webhook_image_repotag="$(awk '{print $2}' <<< "$webhook_image_info")"
+    webhook_image_tar="$(realpath "$OUTPUT_DIR/webhook-image-$webhook_image_id.tar")"
+    # It is better to export (save) the image with image_repotag rather than image_id
+    # because otherwise manifest.json RepoTags will be null and containerd will
+    # remove the image immediately after impoting it as part of garbage collection.
+    docker image save "$webhook_image_repotag" > "$webhook_image_tar"
+    vm-put-file "$webhook_image_tar" "webhook/$(basename "$webhook_image_tar")" || {
+        command-error "copying webhook image to VM failed"
+    }
+    vm-cri-import-image cri-resmgr-webhook "webhook/$(basename "$webhook_image_tar")"
+    # Create a self-signed certificate with SANs
+    vm-command "openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes -keyout webhook/server-key.pem -out webhook/server-crt.pem -subj '/CN=${service}.${namespace}.svc' -addext 'subjectAltName=DNS:${service},DNS:${service}.${namespace},DNS:${service}.${namespace}.svc'" ||
+        command-error "creating self-signed certificate failed, requires openssl >= 1.1.1"
+    # Allow webhook to run on node tainted by cmk=true
+    sed -e "s|IMAGE_PLACEHOLDER|$webhook_image_repotag|" \
+        -e 's|^\(\s*\)tolerations:$|\1tolerations:\n\1  - {"key": "cmk", "operator": "Equal", "value": "true", "effect": "NoSchedule"}|g' \
+        -e 's/imagePullPolicy: Always/imagePullPolicy: Never/' \
+        < "${HOST_PROJECT_DIR}/cmd/cri-resmgr-webhook/webhook-deployment.yaml" \
+        | vm-pipe-to-file webhook/webhook-deployment.yaml
+    # Create secret that contains svc.crt and svc.key for webhook deployment
+    local server_crt_b64 server_key_b64
+    server_crt_b64="$(vm-command-q "cat webhook/server-crt.pem" | base64 -w 0)"
+    server_key_b64="$(vm-command-q "cat webhook/server-key.pem" | base64 -w 0)"
+    cat <<EOF | vm-pipe-to-file --append webhook/webhook-deployment.yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cri-resmgr-webhook-secret
+  namespace: cri-resmgr
+data:
+  svc.crt: ${server_crt_b64}
+  svc.key: ${server_key_b64}
+type: Opaque
+EOF
+    local cabundle_b64
+    cabundle_b64="$server_crt_b64"
+    sed -e "s/CA_BUNDLE_PLACEHOLDER/${cabundle_b64}/" \
+        < "${HOST_PROJECT_DIR}/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml" \
+        | vm-pipe-to-file webhook/mutating-webhook-config.yaml
 }
 
 vm-pkg-type() {
@@ -428,46 +579,37 @@ vm-install-golang() {
 }
 
 vm-install-cri() {
-    case "${VM_CRI}" in
-        containerd)
-            distro-install-containerd
-            ;;
-        crio)
-            distro-install-crio
-            ;;
-        *)
-            command-error "unsupported CRI runtime \"$VM_CRI\" requested"
-            ;;
-    esac
+    distro-install-"$VM_CRI"
+    distro-config-"$VM_CRI"
 }
 
 vm-install-containernetworking() {
     vm-install-golang
     vm-command "go get -d github.com/containernetworking/plugins"
-    CNI_PLUGINS_SOURCE_DIR=$(awk '/package.*plugins/{print $NF}' <<< $COMMAND_OUTPUT)
+    CNI_PLUGINS_SOURCE_DIR="$(awk '/package.*plugins/{print $NF}' <<< "$COMMAND_OUTPUT")"
     [ -n "$CNI_PLUGINS_SOURCE_DIR" ] || {
         command-error "downloading containernetworking plugins failed"
     }
     vm-command "pushd \"$CNI_PLUGINS_SOURCE_DIR\" && ./build_linux.sh && mkdir -p /opt/cni && cp -rv bin /opt/cni && popd" || {
         command-error "building and installing cri-tools failed"
     }
-    vm-command 'rm -rf /etc/cni/net.d && mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
+    vm-command "rm -rf /etc/cni/net.d && mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
 {
-  "cniVersion": "0.4.0",
-  "name": "mynet",
-  "type": "bridge",
-  "bridge": "cni0",
-  "isGateway": true,
-  "ipMasq": true,
-  "ipam": {
-    "type": "host-local",
-    "subnet": "10.217.0.0/16",
-    "routes": [
-      { "dst": "0.0.0.0/0" }
+  \"cniVersion\": \"0.4.0\",
+  \"name\": \"mynet\",
+  \"type\": \"bridge\",
+  \"bridge\": \"cni0\",
+  \"isGateway\": true,
+  \"ipMasq\": true,
+  \"ipam\": {
+    \"type\": \"host-local\",
+    \"subnet\": \"$CNI_SUBNET\",
+    \"routes\": [
+      { \"dst\": \"0.0.0.0/0\" }
     ]
   }
 }
-EOF'
+EOF"
     vm-command 'cat > /etc/cni/net.d/20-portmap.conf <<EOF
 {
     "cniVersion": "0.4.0",
@@ -487,30 +629,40 @@ EOF'
 
 vm-install-k8s() {
     distro-install-k8s
+    distro-restart-$VM_CRI
 }
 
-vm-create-singlenode-cluster-cilium() {
-    vm-create-singlenode-cluster
-    vm-install-cni-cilium
+vm-create-singlenode-cluster() {
+    vm-create-cluster
+    vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
+    vm-install-cni-"$(distro-k8s-cni)"
     if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=120s"; then
         command-error "kubectl waiting for node readiness timed out"
     fi
 }
 
-vm-create-singlenode-cluster() {
-    vm-command "kubeadm init --pod-network-cidr=10.217.0.0/16 --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
+vm-create-cluster() {
+    vm-command "kubeadm init --pod-network-cidr=$CNI_SUBNET --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
         command-error "kubeadm init failed"
     fi
     vm-command "mkdir -p \$HOME/.kube"
-    vm-command "cp -i /etc/kubernetes/admin.conf \$HOME/.kube/config"
-    vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
+    vm-command "cp /etc/kubernetes/admin.conf \$HOME/.kube/config"
+    vm-command "mkdir -p ~root/.kube"
+    vm-command "cp /etc/kubernetes/admin.conf ~root/.kube/config"
 }
 
 vm-install-cni-cilium() {
     vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.8/install/kubernetes/quick-install.yaml"
     if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
         command-error "installing cilium CNI to Kubernetes timed out"
+    fi
+}
+
+vm-install-cni-weavenet() {
+    vm-command "kubectl apply -f \"https://cloud.weave.works/k8s/net?k8s-version=\$(kubectl version | base64 | tr -d '\n')\""
+    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/weave-net"; then
+        command-error "installing weavenet CNI to Kubernetes failed/timed out"
     fi
 }
 

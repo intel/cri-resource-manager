@@ -1,6 +1,8 @@
+# shellcheck disable=SC2120
 GO_URLDIR=https://golang.org/dl
 GO_VERSION=1.14.9
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
+CNI_SUBNET=10.217.0.0/16
 
 ###########################################################################
 
@@ -25,40 +27,66 @@ distro-remove-pkg()         { distro-resolve "$@"; }
 distro-setup-proxies()      { distro-resolve "$@"; }
 distro-install-golang()     { distro-resolve "$@"; }
 distro-install-containerd() { distro-resolve "$@"; }
+distro-config-containerd()  { distro-resolve "$@"; }
+distro-restart-containerd() { distro-resolve "$@"; }
 distro-install-crio()       { distro-resolve "$@"; }
+distro-config-crio()        { distro-resolve "$@"; }
+distro-restart-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
+distro-k8s-cni()            { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
-
-# default no-op fallbacks for optional API functions
-default-bootstrap-commands() { :; }
 
 ###########################################################################
 
 # distro-specific function resolution
 distro-resolve() {
-    # We dig out the distro-* API function name from stack of callers,
-    # then try resolving it to an implementation. The resolution
-    # process goes through a list of potential implementation names in
-    # decreasing order of distro/version-specificity, then tries a few
-    # fallbacks based on known distro relations and properties.
-    local apifn="${FUNCNAME[1]}" fallbacks fn
+    local apifn="${FUNCNAME[1]}" fn prefn postfn
+    # shellcheck disable=SC2086
+    {
+        fn="$(distro-resolve-fn $apifn)"
+        prefn="$(distro-resolve-fn $apifn-pre)"
+        postfn="$(distro-resolve-fn $apifn-post)"
+        command-debug-log "$VM_DISTRO/${FUNCNAME[1]}: pre: ${prefn:--}, fn: ${fn:--}, post: ${postfn:--}"
+    }
+    [ -n "$prefn" ] && { $prefn "$@" || return $?; }
+    $fn "$@" || return $?
+    [ -n "$postfn" ] && { $postfn "$@" || return $?; }
+    return 0
+}
+
+distro-resolve-fn() {
+    # We try resolving distro-agnostic implementations by looping through
+    # a list of candidate function names in decreasing order of precedence
+    # and returning the first one found. The candidate list has version-
+    # exact and unversioned distro-specific functions and a set fallbacks
+    # based on known distro, derivative, and package type relations.
+    #
+    # For normal functions the last fallback is 'distro-unresolved' which
+    # prints and returns an error. For pre- and post-functions there is no
+    # similar setup. IOW, unresolved normal distro functions fail while
+    # unresolved pre- and post-functions get ignored (in distro-resolve).
+    local apifn="$1" candidates fn
+
     case $apifn in
         distro-*) apifn="${apifn#distro-}";;
-        *) error "internal error: $FUNCNAME called by non-API $apifn";;
+        *) error "internal error: can't resolve non-API function $apifn";;
     esac
+    candidates="${VM_DISTRO/./_}-$apifn ${VM_DISTRO%%-*}-$apifn"
     case $VM_DISTRO in
-        ubuntu*) fallbacks="debian-$apifn";;
-        centos*) fallbacks="fedora-$apifn rpm-$apifn";;
-        fedora*) fallbacks="rpm-$apifn";;
-        *suse*)  fallbacks="rpm-$apifn";;
+        ubuntu*) candidates="$candidates debian-$apifn";;
+        centos*) candidates="$candidates fedora-$apifn rpm-$apifn";;
+        fedora*) candidates="$candidates rpm-$apifn";;
+        *suse*)  candidates="$candidates rpm-$apifn";;
     esac
-    fallbacks="$fallbacks default-$apifn distro-unresolved"
-    # try version-based resolution first, then derivative fallbacks
-    for fn in "${VM_DISTRO/./_}-$apifn" "${VM_DISTRO%-*}-$apifn" $fallbacks; do
-        if [ "$(type -t -- $fn)" = "function" ]; then
-            $fn "$@"
-            return $?
+    case $apifn in
+        *-pre|*-post) ;;
+        *) candidates="$candidates default-$apifn distro-unresolved";;
+    esac
+    for fn in $candidates; do
+        if [ "$(type -t -- "$fn")" = "function" ]; then
+            echo "$fn"
+            return 0
         fi
     done
 }
@@ -84,6 +112,18 @@ ubuntu-20_04-image-url() {
     echo "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img"
 }
 
+ubuntu-20_10-image-url() {
+    echo "https://cloud-images.ubuntu.com/groovy/current/groovy-server-cloudimg-amd64.img"
+}
+
+debian-10-image-url() {
+    echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
+}
+
+debian-sid-image-url() {
+    echo "https://cloud.debian.org/images/cloud/sid/daily/20201013-422/debian-sid-generic-amd64-daily-20201013-422.qcow2"
+}
+
 ubuntu-download-kernel() {
     # Usage:
     #   ubuntu-download-kernel list
@@ -106,10 +146,6 @@ ubuntu-download-kernel() {
     fi
     vm-command "mkdir -p kernels; rm -f kernels/linux*$version*deb; for deb in \$(wget -q -O- https://kernel.ubuntu.com/~kernel-ppa/mainline/v$version/ | awk -F'\"' '/amd64.*deb/{print \$2}' | grep -v -E 'headers|lowlatency'); do ( cd kernels; wget -q https://kernel.ubuntu.com/~kernel-ppa/mainline/v$version/\$deb ); done; echo; echo 'Downloaded kernel packages:'; du -h kernels/*.deb" ||
         command-error "downloading kernel $version failed"
- }
-
-debian-10-image-url() {
-    echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
 }
 
 ubuntu-ssh-user() {
@@ -126,20 +162,23 @@ debian-pkg-type() {
 
 debian-install-repo-key() {
     local key
-    for key in $@; do
+    # apt-key needs gnupg2, that might not be available by default
+    vm-command "command -v gpg >/dev/null 2>&1" || {
+        vm-command "apt-get update && apt-get install -y gnupg2"
+    }
+    for key in "$@"; do
         vm-command "curl -s $key | apt-key add -" ||
             command-error "failed to install repo key $key"
     done
 }
 
 debian-install-repo() {
-    vm-command-q "type -t add-apt-repository >& /dev/null" || {
-        vm-command "apt-get update && apt-get install -y software-properties-common" ||
-            command-error "failed to install software-properties-common"
-    }
-    vm-command "add-apt-repository \"$*\"" ||
-        command-error "failed to install apt repository $@"
-    debian-refresh-pkg-db
+    if [ $# = 1 ]; then
+        # shellcheck disable=SC2086,SC2048
+        set -- $*
+    fi
+    vm-command "echo $* > /etc/apt/sources.list.d/$3-$4.list && apt-get update" ||
+        command-error "failed to install apt repository $*"
 }
 
 debian-refresh-pkg-db() {
@@ -161,24 +200,14 @@ debian-install-golang() {
     debian-install-pkg golang
 }
 
-debian-10-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        debian-refresh-pkg-db
-        debian-install-pkg gnupg2
-        debian-install-repo-key https://download.docker.com/linux/debian/gpg
-        debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
-        debian-refresh-pkg-db
-        debian-install-pkg containerd
-        generic-setup-containerd
-    }
+debian-10-install-containerd-pre() {
+    debian-install-repo-key https://download.docker.com/linux/debian/gpg
+    debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
+
 }
 
-debian-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        debian-refresh-pkg-db
-        debian-install-pkg containerd
-        generic-setup-containerd
-    }
+debian-sid-install-containerd-post() {
+    vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
 }
 
 debian-install-k8s() {
@@ -192,7 +221,7 @@ debian-install-k8s() {
 }
 
 debian-set-kernel-cmdline() {
-    local e2e_defaults="$@"
+    local e2e_defaults="$*"
     vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\"' > /etc/default/grub.d/60-e2e-defaults.cfg" || {
         command-error "writing new command line parameters failed"
     }
@@ -205,14 +234,14 @@ debian-set-kernel-cmdline() {
 ###########################################################################
 
 #
-# Centos 7, 8, generic Fedora, generic rpm functions
+# Centos 7, 8, generic Fedora
 #
 
 YUM_INSTALL="yum install --disableplugin=fastestmirror -y"
 YUM_REMOVE="yum remove --disableplugin=fastestmirror -y"
 
 centos-7-image-url() {
-    echo ="https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-1503.qcow2.xz"
+    echo "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-2003.qcow2.xz"
 }
 
 centos-8-image-url() {
@@ -224,7 +253,7 @@ centos-ssh-user() {
 }
 
 centos-7-install-repo() {
-    vm-command-q "$type -t yum-config-manager >&/dev/null" || {
+    vm-command-q "type -t yum-config-manager >&/dev/null" || {
         distro-install-pkg yum-utils
     }
     vm-command "yum-config-manager --add-repo $*" ||
@@ -241,17 +270,26 @@ centos-7-remove-pkg() {
         command-error "failed to remove package(s) $*"
 }
 
+centos-7-install-containerd-pre() {
+    create-ext4-var-lib-containerd
+    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
+}
+
+centos-8-install-containerd-pre() {
+    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
+}
+
+centos-7-install-k8s-post() {
+    vm-sed-file /etc/sysconfig/kubelet 's/^KUBELET_EXTRA_ARGS=/KUBELET_EXTRA_ARGS="--feature-gates=SupportNodePidsLimit=false,SupportPodPidsLimit=false"/'
+}
+
+centos-7-k8s-cni() {
+    echo "weavenet"
+}
+
 centos-install-golang() {
     distro-install-pkg wget tar gzip
     from-tarball-install-golang
-}
-
-centos-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
-        distro-install-pkg containerd
-    }
-    generic-setup-containerd
 }
 
 fedora-image-url() {
@@ -283,12 +321,19 @@ fedora-install-golang() {
     from-tarball-install-golang
 }
 
-fedora-install-containerd() {
-    vm-command-q "[ -f /usr/bin/containerd ]" || {
-        distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
-        distro-install-pkg containerd
-    }
-    generic-setup-containerd
+fedora-install-containerd-pre() {
+    distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
+}
+
+fedora-install-containerd-post() {
+    distro-install-pkg containernetworking-plugins
+}
+
+fedora-config-containerd-post() {
+    if [ "$VM_DISTRO" = "fedora" ]; then
+        vm-command "mkdir -p /opt/cni/bin && mount --bind /usr/libexec/cni /opt/cni/bin"
+        vm-command "echo /usr/libexec/cni /opt/cni/bin none defaults,bind,nofail 0 0 >> /etc/fstab"
+    fi
 }
 
 fedora-install-k8s() {
@@ -308,22 +353,139 @@ gpgkey=$yumkey $rpmkey
 EOF
       vm-pipe-to-file $repo
 
-    vm-command "setenforce 0" ||
-        command-error "failed to runtime-disable selinux"
-    vm-sed-file /etc/selinux/config 's/^SELINUX=.*$/SELINUX=permissive/'
     distro-install-pkg tc kubelet kubeadm kubectl
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
 }
 
-fedora-bootstrap-commands() {
+fedora-bootstrap-commands-pre() {
     cat <<EOF
 mkdir -p /etc/sudoers.d
 echo 'Defaults !requiretty' > /etc/sudoers.d/10-norequiretty
+
 setenforce 0
 sed -E -i 's/^SELINUX=.*$/SELINUX=permissive/' /etc/selinux/config
+
+if grep -q NAME=Fedora /etc/os-release; then
+    if ! grep -q systemd.unified_cgroup_hierarchy=0 /proc/cmdline; then
+        sed -i -E 's/^kernelopts=(.*)/kernelopts=\1 systemd.unified_cgroup_hierarchy=0/' /boot/grub2/grubenv
+        shutdown -r now
+    fi
+fi
+
+echo PATH="\$PATH:/usr/local/bin:/usr/local/sbin" > /etc/profile.d/usr-local-path.sh
 EOF
 }
+
+
+###########################################################################
+
+#
+# OpenSUSE 15.2
+#
+
+ZYPPER="zypper --non-interactive --no-gpg-checks"
+
+opensuse-image-url() {
+    echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
+}
+
+opensuse-ssh-user() {
+    echo "opensuse"
+}
+
+opensuse-pkg-type() {
+    echo "rpm"
+}
+
+opensuse-install-repo() {
+    opensuse-wait-for-zypper
+    vm-command "$ZYPPER addrepo $* && $ZYPPER refresh" ||
+        command-error "failed to add zypper repository $*"
+}
+
+opensuse-refresh-pkg-db() {
+    vm-command "$ZYPPER refresh" ||
+        command-err "failed to refresh zypper package DB"
+}
+
+opensuse-install-pkg() {
+    vm-command "$ZYPPER install $*" ||
+        command-error "failed to install $*"
+}
+
+opensuse-remove-pkg() {
+    vm-command 'for i in $*; do rpm -q --quiet $i || continue; $ZYPPER remove $i || exit 1; done' ||
+        command-error "failed to remove package(s) $*"
+}
+
+opensuse-install-golang() {
+    opensuse-install-pkg wget tar gzip
+    from-tarball-install-golang
+}
+
+opensuse-wait-for-zypper() {
+    vm-command 'cnt=0; while ps axuw | grep zypper | grep -qv grep; do if [ $cnt -lt 5 ]; then echo "Waiting for zypper to exit..."; sleep 1; let cnt=$cnt+1; else echo "Killing running zypper..."; killall zypper; sleep 1; fi; done'
+}
+
+opensuse-install-containerd() {
+    opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/openSUSE_Leap_15.2/Virtualization:containers.repo
+    opensuse-install-pkg containerd
+
+cat <<EOF |
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target
+
+[Service]
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/sbin/containerd
+
+Delegate=yes
+KillMode=process
+Restart=always
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=1048576
+TasksMax=infinity
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    vm-pipe-to-file /etc/systemd/system/containerd.service
+
+    cat <<EOF |
+disabled_plugins = []
+EOF
+    vm-pipe-to-file /etc/containerd/config.toml
+    vm-command "systemctl daemon-reload" ||
+        command-error "failed to reload systemd daemon"
+}
+
+opensuse-install-k8s() {
+    opensuse-install-pkg "kubernetes1.18-kubeadm kubernetes1.18-kubelet kubernetes1.18-client"
+    # remove original options to use crio as runtime
+    vm-command "mv /etc/sysconfig/kubelet /etc/sysconfig/kubelet.orig && cat /etc/sysconfig/kubelet.orig | sed -E 's:--container-runtime=remote::g;s:--container-runtime-endpoint=[^ ]* ::g' > /etc/sysconfig/kubelet" ||
+        command-error "failed to update kubelet configuration"
+    vm-command "systemctl enable --now kubelet" ||
+        command-error "failed to enable kubelet"
+}
+
+opensuse-bootstrap-commands() {
+    cat <<EOF
+export HTTP_PROXY="$http_proxy"
+export HTTPS_PROXY="$http_proxy"
+zypper refresh && zypper install ssh && systemctl enable ssh && systemctl start ssh
+EOF
+}
+
+
+###########################################################################
+
+#
+# Generic rpm functions
+#
 
 rpm-pkg-type() {
     echo rpm
@@ -331,7 +493,7 @@ rpm-pkg-type() {
 
 rpm-install-repo-key() {
     local key
-    for key in $@; do
+    for key in "$@"; do
         vm-command "rpm --import $key" ||
             command-error "failed to import repo key $key"
     done
@@ -347,34 +509,102 @@ rpm-refresh-pkg-db() {
 # default implementations
 #
 
+default-bootstrap-commands() {
+    cat <<EOF
+touch /etc/modules-load.d/k8s.conf
+modprobe bridge && echo bridge >> /etc/modules-load.d/k8s.conf || :
+modprobe nf-tables-bridge && echo nf-tables-bridge >> /etc/modules-load.d/k8s.conf || :
+modprobe br_netfilter && echo br_netfilter >> /etc/modules-load.d/k8s.conf || :
+
+touch /etc/sysctl.d/k8s.conf
+echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/k8s.conf
+echo "net.bridge.bridge-nf-call-iptables = 1" >> /etc/sysctl.d/k8s.conf
+echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.d/k8s.conf
+/sbin/sysctl -p /etc/sysctl.d/k8s.conf
+EOF
+}
+
 default-setup-proxies() {
     # Notes:
     #   We blindly assume that upper- vs. lower-case env vars are identical.
+    # shellcheck disable=SC2154
     if [ -z "$http_proxy$https_proxy$ftp_proxy$no_proxy" ]; then
         return 0
     fi
+    if vm-command-q "grep -q \"http_proxy=$http_proxy\" /etc/profile.d/proxy.sh && \
+                     grep -q \"https_proxy=$https_proxy\" /etc/profile.d/proxy.sh && \
+                     grep -q \"ftp_proxy=$ftp_proxy\" /etc/profile.d/proxy.sh && \
+                     grep -q \"no_proxy=$no_proxy\" /etc/profile.d/proxy.sh" 2>/dev/null; then
+        # No changes in proxy configuration
+        return 0
+    fi
 
-    local file scope="" append="--append"
-    local hn=$(vm-command-q hostname)
+    local file scope="" append="--append" hn
+    hn="$(vm-command-q hostname)"
 
     for file in /etc/environment /etc/profile.d/proxy.sh; do
         cat <<EOF |
 ${scope}http_proxy=$http_proxy
 ${scope}https_proxy=$https_proxy
 ${scope}ftp_proxy=$ftp_proxy
-${scope}no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn
+${scope}no_proxy=$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
 ${scope}HTTP_PROXY=$http_proxy
 ${scope}HTTPS_PROXY=$https_proxy
 ${scope}FTP_PROXY=$ftp_proxy
-${scope}NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn
+${scope}NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
 EOF
       vm-pipe-to-file $append $file
       scope="export "
       append=""
     done
+    # Setup proxies for systemd services that might be installed later
+    for file in /etc/systemd/system/{containerd,docker}.service.d/proxy.conf; do
+        cat <<EOF |
+[Service]
+Environment=HTTP_PROXY=$http_proxy
+Environment=HTTPS_PROXY=$https_proxy
+Environment=NO_PROXY=$no_proxy,$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
+EOF
+        vm-pipe-to-file $file
+    done
+    # Setup proxies inside docker containers
+    for file in /{root,home/$VM_SSH_USER}/.docker/config.json; do
+        cat <<EOF |
+{
+    "proxies": {
+        "default": {
+            "httpProxy": "$http_proxy",
+            "httpsProxy": "$https_proxy",
+            "noProxy": "$no_proxy,$VM_IP,$hn"
+        }
+    }
+}
+EOF
+        vm-pipe-to-file $file
+    done
 }
 
+default-k8s-cni() {
+    echo cilium
+}
 
+default-install-containerd() {
+    vm-command-q "[ -f /usr/bin/containerd ]" || {
+        distro-refresh-pkg-db
+        distro-install-pkg containerd
+    }
+}
+
+default-config-containerd() {
+    if vm-command-q "[ -f /etc/containerd/config.toml ]"; then
+        vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
+    fi
+}
+
+default-restart-containerd() {
+    vm-command "systemctl daemon-reload && systemctl restart containerd" ||
+        command-error "failed to restart containerd systemd service"
+}
 
 ###########################################################################
 
@@ -386,25 +616,58 @@ from-tarball-install-golang() {
     vm-command-q "go version | grep -q go$GOLANG_VERSION" || {
         vm-command "wget --progress=dot:giga $GOLANG_URL -O go.tgz" && \
             vm-command "tar -C /usr/local -xvzf go.tgz && rm go.tgz" && \
-            vm-command "echo "PATH=/usr/local/go/bin:\$PATH" > /etc/profile.d/go.sh" && \
+            vm-command "echo \"PATH=/usr/local/go/bin:\$PATH\" > /etc/profile.d/go.sh" && \
             vm-command "* installed \$(go version)"
     }
 }
 
-generic-setup-containerd() {
-    if [ -n "$http_proxy" ] || [ -n "$https_proxy" ] || [ -n "$no_proxy" ]; then
-        local hn=$(vm-command-q hostname)
-        cat <<EOF |
+create-ext4-var-lib-containerd() {
+    local dir="/var/lib/containerd" file="/loop-ext4.dsk" dev
+
+    echo "Creating loopback-mounted ext4 $dir..."
+
+    if ! dev="$(vm-command-q "losetup -f")" || [ -z "$dev" ]; then
+        command-error "failed to find unused loopback device"
+    fi
+    vm-command "dd if=/dev/zero of=$file bs=$((1024*1000)) count=$((1000*5))" ||
+        command-error "failed to create file for ext4 loopback mount"
+    vm-command "losetup $dev $file" ||
+        command-error "failed to attach $file to $dev"
+    vm-command "mkfs.ext4 $dev" ||
+        command-error "failed to create ext4 filesystem on $dev ($file)"
+    if vm-command "[ -d $dir ]"; then
+        vm-command "mv $dir $dir.orig" ||
+            command-error "failed to rename original $dir to $dir.orig"
+    fi
+    vm-command "mkdir -p $dir" ||
+        command-error "failed to create $dir"
+
+    cat <<EOF |
+[Unit]
+Description=Activate loop device
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
 [Service]
-Environment=HTTP_PROXY="$http_proxy"
-Environment=HTTPS_PROXY="$https_proxy"
-Environment=NO_PROXY="$no_proxy,$VM_IP,10.96.0.0/12,10.217.0.0/16,$hn"
+ExecStart=/sbin/losetup $dev $file
+Type=oneshot
+
+[Install]
+WantedBy=local-fs.target
 EOF
-            vm-pipe-to-file /etc/systemd/system/containerd.service.d/proxy.conf
+    vm-pipe-to-file /etc/systemd/system/attach-loop-devices.service
+    vm-command "systemctl enable attach-loop-devices.service"
+
+    cat <<EOF |
+$dev    $dir    ext4    defaults    1 2
+EOF
+    vm-pipe-to-file --append /etc/fstab
+
+    vm-command "mount $dir" ||
+        command-error "failed to mount new ext4 $dir"
+    if vm-command "[ -d $dir.orig ]"; then
+        vm-command "tar -C $dir.orig -cf - . | tar -C $dir -xf -" ||
+            command-error "failed to copy $dir.orig to $dir"
     fi
-    if vm-command-q "[ -f /etc/containerd/config.toml ]"; then
-        vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
-    fi
-    vm-command "systemctl daemon-reload && systemctl restart containerd" ||
-        command-error "failed to restart containerd systemd service"
 }

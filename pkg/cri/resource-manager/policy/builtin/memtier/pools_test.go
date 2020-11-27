@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
@@ -400,18 +401,22 @@ func TestPoolCreation(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
+				},
 			}
 
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
-			}
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
 
-			if policy.root.GetSupply().SharableCPUs().Size() != tc.expectedRootNodeCPUs {
-				t.Errorf("Expected %d CPUs, got %d", tc.expectedRootNodeCPUs, policy.root.GetSupply().SharableCPUs().Size())
+			if policy.root.GetSupply().SharableCPUs().Size()+policy.root.GetSupply().IsolatedCPUs().Size() != tc.expectedRootNodeCPUs {
+				t.Errorf("Expected %d CPUs, got %d", tc.expectedRootNodeCPUs,
+					policy.root.GetSupply().SharableCPUs().Size()+policy.root.GetSupply().IsolatedCPUs().Size())
 			}
 
 			for _, p := range policy.pools {
@@ -420,7 +425,9 @@ func TestPoolCreation(t *testing.T) {
 						t.Errorf("Leaf node %v had %d children", p, len(p.Children()))
 					}
 					if p.GetSupply().SharableCPUs().Size()+p.GetSupply().IsolatedCPUs().Size() != tc.expectedLeafNodeCPUs {
-						t.Errorf("Expected %d CPUs, got %d (%s)", tc.expectedLeafNodeCPUs, p.GetSupply().SharableCPUs().Size()+p.GetSupply().IsolatedCPUs().Size(), p.GetSupply())
+						t.Errorf("Expected %d CPUs, got %d (%s)", tc.expectedLeafNodeCPUs,
+							p.GetSupply().SharableCPUs().Size()+p.GetSupply().IsolatedCPUs().Size(),
+							p.GetSupply().DumpCapacity())
 					}
 				}
 			}
@@ -486,11 +493,12 @@ func TestWorkloadPlacement(t *testing.T) {
 			path: path.Join(dir, "sysfs", "server", "sys"),
 			name: "workload placement on a server system leaf node",
 			req: &request{
-				memReq:    10000,
-				memLim:    10000,
-				memType:   memoryUnspec,
-				isolate:   false,
-				full:      27, // 28: fully exhaustin the shared CPU subpool is is disallowed
+				memReq:  10000,
+				memLim:  10000,
+				memType: memoryUnspec,
+				isolate: false,
+				full:    25, // 28 - 2 isolated = 26: but fully exhausting the shared CPU subpool is disallowed
+
 				container: &mockContainer{},
 			},
 			expectedRemainingNodes: []int{0, 1, 2, 3, 4, 5, 6},
@@ -532,15 +540,18 @@ func TestWorkloadPlacement(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
+				},
 			}
 
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
-			}
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
 
 			scores, filteredPools := policy.sortPoolsByScore(tc.req, tc.affinities)
 			fmt.Printf("scores: %v, remaining pools: %v\n", scores, filteredPools)
@@ -682,19 +693,19 @@ func TestContainerMove(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
-				allocations: allocations{
-					grants: make(map[string]Grant),
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
 				},
 			}
-			policy.allocations.policy = policy
 
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
-			}
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
+
 			grant1, err := policy.allocatePool(tc.container1)
 			if err != nil {
 				panic(err)
@@ -942,15 +953,18 @@ func TestAffinities(t *testing.T) {
 				panic(err)
 			}
 
-			policy := &policy{
-				sys:   sys,
-				cache: &mockCache{},
+			reserved, _ := resapi.ParseQuantity("750m")
+			policyOptions := &policyapi.BackendOptions{
+				Cache:  &mockCache{},
+				System: sys,
+				Reserved: policyapi.ConstraintSet{
+					policyapi.DomainCPU: reserved,
+				},
 			}
 
-			err = policy.buildPoolsByTopology()
-			if err != nil {
-				panic(err)
-			}
+			log.EnableDebug(true)
+			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			log.EnableDebug(false)
 
 			affinities := map[int]int32{}
 			for name, weight := range tc.affinities {

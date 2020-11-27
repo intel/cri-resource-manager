@@ -259,22 +259,29 @@ func (m *Module) apply(cfg Data) error {
 
 	log.Debug("module %s: applying module configuration...", m.path)
 
-	if len(cfg) == 0 {
-		defcfg, err := DataFromObject(m.getdefault())
-		if err != nil {
-			return configError("module %s: failed to use module defaults: %v", m.path, err)
-		}
-		cfg = defcfg
-	}
-
-	raw, err := yaml.Marshal(cfg)
+	// First, reset module config to defaults
+	defcfg, err := DataFromObject(m.getdefault())
 	if err != nil {
-		return configError("module %s: failed to marshal configuration: %v", m.path, err)
+		return configError("module %s: failed to retrieve default configuration: %v", m.path, err)
+	}
+	raw, err := yaml.Marshal(defcfg)
+	if err != nil {
+		return configError("module %s: failed to marshal default configuration: %v", m.path, err)
 	}
 	if err = yaml.Unmarshal(raw, m.ptr); err != nil {
-		return configError("module %s: failed to apply configuration: %v", m.path, err)
+		return configError("module %s: failed to pre-reset to default configuration: %v", m.path, err)
 	}
 
+	// Second, apply given conf on top of the defaults
+	if len(cfg) > 0 {
+		raw, err = yaml.Marshal(cfg)
+		if err != nil {
+			return configError("module %s: failed to marshal configuration: %v", m.path, err)
+		}
+		if err = yaml.Unmarshal(raw, m.ptr); err != nil {
+			return configError("module %s: failed to apply configuration: %v", m.path, err)
+		}
+	}
 	return nil
 }
 
