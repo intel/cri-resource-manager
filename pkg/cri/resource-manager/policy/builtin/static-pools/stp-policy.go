@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
@@ -89,6 +90,8 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 	}
 
 	stp.Info("creating policy...")
+
+	pkgcfg.GetModule(PolicyPath).AddNotify(stp.configNotify)
 
 	return stp
 }
