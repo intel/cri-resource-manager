@@ -166,12 +166,12 @@ policy:
 ### Debugging
 
 In order to enable more verbose logging for the STP policy set the
-`LOGGER_DEBUG=stp` environment variable or enable debug from the CRI-RM
+`LOGGER_DEBUG=static-pools` environment variable or enable debug from the CRI-RM
 global config:
 
 ```yaml
 logger:
-  Debug: stp
+  Debug: static-pools
 
 ```
 
