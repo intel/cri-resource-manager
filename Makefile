@@ -487,6 +487,7 @@ binary-dist: build
 	tardir=binary-dist; \
 	rm -fr $$tarball* $$tardir && \
 	$(MAKE) DESTDIR=$$tardir \
+	        BUILD_DIRS=cri-resmgr \
 	        PREFIX=/opt/intel \
 	        DEFAULTDIR=/etc/default \
 	        UNITDIR=$(SYSCONFDIR)/systemd/system install install-minimal-docs && \
