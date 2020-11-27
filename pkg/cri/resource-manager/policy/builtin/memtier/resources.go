@@ -1032,7 +1032,7 @@ func (cg *grant) ExclusiveCPUs() cpuset.CPUSet {
 
 // SharedCPUs returns the shared CPUSet in this grant.
 func (cg *grant) SharedCPUs() cpuset.CPUSet {
-	return cg.node.GetSupply().SharableCPUs()
+	return cg.node.FreeSupply().SharableCPUs()
 }
 
 // SharedPortion returns the milli-CPU allocation for the shared CPUSet in this grant.
