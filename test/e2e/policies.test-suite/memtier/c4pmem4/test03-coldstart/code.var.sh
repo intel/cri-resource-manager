@@ -49,9 +49,10 @@ else
     echo "### Verified: PMEM memory consumed during cold period: $PMEM_COLD_CONSUMED kB, pod script allocated: ${COLD_ALLOC%kB} kB"
 fi
 
+coldstarts=$(vm-command-q "$CRI_RESMGR_OUTPUT | grep 'finishing coldstart period for pod0:pod0c0' | wc -l")
 echo "Wait that cri-resmgr finishes coldstart period within 5s + $DURATION."
 sleep 5s
-vm-run-until --timeout ${DURATION%s} "$CRI_RESMGR_OUTPUT | grep 'finishing coldstart period for pod0:pod0c0'" ||
+vm-run-until --timeout ${DURATION%s} "[ \$($CRI_RESMGR_OUTPUT | grep 'finishing coldstart period for pod0:pod0c0' | wc -l) -gt $coldstarts ]" ||
     error "cri-resmgr did not report finishing coldstart period within $DURATION"
 
 vm-command "$CRI_RESMGR_OUTPUT | grep 'pinning to memory 0,6'" ||
