@@ -138,14 +138,11 @@ policy:
 
 #### Stand-alone YAML File
 
-Path to a stand-alone configuration file can be specified by the
-`policy.static-pools.ConfFilePath` option (empty by default) in the CRI-RM
-global config:
+Path to a stand-alone configuration file can be specified with
+`-static-pools-conf-file` (empty by default):
 
-```yaml
-policy:
-  static-pools:
-    ConfFilePath: "/path/to/conf.yaml"
+```bash
+cri-resmgr -static-pools-conf-file "/path/to/conf.yaml"
 ```
 
 Format of the configuration file is similar to the pools config used in the
@@ -156,14 +153,11 @@ for a starting point.
 #### CMK Directory Tree
 
 The STP policy also supports configuration directory format of the original
-CMK. It reads the configuration from a location specified by the
-`policy.static-pools.ConfFileDir` field (`/etc/cmk` by default) in the CRI-RM
-global config:
+CMK. It reads the configuration from a location specified with
+`-static-pools-conf-dir` field (`/etc/cmk` by default):
 
-```yaml
-policy:
-  static-pools:
-    ConfFileDir: "/etc/cmk"
+```bash
+cri-resmgr -static-pools-conf-dir /etc/cmk
 ```
 
 ### Command Line Flags
