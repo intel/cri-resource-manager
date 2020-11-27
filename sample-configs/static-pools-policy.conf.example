@@ -1,6 +1,9 @@
 # This is an example configuration file for the builtin cmk policy
 # The imaginary example system here consists of 4 sockets, 4 cores (8
 # multithreaded CPUs)
+#
+# NOTE: only pools configuration may be specified in this file. Other
+# configuration options must be set through the dynamic configration system
 pools:
   exclusive:
     # 6 exclusive cores, 3 on sockets 1, 2 and 3 each
