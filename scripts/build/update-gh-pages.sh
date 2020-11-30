@@ -117,6 +117,7 @@ build_subdir=${build_subdir:-devel}
 echo "Updating site version subdir: '$build_subdir'"
 export SITE_BUILDDIR="$build_dir/$build_subdir"
 export VERSIONS_MENU=1
+export VERSIONS_MENU_THIS_VERSION=$build_subdir
 
 make html
 
