@@ -84,7 +84,9 @@ release = getenv("BUILD_VERSION", default="unknown")
 
 # Versions to show in the version menu
 if getenv('VERSIONS_MENU'):
-    html_context = {'versions_menu': True}
+    html_context = {
+        'versions_menu': True,
+        'versions_menu_this_version': getenv('VERSIONS_MENU_THIS_VERSION', version)}
 
 # -- General configuration ---------------------------------------------------
 
