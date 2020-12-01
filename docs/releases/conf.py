@@ -23,7 +23,9 @@ author = 'various'
 # Versions to show in the version menu
 version = "all releases"
 if os.getenv('VERSIONS_MENU'):
-    html_context = {'versions_menu': True}
+    html_context = {
+        'versions_menu': True,
+        'versions_menu_this_version': version}
 
 
 # -- General configuration ---------------------------------------------------
