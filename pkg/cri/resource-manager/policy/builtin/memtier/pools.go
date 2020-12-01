@@ -465,7 +465,7 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 }
 
 // Apply the result of allocation to the requesting container.
-func (p *policy) applyGrant(grant Grant) error {
+func (p *policy) applyGrant(grant Grant) {
 	log.Debug("* applying grant %s", grant)
 
 	container := grant.GetContainer()
@@ -527,18 +527,16 @@ func (p *policy) applyGrant(grant Grant) error {
 	} else {
 		log.Debug("  => not pinning memory, memory set is empty...")
 	}
-
-	return nil
 }
 
 // Release resources allocated by this grant.
-func (p *policy) releasePool(container cache.Container) (Grant, bool, error) {
+func (p *policy) releasePool(container cache.Container) (Grant, bool) {
 	log.Debug("* releasing resources allocated to %s", container.PrettyName())
 
 	grant, ok := p.allocations.grants[container.GetCacheID()]
 	if !ok {
 		log.Debug("  => no grant found, nothing to do...")
-		return nil, false, nil
+		return nil, false
 	}
 
 	log.Debug("  => releasing grant %s...", grant)
@@ -549,11 +547,11 @@ func (p *policy) releasePool(container cache.Container) (Grant, bool, error) {
 	delete(p.allocations.grants, container.GetCacheID())
 	p.saveAllocations()
 
-	return grant, true, nil
+	return grant, true
 }
 
 // Update shared allocations effected by agrant.
-func (p *policy) updateSharedAllocations(grant Grant) error {
+func (p *policy) updateSharedAllocations(grant Grant) {
 	log.Debug("* updating shared allocations affected by %s", grant)
 
 	for _, other := range p.allocations.grants {
@@ -580,8 +578,6 @@ func (p *policy) updateSharedAllocations(grant Grant) error {
 			}
 		}
 	}
-
-	return nil
 }
 
 // setDemotionPreferences sets the dynamic demotion preferences a container.
