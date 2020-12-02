@@ -416,7 +416,7 @@ uninstall() { # script API
             terminate cri-resmgr
             terminate cri-resmgr-agent
             distro-remove-pkg cri-resource-manager
-            vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/resmgr /etc/cri-resmgr"
+            vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/cri-resmgr /etc/cri-resmgr"
             ;;
         "cri-resmgr-webhook")
             terminate cri-resmgr-webhook
