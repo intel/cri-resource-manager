@@ -16,10 +16,13 @@ package resmgr
 
 import (
 	"context"
+	"fmt"
 
 	criapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/cri/server"
@@ -524,6 +527,47 @@ func (m *resmgr) DeliverPolicyEvent(e *events.Policy) error {
 	}
 
 	m.cache.Save()
+	return nil
+}
+
+// setConfig activates a new configuration, either from the agent or from a file.
+func (m *resmgr) setConfig(v interface{}) error {
+	var err error
+
+	m.Lock()
+	defer m.Unlock()
+
+	switch cfg := v.(type) {
+	case *config.RawConfig:
+		err = pkgcfg.SetConfig(cfg.Data)
+	case string:
+		err = pkgcfg.SetConfigFromFile(cfg)
+	default:
+		err = fmt.Errorf("invalid configuration source/type %T", v)
+	}
+	if err != nil {
+		m.Error("configuration rejected: %v", err)
+		return resmgrError("configuration rejected: %v", err)
+	}
+
+	// synchronize state of controllers with new configuration
+	if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+		m.Error("failed to synchronize controllers with new configuration: %v", err)
+		return resmgrError("failed to synchronize controllers with new configuration: %v", err)
+	}
+
+	if err = m.runPostUpdateHooks(context.Background(), "setConfig"); err != nil {
+		m.Error("failed to run post-update hooks after reconfiguration: %v", err)
+		return resmgrError("failed to run post-update hooks after reconfiguration: %v", err)
+	}
+
+	// if we managed to activate a configuration from the agent, store it in the cache
+	if cfg, ok := v.(*config.RawConfig); ok {
+		m.cache.SetConfig(cfg)
+	}
+
+	m.Info("successfully switched to new configuration")
+
 	return nil
 }
 

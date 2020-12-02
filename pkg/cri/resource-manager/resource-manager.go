@@ -198,9 +198,6 @@ func (m *resmgr) Stop() {
 // SetConfig pushes new configuration to the resource manager.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	m.Info("applying new configuration from agent...")
-
-	m.Lock()
-	defer m.Unlock()
 	return m.setConfig(conf)
 }
 
@@ -216,49 +213,7 @@ func (m *resmgr) SetAdjustment(adjustment *config.Adjustment) map[string]error {
 // setConfigFromFile pushes new configuration to the resource manager from a file.
 func (m *resmgr) setConfigFromFile(path string) error {
 	m.Info("applying new configuration from file %s...", path)
-
-	m.Lock()
-	defer m.Unlock()
 	return m.setConfig(path)
-}
-
-// setConfig pushes new configuration from the agent or a file.
-func (m *resmgr) setConfig(src interface{}) error {
-	var pending *config.RawConfig
-	var err error
-
-	switch cfg := src.(type) {
-	case *config.RawConfig:
-		pending = cfg // schedule for storing in the cache
-		err = pkgcfg.SetConfig(cfg.Data)
-	case string:
-		// never store a forced configuration in the cache
-		err = pkgcfg.SetConfigFromFile(cfg)
-	default:
-		return resmgrError("configuration source of invalid type %T", src)
-	}
-
-	if err != nil {
-		m.Error("configuration was rejected: %v", err)
-		return resmgrError("configuration rejected: %v", err)
-	}
-
-	// TODO: save current configuration and roll back if some controllers fail to start
-
-	if err := m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
-		m.Error("failed to activate new configuration: %v", err)
-		return resmgrError("failed to fully activate configuration: %v", err)
-	}
-
-	// If the update was not from a forced configuration (IOW it was from the
-	// agent) and the update was activated successfully, then store it in the
-	// cache now.
-	if pending != nil {
-		m.cache.SetConfig(pending)
-	}
-
-	m.Info("sucessfully switched to new configuration")
-	return nil
 }
 
 // setAdjustments pushes new external policies to the resource manager.
