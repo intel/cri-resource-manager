@@ -772,11 +772,13 @@ create() { # script API
     #   TEMPLATE_NAME: the name of the template without extension (.yaml.in)
     #
     # Optional parameters (VAR=VALUE):
+    #   namespace: namespace to which instances are created
     #   wait: condition to be waited for (see kubectl wait --for=condition=).
     #         If empty (""), skip waiting. The default is wait="Ready".
     #   wait_t: wait timeout. The default is wait_t=60s.
     local template_file
     template_file=$(resolve-template "$1" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
+    local namespace_args
     local template_kind
     template_kind=$(awk '/kind/{print tolower($2)}' < "$template_file")
     local wait=${wait-Ready}
@@ -788,8 +790,13 @@ create() { # script API
     if [ -z "$n" ]; then
         local n=1
     fi
+    if [ -n "${namespace:-}" ]; then
+        namespace_args="-n $namespace"
+    else
+        namespace_args=""
+    fi
     if [ ! -f "$template_file" ]; then
-        error "error creating \"$1\": missing template ${template_file}"
+        error "error creating from template \"$template_file.yaml.in\": template file not found"
     fi
     for _ in $(seq 1 $n); do
         kind_count[$template_kind]=$(( ${kind_count[$template_kind]} + 1 ))
@@ -828,7 +835,7 @@ create() { # script API
                 pulled_images_on_vm+=("$image")
             fi
         done
-        vm-command "kubectl create -f $NAME.yaml" || {
+        vm-command "kubectl create -f $NAME.yaml $namespace_args" || {
             if is-hooked on_create_fail; then
                 echo "kubectl create error"
                 run-hook on_create_fail
@@ -837,7 +844,7 @@ create() { # script API
             fi
         }
         if [ "x$wait" != "x" ]; then
-            speed=1000 vm-command "kubectl wait --timeout=${wait_t} --for=condition=${wait} ${template_kind}/$NAME" >/dev/null 2>&1 || {
+            speed=1000 vm-command "kubectl wait --timeout=${wait_t} --for=condition=${wait} $namespace_args ${template_kind}/$NAME" >/dev/null 2>&1 || {
                 errormsg="waiting for ${template_kind} \"$NAME\" to become ready timed out"
                 if is-hooked on_create_fail; then
                     echo "$errormsg"
