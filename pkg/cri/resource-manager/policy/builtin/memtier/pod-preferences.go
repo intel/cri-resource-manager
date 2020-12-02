@@ -40,6 +40,20 @@ const (
 	keyColdStartPreference = "cold-start"
 )
 
+// cpuClass is a type of CPU to allocate
+type cpuClass int
+
+// names by cpu class
+var cpuClassNames = map[cpuClass]string{
+	cpuNormal:   "normal",
+	cpuReserved: "reserved",
+}
+
+const (
+	cpuNormal cpuClass = iota
+	cpuReserved
+)
+
 // types by memory type name
 var memoryNamedTypes = map[string]memoryType{
 	"dram":  memoryDRAM,
@@ -198,10 +212,21 @@ func coldStartPreference(pod cache.Pod, container cache.Container) (ColdStartPre
 }
 
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.
-func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, int, bool, int) {
+// Returned values:
+// 1. full: number of full CPUs
+// 2. fraction: number of milli-CPUs
+// 3. isolate: (bool) isolate full CPUs
+// 4. cpuType: (cpuClass) the type of preferred of CPUs
+// 5. elevate: assign (int) steps above the best-fit-node in topology tree
+func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, int, bool, cpuClass, int) {
+	cpuType := cpuNormal
+	if container.GetNamespace() == metav1.NamespaceSystem {
+		cpuType = cpuReserved
+	}
+
 	req, ok := container.GetResourceRequirements().Requests[corev1.ResourceCPU]
 	if !ok {
-		return 0, 0, false, 0
+		return 0, 0, false, cpuType, 0
 	}
 
 	qos := pod.GetQOSClass()
@@ -237,7 +262,7 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 		elevate = -elevate
 	}
 
-	return full, fraction, isolate, elevate
+	return full, fraction, isolate, cpuType, elevate
 }
 
 // podMemoryTypePreference returns what type of memory should be allocated for the container.
@@ -287,6 +312,14 @@ func memoryAllocationPreference(pod cache.Pod, c cache.Container) (uint64, uint6
 	}
 
 	return req, lim, mtype
+}
+
+// String stringifies a cpuClass.
+func (t cpuClass) String() string {
+	if cpuClassName, ok := cpuClassNames[t]; ok {
+		return cpuClassName
+	}
+	return fmt.Sprintf("#UNNAMED-CPUCLASS(%d)", int(t))
 }
 
 // String stringifies a memoryType.

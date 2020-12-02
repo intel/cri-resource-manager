@@ -86,6 +86,7 @@ func (p *policy) restoreConfig() bool {
 type cachedGrant struct {
 	Exclusive   string
 	Part        int
+	CPUType     cpuClass
 	Container   string
 	Pool        string
 	MemoryPool  string
@@ -98,7 +99,8 @@ type cachedGrant struct {
 func newCachedGrant(cg Grant) *cachedGrant {
 	ccg := &cachedGrant{}
 	ccg.Exclusive = cg.ExclusiveCPUs().String()
-	ccg.Part = cg.SharedPortion()
+	ccg.Part = cg.CPUPortion()
+	ccg.CPUType = cg.CPUType()
 	ccg.Container = cg.GetContainer().GetCacheID()
 	ccg.Pool = cg.GetCPUNode().Name()
 	ccg.MemoryPool = cg.GetMemoryNode().Name()
@@ -128,6 +130,7 @@ func (ccg *cachedGrant) ToGrant(policy *policy) (Grant, error) {
 	g := newGrant(
 		node,
 		container,
+		ccg.CPUType,
 		cpuset.MustParse(ccg.Exclusive),
 		ccg.Part,
 		ccg.MemType,

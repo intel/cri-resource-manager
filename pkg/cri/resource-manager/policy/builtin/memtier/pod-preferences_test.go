@@ -217,6 +217,7 @@ func TestCpuAllocationPreferences(t *testing.T) {
 		expectedFull     int
 		expectedFraction int
 		expectedIsolate  bool
+		expectedCpuType  cpuClass
 		expectedElevate  int
 		disabled         bool
 	}{
@@ -262,6 +263,7 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			},
 			pod:              &mockPod{},
 			expectedFraction: 2000,
+			expectedCpuType:  cpuReserved,
 		},
 		{
 			name: "return request's value for burstable QoS",
@@ -348,12 +350,13 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			full, fraction, isolate, elevate := cpuAllocationPreferences(tc.pod, tc.container)
+			full, fraction, isolate, cpuType, elevate := cpuAllocationPreferences(tc.pod, tc.container)
 			if full != tc.expectedFull || fraction != tc.expectedFraction ||
-				isolate != tc.expectedIsolate || elevate != tc.expectedElevate {
-				t.Errorf("Expected (%v, %v, %v, %v), but got (%v, %v, %v, %v)",
-					tc.expectedFull, tc.expectedFraction, tc.expectedIsolate, tc.expectedElevate,
-					full, fraction, isolate, elevate)
+				isolate != tc.expectedIsolate || elevate != tc.expectedElevate ||
+				cpuType != tc.expectedCpuType {
+				t.Errorf("Expected (%v, %v, %v, %v, %v), but got (%v, %v, %v, %v, %v)",
+					tc.expectedFull, tc.expectedFraction, tc.expectedIsolate, tc.expectedCpuType, tc.expectedElevate,
+					full, fraction, isolate, cpuType, elevate)
 			}
 		})
 	}

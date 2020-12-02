@@ -95,6 +95,8 @@ type Node interface {
 	GetSupply() Supply
 	// FreeSupply returns the available CPU supply of this node.
 	FreeSupply() Supply
+	// GrantedReservedCPU returns the amount of granted reserved CPU of this node and its children.
+	GrantedReservedCPU() int
 	// GrantedSharedCPU returns the amount of granted shared CPU of this node and its children.
 	GrantedSharedCPU() int
 	// GetMemset
@@ -377,7 +379,7 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 				n.Name())
 		}
 
-		n.noderes = newSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, nil, nil)
+		n.noderes = newSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, nil, nil)
 		for _, c := range n.children {
 			supply := c.GetSupply()
 			n.noderes.Cumulate(supply)
@@ -424,9 +426,13 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 			}
 
 			allowed := nodeCPUs.Intersection(n.policy.allowed)
-			isolated := nodeCPUs.Intersection(n.policy.isolated)
-			sharable := allowed.Difference(isolated)
+			isolated := allowed.Intersection(n.policy.isolated)
+			reserved := allowed.Intersection(n.policy.reserved).Difference(isolated)
+			sharable := allowed.Difference(isolated).Difference(reserved)
 
+			if !reserved.IsEmpty() {
+				log.Debug("    allowed reserved CPUs: %s", kubernetes.ShortCPUSet(reserved))
+			}
 			if !sharable.IsEmpty() {
 				log.Debug("    allowed sharable CPUs: %s", kubernetes.ShortCPUSet(sharable))
 			}
@@ -438,8 +444,9 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 		}
 
 		isolated := cpus.Intersection(n.policy.isolated)
-		sharable := cpus.Difference(isolated)
-		n.noderes = newSupply(n, isolated, sharable, 0, mmap, nil)
+		reserved := cpus.Intersection(n.policy.reserved).Difference(isolated)
+		sharable := cpus.Difference(isolated).Difference(reserved)
+		n.noderes = newSupply(n, isolated, reserved, sharable, 0, 0, mmap, nil)
 		log.Debug("  = %s", n.noderes.DumpCapacity())
 	}
 
@@ -514,13 +521,22 @@ func (n *node) GetPhysicalNodeIDs() []system.ID {
 	return n.self.node.GetPhysicalNodeIDs()
 }
 
+// GrantedReservedCPU returns the amount of granted reserved CPU of this node and its children.
+func (n *node) GrantedReservedCPU() int {
+	grantedReserved := n.freeres.GrantedReserved()
+	for _, c := range n.children {
+		grantedReserved += c.GrantedReservedCPU()
+	}
+	return grantedReserved
+}
+
 // GrantedSharedCPU returns the amount of granted shared CPU of this node and its children.
 func (n *node) GrantedSharedCPU() int {
-	granted := n.freeres.Granted()
+	grantedShared := n.freeres.GrantedShared()
 	for _, c := range n.children {
-		granted += c.GrantedSharedCPU()
+		grantedShared += c.GrantedSharedCPU()
 	}
-	return granted
+	return grantedShared
 }
 
 // Get Score for a cpu request.

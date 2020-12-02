@@ -32,8 +32,8 @@ echo "Wait that coldstart period is started for the pod"
 vm-run-until "$CRI_RESMGR_OUTPUT | grep 'coldstart: triggering coldstart for pod0:pod0c0'" ||
     error "cri-resmgr did not report triggering coldstart period"
 
-verify 'cores["pod0c0"] == {"node0/core0"}' \
-       "mems['pod0c0'] == {'node6'}" # PMEM node6 is the closest to CPU node0
+verify 'cores["pod0c0"] == {"node1/core0"}' \
+       "mems['pod0c0'] == {'node7'}"
 
 echo "Wait that the pod has finished memory allocation during cold period."
 vm-run-until "pgrep -f '^sh -c paused after cold_alloc'" >/dev/null ||
@@ -55,11 +55,11 @@ sleep 5s
 vm-run-until --timeout ${DURATION%s} "[ \$($CRI_RESMGR_OUTPUT | grep 'finishing coldstart period for pod0:pod0c0' | wc -l) -gt $coldstarts ]" ||
     error "cri-resmgr did not report finishing coldstart period within $DURATION"
 
-vm-command "$CRI_RESMGR_OUTPUT | grep 'pinning to memory 0,6'" ||
+vm-command "$CRI_RESMGR_OUTPUT | grep 'pinning to memory 1,7'" ||
     error "cri-resmgr did not report pinning to expected memory nodes"
 
-verify 'cores["pod0c0"] == {"node0/core0"}' \
-       'mems["pod0c0"] == {"node0", "node6"}'
+verify 'cores["pod0c0"] == {"node1/core0"}' \
+       'mems["pod0c0"] == {"node1", "node7"}'
 
 echo "Let the pod continue from cold_alloc to warm_alloc."
 vm-command 'kill -9 $(pgrep -f "^sh -c paused after cold_alloc")'
