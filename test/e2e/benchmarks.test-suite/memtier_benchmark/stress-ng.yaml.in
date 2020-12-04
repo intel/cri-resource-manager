@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  labels:
+    app: ${NAME}
+    e2erole: bgload
+spec:
+  containers:
+  $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
+  - name: ${NAME}c$(( contnum - 1 ))
+    image: alexeiled/stress-ng
+    args: ['${ARGS// /\', \'}']
+    imagePullPolicy: IfNotPresent
+    $(if [ "$CPU" != "0" ]; then echo "
+    resources:
+      requests:
+        cpu: ${CPU}
+        memory: '${MEM}'
+      limits:
+        cpu: ${CPULIM}
+        memory: '${MEMLIM}'
+    "; fi)
+  "; done )
+  terminationGracePeriodSeconds: 1
