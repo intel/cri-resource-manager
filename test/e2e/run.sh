@@ -837,11 +837,16 @@ create() { # script API
                 if [ "$image" = "IMAGE" ]; then
                     continue
                 fi
-                image="${image##*/}"
+                local notopdir_image="${image#*/}"
+                local norepo_image="${image##*/}"
                 if [ "$tag" = "latest" ]; then
                     pulled_images_on_vm+=("$image")
+                    pulled_images_on_vm+=("$notopdir_image")
+                    pulled_images_on_vm+=("$norepo_image")
                 fi
                 pulled_images_on_vm+=("$image:$tag")
+                pulled_images_on_vm+=("$notopdir_image:$tag")
+                pulled_images_on_vm+=("$norepo_image:$tag")
             done <<< "$COMMAND_OUTPUT"
         fi
         for image in $images; do
