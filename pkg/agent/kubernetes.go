@@ -17,6 +17,7 @@ limitations under the License.
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -71,7 +72,7 @@ func (a *agent) getK8sClient(kubeconfig string) (*k8sclient.Clientset, *resmgr.C
 
 // getNodeObject gets a k8s Node object
 func getNodeObject(cli *k8sclient.Clientset) (*core_v1.Node, error) {
-	node, err := cli.CoreV1().Nodes().Get(nodeName, meta_v1.GetOptions{})
+	node, err := cli.CoreV1().Nodes().Get(context.TODO(), nodeName, meta_v1.GetOptions{})
 	if err != nil {
 		return nil, agentError("failed to get node object for node %q: %v", nodeName, err)
 	}
@@ -88,7 +89,7 @@ func patchNode(cli *k8sclient.Clientset, patchList []*agent_v1.JsonPatch) error 
 
 	// Patch our node
 	pt := types.JSONPatchType
-	_, err = cli.CoreV1().Nodes().Patch(nodeName, pt, data)
+	_, err = cli.CoreV1().Nodes().Patch(context.TODO(), nodeName, pt, data, meta_v1.PatchOptions{})
 	if err != nil {
 		return err
 	}
@@ -104,7 +105,7 @@ func patchNodeStatus(cli *k8sclient.Clientset, fields map[string]string) error {
 	}
 	patch += "}}"
 
-	_, err := cli.CoreV1().Nodes().PatchStatus(nodeName, []byte(patch))
+	_, err := cli.CoreV1().Nodes().PatchStatus(context.TODO(), nodeName, []byte(patch))
 
 	return err
 }
@@ -154,7 +155,7 @@ func newNodeWatch(parent *watcher) *watch {
 	w := newWatch(parent, "Node", namespace(""),
 		func(ns namespace, name string) (k8swatch.Interface, error) {
 			selector := meta_v1.ListOptions{FieldSelector: "metadata.name=" + name}
-			k8w, err := parent.k8sCli.CoreV1().Nodes().Watch(selector)
+			k8w, err := parent.k8sCli.CoreV1().Nodes().Watch(context.TODO(), selector)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +163,7 @@ func newNodeWatch(parent *watcher) *watch {
 		},
 		func(ns namespace, name string) (interface{}, error) {
 			noopts := meta_v1.GetOptions{}
-			node, err := parent.k8sCli.CoreV1().Nodes().Get(name, noopts)
+			node, err := parent.k8sCli.CoreV1().Nodes().Get(context.TODO(), name, noopts)
 			if err != nil {
 				return nil, err
 			}
@@ -177,7 +178,7 @@ func newConfigMapWatch(parent *watcher, name string, ns namespace) *watch {
 	w := newWatch(parent, "ConfigMap", ns,
 		func(ns namespace, name string) (k8swatch.Interface, error) {
 			selector := meta_v1.ListOptions{FieldSelector: "metadata.name=" + name}
-			k8w, err := parent.k8sCli.CoreV1().ConfigMaps(string(ns)).Watch(selector)
+			k8w, err := parent.k8sCli.CoreV1().ConfigMaps(string(ns)).Watch(context.TODO(), selector)
 			if err != nil {
 				return nil, err
 			}
@@ -185,7 +186,7 @@ func newConfigMapWatch(parent *watcher, name string, ns namespace) *watch {
 		},
 		func(ns namespace, name string) (interface{}, error) {
 			noopts := meta_v1.GetOptions{}
-			cm, err := parent.k8sCli.CoreV1().ConfigMaps(string(ns)).Get(name, noopts)
+			cm, err := parent.k8sCli.CoreV1().ConfigMaps(string(ns)).Get(context.TODO(), name, noopts)
 			if err != nil {
 				return nil, err
 			}

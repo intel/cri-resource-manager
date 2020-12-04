@@ -17,6 +17,7 @@
 package v1alpha1
 
 import (
+	"context"
 	"time"
 
 	scheme "github.com/intel/cri-resource-manager/pkg/apis/resmgr/generated/clientset/versioned/scheme"
@@ -69,7 +70,7 @@ func (c *adjustments) Get(name string, options v1.GetOptions) (result *v1alpha1.
 		Resource("adjustments").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -86,7 +87,7 @@ func (c *adjustments) List(opts v1.ListOptions) (result *v1alpha1.AdjustmentList
 		Resource("adjustments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -103,7 +104,7 @@ func (c *adjustments) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("adjustments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(context.TODO())
 }
 
 // Create takes the representation of a adjustment and creates it.  Returns the server's representation of the adjustment, and an error, if there is any.
@@ -113,7 +114,7 @@ func (c *adjustments) Create(adjustment *v1alpha1.Adjustment) (result *v1alpha1.
 		Namespace(c.ns).
 		Resource("adjustments").
 		Body(adjustment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -126,7 +127,7 @@ func (c *adjustments) Update(adjustment *v1alpha1.Adjustment) (result *v1alpha1.
 		Resource("adjustments").
 		Name(adjustment.Name).
 		Body(adjustment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -142,7 +143,7 @@ func (c *adjustments) UpdateStatus(adjustment *v1alpha1.Adjustment) (result *v1a
 		Name(adjustment.Name).
 		SubResource("status").
 		Body(adjustment).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
@@ -154,7 +155,7 @@ func (c *adjustments) Delete(name string, options *v1.DeleteOptions) error {
 		Resource("adjustments").
 		Name(name).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -170,7 +171,7 @@ func (c *adjustments) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Timeout(timeout).
 		Body(options).
-		Do().
+		Do(context.TODO()).
 		Error()
 }
 
@@ -183,7 +184,7 @@ func (c *adjustments) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
-		Do().
+		Do(context.TODO()).
 		Into(result)
 	return
 }
