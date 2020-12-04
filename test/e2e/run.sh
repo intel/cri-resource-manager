@@ -288,7 +288,7 @@ resolve-template() {
         if [ -z "$d" ] || ! [ -d "$d" ]; then
             continue
         fi
-        t="$d/$name.yaml.in"
+        t="$d/$name.in"
         if ! [ -e "$t" ]; then
             continue
         fi
@@ -758,6 +758,24 @@ delete() { # script API
     }
 }
 
+instantiate() { # script API
+    # Usage: instantiate FILENAME
+    #
+    # Produces $OUTPUT_DIR/instance/FILENAME. Prints the filename on success.
+    # Uses FILENAME.in as source (resolved from $TEST_DIR, $TOPOLOGY_DIR, ...)
+    local FILENAME="$1"
+    local RESULT="$OUTPUT_DIR/instance/$FILENAME"
+
+    template_file=$(resolve-template "$FILENAME" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
+    if [ ! -f "$template_file" ]; then
+        error "error instantiating \"$FILENAME\": missing template ${template_file}"
+    fi
+    mkdir -p "$(dirname "$RESULT")" 2>/dev/null
+    eval "echo -e \"$(<"${template_file}")\"" | grep -v '^ *$' > "$RESULT" ||
+        error "instantiating \"$FILENAME\" failed"
+    echo "$RESULT"
+}
+
 declare -a pulled_images_on_vm
 create() { # script API
     # Usage: [VAR=VALUE][n=COUNT] create TEMPLATE_NAME
@@ -777,7 +795,7 @@ create() { # script API
     #         If empty (""), skip waiting. The default is wait="Ready".
     #   wait_t: wait timeout. The default is wait_t=60s.
     local template_file
-    template_file=$(resolve-template "$1" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
+    template_file=$(resolve-template "$1.yaml" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
     local namespace_args
     local template_kind
     template_kind=$(awk '/kind/{print tolower($2)}' < "$template_file")
