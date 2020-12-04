@@ -32,6 +32,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/dump"
 	"google.golang.org/grpc"
 	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
 const (
@@ -39,6 +41,9 @@ const (
 )
 
 func init() {
+	rate := logger.Rate{Limit: logger.Every(1 * time.Minute)}
+	logger.SetGrpcLogger("grpc", &rate)
+
 	if err := os.MkdirAll(testDir, 0700); err != nil {
 		fmt.Printf("unable to create %q: %+v\n", testDir, err)
 	}
