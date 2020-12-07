@@ -79,6 +79,9 @@ func readSysfsEntry(base, entry string, ptr interface{}, args ...interface{}) (s
 			return "", sysfsError(path, "%v", err)
 		}
 		return buf, nil
+	case *EPP:
+		*ptr.(*EPP) = EPPFromString(buf)
+		return buf, nil
 	}
 
 	return "", sysfsError(path, "unsupported sysfs entry type %T", ptr)

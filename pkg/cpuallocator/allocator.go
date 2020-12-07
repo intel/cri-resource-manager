@@ -119,14 +119,19 @@ func (ca *cpuAllocator) discoverPriorityCpus() {
 		return
 	}
 
-	// Group cpus by base frequency
+	// Group cpus by base frequency and energy performance profile
 	freqs := map[uint64][]sysfs.ID{}
+	epps := map[sysfs.EPP][]sysfs.ID{}
 	for _, id := range ca.sys.CPUIDs() {
-		bf := ca.sys.CPU(id).BaseFrequency()
+		cpu := ca.sys.CPU(id)
+		bf := cpu.BaseFrequency()
 		freqs[bf] = append(freqs[bf], id)
+
+		epp := cpu.EPP()
+		epps[epp] = append(epps[epp], id)
 	}
 
-	// Construct a sorted list of detected frequencies
+	// Construct a sorted lists of detected frequencies and epp values
 	freqList := []uint64{}
 	for freq := range freqs {
 		if freq > 0 {
@@ -135,16 +140,34 @@ func (ca *cpuAllocator) discoverPriorityCpus() {
 	}
 	utils.SortUint64s(freqList)
 
+	eppList := []int{}
+	for e := range epps {
+		if e != sysfs.EPPUnknown {
+			eppList = append(eppList, int(e))
+		}
+	}
+	sort.Ints(eppList)
+
+	priorityCpus := []sysfs.ID{}
 	// All cpus NOT in the lowest base frequency bin are considered high prio
 	if len(freqList) > 0 {
-		priorityCpus := []sysfs.ID{}
 		for _, freq := range freqList[1:] {
 			priorityCpus = append(priorityCpus, freqs[freq]...)
 		}
-		ca.priorityCpus = sysfs.NewIDSet(priorityCpus...).CPUSet()
 	}
+
+	// All cpus NOT in the lowest performance epp are considered high prio
+	if len(eppList) > 1 {
+		for _, epp := range eppList[0 : len(eppList)-1] {
+			priorityCpus = append(priorityCpus, epps[sysfs.EPP(epp)]...)
+		}
+	}
+	ca.priorityCpus = sysfs.NewIDSet(priorityCpus...).CPUSet()
+
 	if ca.priorityCpus.Size() > 0 {
 		log.Debug("discovered high priority cpus: %v", ca.priorityCpus)
+	} else {
+		log.Debug("no high priority cpus detected")
 	}
 }
 
