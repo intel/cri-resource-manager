@@ -148,7 +148,12 @@ pushd "$build_dir"
 touch .nojekyll
 
 _stable=`(ls -d1 v*/ || :) | sort -n | tail -n1`
-[ -n "$_stable" ] && ln -sfT "$_stable" stable
+if [ -n "$_stable" ]; then
+    ln -sfT "$_stable" stable
+    redirect_to="stable"
+else
+    redirect_to=$build_subdir
+fi
 
 # Detect existing versions from the gh-pages branch
 create_versions_js > versions.js
@@ -161,7 +166,7 @@ create_releases_js > releases.js
 popd
 
 cat > index.html << EOF
-<meta http-equiv="refresh" content="0; URL='stable'" />
+<meta http-equiv="refresh" content="0; URL='$redirect_to'" />
 EOF
 
 if [ -z "`git status --short`" ]; then
