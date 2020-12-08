@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Container Affinity and Anti-Affinity &mdash; CRI Resource Manager 0.4.1-3-g45b607a documentation</title>
+  <title>Container Affinity and Anti-Affinity &mdash; CRI Resource Manager 0.4.1-5-g4b958ca documentation</title>
   
 
   
@@ -356,14 +356,14 @@ matching operators. The joint key syntax allows joining the value of several key
 with a separator into a single value. A joint key can be specified in a simple or
 full format:</p>
 <ul class="simple">
-<li><p>simple: “:<colon-separated-subkeys>”, this is equivalent to “:::<colon-separated-subkeys>”</p></li>
-<li><p>full:   “:<ksep><vsep><ksep-separated-keylist>”</p></li>
+<li><p>simple: <code class="docutils literal notranslate"><span class="pre">&lt;colon-separated-subkeys&gt;</span></code>, this is equivalent to <code class="docutils literal notranslate"><span class="pre">:::&lt;colon-separated-subkeys&gt;</span></code></p></li>
+<li><p>full:   <code class="docutils literal notranslate"><span class="pre">&lt;ksep&gt;&lt;vsep&gt;&lt;ksep-separated-keylist&gt;</span></code></p></li>
 </ul>
-<p>A joint key evaluates to the values of all subkeys joined by the <vsep>. A non-existent
-subkey evaluates to the empty string. For instance the joint key</p>
-<p>:pod/qosclass:pod/name:name</p>
+<p>A joint key evaluates to the values of all the <code class="docutils literal notranslate"><span class="pre">&lt;ksep&gt;</span></code>-separated subkeys joined by <code class="docutils literal notranslate"><span class="pre">&lt;vsep&gt;</span></code>.
+A non-existent subkey evaluates to the empty string. For instance the joint key</p>
+<p><code class="docutils literal notranslate"><span class="pre">:pod/qosclass:pod/name:name</span></code></p>
 <p>evaluates to</p>
-<p>“<qosclass>:<pod name>:<container name>”</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;qosclass&gt;:&lt;pod</span> <span class="pre">name&gt;:&lt;container</span> <span class="pre">name&gt;</span></code></p>
 <p>For existence operators, a joint key is considered to exist if any of its subkeys exists.</p>
 </div>
 <div class="section" id="examples">

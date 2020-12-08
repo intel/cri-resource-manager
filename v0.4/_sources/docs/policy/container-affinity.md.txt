@@ -174,17 +174,17 @@ matching operators. The joint key syntax allows joining the value of several key
 with a separator into a single value. A joint key can be specified in a simple or
 full format:
 
-  - simple: ":<colon-separated-subkeys>", this is equivalent to ":::<colon-separated-subkeys>"
-  - full:   ":<ksep><vsep><ksep-separated-keylist>"
+  - simple: `<colon-separated-subkeys>`, this is equivalent to `:::<colon-separated-subkeys>`
+  - full:   `<ksep><vsep><ksep-separated-keylist>`
 
-A joint key evaluates to the values of all subkeys joined by the <vsep>. A non-existent
-subkey evaluates to the empty string. For instance the joint key
+A joint key evaluates to the values of all the `<ksep>`-separated subkeys joined by `<vsep>`.
+A non-existent subkey evaluates to the empty string. For instance the joint key
 
-  :pod/qosclass:pod/name:name
+  `:pod/qosclass:pod/name:name`
 
 evaluates to
 
-  "<qosclass>:<pod name>:<container name>"
+  `<qosclass>:<pod name>:<container name>`
 
 For existence operators, a joint key is considered to exist if any of its subkeys exists.
 
