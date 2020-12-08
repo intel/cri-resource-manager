@@ -369,7 +369,7 @@ func TestPoolCreation(t *testing.T) {
 				container: &mockContainer{},
 			},
 			expectedRemainingNodes:  []int{0},
-			expectedFirstNodeMemory: memoryUnspec,
+			expectedFirstNodeMemory: memoryDRAM,
 			expectedLeafNodeCPUs:    20,
 			expectedRootNodeCPUs:    20,
 		},

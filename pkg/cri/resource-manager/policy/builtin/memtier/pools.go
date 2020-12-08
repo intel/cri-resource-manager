@@ -27,148 +27,147 @@ import (
 
 // buildPoolsByTopology builds a hierarchical tree of pools based on HW topology.
 func (p *policy) buildPoolsByTopology() error {
-	var n Node
-
 	if err := p.checkHWTopology(); err != nil {
 		return err
 	}
 
-	socketCnt := p.sys.SocketCount()
-	dieCnt := 0
-	nodeCnt := p.sys.NUMANodeCount()
-	if nodeCnt < 2 {
-		nodeCnt = 0
-	}
-	memNodeCnt := 0
-	if nodeCnt > 0 {
-		for _, id := range p.sys.NodeIDs() {
-			if p.sys.Node(id).GetMemoryType() == system.MemoryTypePMEM {
-				memNodeCnt++
-			}
-		}
-	}
-	for _, id := range p.sys.PackageIDs() {
-		pkg := p.sys.Package(id)
-		if n := len(pkg.DieIDs()); n > 1 {
-			dieCnt += n
-		}
-	}
-	poolCnt := socketCnt + dieCnt + nodeCnt - memNodeCnt + map[bool]int{false: 0, true: 1}[socketCnt > 1]
+	// Notes:
+	//   we never create pool nodes for PMEM-only NUMA nodes (as these
+	//   are always without any close/local set of CPUs). We instead
+	//   assign the PMEM memory of such a node to one of the closest
+	//   normal (DRAM) pool NUMA nodes.
+	//
+	//   Akin to omitting lone dies from their parent, we omit from the
+	//   pool tree each NUMA node that would end up being the only child
+	//   of its parent (a die or a socket pool node). Resources for each
+	//   such node will get discovered by and assigned to the would be
+	//   parent which is now a leaf (die or socket) node in the tree.
+	//
+	//   The PMEM memory of (omitted) PMEM-only nodes is assigned
+	//   to one of the closest normal (DRAM) NUMA nodes. This right
+	//   assignment has already been calculated by assignPMEMNodes().
+	//   However, making the corresponding assignment in the pool
+	//   tree is a bit more involved as the DRAM node where a PMEM
+	//   node has been assigned to might have gotten omitted from the
+	//   tree if it ended up being a lone child. We use the recorded
+	//   per NUMA node surrogates to find both if and where resources
+	//   of omitted DRAM NUMA nodes need to get assigned to, and also
+	//   where PMEM NUMA node resources need to get assigned to.
 
-	p.nodes = make(map[string]Node, poolCnt)
-	p.pools = make([]Node, poolCnt)
+	log.Debug("building topology pool tree...")
 
-	// create virtual root if necessary
-	if socketCnt > 1 {
+	p.nodes = make(map[string]Node)
+
+	// create a virtual root node, if we have a multi-socket system
+	if p.sys.SocketCount() > 1 {
 		p.root = p.NewVirtualNode("root", nilnode)
 		p.nodes[p.root.Name()] = p.root
+		log.Debug("  + created pool (root) %q", p.root.Name())
+	} else {
+		log.Debug("  - omitted pool virtual root (single-socket system)")
 	}
 
-	// die nodes by NUMA id
-	dies := map[system.ID]Node{}
+	// create socket nodes, for a single-socket system set the only socket as the root
+	sockets := map[system.ID]Node{}
+	for _, socketID := range p.sys.PackageIDs() {
+		var socket Node
 
-	// create nodes for sockets
-	sockets := make(map[system.ID]Node, socketCnt)
-	for _, id := range p.sys.PackageIDs() {
-		if socketCnt > 1 {
-			n = p.NewSocketNode(id, p.root)
+		if p.root != nil {
+			socket = p.NewSocketNode(socketID, p.root)
+			log.Debug("    + created pool %q", socket.Parent().Name()+"/"+socket.Name())
 		} else {
-			n = p.NewSocketNode(id, nilnode)
-			p.root = n
+			socket = p.NewSocketNode(socketID, nilnode)
+			p.root = socket
+			log.Debug("    + created pool %q (as root)", socket.Name())
 		}
-		p.nodes[n.Name()] = n
-		sockets[id] = n
 
-		if dieCnt > 0 {
-			pkg := p.sys.Package(id)
-			for _, dieid := range pkg.DieIDs() {
-				die := p.NewDieNode(dieid, n)
-				for _, nodeid := range pkg.DieNodeIDs(dieid) {
-					dies[nodeid] = die
-				}
+		p.nodes[socket.Name()] = socket
+		sockets[socketID] = socket
+	}
+
+	// create dies for every socket, but only if we have more than one die in the socket
+	numaDies := map[system.ID]Node{} // created die Nodes per NUMA node id
+	for socketID, socket := range sockets {
+		dieIDs := p.sys.Package(socketID).DieIDs()
+		if len(dieIDs) < 2 {
+			log.Debug("      - omitted pool %q (die count: %d)", socket.Name()+"/die #0",
+				len(dieIDs))
+			continue
+		}
+		for _, dieID := range dieIDs {
+			die := p.NewDieNode(dieID, socket)
+			p.nodes[die.Name()] = die
+			for _, numaNodeID := range p.sys.Package(socketID).DieNodeIDs(dieID) {
+				numaDies[numaNodeID] = die
 			}
+			log.Debug("      + created pool %q", die.Parent().Name()+"/"+die.Name())
 		}
 	}
 
-	pmemNodes := map[system.ID]system.Node{}
-	dramNodes := map[system.ID]system.Node{}
+	// create pool nodes for NUMA nodes
+	pmemNodes := map[system.ID]system.Node{} // collected PMEM-only nodes
+	dramNodes := map[system.ID]system.Node{} // collected DRAM-only nodes
+	numaSurrogates := map[system.ID]Node{}   // surrogate leaf nodes for omitted NUMA nodes
+	for _, numaNodeID := range p.sys.NodeIDs() {
+		var numaNode Node
 
-	// create nodes for NUMA nodes
-	if nodeCnt > 0 {
-		for _, id := range p.sys.NodeIDs() {
-			var parent Node
-
-			sysnode := p.sys.Node(id)
-			switch sysnode.GetMemoryType() {
-			case system.MemoryTypePMEM:
-				pmemNodes[id] = sysnode
-				continue // don't create pool nodes for CPU-less NUMA nodes
-			case system.MemoryTypeDRAM:
-				dramNodes[id] = sysnode
-			}
-
-			if len(dies) > 0 {
-				parent = dies[id]
-			} else {
-				parent = sockets[p.sys.Node(id).PackageID()]
-			}
-
-			n = p.NewNumaNode(id, parent)
-			p.nodes[n.Name()] = n
+		numaSysNode := p.sys.Node(numaNodeID)
+		switch numaSysNode.GetMemoryType() {
+		case system.MemoryTypeDRAM:
+			dramNodes[numaNodeID] = numaSysNode
+		case system.MemoryTypePMEM:
+			pmemNodes[numaNodeID] = numaSysNode
+			log.Debug("        - omitted pool \"NUMA node #%d\": PMEM node", numaNodeID)
+			continue // don't create pool, will assign to a closest DRAM node
+		default:
+			log.Warn("        - ignored pool \"NUMA node #%d\": unhandled memory type %v",
+				numaNodeID, numaSysNode.GetMemoryType())
+			continue
 		}
+
+		//
+		// Notes:
+		//   We omit inserting NUMA nodes (as leaf nodes) in the tree, if that NUMA node
+		//   would be the only child of its parent. In this case, we record the would-be
+		//   parent as the surrogate for the NUMA node. This surrogate will get assigned
+		//   any closest PMEM-only NUMA node that the original one would have received.
+		//
+
+		if die, ok := numaDies[numaNodeID]; ok {
+			if p.parentNumaNodeCountWithCPUs(numaSysNode) < 2 {
+				numaSurrogates[numaNodeID] = die
+				log.Debug("        - omitted pool \"NUMA node #%d\": using surrogate %q",
+					numaNodeID, numaSurrogates[numaNodeID].Name())
+				continue
+			}
+			numaNode = p.NewNumaNode(numaNodeID, die)
+		} else {
+			socket := sockets[p.sys.Node(numaNodeID).PackageID()]
+			if p.parentNumaNodeCountWithCPUs(numaSysNode) < 2 {
+				numaSurrogates[numaNodeID] = socket
+				log.Debug("        - omitted pool \"NUMA node #%d\": using surrogate %q",
+					numaNodeID, numaSurrogates[numaNodeID].Name())
+				continue
+			}
+			numaNode = p.NewNumaNode(numaNodeID, socket)
+		}
+
+		p.nodes[numaNode.Name()] = numaNode
+		numaSurrogates[numaNodeID] = numaNode
+		log.Debug("        + created pool %q", numaNode.Parent().Name()+"/"+numaNode.Name())
 	}
 
-	// get closest per-PMEM DRAM nodes (sorted by system.ID if there are multiple)
-	pmemClosest := map[system.ID][]system.Node{}
-	for id, sysnode := range pmemNodes {
-		var closest []system.Node
-		for _, dram := range dramNodes {
-			if len(closest) < 1 {
-				closest = []system.Node{dram}
-			} else {
-				curr := closest[0]
-				currDist := sysnode.DistanceFrom(curr.ID())
-				dramDist := sysnode.DistanceFrom(dram.ID())
-				switch {
-				case currDist == dramDist:
-					closest = append(closest, dram)
-				case dramDist < currDist:
-					closest = []system.Node{dram}
-				}
-			}
-		}
-		sort.Slice(closest, func(i, j int) bool {
-			iid := closest[i].ID()
-			jid := closest[j].ID()
-			return iid < jid
-		})
-		pmemClosest[id] = closest
+	// set up assignment of PMEM and DRAM node resources to pool nodes and surrogates
+	assigned := p.assignNUMANodes(numaSurrogates, pmemNodes, dramNodes)
+	log.Debug("NUMA node to pool assignment:")
+	for n, numaNodeIDs := range assigned {
+		log.Debug("  pool %q: NUMA nodes #%s", n.Name(), system.NewIDSet(numaNodeIDs...))
 	}
 
-	// assign PMEM nodes to closest DRAM node with least PMEM assigned
-	assigned := map[system.ID][]system.ID{}
-	for id, closest := range pmemClosest {
-		var taker system.Node
-		for _, dram := range closest {
-			if taker == nil {
-				taker = dram
-			} else {
-				if len(assigned[taker.ID()]) > len(assigned[dram.ID()]) {
-					taker = dram
-				}
-			}
-		}
-		if taker == nil {
-			log.Panic("failed to assign CPU-less PMEM node #%d to any DRAM node with CPUs", id)
-		}
-		assigned[taker.ID()] = append(assigned[taker.ID()], id)
-		log.Info("*** PMEM node #%d assigned to #%d (distance %v)", id, taker.ID(),
-			taker.DistanceFrom(id))
-	}
-
-	// enumerate nodes, calculate tree depth, discover node resource capacity
+	// enumerate pools, calculate depth, discover resource capacity, assign NUMA nodes
+	p.pools = make([]Node, 0)
 	p.root.DepthFirst(func(n Node) error {
-		p.pools[p.nodeCnt] = n
+		p.pools = append(p.pools, n)
 		n.(*node).id = p.nodeCnt
 		p.nodeCnt++
 
@@ -176,20 +175,99 @@ func (p *policy) buildPoolsByTopology() error {
 			p.depth = n.(*node).depth
 		}
 
-		n.DiscoverSupply()
-		n.DiscoverMemset()
-
-		// assign CPU-less PMEM nodes if we have any
-		if n.Kind() == NumaNode {
-			// gosh, this whole Node/*node is seriously fscked up...
-			numa := n.(*node).self.node.(*numanode)
-			numa.AssignPMEMNodes(assigned[numa.id])
-		}
+		n.DiscoverSupply(assigned[n.(*node).self.node])
+		delete(assigned, n.(*node).self.node)
 
 		return nil
 	})
 
+	// make sure all PMEM nodes got assigned
+	if len(assigned) > 0 {
+		for node, pmem := range assigned {
+			log.Error("failed to assign PMEM NUMA nodes #%s (to NUMA node/surrogate %s %v)",
+				system.NewIDSet(pmem...), node.Name(), node)
+		}
+		log.Fatal("internal error: unassigned PMEM NUMA nodes remaining")
+	}
+
+	p.root.Dump("<pool-setup>")
+
 	return nil
+}
+
+// parentNumaNodeCountWithCPUs returns the number of CPU-ful NUMA nodes in the parent die/socket.
+func (p *policy) parentNumaNodeCountWithCPUs(numaNode system.Node) int {
+	socketID := numaNode.PackageID()
+	socket := p.sys.Package(socketID)
+	count := 0
+	for _, nodeID := range socket.DieNodeIDs(numaNode.DieID()) {
+		node := p.sys.Node(nodeID)
+		if !node.CPUSet().IsEmpty() {
+			count++
+		}
+	}
+	return count
+}
+
+// assignNUMANodes assigns each PMEM node to one of the closest DRAM nodes
+func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[system.ID]system.Node) map[Node][]system.ID {
+	// collect the closest DRAM NUMA nodes (sorted by system.ID) for each PMEM NUMA node.
+	closest := map[system.ID][]system.ID{}
+	for pmemID := range pmem {
+		var min []system.ID
+		for dramID := range dram {
+			if len(min) < 1 {
+				min = []system.ID{dramID}
+			} else {
+				minDist := p.sys.NodeDistance(pmemID, min[0])
+				newDist := p.sys.NodeDistance(pmemID, dramID)
+				switch {
+				case newDist == minDist:
+					min = append(min, dramID)
+				case newDist < minDist:
+					min = []system.ID{dramID}
+				}
+			}
+		}
+		sort.Slice(min, func(i, j int) bool { return min[i] < min[j] })
+		closest[pmemID] = min
+	}
+
+	assigned := map[Node][]system.ID{}
+
+	// assign each PMEM node to the closest DRAM surrogate with the least PMEM assigned
+	for pmemID, min := range closest {
+		var taker Node
+		var takerID system.ID
+
+		for _, dramID := range min {
+			if taker == nil {
+				taker = surrogates[dramID]
+				takerID = dramID
+			} else {
+				if len(assigned[taker]) > len(assigned[surrogates[dramID]]) {
+					taker = surrogates[dramID]
+					takerID = dramID
+				}
+			}
+		}
+		if taker == nil {
+			log.Panic("failed to assign CPU-less PMEM node #%d to any surrogate", pmemID)
+		}
+
+		assigned[taker] = append(assigned[taker], pmemID)
+		log.Debug("        + PMEM node #%d assigned to %s with distance %v", pmemID, taker.Name(),
+			p.sys.NodeDistance(pmemID, takerID))
+	}
+
+	// assign each DRAM node to its own surrogate (can be the DRAM node itself)
+	for dramID := range dram {
+		taker := surrogates[dramID]
+		assigned[taker] = append([]system.ID{dramID}, assigned[taker]...)
+		log.Debug("        + DRAM node #%d assigned to %s", dramID, taker.Name())
+	}
+
+	return assigned
 }
 
 // checkHWTopology verifies our otherwise implicit assumptions about the HW.

@@ -43,6 +43,8 @@ type Supply interface {
 	GrantedMemory(memoryType) uint64
 	// Cumulate cumulates the given supply into this one.
 	Cumulate(Supply)
+	// AssignMemory adds extra memory to this supply (for extra NUMA nodes assigned to a pool).
+	AssignMemory(mem memoryMap)
 	// AccountAllocate accounts for (removes) allocated exclusive capacity from the supply.
 	AccountAllocate(Grant)
 	// AccountRelease accounts for (reinserts) released exclusive capacity into the supply.
@@ -243,26 +245,53 @@ var _ Score = &score{}
 
 // newSupply creates CPU supply for the given node, cpusets and existing grant.
 func newSupply(n Node, isolated, sharable cpuset.CPUSet, granted int, mem, grantedMem memoryMap) Supply {
+	if mem == nil {
+		mem = createMemoryMap(0, 0, 0)
+	}
+	if grantedMem == nil {
+		grantedMem = createMemoryMap(0, 0, 0)
+	}
 	return &supply{
-		node:     n,
-		isolated: isolated.Clone(),
-		sharable: sharable.Clone(),
-		granted:  granted,
-		// TODO: why are the CPU amounts cloned? Should we do the same for memory to be predictable?
+		node:                 n,
+		isolated:             isolated.Clone(),
+		sharable:             sharable.Clone(),
+		granted:              granted,
 		mem:                  mem,
 		grantedMem:           grantedMem,
 		extraMemReservations: make(map[Grant]memoryMap),
 	}
 }
 
-func createMemoryMap(normalMemory, persistentMemory, hbMemory uint64) memoryMap {
+func createMemoryMap(dram, pmem, hbm uint64) memoryMap {
 	return memoryMap{
-		memoryDRAM:   normalMemory,
-		memoryPMEM:   persistentMemory,
-		memoryHBM:    hbMemory,
-		memoryAll:    normalMemory + persistentMemory + hbMemory,
+		memoryDRAM:   dram,
+		memoryPMEM:   pmem,
+		memoryHBM:    hbm,
+		memoryAll:    dram + pmem + hbm,
 		memoryUnspec: 0,
 	}
+}
+
+func (m memoryMap) Add(dram, pmem, hbm uint64) {
+	m[memoryDRAM] += dram
+	m[memoryPMEM] += pmem
+	m[memoryPMEM] += hbm
+	m[memoryAll] += dram + pmem + hbm
+}
+
+func (m memoryMap) AddDRAM(dram uint64) {
+	m[memoryDRAM] += dram
+	m[memoryAll] += dram
+}
+
+func (m memoryMap) AddPMEM(pmem uint64) {
+	m[memoryPMEM] += pmem
+	m[memoryAll] += pmem
+}
+
+func (m memoryMap) AddHBM(hbm uint64) {
+	m[memoryHBM] += hbm
+	m[memoryAll] += hbm
 }
 
 func (m memoryMap) String() string {
@@ -342,6 +371,13 @@ func (cs *supply) Cumulate(more Supply) {
 	}
 	for key, value := range mcs.grantedMem {
 		cs.grantedMem[key] += value
+	}
+}
+
+// AssignMemory adds memory (for extra NUMA nodes assigned to a pool node).
+func (cs *supply) AssignMemory(mem memoryMap) {
+	for key, value := range mem {
+		cs.mem[key] += value
 	}
 }
 

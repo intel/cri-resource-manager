@@ -96,8 +96,6 @@ func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 
 	config.GetModule(PolicyPath).AddNotify(p.configNotify)
 
-	p.root.Dump("<pre-start>")
-
 	return p
 }
 
