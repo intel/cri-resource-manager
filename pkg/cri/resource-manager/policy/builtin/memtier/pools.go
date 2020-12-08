@@ -53,6 +53,12 @@ func (p *policy) buildPoolsByTopology() error {
 			dieCnt += n
 		}
 	}
+
+	// don't create nodes for NUMA nodes if we have a single NUMA node per socket.
+	if nodeCnt == socketCnt && memNodeCnt == 0 {
+		nodeCnt = 0
+	}
+
 	poolCnt := socketCnt + dieCnt + nodeCnt - memNodeCnt + map[bool]int{false: 0, true: 1}[socketCnt > 1]
 
 	p.nodes = make(map[string]Node, poolCnt)
