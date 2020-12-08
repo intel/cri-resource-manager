@@ -35,7 +35,11 @@ vm-image-url() {
 }
 
 vm-ssh-user() {
-    distro-ssh-user
+    if [ -n "$VM_SSH_USER" ]; then
+        echo "$VM_SSH_USER"
+    else
+        distro-ssh-user
+    fi
 }
 
 vm-check-env() {
