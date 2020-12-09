@@ -64,9 +64,10 @@ exceeded.
 
 Below is a config snippet that would allocate (ca.) 60% of the cache lines
 exclusively to the Guarenteed class. The remaining 40% is for Burstable and
-Besteffort, Besteffort getting only 50% of this.
+Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
+memory bandwidth whereas the other classes are throttled to 50%.
 
-```
+```yaml
 metadata:
   name: cri-resmgr-config.default
   namespace: kube-system
@@ -78,46 +79,102 @@ data:
       l3:
         # Make this false if CAT must be available
         optional: true
+      mb:
+        # Make this false if MBA must be available
+        optional: true
     partitions:
       exclusive:
-        l3Allocation:
-          # Allocate 60% of all cache IDs to the "exclusive" partition
-          all: "60%"
+        # Allocate 60% of all cache IDs to the "exclusive" partition
+        l3Allocation: "60%"
+        mbAllocation: ["100%"]
         classes:
           Guaranteed:
-            l3schema:
-              # Allocate all of the partitions cache lines to "Guarenteed"
-              all: "100%"
+            # Allocate all of the partitions cache lines to "Guarenteed"
+            l3Schema: "100%"
       shared:
-        l3Allocation:
-          # Allocate 40% of all cache IDs to the "shared" partition
-          # These will NOT overlap with the cache lines allocated for "exclusive" partition
-          all: "40%"
+        # Allocate 40% of all cache IDs to the "shared" partition
+        # These will NOT overlap with the cache lines allocated for "exclusive" partition
+        l3Allocation: "40%"
+        mbAllocation: ["50%"]
         classes:
           Burstable:
-            l3schema:
-              # Allow "Burstable" to use all cache lines of the "shared" partition
-              all: "100%"
+            # Allow "Burstable" to use all cache lines of the "shared" partition
+            l3Schema: "100%"
           BestEffort:
-            l3schema:
-              # Allow "Besteffort" to use half of the cache lines of the "shared" partition
-              # These will overlap with those used by "Burstable"
-              all: "50%"
+            # Allow "Besteffort" to use half of the cache lines of the "shared" partition
+            # These will overlap with those used by "Burstable"
+            l3Schema: "50%"
 ```
 
 The configuration also supports far more fine-grained control, e.g. per
 cache-ID configuration (i.e. different sockets having different allocation) and
-Code and Data Prioritization (CDP) allowing different allocation for code and
-data paths.
+Code and Data Prioritization (CDP) allowing different cache allocation for code
+and data paths.
+
+```yaml
+...
+    partitions:
+      exclusive:
+        l3Allocation: "60%"
+        mbAllocation: ["100%"]
+        classes:
+          # Automatically gets 100% of what was allocated for the partition
+          Guaranteed:
+      shared:
+        l3Allocation:
+          # 'all' denotes the default and must be specified
+          all: "40%"
+          # Specific cache allotation for cache-ids 2 and 3
+          2-3: "20%"
+        mbAllocation: ["100%"]
+        classes:
+          Burstable:
+            l3Schema:
+              all:
+                unified: "100%"
+                code: "100%"
+                data: "80%"
+              mbSchema:
+                all: ["80%"]
+                2-3: ["50%"]
+...
+...
+```
 
 In addition, if the hardware details are known, raw bitmasks or bit numbers
 ("0x1f" or 0-4) can be used instead of percentages in order to be able to
-configure allocations exactly as required. The bits in this case are
+configure cache allocations exactly as required. The bits in this case are
 corresponding to those in /sys/fs/resctrl/ bitmasks. You can also mix relative
-(percentage) and absolute (bitmask) allocations.
+(percentage) and absolute (bitmask) allocations. For cases where the resctrl
+filesystem is mounted with `-o mba_MBps` Memory bandwidth must be specifed in
+MBps.
+
+```yaml
+...
+    partitions:
+      exclusive:
+        # Specify bitmask in bit numbers
+        l3Allocation: "8-19"
+        # MBps value takes effect when resctrl mount option mba_MBps is used
+        mbAllocation: ["100%", "100000MBps"]
+        classes:
+          # Automatically gets 100% of what was allocated for the partition
+          Guaranteed:
+      shared:
+        # Explicit bitmask
+        l3Allocation: "0xff"
+        mbAllocation: ["50%", "2000MBps"]
+        classes:
+          # Burstable gets 100% of what was allocated for the partition
+          Burstable:
+          BestEffort:
+            l3Schema: "50%"
+            # Besteffort gets 50% of the 50% (i.e. 25% of total) or 1000MBps
+            mbSchema: ["50%", "1000MBps"]
+```
 
 See `rdt` in the [example ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
-for a more complete example configuration.
+for another example configuration.
 
 ### Dynamic Configuration
 

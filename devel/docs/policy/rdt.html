@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.4.0-284-g192f102 documentation</title>
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.4.0-286-gb595911 documentation</title>
   
 
   
@@ -247,56 +247,111 @@ exceeded.</p>
 <h3>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h3>
 <p>Below is a config snippet that would allocate (ca.) 60% of the cache lines
 exclusively to the Guarenteed class. The remaining 40% is for Burstable and
-Besteffort, Besteffort getting only 50% of this.</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
-  <span class="n">name</span><span class="p">:</span> <span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">-</span><span class="n">config</span><span class="o">.</span><span class="n">default</span>
-  <span class="n">namespace</span><span class="p">:</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span>
-<span class="n">data</span><span class="p">:</span>
-<span class="o">...</span>
-  <span class="n">rdt</span><span class="p">:</span> <span class="o">|+</span>
-    <span class="c1"># Common options</span>
-    <span class="n">options</span><span class="p">:</span>
-      <span class="n">l3</span><span class="p">:</span>
-        <span class="c1"># Make this false if CAT must be available</span>
-        <span class="n">optional</span><span class="p">:</span> <span class="n">true</span>
-    <span class="n">partitions</span><span class="p">:</span>
-      <span class="n">exclusive</span><span class="p">:</span>
-        <span class="n">l3Allocation</span><span class="p">:</span>
-          <span class="c1"># Allocate 60% of all cache IDs to the &quot;exclusive&quot; partition</span>
-          <span class="nb">all</span><span class="p">:</span> <span class="s2">&quot;60%&quot;</span>
-        <span class="n">classes</span><span class="p">:</span>
-          <span class="n">Guaranteed</span><span class="p">:</span>
-            <span class="n">l3schema</span><span class="p">:</span>
-              <span class="c1"># Allocate all of the partitions cache lines to &quot;Guarenteed&quot;</span>
-              <span class="nb">all</span><span class="p">:</span> <span class="s2">&quot;100%&quot;</span>
-      <span class="n">shared</span><span class="p">:</span>
-        <span class="n">l3Allocation</span><span class="p">:</span>
-          <span class="c1"># Allocate 40% of all cache IDs to the &quot;shared&quot; partition</span>
-          <span class="c1"># These will NOT overlap with the cache lines allocated for &quot;exclusive&quot; partition</span>
-          <span class="nb">all</span><span class="p">:</span> <span class="s2">&quot;40%&quot;</span>
-        <span class="n">classes</span><span class="p">:</span>
-          <span class="n">Burstable</span><span class="p">:</span>
-            <span class="n">l3schema</span><span class="p">:</span>
-              <span class="c1"># Allow &quot;Burstable&quot; to use all cache lines of the &quot;shared&quot; partition</span>
-              <span class="nb">all</span><span class="p">:</span> <span class="s2">&quot;100%&quot;</span>
-          <span class="n">BestEffort</span><span class="p">:</span>
-            <span class="n">l3schema</span><span class="p">:</span>
-              <span class="c1"># Allow &quot;Besteffort&quot; to use half of the cache lines of the &quot;shared&quot; partition</span>
-              <span class="c1"># These will overlap with those used by &quot;Burstable&quot;</span>
-              <span class="nb">all</span><span class="p">:</span> <span class="s2">&quot;50%&quot;</span>
+Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
+memory bandwidth whereas the other classes are throttled to 50%.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">cri-resmgr-config.default</span>
+  <span class="nt">namespace</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">kube-system</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="nn">...</span>
+  <span class="nt">rdt</span><span class="p">:</span> <span class="p p-Indicator">|+</span>
+    <span class="no"># Common options</span>
+    <span class="no">options:</span>
+      <span class="no">l3:</span>
+        <span class="no"># Make this false if CAT must be available</span>
+        <span class="no">optional: true</span>
+      <span class="no">mb:</span>
+        <span class="no"># Make this false if MBA must be available</span>
+        <span class="no">optional: true</span>
+    <span class="no">partitions:</span>
+      <span class="no">exclusive:</span>
+        <span class="no"># Allocate 60% of all cache IDs to the &quot;exclusive&quot; partition</span>
+        <span class="no">l3Allocation: &quot;60%&quot;</span>
+        <span class="no">mbAllocation: [&quot;100%&quot;]</span>
+        <span class="no">classes:</span>
+          <span class="no">Guaranteed:</span>
+            <span class="no"># Allocate all of the partitions cache lines to &quot;Guarenteed&quot;</span>
+            <span class="no">l3Schema: &quot;100%&quot;</span>
+      <span class="no">shared:</span>
+        <span class="no"># Allocate 40% of all cache IDs to the &quot;shared&quot; partition</span>
+        <span class="no"># These will NOT overlap with the cache lines allocated for &quot;exclusive&quot; partition</span>
+        <span class="no">l3Allocation: &quot;40%&quot;</span>
+        <span class="no">mbAllocation: [&quot;50%&quot;]</span>
+        <span class="no">classes:</span>
+          <span class="no">Burstable:</span>
+            <span class="no"># Allow &quot;Burstable&quot; to use all cache lines of the &quot;shared&quot; partition</span>
+            <span class="no">l3Schema: &quot;100%&quot;</span>
+          <span class="no">BestEffort:</span>
+            <span class="no"># Allow &quot;Besteffort&quot; to use half of the cache lines of the &quot;shared&quot; partition</span>
+            <span class="no"># These will overlap with those used by &quot;Burstable&quot;</span>
+            <span class="no">l3Schema: &quot;50%&quot;</span>
 </pre></div>
 </div>
 <p>The configuration also supports far more fine-grained control, e.g. per
 cache-ID configuration (i.e. different sockets having different allocation) and
-Code and Data Prioritization (CDP) allowing different allocation for code and
-data paths.</p>
+Code and Data Prioritization (CDP) allowing different cache allocation for code
+and data paths.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+    <span class="nt">partitions</span><span class="p">:</span>
+      <span class="nt">exclusive</span><span class="p">:</span>
+        <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;60%&quot;</span>
+        <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span>
+        <span class="nt">classes</span><span class="p">:</span>
+          <span class="c1"># Automatically gets 100% of what was allocated for the partition</span>
+          <span class="nt">Guaranteed</span><span class="p">:</span>
+      <span class="nt">shared</span><span class="p">:</span>
+        <span class="nt">l3Allocation</span><span class="p">:</span>
+          <span class="c1"># &#39;all&#39; denotes the default and must be specified</span>
+          <span class="nt">all</span><span class="p">:</span> <span class="s">&quot;40%&quot;</span>
+          <span class="c1"># Specific cache allotation for cache-ids 2 and 3</span>
+          <span class="nt">2-3</span><span class="p">:</span> <span class="s">&quot;20%&quot;</span>
+        <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span>
+        <span class="nt">classes</span><span class="p">:</span>
+          <span class="nt">Burstable</span><span class="p">:</span>
+            <span class="nt">l3Schema</span><span class="p">:</span>
+              <span class="nt">all</span><span class="p">:</span>
+                <span class="nt">unified</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
+                <span class="nt">code</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
+                <span class="nt">data</span><span class="p">:</span> <span class="s">&quot;80%&quot;</span>
+              <span class="nt">mbSchema</span><span class="p">:</span>
+                <span class="nt">all</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;80%&quot;</span><span class="p p-Indicator">]</span>
+                <span class="nt">2-3</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span>
+<span class="nn">...</span>
+<span class="nn">...</span>
+</pre></div>
+</div>
 <p>In addition, if the hardware details are known, raw bitmasks or bit numbers
 (“0x1f” or 0-4) can be used instead of percentages in order to be able to
-configure allocations exactly as required. The bits in this case are
+configure cache allocations exactly as required. The bits in this case are
 corresponding to those in /sys/fs/resctrl/ bitmasks. You can also mix relative
-(percentage) and absolute (bitmask) allocations.</p>
-<p>See <code class="docutils literal notranslate"><span class="pre">rdt</span></code> in the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/192f10245be6333a4db07fbc52d48817862f593f/sample-configs/cri-resmgr-configmap.example.yaml">example ConfigMap spec</a>
-for a more complete example configuration.</p>
+(percentage) and absolute (bitmask) allocations. For cases where the resctrl
+filesystem is mounted with <code class="docutils literal notranslate"><span class="pre">-o</span> <span class="pre">mba_MBps</span></code> Memory bandwidth must be specifed in
+MBps.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+    <span class="nt">partitions</span><span class="p">:</span>
+      <span class="nt">exclusive</span><span class="p">:</span>
+        <span class="c1"># Specify bitmask in bit numbers</span>
+        <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;8-19&quot;</span>
+        <span class="c1"># MBps value takes effect when resctrl mount option mba_MBps is used</span>
+        <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">,</span> <span class="s">&quot;100000MBps&quot;</span><span class="p p-Indicator">]</span>
+        <span class="nt">classes</span><span class="p">:</span>
+          <span class="c1"># Automatically gets 100% of what was allocated for the partition</span>
+          <span class="nt">Guaranteed</span><span class="p">:</span>
+      <span class="nt">shared</span><span class="p">:</span>
+        <span class="c1"># Explicit bitmask</span>
+        <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;0xff&quot;</span>
+        <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">,</span> <span class="s">&quot;2000MBps&quot;</span><span class="p p-Indicator">]</span>
+        <span class="nt">classes</span><span class="p">:</span>
+          <span class="c1"># Burstable gets 100% of what was allocated for the partition</span>
+          <span class="nt">Burstable</span><span class="p">:</span>
+          <span class="nt">BestEffort</span><span class="p">:</span>
+            <span class="nt">l3Schema</span><span class="p">:</span> <span class="s">&quot;50%&quot;</span>
+            <span class="c1"># Besteffort gets 50% of the 50% (i.e. 25% of total) or 1000MBps</span>
+            <span class="nt">mbSchema</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">,</span> <span class="s">&quot;1000MBps&quot;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>See <code class="docutils literal notranslate"><span class="pre">rdt</span></code> in the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/b5959110e1ca8e9dc515ef53bb49c447ed50f578/sample-configs/cri-resmgr-configmap.example.yaml">example ConfigMap spec</a>
+for another example configuration.</p>
 </div>
 <div class="section" id="dynamic-configuration">
 <h3>Dynamic Configuration<a class="headerlink" href="#dynamic-configuration" title="Permalink to this headline">¶</a></h3>
