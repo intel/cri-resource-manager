@@ -401,6 +401,20 @@ func TestPoolCreation(t *testing.T) {
 			expectedLeafNodeCPUs:    28,
 			expectedRootNodeCPUs:    112,
 		},
+		{
+			path: path.Join(dir, "sysfs", "4-socket-server-nosnc", "sys"),
+			name: "sysfs pool creation from a 4 socket server with SNC disabled",
+			req: &request{
+				memReq:    10000,
+				memLim:    10000,
+				memType:   memoryAll,
+				container: &mockContainer{},
+			},
+			expectedRemainingNodes:  []int{0, 1, 2, 3, 4},
+			expectedFirstNodeMemory: memoryDRAM,
+			expectedLeafNodeCPUs:    36,
+			expectedRootNodeCPUs:    36 * 4,
+		},
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
