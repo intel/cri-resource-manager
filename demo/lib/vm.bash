@@ -511,6 +511,15 @@ vm-cri-import-image() {
     esac
 }
 
+vm-put-docker-image() {
+    local image_name="$1"
+    local image_file_on_vm="images/${image_name//:/__}"
+    vm-command-q "mkdir -p $(dirname "$image_file_on_vm")"
+    docker save "$image_name" | vm-pipe-to-file "$image_file_on_vm" ||
+        error "failed to save and pipe image '$image_name'"
+    vm-cri-import-image "$image_name" "$image_file_on_vm"
+}
+
 vm-install-cri-resmgr-webhook() {
     local service=cri-resmgr-webhook
     local namespace=cri-resmgr
