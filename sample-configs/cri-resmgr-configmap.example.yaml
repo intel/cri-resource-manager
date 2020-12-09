@@ -305,15 +305,15 @@ data:
     # with L3 CAT configured
     partitions:
       default:
-        l3Allocation:
-          all: 100%
-        mbAllocation:
-          all: [100%]
+        l3Allocation: "100%"
+        mbAllocation: ["100%"]
         classes:
           Guaranteed:
-            l3schema:
-              all: "100%"
-## Specific settings for L3 CDP (Code and Data Prioritization)
+            l3schema: "100%"
+## Specific settings for L3 CDP (Code and Data Prioritization). Note: need to
+## remove the "100%" shorthand above if enabling this
+## 'all' specificies the default value for all cache-ids
+#              all:
 #                unified: "100%"
 #                code: "100%"
 #                data: "80%"
@@ -331,20 +331,16 @@ data:
                 code: "100%"
                 data: "50%"
 ## MBA (Memory Bandwidth Allocation) for 'Burstable'
-#            mbschema:
-#              all: [66%, 5000MBps]
+## 'all' may be omitted if no cache-id specific settings are required
+#            mbschema: [66%, 5000MBps]
           BestEffort:
-            l3schema:
-              all:
-                unified: "33%"
+            l3schema: "33%"
 ## MBA (Memory Bandwidth Allocation) for 'BestEffort'
-#            mbschema:
-#              all: [33%, 3000MBps]
+#            mbschema: [33%, 3000MBps]
 ## Special class 'SYSTEM_DEFAULT'. Reserved name for configuring the "root"
 ## resctrl group of the system
 #          SYSTEM_DEFAULT:
-#            l3schema:
-#              all: "50%"
+#            l3schema: "50%"
   dump: |+
     Config: full:.*,short:.*Stop.*,off:.*List.*
     File: /tmp/cri-selective-debug.dump
