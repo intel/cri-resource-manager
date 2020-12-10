@@ -351,8 +351,8 @@ func TestDefaultRDTAndBlockIOClasses(t *testing.T) {
 const (
 	// anything below 2 millicpus will yield 0 as an estimate
 	minNonZeroRequest = 2
-	// check CPU request/limit estimate accuracy up to 1024 CPU cores
-	maxCPU = 1024 * 1000
+	// check CPU request/limit estimate accuracy up to this many CPU cores
+	maxCPU = (kubecm.MaxShares / kubecm.SharesPerCPU) * kubecm.MilliCPUToCPU
 	// we expect our estimates to be within 1 millicpu from the real ones
 	expectedAccuracy = 1
 )
