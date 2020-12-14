@@ -80,7 +80,7 @@ func isProcess(processID string) bool {
 	return true
 }
 
-func getTasksInContainer(cgroupParentDir, containerID string, onlyProcesses bool) ([]string, error) {
+func getTasksInContainer(cgroupParentDir, podID, containerID string, onlyProcesses bool) ([]string, error) {
 	var entries []string
 
 	// Find Cpuset sub-cgroup directory of this container
@@ -92,6 +92,7 @@ func getTasksInContainer(cgroupParentDir, containerID string, onlyProcesses bool
 			filepath.Join(CpusetCgroupDir, cgroupParentDir, "crio-"+containerID+".scope"),
 			filepath.Join(CpusetCgroupDir, cgroupParentDir, "docker-"+containerID+".scope"),
 			filepath.Join(CpusetCgroupDir, cgroupParentDir, containerID),
+			filepath.Join(CpusetCgroupDir, cgroupParentDir, "kata_"+podID),
 		}
 		for _, d := range dirs {
 			info, err := os.Stat(d)
@@ -130,11 +131,12 @@ func getTasksInContainer(cgroupParentDir, containerID string, onlyProcesses bool
 }
 
 // GetProcessesInContainer gets the IDs of all processes in the container.
-func GetProcessesInContainer(cgroupParentDir, containerID string) ([]string, error) {
-	return getTasksInContainer(cgroupParentDir, containerID, true)
+func GetProcessesInContainer(cgroupParentDir, podID, containerID string) ([]string, error) {
+	return getTasksInContainer(cgroupParentDir, podID, containerID, true)
 }
 
 // GetTasksInContainer gets the IDs of all tasks in the container.
-func GetTasksInContainer(cgroupParentDir, containerID string) ([]string, error) {
-	return getTasksInContainer(cgroupParentDir, containerID, false)
+func GetTasksInContainer(cgroupParentDir, podID, containerID string) ([]string, error) {
+	return getTasksInContainer(cgroupParentDir, podID, containerID, false)
+
 }

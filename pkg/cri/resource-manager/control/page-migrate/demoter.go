@@ -249,7 +249,7 @@ func resetDirtyBit(pid string) error {
 
 // resetDirtyBit unsets soft-dirty bits for all processes in a container.
 func (d *demoter) resetDirtyBit(c *container) error {
-	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetID())
+	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetPodID(), c.GetID())
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 		pages:        make(map[int][]page, 0),
 		longestRange: 0,
 	}
-	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetID())
+	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetPodID(), c.GetID())
 	if err != nil {
 		return pagePool{}, err
 	}
