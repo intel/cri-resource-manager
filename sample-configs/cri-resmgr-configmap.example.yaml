@@ -297,6 +297,7 @@ data:
   rdt: |+
     # Common options
     options:
+      monitoringDisabled: false
       l3:
         optional: true
       mb:
