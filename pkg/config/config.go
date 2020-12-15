@@ -16,8 +16,10 @@ package config
 
 import (
 	"reflect"
-	"sigs.k8s.io/yaml"
+	"sort"
 	"strings"
+
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -278,6 +280,7 @@ func (m *Module) apply(cfg Data) error {
 		if err != nil {
 			return configError("module %s: failed to marshal configuration: %v", m.path, err)
 		}
+
 		if err = yaml.Unmarshal(raw, m.ptr); err != nil {
 			return configError("module %s: failed to apply configuration: %v", m.path, err)
 		}
@@ -329,7 +332,7 @@ func (m *Module) validate(data Data) error {
 	log.Debug("validating data for module %s...", m.path)
 
 	modcfg, subcfg := data.split(m.hasChild)
-	fields := map[string]struct{}{}
+	fields := fieldMap{}
 
 	if m.isImplicit() {
 		if len(modcfg) > 0 {
@@ -346,19 +349,24 @@ func (m *Module) validate(data Data) error {
 		}
 	} else {
 		ptr := reflect.ValueOf(m.ptr).Elem()
-		for i := 0; i < ptr.NumField(); i++ {
-			field := ptr.Type().Field(i)
-			name := fieldName(field)
-			fields[name] = struct{}{}
-		}
+		fields.collect(ptr.Type(), "")
+		fields.sort()
 	}
 
 	for field := range modcfg {
-		if _, ok := fields[field]; !ok {
+		if !fields.has(field) {
 			if !m.noValidate {
 				return configError("module %s: given unknown configuration data %s", m.path, field)
 			}
 			log.Error("module %s: given unknown configuration data %s", m.path, field)
+		}
+		if fields.isAmbiguous(field) {
+			if !m.noValidate {
+				return configError("module %s: configuration data %q is ambiguous (%s)",
+					m.path, field, fields.fullyQualifiedFieldNames(field))
+			}
+			log.Error("module %s: configuration data %q is ambiguous (%s)",
+				m.path, field, fields.fullyQualifiedFieldNames(field))
 		}
 	}
 
@@ -385,6 +393,82 @@ func (m *Module) validate(data Data) error {
 	}
 
 	return nil
+}
+
+// fieldMap maps field names to all possible (optionally promoted) interpretations.
+type fieldMap map[string][]string
+
+// collect collects all (normal and potentially promoted) field names for the given type.
+func (fm fieldMap) collect(t reflect.Type, prefix string) {
+	anon := []reflect.StructField{}
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if !field.Anonymous {
+			name := fieldName(field)
+			fm.add(name, prefix+name)
+		} else if field.Type.Kind() == reflect.Struct {
+			anon = append(anon, field)
+		}
+	}
+	for _, field := range anon {
+		fm.collect(field.Type, prefix+fieldName(field)+".")
+	}
+}
+
+// add adds a new fully qualified field name to the map.
+func (fm fieldMap) add(name, fqField string) {
+	fqFields := fm[name]
+	fm[name] = append(fqFields, fqField)
+}
+
+// sort sorts the fully qualified names for every entry in the map by nesting depth.
+func (fm fieldMap) sort() {
+	for name, fqFields := range fm {
+		sort.Slice(fqFields, func(i, j int) bool {
+			iField, jField := fqFields[i], fqFields[j]
+			iSplit, jSplit := strings.Split(iField, "."), strings.Split(jField, ".")
+			iLevel, jLevel := len(iSplit), len(jSplit)
+			return iLevel < jLevel
+		})
+		fm[name] = fqFields
+	}
+}
+
+// has checks if the name has any entries in the map.
+func (fm fieldMap) has(name string) bool {
+	_, ok := fm[name]
+	return ok
+}
+
+// isAmbiguous checks if an assignment by the plain field name is ambiguous.
+func (fm fieldMap) isAmbiguous(name string) bool {
+	// Notes: must be called with an already sort()ed fieldMap.
+	fqFields, ok := fm[name]
+	if !ok || len(fqFields) < 2 {
+		return false
+	}
+	return (len(strings.Split(fqFields[0], ".")) == len(strings.Split(fqFields[1], ".")))
+}
+
+// fullyQualifiedFieldNames returns the field names for the given name as a string.
+func (fm fieldMap) fullyQualifiedFieldNames(name string) string {
+	if fqFields, ok := fm[name]; ok {
+		return strings.Join(fqFields, ", ")
+	}
+	return ""
+}
+
+// dump debug-dumps the fieldMap.
+func (fm fieldMap) dump(module string) {
+	names := []string{}
+	log.Debug("configuration fields for module %q", module)
+	for name, fqFields := range fm {
+		log.Debug("  - %q: %s", name, strings.Join(fqFields, ", "))
+		names = append(names, name)
+	}
+	for _, name := range names {
+		log.Debug("    => isAmbiguous(%q): %v", name, fm.isAmbiguous(name))
+	}
 }
 
 // fieldName returns the name used to refer to the struct field in JSON/YAML encoding.
