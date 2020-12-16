@@ -81,8 +81,6 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 		log.Error("failed apply initial configuration: %v", err)
 	}
 
-	pkgcfg.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
-
 	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
 	err := metrics.RegisterCollector("rdt", rdt.NewCollector)
 	if err != nil {
@@ -90,6 +88,10 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 	}
 
 	ctl.cache = cache
+
+	ctl.assignAll()
+
+	pkgcfg.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
 
 	return nil
 }
@@ -241,15 +243,30 @@ func (ctl *rdtctl) stopMonitor(c cache.Container) error {
 	return nil
 }
 
+func (ctl *rdtctl) assignAll() {
+	for _, c := range ctl.cache.GetContainers() {
+		if err := ctl.assign(c); err != nil {
+			log.Warn("failed to assign rdt class of %q: %v", c.PrettyName(), err)
+		}
+	}
+}
+
 // configNotify is our runtime configuration notification callback.
 func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	log.Info("configuration update, applying new config")
 	log.Debug("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.opt.Options.MonitoringDisabled])
 	// We'll re-check idleness at next operation/request.
 	ctl.idle = nil
+
 	// Copy goresctrl specific part from our extended options
 	ctl.opt.Config.Options = ctl.opt.Options.Options
-	return rdt.SetConfig(&ctl.opt.Config)
+	if err := rdt.SetConfig(&ctl.opt.Config); err != nil {
+		return err
+	}
+
+	ctl.assignAll()
+
+	return nil
 }
 
 func (ctl *rdtctl) defaultOptions() interface{} {
