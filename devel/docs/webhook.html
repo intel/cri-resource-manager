@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Webhook &mdash; CRI Resource Manager 0.4.0-297-g26f5f84 documentation</title>
+  <title>Webhook &mdash; CRI Resource Manager 0.4.0-299-g03cac61 documentation</title>
   
 
   
@@ -178,12 +178,12 @@ these parameters to estimate <code class="docutils literal notranslate"><span cl
 <em>resource requirement</em>s, you need to duplicate these as <em>annotations</em> on the Pod.
 This is necessary if you plan using or writing a policy which needs <em>extended
 resource</em>s.</p>
-<p>This process can be fully automated using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/26f5f84a9b03c97a1e809a02157c6805e7918b4e/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating
+<p>This process can be fully automated using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/03cac6172828cc8c287f3412aa2d7fb9f8aebbf7/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating
 Webhook</a>. Once you built the docker image for it using
-the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/26f5f84a9b03c97a1e809a02157c6805e7918b4e/cmd/cri-resmgr-webhook/Dockerfile">provided Dockerfile</a> and published it,
+the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/03cac6172828cc8c287f3412aa2d7fb9f8aebbf7/cmd/cri-resmgr-webhook/Dockerfile">provided Dockerfile</a> and published it,
 you can set up the webhook as follows:</p>
 <ul>
-<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">IMAGE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/26f5f84a9b03c97a1e809a02157c6805e7918b4e/cmd/cri-resmgr-webhook/webhook-deployment.yaml">webhook-deployment.yaml</a> to match the image.</p></li>
+<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">IMAGE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/03cac6172828cc8c287f3412aa2d7fb9f8aebbf7/cmd/cri-resmgr-webhook/webhook-deployment.yaml">webhook-deployment.yaml</a> to match the image.</p></li>
 <li><p>Create a <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook-secret</span></code> that carries a key and a certificate to <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook</span></code>. You can create a key, a self-signed certificate and the secret that holds them with commands:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SVC</span><span class="o">=</span>cri-resmgr-webhook <span class="nv">NS</span><span class="o">=</span>cri-resmgr
 openssl req -x509 -newkey rsa:2048 -sha256 -days <span class="m">365</span> -nodes <span class="se">\</span>
@@ -207,7 +207,7 @@ kubectl create -f cmd/cri-resmgr-webhook/webhook-secret.yaml
 </pre></div>
 </div>
 </li>
-<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">CA_BUNDLE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/26f5f84a9b03c97a1e809a02157c6805e7918b4e/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml">mutating-webhook-config.yaml</a>.
+<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">CA_BUNDLE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/03cac6172828cc8c287f3412aa2d7fb9f8aebbf7/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml">mutating-webhook-config.yaml</a>.
 If you created the key and the certificate with the commands above,
 you can do this with command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sed -e <span class="s2">&quot;s/CA_BUNDLE_PLACEHOLDER/</span><span class="k">$(</span>base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem<span class="k">)</span><span class="s2">/&quot;</span> <span class="se">\</span>
