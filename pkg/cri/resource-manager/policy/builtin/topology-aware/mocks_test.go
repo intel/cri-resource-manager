@@ -94,6 +94,9 @@ type mockCPU struct {
 func (c *mockCPU) BaseFrequency() uint64 {
 	return c.baseFrequency
 }
+func (c *mockCPU) EPP() system.EPP {
+	return system.EPPUnknown
+}
 func (c *mockCPU) ID() system.ID {
 	return c.id
 }

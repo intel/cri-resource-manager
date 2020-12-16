@@ -152,6 +152,7 @@ type CPU interface {
 	ThreadCPUSet() cpuset.CPUSet
 	BaseFrequency() uint64
 	FrequencyRange() CPUFreq
+	EPP() EPP
 	Online() bool
 	Isolated() bool
 	SetFrequencyLimits(min, max uint64) error
@@ -167,6 +168,7 @@ type cpu struct {
 	threads  IDSet   // sibling/hyper-threads
 	baseFreq uint64  // CPU base frequency
 	freq     CPUFreq // CPU frequencies
+	epp      EPP     // Energy Performance Preference from cpufreq governor
 	online   bool    // whether this CPU is online
 	isolated bool    // whether this CPU is isolated
 }
@@ -177,6 +179,17 @@ type CPUFreq struct {
 	max uint64   // maximum frequency (kHz)
 	all []uint64 // discrete set of frequencies if applicable/known
 }
+
+// EPP represents the value of a CPU energy performance profile
+type EPP int
+
+const (
+	EPPPerformance EPP = iota
+	EPPBalancePerformance
+	EPPBalancePower
+	EPPPower
+	EPPUnknown
+)
 
 // MemInfo contains data read from a NUMA node meminfo file.
 type MemInfo struct {
@@ -301,6 +314,7 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 			sys.Debug("    threads: %s", cpu.threads)
 			sys.Debug("  base freq: %d", cpu.baseFreq)
 			sys.Debug("       freq: %d - %d", cpu.freq.min, cpu.freq.max)
+			sys.Debug("        epp: %d", cpu.epp)
 		}
 
 		sys.Debug("offline CPUs: %s", sys.offline)
@@ -544,6 +558,9 @@ func (sys *system) discoverCPU(path string) error {
 	if _, err := readSysfsEntry(path, "cpufreq/cpuinfo_max_freq", &cpu.freq.max); err != nil {
 		cpu.freq.max = 0
 	}
+	if _, err := readSysfsEntry(path, "cpufreq/energy_performance_preference", &cpu.epp); err != nil {
+		cpu.epp = EPPUnknown
+	}
 	if node, _ := filepath.Glob(filepath.Join(path, "node[0-9]*")); len(node) == 1 {
 		cpu.node = getEnumeratedID(node[0])
 	} else {
@@ -609,6 +626,11 @@ func (c *cpu) BaseFrequency() uint64 {
 // FrequencyRange returns the frequency range for this CPU.
 func (c *cpu) FrequencyRange() CPUFreq {
 	return c.freq
+}
+
+// EPP returns the energy performance profile of this CPU.
+func (c *cpu) EPP() EPP {
+	return c.epp
 }
 
 // Online returns if this CPU is online.
@@ -994,4 +1016,38 @@ func (sys *system) discoverCache(path string) error {
 	sys.cache[c.id] = c
 
 	return nil
+}
+
+// eppStrings initialized this way to better catch changes in the enum
+var eppStrings = func() [EPPUnknown]string {
+	var e [EPPUnknown]string
+	e[EPPPerformance] = "performance"
+	e[EPPBalancePerformance] = "balance_performance"
+	e[EPPBalancePower] = "balance_power"
+	e[EPPPower] = "power"
+	return e
+}()
+
+var eppValues = func() map[string]EPP {
+	m := make(map[string]EPP, len(eppStrings))
+	for i, v := range eppStrings {
+		m[v] = EPP(i)
+	}
+	return m
+}()
+
+// String returns EPP value as string
+func (e EPP) String() string {
+	if int(e) < len(eppStrings) {
+		return eppStrings[e]
+	}
+	return ""
+}
+
+// EPPFromString converts string to EPP value
+func EPPFromString(s string) EPP {
+	if v, ok := eppValues[s]; ok {
+		return v
+	}
+	return EPPUnknown
 }
