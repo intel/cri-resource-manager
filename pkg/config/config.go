@@ -167,7 +167,7 @@ func setconfig(data Data, source Source) error {
 func revertconfig(snapshot Data, notify bool) {
 	err := main.configure(snapshot, true)
 	if err != nil {
-		log.Error("failed to rever configuration: %v", err)
+		log.Error("failed to revert configuration: %v", err)
 	}
 
 	if !notify {
