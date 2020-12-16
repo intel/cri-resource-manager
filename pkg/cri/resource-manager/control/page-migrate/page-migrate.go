@@ -73,6 +73,7 @@ type migration struct {
 type container struct {
 	cacheID    string
 	id         string
+	podID      string
 	prettyName string
 	parentDir  string
 	pm         *cache.PageMigrate
@@ -170,6 +171,7 @@ func (m *migration) insertContainer(cc cache.Container) error {
 	c := &container{
 		cacheID:    cc.GetCacheID(),
 		id:         cc.GetID(),
+		podID:      cc.GetPodID(),
 		prettyName: cc.PrettyName(),
 		parentDir:  pod.GetCgroupParentDir(),
 		pm:         pm.Clone(),
@@ -210,6 +212,11 @@ func (m *migration) deleteContainer(cc cache.Container) error {
 // GetCacheID replicates the respective cache.Container function.
 func (c *container) GetCacheID() string {
 	return c.cacheID
+}
+
+// GetPodID replicates the respective cache.Container function.
+func (c *container) GetPodID() string {
+	return c.podID
 }
 
 // GetID replicates the respective cache.Container function.
