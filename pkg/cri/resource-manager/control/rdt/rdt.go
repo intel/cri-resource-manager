@@ -129,9 +129,6 @@ func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
 		return nil
 	}
 
-	if err := ctl.stopMonitor(c); err != nil {
-		log.Warn("%q: failed to remove monitoring group: %v", c.PrettyName(), err)
-	}
 	if err := ctl.assign(c); err != nil {
 		return err
 	}
@@ -194,8 +191,13 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 		return rdtError("%q: failed to assign to class %q: %v", c.PrettyName(), class, err)
 	}
 
-	pname, name, id, pretty := pod.GetName(), c.GetName(), c.GetID(), c.PrettyName()
+	pretty := c.PrettyName()
+	if _, ok := cls.GetMonGroup(pretty); !ok || ctl.opt.Options.MonitoringDisabled {
+		ctl.stopMonitor(c)
+	}
+
 	if !ctl.opt.Options.MonitoringDisabled {
+		pname, name, id := pod.GetName(), c.GetName(), c.GetID()
 		if err := ctl.monitor(cls, pname, name, id, pretty, pids); err != nil {
 			return err
 		}
