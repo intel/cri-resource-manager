@@ -324,6 +324,29 @@ func (m *Module) check() {
 	}
 }
 
+// getFields() does a deep discovery of all fields of struct, handling also
+// embedded (i.e. struct composition) fields.
+func getFields(typ reflect.Type) map[string]struct{} {
+	fields := make(map[string]struct{})
+
+	var get func(t reflect.Type)
+	get = func(t reflect.Type) {
+		for i := 0; i < t.NumField(); i++ {
+			f := t.Field(i)
+
+			if f.Type.Kind() == reflect.Struct && f.Anonymous {
+				get(f.Type)
+			} else {
+				fields[fieldName(f)] = struct{}{}
+			}
+		}
+	}
+
+	get(typ)
+
+	return fields
+}
+
 // validate checks that each field of data refers to either module data or a submodule.
 func (m *Module) validate(data Data) error {
 	log.Debug("validating data for module %s...", m.path)
@@ -345,12 +368,7 @@ func (m *Module) validate(data Data) error {
 				m.path, strings.Join(names, ","))
 		}
 	} else {
-		ptr := reflect.ValueOf(m.ptr).Elem()
-		for i := 0; i < ptr.NumField(); i++ {
-			field := ptr.Type().Field(i)
-			name := fieldName(field)
-			fields[name] = struct{}{}
-		}
+		fields = getFields(reflect.TypeOf(m.ptr).Elem())
 	}
 
 	for field := range modcfg {
