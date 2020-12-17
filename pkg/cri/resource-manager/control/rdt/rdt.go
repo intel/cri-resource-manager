@@ -41,7 +41,7 @@ const (
 // rdtctl encapsulates the runtime state of our RTD enforcement/controller.
 type rdtctl struct {
 	cache cache.Cache // resource manager cache
-	idle  *bool       // true if we run without any classes configured
+	idle  bool        // true if we run without any classes configured
 	opt   *config
 }
 
@@ -80,6 +80,8 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 		// Just print an error. A config update later on may be valid.
 		log.Error("failed apply initial configuration: %v", err)
 	}
+
+	ctl.idle = ctl.checkIdle()
 
 	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
 	err := metrics.RegisterCollector("rdt", rdt.NewCollector)
@@ -148,19 +150,9 @@ func (ctl *rdtctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
-// isImplicitlyDisabled checks if we run without any classes confiured
-func (ctl *rdtctl) isImplicitlyDisabled() bool {
-	if ctl.idle != nil {
-		return *ctl.idle
-	}
-
-	idle := len(rdt.GetClasses()) == 0
-	if idle {
-		log.Warn("controller implictly disabled (no classes configured)")
-	}
-	ctl.idle = &idle
-
-	return *ctl.idle
+// checkIdle checks if we run without any classes confiured
+func (ctl *rdtctl) checkIdle() bool {
+	return len(rdt.GetClasses()) <= 1
 }
 
 // assign assigns all processes/threads in a container to an RDT class.
@@ -170,7 +162,7 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 		class = rdt.RootClassName
 	}
 
-	if ctl.isImplicitlyDisabled() && cache.IsPodQOSClassName(class) {
+	if ctl.idle && cache.IsPodQOSClassName(class) {
 		return nil
 	}
 
@@ -255,8 +247,8 @@ func (ctl *rdtctl) assignAll() {
 func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	log.Info("configuration update, applying new config")
 	log.Debug("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.opt.Options.MonitoringDisabled])
-	// We'll re-check idleness at next operation/request.
-	ctl.idle = nil
+
+	ctl.idle = ctl.checkIdle()
 
 	// Copy goresctrl specific part from our extended options
 	ctl.opt.Config.Options = ctl.opt.Options.Options
