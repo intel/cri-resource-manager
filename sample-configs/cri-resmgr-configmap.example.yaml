@@ -297,6 +297,8 @@ data:
   rdt: |+
     # Common options
     options:
+      # Mode must be one of Full, Discovery or Disabled. Defaults to Full.
+      mode: Full
       monitoringDisabled: false
       l3:
         optional: true
