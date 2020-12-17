@@ -76,7 +76,7 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 		return rdtError("failed to initialize RDT controls: %v", err)
 	}
 
-	if err := rdt.SetConfig(&ctl.opt.Config); err != nil {
+	if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
 		// Just print an error. A config update later on may be valid.
 		log.Error("failed apply initial configuration: %v", err)
 	}
@@ -254,7 +254,7 @@ func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error 
 
 	// Copy goresctrl specific part from our extended options
 	ctl.opt.Config.Options = ctl.opt.Options.Options
-	if err := rdt.SetConfig(&ctl.opt.Config); err != nil {
+	if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
 		return err
 	}
 
