@@ -76,6 +76,8 @@ data:
   rdt: |+
     # Common options
     options:
+      # Set to true to disable creation of monitoring groups
+      monitoringDisabled: false
       l3:
         # Make this false if CAT must be available
         optional: true
