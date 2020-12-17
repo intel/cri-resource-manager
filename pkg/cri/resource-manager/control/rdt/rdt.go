@@ -168,7 +168,7 @@ func (ctl *rdtctl) isImplicitlyDisabled() bool {
 func (ctl *rdtctl) assign(c cache.Container) error {
 	class := c.GetRDTClass()
 	if class == "" {
-		return nil
+		class = rdt.RootClassName
 	}
 
 	if ctl.isImplicitlyDisabled() && cache.IsPodQOSClassName(class) {
