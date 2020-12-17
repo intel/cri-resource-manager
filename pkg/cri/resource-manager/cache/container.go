@@ -189,7 +189,7 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 func (c *container) setDefaults() error {
 	class, ok := c.GetEffectiveAnnotation(RDTClassKey)
 	if !ok {
-		class = string(c.GetQOSClass())
+		class = RDTClassPodQoS
 	}
 	c.SetRDTClass(class)
 
