@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: memtier-benchmark
+spec:
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/${AFFINITY}: |+
+          memtier-benchmark:
+            - scope:
+                key: pod/name
+                operator: Matches
+                values:
+                  - redis-*
+              match:
+                key: name
+                operator: Equals
+                values:
+                  - redis
+              weight: 10
+    spec:
+      containers:
+        - name: memtier-benchmark
+          image: redislabs/memtier_benchmark:edge
+          args: ['${ARGS// /\', \'}']
+          $(if [ "$CPU" != "0" ]; then echo "
+          resources:
+            requests:
+              cpu: ${CPU}
+              memory: '${MEM}'
+            limits:
+              cpu: ${CPULIM}
+              memory: '${MEMLIM}'
+          "; fi)
+      restartPolicy: Never

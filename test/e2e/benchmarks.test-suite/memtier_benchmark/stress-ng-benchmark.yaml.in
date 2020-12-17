@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stress-ng-benchmark
+spec:
+  template:
+    spec:
+      containers:
+        - name: ${NAME}c$(( contnum - 1 ))
+          image: alexeiled/stress-ng
+          args: ['${ARGS// /\', \'}']
+          imagePullPolicy: IfNotPresent
+          $(if [ "$CPU" != "0" ]; then echo "
+          resources:
+            requests:
+              cpu: ${CPU}
+              memory: '${MEM}'
+            limits:
+              cpu: ${CPULIM}
+              memory: '${MEMLIM}'
+          "; fi)
+      restartPolicy: Never

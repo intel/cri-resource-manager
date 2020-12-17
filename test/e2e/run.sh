@@ -805,6 +805,7 @@ create() { # script API
     local image
     local tag
     local errormsg
+    local default_name=${NAME:-""}
     if [ -z "$n" ]; then
         local n=1
     fi
@@ -818,7 +819,11 @@ create() { # script API
     fi
     for _ in $(seq 1 $n); do
         kind_count[$template_kind]=$(( ${kind_count[$template_kind]} + 1 ))
-        local NAME="${template_kind}$(( ${kind_count[$template_kind]} - 1 ))" # the first pod is pod0
+        if [ -n "$default_name" ]; then
+            local NAME="$default_name"
+        else
+            local NAME="${template_kind}$(( ${kind_count[$template_kind]} - 1 ))" # the first pod is pod0
+        fi
         eval "echo -e \"$(<"${template_file}")\"" | grep -v '^ *$' > "$OUTPUT_DIR/$NAME.yaml"
         host-command "$SCP \"$OUTPUT_DIR/$NAME.yaml\" $VM_SSH_USER@$VM_IP:" || {
             command-error "copying \"$OUTPUT_DIR/$NAME.yaml\" to VM failed"
@@ -832,11 +837,16 @@ create() { # script API
                 if [ "$image" = "IMAGE" ]; then
                     continue
                 fi
-                image="${image##*/}"
+                local notopdir_image="${image#*/}"
+                local norepo_image="${image##*/}"
                 if [ "$tag" = "latest" ]; then
                     pulled_images_on_vm+=("$image")
+                    pulled_images_on_vm+=("$notopdir_image")
+                    pulled_images_on_vm+=("$norepo_image")
                 fi
                 pulled_images_on_vm+=("$image:$tag")
+                pulled_images_on_vm+=("$notopdir_image:$tag")
+                pulled_images_on_vm+=("$norepo_image:$tag")
             done <<< "$COMMAND_OUTPUT"
         fi
         for image in $images; do
