@@ -158,12 +158,14 @@ func (ctl *rdtctl) checkIdle() bool {
 // assign assigns all processes/threads in a container to an RDT class.
 func (ctl *rdtctl) assign(c cache.Container) error {
 	class := c.GetRDTClass()
-	if class == "" {
+	switch class {
+	case "":
 		class = rdt.RootClassName
-	}
-
-	if ctl.idle && cache.IsPodQOSClassName(class) {
-		return nil
+	case cache.RDTClassPodQoS:
+		if ctl.idle {
+			return nil
+		}
+		class = string(c.GetQOSClass())
 	}
 
 	cls, ok := rdt.GetClass(class)

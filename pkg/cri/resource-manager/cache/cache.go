@@ -59,6 +59,9 @@ const (
 	// ToptierLimitKey is the pod annotation key for specifying container top tier memory limits.
 	ToptierLimitKey = "toptierlimit" + "." + kubernetes.ResmgrKeyNamespace
 
+	// RDTClassPodQoS denotes that the RDTClass should be taken from PodQosClass
+	RDTClassPodQoS = "/PodQos"
+
 	// ToptierLimitUnset is the reserved value for indicating unset top tier limits.
 	ToptierLimitUnset int64 = -1
 
