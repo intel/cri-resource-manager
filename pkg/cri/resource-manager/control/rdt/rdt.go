@@ -81,8 +81,6 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 		log.Error("failed apply initial configuration: %v", err)
 	}
 
-	pkgcfg.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
-
 	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
 	err := metrics.RegisterCollector("rdt", rdt.NewCollector)
 	if err != nil {
@@ -90,6 +88,10 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 	}
 
 	ctl.cache = cache
+
+	ctl.assignAll()
+
+	pkgcfg.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
 
 	return nil
 }
@@ -129,9 +131,6 @@ func (ctl *rdtctl) PostUpdateHook(c cache.Container) error {
 		return nil
 	}
 
-	if err := ctl.stopMonitor(c); err != nil {
-		log.Warn("%q: failed to remove monitoring group: %v", c.PrettyName(), err)
-	}
 	if err := ctl.assign(c); err != nil {
 		return err
 	}
@@ -194,8 +193,13 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 		return rdtError("%q: failed to assign to class %q: %v", c.PrettyName(), class, err)
 	}
 
-	pname, name, id, pretty := pod.GetName(), c.GetName(), c.GetID(), c.PrettyName()
+	pretty := c.PrettyName()
+	if _, ok := cls.GetMonGroup(pretty); !ok || ctl.opt.Options.MonitoringDisabled {
+		ctl.stopMonitor(c)
+	}
+
 	if !ctl.opt.Options.MonitoringDisabled {
+		pname, name, id := pod.GetName(), c.GetName(), c.GetID()
 		if err := ctl.monitor(cls, pname, name, id, pretty, pids); err != nil {
 			return err
 		}
@@ -239,15 +243,30 @@ func (ctl *rdtctl) stopMonitor(c cache.Container) error {
 	return nil
 }
 
+func (ctl *rdtctl) assignAll() {
+	for _, c := range ctl.cache.GetContainers() {
+		if err := ctl.assign(c); err != nil {
+			log.Warn("failed to assign rdt class of %q: %v", c.PrettyName(), err)
+		}
+	}
+}
+
 // configNotify is our runtime configuration notification callback.
 func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	log.Info("configuration update, applying new config")
 	log.Debug("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.opt.Options.MonitoringDisabled])
 	// We'll re-check idleness at next operation/request.
 	ctl.idle = nil
+
 	// Copy goresctrl specific part from our extended options
 	ctl.opt.Config.Options = ctl.opt.Options.Options
-	return rdt.SetConfig(&ctl.opt.Config)
+	if err := rdt.SetConfig(&ctl.opt.Config); err != nil {
+		return err
+	}
+
+	ctl.assignAll()
+
+	return nil
 }
 
 func (ctl *rdtctl) defaultOptions() interface{} {
