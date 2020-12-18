@@ -250,13 +250,13 @@ func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error 
 	log.Info("configuration update, applying new config")
 	log.Debug("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.opt.Options.MonitoringDisabled])
 
-	ctl.idle = ctl.checkIdle()
-
 	// Copy goresctrl specific part from our extended options
 	ctl.opt.Config.Options = ctl.opt.Options.Options
 	if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
 		return err
 	}
+
+	ctl.idle = ctl.checkIdle()
 
 	ctl.assignAll()
 
