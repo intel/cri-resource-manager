@@ -16,6 +16,8 @@ package policy
 
 import (
 	"encoding/json"
+	"io/ioutil"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
@@ -71,47 +74,24 @@ func (cs *ConstraintSet) UnmarshalJSON(raw []byte) error {
 	set := make(ConstraintSet)
 	obj := map[string]interface{}{}
 	if err := json.Unmarshal(raw, &obj); err != nil {
-		return policyError("failed unmarshal ConstraintSet: %v", err)
+		return policyError("failed to unmarshal ConstraintSet: %v", err)
 	}
+
 	for name, value := range obj {
-		switch {
-		case DomainCPU.isEqual(name):
-			switch value.(type) {
+		switch strings.ToUpper(name) {
+		case string(DomainCPU):
+			switch v := value.(type) {
 			case string:
-				kind, val := "", ""
-				split := strings.SplitN(value.(string), ":", 2)
-				switch len(split) {
-				case 0:
-				case 1:
-					kind, val = "", split[0]
-				case 2:
-					kind, val = split[0], split[1]
-				}
-				switch kind {
-				case "cpuset":
-					cset, err := cpuset.Parse(val)
-					if err != nil {
-						return policyError("failed to unmarshal cpuset constraint: %v", err)
-					}
-					set[DomainCPU] = cset
-				case "":
-					qty, err := resource.ParseQuantity(val)
-					if err != nil {
-						return policyError("failed to unmarshal CPU Quantity constraint: %v", err)
-					}
-					set[DomainCPU] = qty
-				default:
-					return policyError("invalid CPU constraint qualifier '%s'", kind)
+				if err := set.parseCPU(v); err != nil {
+					return err
 				}
 			case int:
-				set[DomainCPU] = resource.NewMilliQuantity(int64(value.(int)), resource.DecimalSI)
+				set.setCPUMilliQuantity(v)
 			case float64:
-				qty := resource.NewMilliQuantity(int64(1000.0*value.(float64)), resource.DecimalSI)
-				set[DomainCPU] = *qty
+				set.setCPUMilliQuantity(int(1000.0 * v))
 			default:
 				return policyError("invalid CPU constraint of type %T", value)
 			}
-
 		default:
 			return policyError("internal error: unhandled ConstraintSet domain %s", name)
 		}
@@ -131,15 +111,78 @@ func (cs *ConstraintSet) String() string {
 	return ret
 }
 
-func (d Domain) isEqual(domain interface{}) bool {
-	switch domain.(type) {
-	case string:
-		return strings.ToLower(string(d)) == strings.ToLower(domain.(string))
-	case Domain:
-		return strings.ToLower(string(d)) == strings.ToLower(string(domain.(Domain)))
-	default:
-		return false
+func (cs *ConstraintSet) parseCPU(value string) error {
+	kind, spec := "", ""
+	if sep := strings.IndexByte(value, ':'); sep != -1 {
+		kind = value[:sep]
+		spec = value[sep+1:]
+	} else {
+		spec = value
 	}
+
+	switch {
+	case kind == "cgroup" || spec[0] == '/':
+		if err := cs.parseCPUFromCgroup(spec); err != nil {
+			return err
+		}
+	case kind == "cpuset" || strings.IndexAny(spec, "-,") != -1:
+		if err := cs.parseCPUSet(spec); err != nil {
+			return err
+		}
+	case kind == "":
+		if err := cs.parseCPUQuantity(spec); err != nil {
+			return err
+		}
+	default:
+		return policyError("invalid CPU constraint qualifier %q", kind)
+	}
+
+	return nil
+}
+
+func (cs *ConstraintSet) parseCPUSet(value string) error {
+	cset, err := cpuset.Parse(value)
+	if err != nil {
+		return policyError("failed to parse CPU cpuset constraint %q: %v",
+			value, err)
+	}
+	(*cs)[DomainCPU] = cset
+	return nil
+}
+
+func (cs *ConstraintSet) parseCPUQuantity(value string) error {
+	qty, err := resource.ParseQuantity(value)
+	if err != nil {
+		return policyError("failed to parse CPU Quantity constraint %q: %v",
+			value, err)
+	}
+	(*cs)[DomainCPU] = qty
+	return nil
+}
+
+func (cs *ConstraintSet) parseCPUFromCgroup(dir string) error {
+	if !strings.HasPrefix(dir, utils.CpusetCgroupDir+"/") {
+		dir = filepath.Join(utils.CpusetCgroupDir, dir)
+	}
+	path := filepath.Join(dir, "cpuset.cpus")
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return policyError("failed read CPU cpuset cgroup constraint %q: %v",
+			path, err)
+	}
+	cpus := strings.TrimSuffix(string(bytes), "\n")
+	cset, err := cpuset.Parse(cpus)
+	if err != nil {
+		return policyError("failed to parse cpuset cgroup constraint %q: %v",
+			cpus, err)
+	}
+	(*cs)[DomainCPU] = cset
+	return nil
+}
+
+func (cs *ConstraintSet) setCPUMilliQuantity(value int) {
+	qty := resource.NewMilliQuantity(int64(value), resource.DecimalSI)
+	(*cs)[DomainCPU] = *qty
 }
 
 // AvailablePolicy describes an available policy.
