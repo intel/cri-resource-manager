@@ -51,7 +51,7 @@ type allocations struct {
 
 // policy is our runtime state for the memtier policy.
 type policy struct {
-	options      policyapi.BackendOptions  // options we were created or reconfigured with
+	options      *policyapi.BackendOptions // options we were created or reconfigured with
 	cache        cache.Cache               // pod/container cache
 	sys          system.System             // system/HW topology info
 	allowed      cpuset.CPUSet             // bounding set of CPUs we're allowed to use
@@ -79,24 +79,17 @@ func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 	p := &policy{
 		cache:        opts.Cache,
 		sys:          opts.System,
-		options:      *opts,
+		options:      opts,
 		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
 	}
 
-	p.nodes = make(map[string]Node)
-	p.allocations = p.newAllocations()
-
-	if err := p.checkConstraints(); err != nil {
-		log.Fatal("failed to create memtier policy: %v", err)
-	}
-
-	if err := p.buildPoolsByTopology(); err != nil {
-		log.Fatal("failed to create memtier policy: %v", err)
+	if err := p.initialize(); err != nil {
+		log.Fatal("failed to initialize %s policy: %v", PolicyName, err)
 	}
 
 	p.addImplicitAffinities()
 
-	config.GetModule(PolicyPath).AddNotify(p.configNotify)
+	config.GetModule(policyapi.ConfigPath).AddNotify(p.configNotify)
 
 	p.root.Dump("<pre-start>")
 
@@ -368,12 +361,101 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
 	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
 
-	// TODO: We probably should release and reallocate resources for all containers
-	//   to honor the latest configuration. Depending on the changes that might be
-	//   disruptive to some containers, so whether we do so or not should probably
-	//   be part of the configuration as well.
+	var allowed, reserved cpuset.CPUSet
+	var reinit bool
+
+	if cpus, ok := p.options.Available[policyapi.DomainCPU]; ok {
+		if cset, ok := cpus.(cpuset.CPUSet); ok {
+			allowed = cset
+		}
+	}
+	if cpus, ok := p.options.Reserved[policyapi.DomainCPU]; ok {
+		switch v := cpus.(type) {
+		case cpuset.CPUSet:
+			reserved = v
+		case resapi.Quantity:
+			reserveCnt := (int(v.MilliValue()) + 999) / 1000
+			if reserveCnt != p.reserveCnt {
+				log.Warn("CPU reservation has changed (%v, was %v)",
+					reserveCnt, p.reserveCnt)
+				reinit = true
+			}
+		}
+	}
+
+	if !allowed.Equals(p.allowed) {
+		if !(allowed.Size() == 0 && p.allowed.Size() == 0) {
+			log.Warn("allowed cpuset changed (%s, was %s)",
+				p.allowed.String(), allowed.String())
+			reinit = true
+		}
+	}
+	if !reserved.Equals(p.reserved) {
+		if !(reserved.Size() == 0 && p.reserved.Size() == 0) {
+			log.Warn("reserved cpuset changed (%s, was %s)",
+				p.reserved.String(), reserved.String())
+			reinit = true
+		}
+	}
+
+	//
+	// Notes:
+	//   If the allowed or reserved resources have changed, we need to
+	//   rebuild our pool hierarchy using the updated constraints and
+	//   also update the existing allocations accordingly. We do this
+	//   first reinitializing the policy then reloading the allocations
+	//   from the cache. If we fail, we restore the original state of
+	//   the policy and reject the new configuration.
+	//
+
+	if reinit {
+		log.Warn("reinitializing memtier policy...")
+
+		savedPolicy := *p
+		allocations := savedPolicy.allocations.clone()
+
+		if err := p.initialize(); err != nil {
+			*p = savedPolicy
+			return policyError("failed to reconfigure: %v", err)
+		}
+
+		for _, grant := range allocations.grants {
+			if err := grant.RefetchNodes(); err != nil {
+				*p = savedPolicy
+				return policyError("failed to reconfigure: %v", err)
+			}
+		}
+
+		log.Warn("updating existing allocations...")
+		if err := p.restoreAllocations(&allocations); err != nil {
+			*p = savedPolicy
+			return policyError("failed to reconfigure: %v", err)
+		}
+
+		p.root.Dump("<post-config>")
+	}
 
 	p.saveConfig()
+
+	return nil
+}
+
+// Initialize or reinitialize the policy.
+func (p *policy) initialize() error {
+	p.nodes = nil
+	p.pools = nil
+	p.root = nil
+	p.nodeCnt = 0
+	p.depth = 0
+	p.allocations = p.newAllocations()
+
+	if err := p.checkConstraints(); err != nil {
+		return err
+	}
+
+	if err := p.buildPoolsByTopology(); err != nil {
+		return err
+	}
 
 	return nil
 }

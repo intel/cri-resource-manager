@@ -105,6 +105,8 @@ type Request interface {
 type Grant interface {
 	// Clone creates a copy of this grant.
 	Clone() Grant
+	// RefetchNodes updates the stored cpu and memory nodes of this grant by name.
+	RefetchNodes() error
 	// GetContainer returns the container CPU capacity is granted to.
 	GetContainer() cache.Container
 	// GetCPUNode returns the node that granted CPU capacity to the container.
@@ -1020,6 +1022,21 @@ func (cg *grant) Clone() Grant {
 		allocatedMem: cg.MemLimit(),
 		coldStart:    cg.ColdStart(),
 	}
+}
+
+// RefetchNodes updates the stored cpu and memory nodes of this grant by name.
+func (cg *grant) RefetchNodes() error {
+	node, ok := cg.node.Policy().nodes[cg.node.Name()]
+	if !ok {
+		return policyError("failed to refetch grant cpu node %s", cg.node.Name())
+	}
+	memoryNode, ok := cg.memoryNode.Policy().nodes[cg.memoryNode.Name()]
+	if !ok {
+		return policyError("failed to refetch grant memory node %s", cg.memoryNode.Name())
+	}
+	cg.node = node
+	cg.memoryNode = memoryNode
+	return nil
 }
 
 // GetContainer returns the container this grant is valid for.

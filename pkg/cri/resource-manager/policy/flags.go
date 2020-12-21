@@ -34,6 +34,8 @@ const (
 	NullPolicy = "null"
 	// NullPolicyDescription is the description for the null policy.
 	NullPolicyDescription = "A policy to bypass local policy processing."
+	// ConfigPath is the configuration module path for the generic policy layer.
+	ConfigPath = "policy"
 )
 
 // Options captures our configurable parameters.
@@ -222,5 +224,6 @@ func defaultOptions() interface{} {
 
 // Register us for configuration handling.
 func init() {
-	config.Register("policy", "Generic policy layer.", opt, defaultOptions)
+	config.Register(ConfigPath, "Generic policy layer.", opt, defaultOptions,
+		config.WithNotify(configNotify))
 }

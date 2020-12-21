@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/blockio"
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/rdt"
@@ -177,6 +178,9 @@ var log logger.Logger = logger.NewLogger("policy")
 // Registered backends.
 var backends = make(map[string]*backend)
 
+// Options passed to created/activated backend.
+var backendOpts = &BackendOptions{}
+
 // ActivePolicy returns the name of the policy to be activated.
 func ActivePolicy() string {
 	return opt.Policy
@@ -222,14 +226,12 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 			logger.Get(opt.Policy).EnableDebug(true)
 		}
 
-		backendOpts := &BackendOptions{
-			Cache:     p.cache,
-			System:    p.system,
-			Available: opt.Available,
-			Reserved:  opt.Reserved,
-			AgentCli:  o.AgentCli,
-			SendEvent: o.SendEvent,
-		}
+		backendOpts.Cache = p.cache
+		backendOpts.System = p.system
+		backendOpts.Available = opt.Available
+		backendOpts.Reserved = opt.Reserved
+		backendOpts.AgentCli = o.AgentCli
+		backendOpts.SendEvent = o.SendEvent
 
 		p.active = active.create(backendOpts)
 	}
@@ -430,4 +432,12 @@ func ConstraintToString(value Constraint) string {
 	default:
 		return fmt.Sprintf("<???(type:%T)>", value)
 	}
+}
+
+// configNotify is the configuration change notification callback for the genric policy layer.
+func configNotify(event config.Event, src config.Source) error {
+	// let the active policy know of changes
+	backendOpts.Available = opt.Available
+	backendOpts.Reserved = opt.Reserved
+	return nil
 }
