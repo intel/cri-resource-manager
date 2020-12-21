@@ -103,6 +103,8 @@ type Request interface {
 
 // Grant represents CPU and memory capacity allocated to a container from a node.
 type Grant interface {
+	// Clone creates a copy of this grant.
+	Clone() Grant
 	// GetContainer returns the container CPU capacity is granted to.
 	GetContainer() cache.Container
 	// GetCPUNode returns the node that granted CPU capacity to the container.
@@ -1002,6 +1004,21 @@ func newGrant(n Node, c cache.Container, exclusive cpuset.CPUSet, portion int, i
 		memset:       mems.Clone(),
 		allocatedMem: allocatedMem,
 		coldStart:    coldStart,
+	}
+}
+
+// Clone creates a copy of this grant.
+func (cg *grant) Clone() Grant {
+	return &grant{
+		node:         cg.GetCPUNode(),
+		memoryNode:   cg.GetMemoryNode(),
+		container:    cg.GetContainer(),
+		exclusive:    cg.ExclusiveCPUs(),
+		portion:      cg.SharedPortion(),
+		memType:      cg.MemoryType(),
+		memset:       cg.Memset().Clone(),
+		allocatedMem: cg.MemLimit(),
+		coldStart:    cg.ColdStart(),
 	}
 }
 

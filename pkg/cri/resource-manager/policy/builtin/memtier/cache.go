@@ -34,35 +34,63 @@ func (p *policy) saveAllocations() {
 	p.cache.Save()
 }
 
-func (p *policy) restoreAllocations() error {
-	// Get the allocations map.
-	if !p.cache.GetPolicyEntry(keyAllocations, &p.allocations) {
-		return nil
-	}
+func (p *policy) restoreAllocations(allocations *allocations) error {
+	savedAllocations := allocations.clone()
+	p.allocations = p.newAllocations()
 
 	//
-	// Based on the allocations
-	//   1) update the free supply of the grant's pool to account for the grant
-	//   2) set the extra memory allocations to the nodes below the grant in the tree
+	// Try to reinstate all grants with the exact same resource assignments
+	// as saved. If that fails, release and try to reallocate all corresponding
+	// containers with pool hints pointing to the currently assigned pools. If
+	// this fails too, save the original allocations unchanged to the cache and
+	// return an error.
 	//
-	// We assume (for now) that the allocations are correct and the workloads don't
-	// need moving.
-	//
-	for id, grant := range p.allocations.grants {
-		pool := grant.GetCPUNode()
 
-		log.Info("updating pool %s for container %s CPU grant", pool.Name(), id)
-		supply := pool.FreeSupply()
-		if err := supply.Reserve(grant); err != nil {
+	if err := p.reinstateGrants(allocations.grants); err != nil {
+		log.Error("failed to reinstate grants verbatim: %v", err)
+		containers, poolHints := allocations.getContainerPoolHints()
+		if err := p.reallocateResources(containers, poolHints); err != nil {
+			p.allocations = savedAllocations
+			p.saveAllocations() // undo any potential changes in saved cache
 			return err
 		}
+	}
 
-		log.Info("updating pool %s for container %s extra memory", pool.Name(), id)
+	return nil
+}
+
+// reinstateGrants tries to restore the given grants exactly as such.
+func (p *policy) reinstateGrants(grants map[string]Grant) error {
+	for id, grant := range grants {
+		c := grant.GetContainer()
+
+		pool := grant.GetCPUNode()
+		supply := pool.FreeSupply()
+
+		if err := supply.Reserve(grant); err != nil {
+			return policyError("failed to update pool %q with CPU grant of %q: %v",
+				pool.Name(), c.PrettyName(), err)
+		}
+
+		log.Info("updated pool %q with reinstated CPU grant of %q",
+			pool.Name(), c.PrettyName())
+
 		pool = grant.GetMemoryNode()
 		if err := supply.ReserveMemory(grant); err != nil {
-			return err
+			grant.GetCPUNode().FreeSupply().ReleaseCPU(grant)
+			return policyError("failed to update pool %q with extra memory of %q: %v",
+				pool.Name(), c.PrettyName(), err)
 		}
+
+		log.Info("updated pool %q with reinstanted memory reservation of %q",
+			pool.Name(), c.PrettyName())
+
+		p.allocations.grants[id] = grant
+		p.applyGrant(grant)
 	}
+
+	p.updateSharedAllocations(nil)
+
 	return nil
 }
 

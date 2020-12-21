@@ -103,7 +103,7 @@ func TestColdStart(t *testing.T) {
 				t.Errorf("failed to build topology pool")
 			}
 
-			grant, err := policy.allocatePool(tc.container)
+			grant, err := policy.allocatePool(tc.container, "")
 			if err != nil {
 				panic(err)
 			}
