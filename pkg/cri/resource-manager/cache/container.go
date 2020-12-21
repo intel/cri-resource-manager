@@ -984,3 +984,127 @@ func (c *container) Eval(key string) interface{} {
 		return cacheError("%s: Container cannot evaluate of %q", c.PrettyName(), key)
 	}
 }
+
+// CompareContainersFn compares two containers by some arbitrary property.
+// It returns a negative integer, 0, or a positive integer, depending on
+// whether the first container is considered smaller, equal, or larger than
+// the second.
+type CompareContainersFn func(Container, Container) int
+
+// SortContainers sorts a slice of containers using the given comparison functions.
+// If the containers are otherwise equal they are sorted by pod and container name.
+// If the comparison functions are omitted, containers are compared by QoS class,
+// memory and cpuset size.
+func SortContainers(containers []Container, compareFns ...CompareContainersFn) {
+	if len(compareFns) == 0 {
+		compareFns = CompareByQOSMemoryCPU
+	}
+	sort.Slice(containers, func(i, j int) bool {
+		ci, cj := containers[i], containers[j]
+		for _, cmpFn := range compareFns {
+			switch diff := cmpFn(ci, cj); {
+			case diff < 0:
+				return true
+			case diff > 0:
+				return false
+			}
+		}
+		// If two containers are otherwise equal they are sorted by pod and container name.
+		if pi, ok := ci.GetPod(); ok {
+			if pj, ok := cj.GetPod(); ok {
+				ni, nj := pi.GetName(), pj.GetName()
+				if ni != nj {
+					return ni < nj
+				}
+			}
+		}
+		return ci.GetName() < cj.GetName()
+	})
+}
+
+// CompareByQOSMemoryCPU is a slice for comparing container by QOS, memory, and CPU.
+var CompareByQOSMemoryCPU = []CompareContainersFn{CompareQOS, CompareMemory, CompareCPU}
+
+// CompareQOS compares containers by QOS class.
+func CompareQOS(ci, cj Container) int {
+	qosi, qosj := ci.GetQOSClass(), cj.GetQOSClass()
+	switch {
+	case qosi == v1.PodQOSGuaranteed && qosj != v1.PodQOSGuaranteed:
+		return -1
+	case qosj == v1.PodQOSGuaranteed && qosi != v1.PodQOSGuaranteed:
+		return +1
+	case qosi == v1.PodQOSBurstable && qosj == v1.PodQOSBestEffort:
+		return -1
+	case qosj == v1.PodQOSBurstable && qosi == v1.PodQOSBestEffort:
+		return +1
+	}
+	return 0
+}
+
+// CompareMemory compares containers by memory requests and limits.
+func CompareMemory(ci, cj Container) int {
+	var reqi, limi, reqj, limj int64
+
+	resi := ci.GetResourceRequirements()
+	if qty, ok := resi.Requests[v1.ResourceMemory]; ok {
+		reqi = qty.Value()
+	}
+	if qty, ok := resi.Limits[v1.ResourceMemory]; ok {
+		limi = qty.Value()
+	}
+	resj := cj.GetResourceRequirements()
+	if qty, ok := resj.Requests[v1.ResourceMemory]; ok {
+		reqj = qty.Value()
+	}
+	if qty, ok := resj.Limits[v1.ResourceMemory]; ok {
+		limj = qty.Value()
+	}
+
+	switch diff := reqj - reqi; {
+	case diff < 0:
+		return -1
+	case diff > 0:
+		return +1
+	}
+	switch diff := limj - limi; {
+	case diff < 0:
+		return -1
+	case diff > 0:
+		return +1
+	}
+	return 0
+}
+
+// CompareCPU compares containers by CPU requests and limits.
+func CompareCPU(ci, cj Container) int {
+	var reqi, limi, reqj, limj int64
+
+	resi := ci.GetResourceRequirements()
+	if qty, ok := resi.Requests[v1.ResourceCPU]; ok {
+		reqi = qty.MilliValue()
+	}
+	if qty, ok := resi.Limits[v1.ResourceCPU]; ok {
+		limi = qty.MilliValue()
+	}
+	resj := cj.GetResourceRequirements()
+	if qty, ok := resj.Requests[v1.ResourceCPU]; ok {
+		reqj = qty.MilliValue()
+	}
+	if qty, ok := resj.Limits[v1.ResourceCPU]; ok {
+		limj = qty.MilliValue()
+	}
+
+	switch diff := reqj - reqi; {
+	case diff < 0:
+		return -1
+	case diff > 0:
+		return +1
+	}
+	switch diff := limj - limi; {
+	case diff < 0:
+		return -1
+	case diff > 0:
+		return +1
+	}
+	return 0
+}
