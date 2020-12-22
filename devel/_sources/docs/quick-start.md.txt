@@ -84,3 +84,4 @@ policying container resource allocations. Next, you could see:
 - [Setup](setup.md) for details on setup and usage
 - [Node Agent](node-agent.md) for seting up cri-resmgr-agent for dynamic configuration and more
 - [Webhook](webhook.md) for setting up our resource-annotating webhook
+- [Kata support](setup.md#kata-containers) for setting up CRI-RM with Kata containers

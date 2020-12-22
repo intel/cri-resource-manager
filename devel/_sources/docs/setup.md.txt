@@ -286,6 +286,46 @@ provided [sample configuration](/sample-configs/cri-full-message-dump.cfg)
 for doing this.
 
 
+## Kata Containers
+
+[Kata Containers](https://katacontainers.io/) is an open source container runtime, 
+building lightweight virtual machines that seamlessly plug into the containers ecosystem.
+
+In order to enable Kata container in a Kubernetes-CRI-RM stack, both Kubernetes 
+and the Container Runtime need to be aware of the new runtime environment:
+
+  * The Container Runtime can only be CRI-O or containerd, and will need to
+   have the runtimes enabled in their configuration files.
+  * Kubernetes will also have to be made aware of the CRI-O/containerd runtimes via a "RuntimeClass" [resource](https://kubernetes.io/docs/concepts/containers/runtime-class/) 
+
+After these prerequisites are satisfied, the configuration file for the target  Kata Container, will have to have the flag "SandboxCgroupOnly" set to true. As of Kata 2.0 this is the only way Kata containers can work with the Kubernetes cgroup naming conventions.
+
+   ```toml
+   ...
+   # If enabled, the runtime will add all the kata processes inside one dedicated cgroup.
+   # The container cgroups in the host are not created, just one single cgroup per sandbox.
+   # The runtime caller is free to restrict or collect cgroup stats of the overall Kata sandbox.
+   # The sandbox cgroup path is the parent cgroup of a container with the PodSandbox annotation.
+   # The sandbox cgroup is constrained if there is no container type annotation.
+   # See: https://godoc.org/github.com/kata-containers/runtime/virtcontainers#ContainerType
+   sandbox_cgroup_only=true
+   ...
+   ``` 
+
+### Reference
+
+If you have a pre-existing Kubernetes cluster, for an easy deployement follow this [document](https://github.com/kata-containers/packaging/blob/master/kata-deploy/README.md#kubernetes-quick-start).
+
+
+Starting from scratch:
+
+   * [Kata installation guide](https://github.com/kata-containers/kata-containers/tree/2.0-dev/docs/install#manual-installation)
+   * [Kata Containers + CRI-O](https://github.com/kata-containers/documentation/blob/master/how-to/run-kata-with-k8s.md)
+   * [Kata Containers + containerd](https://github.com/kata-containers/documentation/blob/master/how-to/containerd-kata.md)
+   * [Kubernetes Runtime Class](https://kubernetes.io/docs/concepts/containers/runtime-class/)
+   * [Cgroup and Kata containers](https://github.com/kata-containers/kata-containers/blob/stable-2.0.0/docs/design/host-cgroups.md)
+
+
 ## Using Docker as the Runtime
 
 If you must use `docker` as the runtime then the proxying setup is slightly more
