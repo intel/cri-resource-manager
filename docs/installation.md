@@ -5,7 +5,7 @@
 You can install CRI Resource Manager from `deb` or `rpm` packages
 for supported distros.
 
-  - [download](https://github.com/intel/cri-resource-manager/releases) packages
+  - [download](https://github.com/intel/cri-resource-manager/releases/tag/v0.4.1) packages
   - install them:
     - for rpm packages: `sudo rpm -Uvh <packages>`
     - for deb packages: `sudo dpkg -i <packages>`
