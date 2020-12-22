@@ -17,15 +17,16 @@ package rdt
 import (
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
+	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
-	"github.com/intel/cri-resource-manager/pkg/utils"
-	"github.com/intel/goresctrl/pkg/rdt"
-
-	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/metrics"
+	"github.com/intel/cri-resource-manager/pkg/utils"
+	"github.com/intel/goresctrl/pkg/rdt"
 )
 
 const (
@@ -40,10 +41,10 @@ const (
 
 // rdtctl encapsulates the runtime state of our RTD enforcement/controller.
 type rdtctl struct {
-	cache cache.Cache   // resource manager cache
-	idle  bool          // true if we run without any classes configured
-	mode  OperatingMode // track the mode here to capture mode changes
-	opt   *config
+	cache        cache.Cache   // resource manager cache
+	noQoSClasses bool          // true if we run without any classes configured
+	mode         OperatingMode // track the mode here to capture mode changes
+	opt          *config
 }
 
 type config struct {
@@ -167,7 +168,7 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 	case "":
 		class = rdt.RootClassName
 	case cache.RDTClassPodQoS:
-		if ctl.idle {
+		if ctl.noQoSClasses {
 			return nil
 		}
 		class = string(c.GetQOSClass())
@@ -287,7 +288,7 @@ func (ctl *rdtctl) configure() error {
 			if err := rdt.SetConfig(&rdt.Config{}, true); err != nil {
 				return rdtError("failed apply empty rdt config: %v", err)
 			}
-			ctl.idle = true
+			ctl.noQoSClasses = true
 			ctl.mode = ctl.opt.Options.Mode
 			ctl.assignAll(rdt.RootClassName)
 		}
@@ -303,7 +304,17 @@ func (ctl *rdtctl) configure() error {
 		if err := rdt.DiscoverClasses(""); err != nil {
 			return rdtError("failed to discover classes from fs: %v", err)
 		}
-		ctl.idle = false
+
+		// Set idle to true if none of the Pod QoS class equivalents exist
+		ctl.noQoSClasses = true
+		cs := []corev1.PodQOSClass{corev1.PodQOSBestEffort, corev1.PodQOSBurstable, corev1.PodQOSGuaranteed}
+		for c := range cs {
+			if _, ok := rdt.GetClass(string(c)); ok {
+				ctl.noQoSClasses = false
+				break
+			}
+		}
+
 		ctl.mode = ctl.opt.Options.Mode
 		ctl.assignAll("")
 	case OperatingModeFull:
@@ -316,7 +327,7 @@ func (ctl *rdtctl) configure() error {
 		if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
 			return err
 		}
-		ctl.idle = len(rdt.GetClasses()) <= 1
+		ctl.noQoSClasses = len(rdt.GetClasses()) <= 1
 		ctl.mode = ctl.opt.Options.Mode
 		ctl.assignAll("")
 	default:
