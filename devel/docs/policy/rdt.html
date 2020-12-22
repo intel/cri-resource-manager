@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.4.0-325-g4f953d9 documentation</title>
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.4.0-327-gedc3124 documentation</title>
   
 
   
@@ -102,8 +102,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#background">Background</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#partitions">Partitions</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#classes">Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#operating-modes">Operating Modes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#rdt-classes">RDT Classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#example">Example</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#dynamic-configuration">Dynamic Configuration</a></li>
 </ul>
@@ -221,11 +221,32 @@ the builtin policies do that.</p>
 </div>
 <div class="section" id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
-<p>The RDT configuration in CRI-RM is a two-level hierarchy consisting of
+<div class="section" id="operating-modes">
+<h3>Operating Modes<a class="headerlink" href="#operating-modes" title="Permalink to this headline">¶</a></h3>
+<p>The RDT controller supports three operating modes, controlled by
+<code class="docutils literal notranslate"><span class="pre">rdt.options.mode</span></code> configuration option.</p>
+<ul class="simple">
+<li><p>Disabled: RDT controller is effectively disabled and containers will not be
+assigned and no monitoring groups will be created. Upon activation of this
+mode all CRI-RM specific control and monitoring groups from the resctrl
+filesystem are removed.</p></li>
+<li><p>Discovery: RDT controller detects existing non-CRI-RM specific classes from
+the resctrl filesystem and uses these. The configuration of the discovered
+classes is considered read-only and it will not be altered. Upon activation
+of this mode all CRI-RM specific control groups from the resctrl filesystem
+are removed.</p></li>
+<li><p>Full: Full operating mode. The controller manages the configuration of the
+resctrl filesystem according to the rdt class definitions in the CRI-RM
+configiration. This is the default operating mode.</p></li>
+</ul>
+</div>
+<div class="section" id="rdt-classes">
+<h3>RDT Classes<a class="headerlink" href="#rdt-classes" title="Permalink to this headline">¶</a></h3>
+<p>The RDT class configuration in CRI-RM is a two-level hierarchy consisting of
 partitions and classes. It specifies a set of partitions each having a set of
 classes.</p>
 <div class="section" id="partitions">
-<h3>Partitions<a class="headerlink" href="#partitions" title="Permalink to this headline">¶</a></h3>
+<h4>Partitions<a class="headerlink" href="#partitions" title="Permalink to this headline">¶</a></h4>
 <p>Partitions represent a logical grouping of the underlying classes, each
 partition specifying a portion of the available resources (L3/MB) which will be
 shared by the classes under it. Partitions guarantee non-overlapping exclusive
@@ -234,7 +255,7 @@ allowed. However, by technology, MB allocations are not exclusive. Thus, it is
 possible to assign all partitions 100% of memory bandwidth, for example.</p>
 </div>
 <div class="section" id="classes">
-<h3>Classes<a class="headerlink" href="#classes" title="Permalink to this headline">¶</a></h3>
+<h4>Classes<a class="headerlink" href="#classes" title="Permalink to this headline">¶</a></h4>
 <p>Classes represent the actual RDT classes containers are assigned to. In
 contrast to partitions, cache allocation between classes under a specific
 partition may overlap (and they usually do).</p>
@@ -242,6 +263,7 @@ partition may overlap (and they usually do).</p>
 classes corresponding to the Pod QoS classes are specified. Also, the maximum
 number of classes (CLOSes) supported by the underlying hardware must not be
 exceeded.</p>
+</div>
 </div>
 <div class="section" id="example">
 <h3>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h3>
@@ -257,6 +279,8 @@ memory bandwidth whereas the other classes are throttled to 50%.</p>
   <span class="nt">rdt</span><span class="p">:</span> <span class="p p-Indicator">|+</span>
     <span class="no"># Common options</span>
     <span class="no">options:</span>
+      <span class="no"># One of Full, Discovery or Disabled</span>
+      <span class="no">mode: Full</span>
       <span class="no"># Set to true to disable creation of monitoring groups</span>
       <span class="no">monitoringDisabled: false</span>
       <span class="no">l3:</span>
@@ -352,7 +376,7 @@ MBps.</p>
             <span class="nt">mbSchema</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">,</span> <span class="s">&quot;1000MBps&quot;</span><span class="p p-Indicator">]</span>
 </pre></div>
 </div>
-<p>See <code class="docutils literal notranslate"><span class="pre">rdt</span></code> in the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/4f953d9248cd352ce94ffc0cdeeda806ae61fa16/sample-configs/cri-resmgr-configmap.example.yaml">example ConfigMap spec</a>
+<p>See <code class="docutils literal notranslate"><span class="pre">rdt</span></code> in the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/edc312403524583fcd5b86487da697f2479444d0/sample-configs/cri-resmgr-configmap.example.yaml">example ConfigMap spec</a>
 for another example configuration.</p>
 </div>
 <div class="section" id="dynamic-configuration">

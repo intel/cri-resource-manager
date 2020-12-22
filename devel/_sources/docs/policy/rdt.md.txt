@@ -36,11 +36,31 @@ the builtin policies do that.
 
 ## Configuration
 
-The RDT configuration in CRI-RM is a two-level hierarchy consisting of
+### Operating Modes
+
+The RDT controller supports three operating modes, controlled by
+`rdt.options.mode` configuration option.
+
+- Disabled: RDT controller is effectively disabled and containers will not be
+  assigned and no monitoring groups will be created. Upon activation of this
+  mode all CRI-RM specific control and monitoring groups from the resctrl
+  filesystem are removed.
+- Discovery: RDT controller detects existing non-CRI-RM specific classes from
+  the resctrl filesystem and uses these. The configuration of the discovered
+  classes is considered read-only and it will not be altered. Upon activation
+  of this mode all CRI-RM specific control groups from the resctrl filesystem
+  are removed.
+- Full: Full operating mode. The controller manages the configuration of the
+  resctrl filesystem according to the rdt class definitions in the CRI-RM
+  configiration. This is the default operating mode.
+
+### RDT Classes
+
+The RDT class configuration in CRI-RM is a two-level hierarchy consisting of
 partitions and classes. It specifies a set of partitions each having a set of
 classes.
 
-### Partitions
+#### Partitions
 
 Partitions represent a logical grouping of the underlying classes, each
 partition specifying a portion of the available resources (L3/MB) which will be
@@ -49,7 +69,7 @@ cache allocation - i.e. no overlap on the cache ways between partitions is
 allowed. However, by technology, MB allocations are not exclusive. Thus, it is
 possible to assign all partitions 100% of memory bandwidth, for example.
 
-### Classes
+#### Classes
 
 Classes represent the actual RDT classes containers are assigned to. In
 contrast to partitions, cache allocation between classes under a specific
@@ -76,6 +96,8 @@ data:
   rdt: |+
     # Common options
     options:
+      # One of Full, Discovery or Disabled
+      mode: Full
       # Set to true to disable creation of monitoring groups
       monitoringDisabled: false
       l3:
