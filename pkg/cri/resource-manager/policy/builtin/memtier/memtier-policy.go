@@ -150,18 +150,8 @@ func (p *policy) AllocateResources(container cache.Container) error {
 		return policyError("failed to allocate resources for %s: %v",
 			container.PrettyName(), err)
 	}
-
-	if err := p.applyGrant(grant); err != nil {
-		if _, _, err = p.releasePool(container); err != nil {
-			log.Warn("failed to undo/release unapplicable grant %s: %v", grant, err)
-			return policyError("failed to undo/release unapplicable grant %s: %v", grant, err)
-		}
-	}
-
-	if err := p.updateSharedAllocations(grant); err != nil {
-		log.Warn("failed to update shared allocations affected by %s: %v",
-			container.PrettyName(), err)
-	}
+	p.applyGrant(grant)
+	p.updateSharedAllocations(grant)
 
 	p.root.Dump("<post-alloc>")
 
@@ -172,17 +162,8 @@ func (p *policy) AllocateResources(container cache.Container) error {
 func (p *policy) ReleaseResources(container cache.Container) error {
 	log.Debug("releasing resources of %s...", container.PrettyName())
 
-	grant, found, err := p.releasePool(container)
-	if err != nil {
-		return policyError("failed to release resources of %s: %v",
-			container.PrettyName(), err)
-	}
-
-	if found {
-		if err = p.updateSharedAllocations(grant); err != nil {
-			log.Warn("failed to update shared allocations affected by %s: %v",
-				container.PrettyName(), err)
-		}
+	if grant, found := p.releasePool(container); found {
+		p.updateSharedAllocations(grant)
 	}
 
 	p.root.Dump("<post-release>")
