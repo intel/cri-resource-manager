@@ -40,8 +40,9 @@ const (
 
 // rdtctl encapsulates the runtime state of our RTD enforcement/controller.
 type rdtctl struct {
-	cache cache.Cache // resource manager cache
-	idle  bool        // true if we run without any classes configured
+	cache cache.Cache   // resource manager cache
+	idle  bool          // true if we run without any classes configured
+	mode  OperatingMode // track the mode here to capture mode changes
 	opt   *config
 }
 
@@ -51,9 +52,18 @@ type config struct {
 	Options struct {
 		rdt.Options
 
-		MonitoringDisabled bool `json:"monitoringDisabled"`
+		Mode               OperatingMode `json:"mode"`
+		MonitoringDisabled bool          `json:"monitoringDisabled"`
 	} `json:"options"`
 }
+
+type OperatingMode string
+
+const (
+	OperatingModeDisabled  OperatingMode = "Disabled"
+	OperatingModeDiscovery OperatingMode = "Discovery"
+	OperatingModeFull      OperatingMode = "Full"
+)
 
 // Our logger instance.
 var log logger.Logger = logger.NewLogger(RDTController)
@@ -76,22 +86,18 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 		return rdtError("failed to initialize RDT controls: %v", err)
 	}
 
-	if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
+	ctl.cache = cache
+
+	if err := ctl.configure(); err != nil {
 		// Just print an error. A config update later on may be valid.
 		log.Error("failed apply initial configuration: %v", err)
 	}
-
-	ctl.idle = ctl.checkIdle()
 
 	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
 	err := metrics.RegisterCollector("rdt", rdt.NewCollector)
 	if err != nil {
 		log.Error("failed register rdt collector: %v", err)
 	}
-
-	ctl.cache = cache
-
-	ctl.assignAll()
 
 	pkgcfg.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
 
@@ -150,13 +156,12 @@ func (ctl *rdtctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
-// checkIdle checks if we run without any classes confiured
-func (ctl *rdtctl) checkIdle() bool {
-	return len(rdt.GetClasses()) <= 1
-}
-
-// assign assigns all processes/threads in a container to an RDT class.
+// assign assigns all processes/threads in a container to the correct class
 func (ctl *rdtctl) assign(c cache.Container) error {
+	if ctl.opt.Options.Mode == OperatingModeDisabled {
+		return nil
+	}
+
 	class := c.GetRDTClass()
 	switch class {
 	case "":
@@ -168,6 +173,11 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 		class = string(c.GetQOSClass())
 	}
 
+	return ctl.assignClass(c, class)
+}
+
+// assignClass assigns all processes/threads in a container to the specified class
+func (ctl *rdtctl) assignClass(c cache.Container, class string) error {
 	cls, ok := rdt.GetClass(class)
 	if !ok {
 		return rdtError("%q: unknown RDT class %q", c.PrettyName(), class)
@@ -188,11 +198,11 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 	}
 
 	pretty := c.PrettyName()
-	if _, ok := cls.GetMonGroup(pretty); !ok || ctl.opt.Options.MonitoringDisabled {
+	if _, ok := cls.GetMonGroup(pretty); !ok || ctl.monitoringDisabled() {
 		ctl.stopMonitor(c)
 	}
 
-	if !ctl.opt.Options.MonitoringDisabled {
+	if !ctl.monitoringDisabled() {
 		pname, name, id := pod.GetName(), c.GetName(), c.GetID()
 		if err := ctl.monitor(cls, pname, name, id, pretty, pids); err != nil {
 			return err
@@ -237,34 +247,101 @@ func (ctl *rdtctl) stopMonitor(c cache.Container) error {
 	return nil
 }
 
-func (ctl *rdtctl) assignAll() {
+// stopMonitorAll removes all monitoring groups
+func (ctl *rdtctl) stopMonitorAll() error {
+	for _, cls := range rdt.GetClasses() {
+		if err := cls.DeleteMonGroups(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ctl *rdtctl) assignAll(forceClass string) {
+	// Assign all containers
 	for _, c := range ctl.cache.GetContainers() {
-		if err := ctl.assign(c); err != nil {
+		var err error
+		if forceClass != "" {
+			err = ctl.assignClass(c, forceClass)
+		} else {
+			err = ctl.assign(c)
+		}
+		if err != nil {
 			log.Warn("failed to assign rdt class of %q: %v", c.PrettyName(), err)
 		}
 	}
+
+}
+
+func (ctl *rdtctl) monitoringDisabled() bool {
+	return ctl.mode == OperatingModeDisabled || ctl.opt.Options.MonitoringDisabled
+}
+
+func (ctl *rdtctl) configure() error {
+	// Apply RDT configuration, depending on the operating mode
+	switch ctl.opt.Options.Mode {
+	case OperatingModeDisabled:
+		if ctl.mode != ctl.opt.Options.Mode {
+			ctl.stopMonitorAll()
+			// Drop all cri-resctrl specific groups by applying an empty config
+			if err := rdt.SetConfig(&rdt.Config{}, true); err != nil {
+				return rdtError("failed apply empty rdt config: %v", err)
+			}
+			ctl.idle = true
+			ctl.mode = ctl.opt.Options.Mode
+			ctl.assignAll(rdt.RootClassName)
+		}
+	case OperatingModeDiscovery:
+		if ctl.mode != ctl.opt.Options.Mode {
+			ctl.stopMonitorAll()
+			// Drop all cri-resctrl specific groups by applying an empty config
+			if err := rdt.SetConfig(&rdt.Config{}, true); err != nil {
+				return rdtError("failed apply empty rdt config: %v", err)
+			}
+		}
+		// Run Initialize with empty prefix to discover existing resctrl groups
+		if err := rdt.DiscoverClasses(""); err != nil {
+			return rdtError("failed to discover classes from fs: %v", err)
+		}
+		ctl.idle = false
+		ctl.mode = ctl.opt.Options.Mode
+		ctl.assignAll("")
+	case OperatingModeFull:
+		if ctl.mode != ctl.opt.Options.Mode {
+			ctl.stopMonitorAll()
+		}
+
+		// Copy goresctrl specific part from our extended options
+		ctl.opt.Config.Options = ctl.opt.Options.Options
+		if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
+			return err
+		}
+		ctl.idle = len(rdt.GetClasses()) <= 1
+		ctl.mode = ctl.opt.Options.Mode
+		ctl.assignAll("")
+	default:
+		return rdtError("invalid mode %q", ctl.opt.Options.Mode)
+	}
+
+	log.Debug("rdt controller operating mode set to %q", ctl.mode)
+
+	if ctl.opt.Options.Mode != OperatingModeDisabled {
+		log.Debug("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.monitoringDisabled()])
+	}
+
+	return nil
 }
 
 // configNotify is our runtime configuration notification callback.
 func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	log.Info("configuration update, applying new config")
-	log.Debug("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.opt.Options.MonitoringDisabled])
-
-	// Copy goresctrl specific part from our extended options
-	ctl.opt.Config.Options = ctl.opt.Options.Options
-	if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
-		return err
-	}
-
-	ctl.idle = ctl.checkIdle()
-
-	ctl.assignAll()
-
-	return nil
+	return ctl.configure()
 }
 
 func (ctl *rdtctl) defaultOptions() interface{} {
-	return &config{}
+	c := &config{}
+	c.Options.Mode = OperatingModeFull
+	return c
 }
 
 // GetClasses returns all available RDT classes
