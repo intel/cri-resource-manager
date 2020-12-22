@@ -44,6 +44,10 @@ func (fake *mockSystemNode) PackageID() system.ID {
 	return 0
 }
 
+func (fake *mockSystemNode) DieID() system.ID {
+	return 0
+}
+
 func (fake *mockSystemNode) ID() system.ID {
 	return fake.id
 }
