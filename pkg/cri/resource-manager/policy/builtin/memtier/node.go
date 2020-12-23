@@ -426,7 +426,7 @@ func (n *node) HasMemoryType(reqType memoryType) bool {
 func (p *policy) NewNumaNode(id system.ID, parent Node) Node {
 	n := &numanode{}
 	n.self.node = n
-	n.node.init(p, fmt.Sprintf("numa node #%v", id), NumaNode, parent)
+	n.node.init(p, fmt.Sprintf("NUMA node #%v", id), NumaNode, parent)
 	n.id = id
 	n.sysnode = p.sys.Node(id)
 

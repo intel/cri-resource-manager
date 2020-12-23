@@ -40,7 +40,7 @@ func findNodeWithID(id int, nodes []Node) Node {
 			return node
 		}
 	}
-	panic("No node found")
+	panic("No node found with id " + fmt.Sprintf("%d", id))
 }
 
 func findNodeWithName(name string, nodes []Node) Node {
@@ -49,7 +49,7 @@ func findNodeWithName(name string, nodes []Node) Node {
 			return node
 		}
 	}
-	panic("No node found")
+	panic("No node found with name " + name)
 }
 
 func setLinks(nodes []Node, tree map[int][]int) {
@@ -798,7 +798,7 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{},
-			expected:   "numa node #0",
+			expected:   "NUMA node #0",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
@@ -812,9 +812,9 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{
-				"numa node #1": 1,
+				"NUMA node #1": 1,
 			},
-			expected: "numa node #1",
+			expected: "NUMA node #1",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
@@ -834,7 +834,7 @@ func TestAffinities(t *testing.T) {
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
-			name: "equal affinities to numa node #1, socket #1",
+			name: "equal affinities to NUMA node #1, socket #1",
 			req: &request{
 				memReq:    10000,
 				memLim:    10000,
@@ -845,13 +845,13 @@ func TestAffinities(t *testing.T) {
 			},
 			affinities: map[string]int32{
 				"socket #1":    1,
-				"numa node #1": 1,
+				"NUMA node #1": 1,
 			},
-			expected: "numa node #1",
+			expected: "NUMA node #1",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
-			name: "equal affinities to numa node #1, numa node #3",
+			name: "equal affinities to NUMA node #1, NUMA node #3",
 			req: &request{
 				memReq:    10000,
 				memLim:    10000,
@@ -861,14 +861,14 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{
-				"numa node #1": 1,
-				"numa node #3": 1,
+				"NUMA node #1": 1,
+				"NUMA node #3": 1,
 			},
 			expected: "socket #1",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
-			name: "double affinity to numa node #1 vs. #3",
+			name: "double affinity to NUMA node #1 vs. #3",
 			req: &request{
 				memReq:    10000,
 				memLim:    10000,
@@ -878,14 +878,14 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{
-				"numa node #1": 2,
-				"numa node #3": 1,
+				"NUMA node #1": 2,
+				"NUMA node #3": 1,
 			},
 			expected: "socket #1",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
-			name: "triple affinity to numa node #1 vs. #3",
+			name: "triple affinity to NUMA node #1 vs. #3",
 			req: &request{
 				memReq:    10000,
 				memLim:    10000,
@@ -895,14 +895,14 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{
-				"numa node #1": 3,
-				"numa node #3": 1,
+				"NUMA node #1": 3,
+				"NUMA node #3": 1,
 			},
-			expected: "numa node #1",
+			expected: "NUMA node #1",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
-			name: "double affinity to numa node #0,#3 vs. socket #1",
+			name: "double affinity to NUMA node #0,#3 vs. socket #1",
 			req: &request{
 				memReq:    10000,
 				memLim:    10000,
@@ -912,15 +912,15 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{
-				"numa node #0": 2,
-				"numa node #3": 2,
+				"NUMA node #0": 2,
+				"NUMA node #3": 2,
 				"socket #1":    1,
 			},
 			expected: "root",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
-			name: "equal affinity to numa node #0,#3 vs. socket #1",
+			name: "equal affinity to NUMA node #0,#3 vs. socket #1",
 			req: &request{
 				memReq:    10000,
 				memLim:    10000,
@@ -930,15 +930,15 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{
-				"numa node #0": 1,
-				"numa node #3": 1,
+				"NUMA node #0": 1,
+				"NUMA node #3": 1,
 				"socket #1":    1,
 			},
 			expected: "root",
 		},
 		{
 			path: path.Join(dir, "sysfs", "server", "sys"),
-			name: "half the affinity to numa node #0,#3 vs. socket #1",
+			name: "half the affinity to NUMA node #0,#3 vs. socket #1",
 			req: &request{
 				memReq:    10000,
 				memLim:    10000,
@@ -948,8 +948,8 @@ func TestAffinities(t *testing.T) {
 				container: &mockContainer{},
 			},
 			affinities: map[string]int32{
-				"numa node #0": 1,
-				"numa node #3": 1,
+				"NUMA node #0": 1,
+				"NUMA node #3": 1,
 				"socket #1":    2,
 			},
 			expected: "socket #1",
