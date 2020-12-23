@@ -236,6 +236,20 @@ func (p *policy) checkHWTopology() error {
 		}
 	}
 
+	// NUMA distance matrix should be symmetric.
+	for _, from := range p.sys.NodeIDs() {
+		for _, to := range p.sys.NodeIDs() {
+			d1 := p.sys.NodeDistance(from, to)
+			d2 := p.sys.NodeDistance(to, from)
+			if d1 != d2 {
+				log.Error("asymmetric NUMA distance (#%d, #%d): %d != %d",
+					from, to, d1, d2)
+				return policyError("asymmetric NUMA distance (#%d, #%d): %d != %d",
+					from, to, d1, d2)
+			}
+		}
+	}
+
 	return nil
 }
 
