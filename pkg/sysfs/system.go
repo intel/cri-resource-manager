@@ -82,6 +82,7 @@ type System interface {
 	CPUSet() cpuset.CPUSet
 	Package(id ID) CPUPackage
 	Node(id ID) Node
+	NodeDistance(from, to ID) int
 	CPU(id ID) CPU
 	Offlined() cpuset.CPUSet
 	Isolated() cpuset.CPUSet
@@ -484,6 +485,11 @@ func (sys *system) Package(id ID) CPUPackage {
 // Node gets the node with a given node id.
 func (sys *system) Node(id ID) Node {
 	return sys.nodes[id]
+}
+
+// NodeDistance gets the distance between two NUMA nodes.
+func (sys *system) NodeDistance(from, to ID) int {
+	return sys.nodes[from].DistanceFrom(to)
 }
 
 // CPU gets the CPU with a given CPU id.

@@ -187,6 +187,9 @@ func (fake *mockSystem) PackageIDs() []system.ID {
 func (fake *mockSystem) NodeIDs() []system.ID {
 	return []system.ID{0, 1}
 }
+func (fake *mockSystem) NodeDistance(system.ID, system.ID) int {
+	return 10
+}
 
 type mockContainer struct {
 	name                                  string
