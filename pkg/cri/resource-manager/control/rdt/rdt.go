@@ -169,12 +169,18 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 		class = rdt.RootClassName
 	case cache.RDTClassPodQoS:
 		if ctl.noQoSClasses {
-			return nil
+			class = rdt.RootClassName
+		} else {
+			class = string(c.GetQOSClass())
 		}
-		class = string(c.GetQOSClass())
 	}
 
-	return ctl.assignClass(c, class)
+	err := ctl.assignClass(c, class)
+	if err != nil && class != rdt.RootClassName {
+		log.Warn("%v; falling back to system root class", err)
+		return ctl.assignClass(c, rdt.RootClassName)
+	}
+	return err
 }
 
 // assignClass assigns all processes/threads in a container to the specified class
