@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Quick-start &mdash; CRI Resource Manager 0.4.0-333-g3d42160 documentation</title>
+  <title>Quick-start &mdash; CRI Resource Manager 0.4.0-335-g03be2ef documentation</title>
   
 
   
@@ -206,7 +206,8 @@ Manager.</p>
 <h3>Install Package<a class="headerlink" href="#install-package" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="centos-fedora-and-suse">
 <h4>CentOS, Fedora and SUSE<a class="headerlink" href="#centos-fedora-and-suse" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=0.4.0
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=`curl -s &quot;https://api.github.com/repos/intel/cri-resource-manager/releases/latest&quot; | \
+               jq .tag_name | tr -d &#39;&quot;v&#39;`
 source /etc/os-release
 sudo rpm -Uvh https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/cri-resource-manager-${CRIRM_VERSION}-0.x86_64.${ID}-${VERSION_ID}.rpm
 </pre></div>
@@ -214,7 +215,8 @@ sudo rpm -Uvh https://github.com/intel/cri-resource-manager/releases/download/v$
 </div>
 <div class="section" id="ubuntu-and-debian">
 <h4>Ubuntu and Debian<a class="headerlink" href="#ubuntu-and-debian" title="Permalink to this headline">¶</a></h4>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=0.4.0
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=`curl -s &quot;https://api.github.com/repos/intel/cri-resource-manager/releases/latest&quot; | \
+               jq .tag_name | tr -d &#39;&quot;v&#39;`
 source /etc/os-release
 pkg=cri-resource-manager_${CRIRM_VERSION}_amd64.${ID}-${VERSION_ID}.deb; curl -LO https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/${pkg}; sudo dpkg -i ${pkg}; rm ${pkg}
 </pre></div>
@@ -277,7 +279,7 @@ policying container resource allocations. Next, you could see:</p>
 <li><p><a class="reference internal" href="setup.html"><span class="doc">Setup</span></a> for details on setup and usage</p></li>
 <li><p><a class="reference internal" href="node-agent.html"><span class="doc">Node Agent</span></a> for seting up cri-resmgr-agent for dynamic configuration and more</p></li>
 <li><p><a class="reference internal" href="webhook.html"><span class="doc">Webhook</span></a> for setting up our resource-annotating webhook</p></li>
-<li><p><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/3d42160c8b210cf1dc927d429c0ab842d1ff0d7f/docs/setup.md">Kata support</a> for setting up CRI-RM with Kata containers</p></li>
+<li><p><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/03be2ef149d500072415060721b58e5d9e238346/docs/setup.md">Kata support</a> for setting up CRI-RM with Kata containers</p></li>
 </ul>
 </div>
 </div>
