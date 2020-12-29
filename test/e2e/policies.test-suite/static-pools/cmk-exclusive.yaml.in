@@ -14,6 +14,7 @@ spec:
   containers:
     - name: ${NAME}c0
       image: busybox
+      imagePullPolicy: IfNotPresent
       env:
 $([ -z $STP_POOL ] || echo "
         - name: STP_POOL

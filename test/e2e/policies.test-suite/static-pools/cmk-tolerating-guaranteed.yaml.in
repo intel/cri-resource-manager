@@ -11,11 +11,11 @@ spec:
   $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
   - name: ${NAME}c$(( contnum - 1 ))
     image: busybox
+    imagePullPolicy: IfNotPresent
     command:
       - sh
       - -c
       - echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
-    imagePullPolicy: IfNotPresent
     resources:
       requests:
         cpu: ${CPU}

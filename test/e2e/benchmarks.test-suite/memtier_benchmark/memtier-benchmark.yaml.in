@@ -23,6 +23,7 @@ spec:
       containers:
         - name: memtier-benchmark
           image: redislabs/memtier_benchmark:edge
+          imagePullPolicy: IfNotPresent
           args: ['${ARGS// /\', \'}']
           $(if [ "$CPU" != "0" ]; then echo "
           resources:
