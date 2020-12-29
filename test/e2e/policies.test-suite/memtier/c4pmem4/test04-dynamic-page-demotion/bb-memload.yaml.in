@@ -12,6 +12,7 @@ spec:
   containers:
     - name: ${NAME}c0
       image: busybox
+      imagePullPolicy: IfNotPresent
       command:
         - sh
         - -c
@@ -25,6 +26,7 @@ spec:
           memory: $(( ${WORN%M} * 1024 * 1024 / $BSIZE + 100000 ))k
     - name: ${NAME}c1
       image: busybox
+      imagePullPolicy: IfNotPresent
       command:
         - sh
         - -c
@@ -38,6 +40,7 @@ spec:
           memory: $(( ${WMRN%M} * 1024 * 1024 / $BSIZE + 100000 ))k
     - name: ${NAME}c2
       image: busybox
+      imagePullPolicy: IfNotPresent
       command:
         - sh
         - -c
@@ -51,6 +54,7 @@ spec:
           memory: $(( ${WORM%M} * 1024 * 1024 / $BSIZE + 100000 ))k
     - name: ${NAME}c3
       image: busybox
+      imagePullPolicy: IfNotPresent
       command:
         - sh
         - -c

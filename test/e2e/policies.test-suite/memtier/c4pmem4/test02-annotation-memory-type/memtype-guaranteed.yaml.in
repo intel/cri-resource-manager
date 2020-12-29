@@ -12,6 +12,7 @@ spec:
     $(for CONT in 0 1 2; do echo "
     - name: ${NAME}c${CONT}
       image: busybox
+      imagePullPolicy: IfNotPresent
       command: ['sh', '-c', 'echo ${NAME}c${CONT} \$(sleep inf)']
       resources:
         requests:
@@ -23,6 +24,7 @@ spec:
     "; done)
     - name: ${NAME}c9
       image: busybox
+      imagePullPolicy: IfNotPresent
       command: ['sh', '-c', 'echo ${NAME}c9 \$(sleep inf)']
       resources:
         requests:

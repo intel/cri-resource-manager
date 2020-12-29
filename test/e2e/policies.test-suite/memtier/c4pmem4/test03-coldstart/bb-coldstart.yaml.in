@@ -12,6 +12,7 @@ spec:
   containers:
     - name: ${NAME}c0
       image: busybox
+      imagePullPolicy: IfNotPresent
       command:
         - sh
         - -c

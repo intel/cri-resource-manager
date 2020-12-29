@@ -10,8 +10,8 @@ spec:
   $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
   - name: ${NAME}c$(( contnum - 1 ))
     image: alexeiled/stress-ng
-    args: ['${ARGS// /\', \'}']
     imagePullPolicy: IfNotPresent
+    args: ['${ARGS// /\', \'}']
     $(if [ "$CPU" != "0" ]; then echo "
     resources:
       requests:
