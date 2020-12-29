@@ -16,3 +16,4 @@ coverage.txt
 /_build
 /_work
 *.stamp
+test/e2e/**/output

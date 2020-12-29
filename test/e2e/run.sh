@@ -435,6 +435,7 @@ launch() { # script API
     #   cri-resmgr:  launch cri-resmgr on VM. Environment variables:
     #                cri_resmgr_cfg: configuration filepath (on host)
     #                cri_resmgr_extra_args: extra arguments on command line
+    #                cri_resmgr_config: "force" (default) or "fallback"
     #
     #   cri-resmgr-systemd:
     #                launch cri-resmgr on VM using "systemctl start".
@@ -454,13 +455,14 @@ launch() { # script API
     local target="$1"
     local launch_cmd
     local adjustment_schema="$HOST_PROJECT_DIR/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml"
+    local cri_resmgr_config_option="-${cri_resmgr_config:-force}-config"
     case $target in
         "cri-resmgr")
             host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
             }
             vm-command "cat $(basename "$cri_resmgr_cfg")"
-            launch_cmd="cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock -force-config $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
+            launch_cmd="cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock $cri_resmgr_config_option $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
             vm-command-q "echo '$launch_cmd' > cri-resmgr.launch.sh ; rm -f cri-resmgr.output.txt"
             vm-command "$launch_cmd  >cri-resmgr.output.txt 2>&1 &"
             sleep 2 >/dev/null 2>&1
