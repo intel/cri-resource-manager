@@ -329,8 +329,12 @@ func (m *mockContainer) GetResmgrAnnotationKeys() []string {
 func (m *mockContainer) GetResmgrAnnotation(string, interface{}) (string, bool) {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetEffectiveAnnotation(string) (string, bool) {
-	panic("unimplemented")
+func (m *mockContainer) GetEffectiveAnnotation(key string) (string, bool) {
+	pod, ok := m.GetPod()
+	if !ok {
+		return "", false
+	}
+	return pod.GetEffectiveAnnotation(key, m.name)
 }
 func (m *mockContainer) GetAnnotations() map[string]string {
 	panic("unimplemented")
@@ -529,6 +533,7 @@ type mockPod struct {
 	returnValue2FotGetResmgrAnnotation bool
 	coldStartTimeout                   time.Duration
 	coldStartContainerName             string
+	annotations                        map[string]string
 }
 
 func (m *mockPod) GetInitContainers() []cache.Container {
@@ -591,8 +596,15 @@ func (m *mockPod) GetResmgrAnnotation(key string) (string, bool) {
 func (m *mockPod) GetResmgrAnnotationObject(string, interface{}, func([]byte, interface{}) error) (bool, error) {
 	panic("unimplemented")
 }
-func (m *mockPod) GetEffectiveAnnotation(string, string) (string, bool) {
-	panic("unimplemented")
+func (m *mockPod) GetEffectiveAnnotation(key, container string) (string, bool) {
+	if v, ok := m.annotations[key+"/container."+container]; ok {
+		return v, true
+	}
+	if v, ok := m.annotations[key+"/pod"]; ok {
+		return v, true
+	}
+	v, ok := m.annotations[key]
+	return v, ok
 }
 func (m *mockPod) GetCgroupParentDir() string {
 	panic("unimplemented")

@@ -17,6 +17,7 @@ package memtier
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
 
 const (
@@ -37,6 +39,9 @@ const (
 	keyMemoryTypePreference = "memory-type"
 	// annotation key for type "cold start" of workloads
 	keyColdStartPreference = "cold-start"
+
+	// effective annotation key for isolated CPU preference
+	preferIsolatedCPUsKey = keyIsolationPreference + "." + kubernetes.ResmgrKeyNamespace
 )
 
 // cpuClass is a type of CPU to allocate
@@ -84,14 +89,46 @@ const (
 	defaultMemoryType = memoryAll
 )
 
+// isolatedCPUsPreference returns whether isolated CPUs should be preferred for
+// containers that allocate multiple CPUs, and if the container was explicitly
+// annotated with this setting.
+//
+// If the effective annotations are not found, this function falls back to
+// looking for the deprecated syntax by calling podIsolationPreference.
+func isolatedCPUsPreference(pod cache.Pod, container cache.Container) (bool, bool) {
+	key := preferIsolatedCPUsKey
+	value, ok := pod.GetEffectiveAnnotation(key, container.GetName())
+	if !ok {
+		return podIsolationPreference(pod, container)
+	}
+
+	preference, err := strconv.ParseBool(value)
+	if err != nil {
+		log.Error("invalid CPU isolation preference annotation (%q, %q): %v",
+			key, value, err)
+		return opt.PreferIsolated, false
+	}
+
+	log.Debug("%s: effective CPU isolation preference %v", container.PrettyName(), preference)
+
+	return preference, true
+}
+
 // podIsolationPreference checks if containers explicitly prefers to run on multiple isolated CPUs.
 // The first return value indicates whether the container is isolated or not.
 // The second return value indicates whether that decision was explicit (true) or implicit (false).
 func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, bool) {
-	value, ok := pod.GetResmgrAnnotation(keyIsolationPreference)
+	key := keyIsolationPreference
+	value, ok := pod.GetResmgrAnnotation(key)
 	if !ok {
 		return opt.PreferIsolated, false
 	}
+
+	log.Warn("WARNING: using deprecated annotation %q", key)
+	log.Warn("WARNING: consider using instead")
+	log.Warn("WARNING:     %q, or", preferIsolatedCPUsKey+"/container."+container.GetName())
+	log.Warn("WARNING:     %q", preferIsolatedCPUsKey+"/pod")
+
 	if value == "false" || value == "true" {
 		return (value[0] == 't'), true
 	}
@@ -215,7 +252,7 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 
 	qos := pod.GetQOSClass()
 
-	preferIsol, explicit := podIsolationPreference(pod, container)
+	preferIsol, explicit := isolatedCPUsPreference(pod, container)
 	preferShared := podSharedCPUPreference(pod, container)
 
 	full, fraction, isolate := 0, 0, false

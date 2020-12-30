@@ -39,6 +39,7 @@ func TestPodIsolationPreference(t *testing.T) {
 		{
 			name:            "return defaults",
 			pod:             &mockPod{},
+			container:       &mockContainer{},
 			expectedIsolate: opt.PreferIsolated,
 		},
 		{
@@ -47,6 +48,7 @@ func TestPodIsolationPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:        &mockContainer{},
 			expectedIsolate:  true,
 			expectedExplicit: true,
 		},
@@ -56,6 +58,7 @@ func TestPodIsolationPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "UNPARSABLE",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:       &mockContainer{},
 			expectedIsolate: opt.PreferIsolated,
 		},
 		{
@@ -64,7 +67,8 @@ func TestPodIsolationPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "key: true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
-			disabled: true,
+			container: &mockContainer{},
+			disabled:  true,
 		},
 		{
 			name: "return defaults for missing preferences",
@@ -86,13 +90,56 @@ func TestPodIsolationPreference(t *testing.T) {
 			},
 			expectedExplicit: true,
 		},
+		// effective annotation tests
+		{
+			name: "prefer resmgr's annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "true",
+				},
+			},
+			container:        &mockContainer{name: "c0"},
+			expectedIsolate:  true,
+			expectedExplicit: true,
+		},
+		{
+			name: "prefer resmgr's annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "false",
+				},
+			},
+			container:        &mockContainer{name: "c0"},
+			expectedIsolate:  false,
+			expectedExplicit: true,
+		},
+		{
+			name: "return defaults for unparsable annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "blah",
+				},
+			},
+			container:       &mockContainer{name: "c0"},
+			expectedIsolate: opt.PreferIsolated,
+		},
+		{
+			name: "return defaults for missing preferences",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "true",
+				},
+			},
+			container:       &mockContainer{name: "c1"},
+			expectedIsolate: opt.PreferIsolated,
+		},
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			isolate, explicit := podIsolationPreference(tc.pod, tc.container)
+			isolate, explicit := isolatedCPUsPreference(tc.pod, tc.container)
 			if isolate != tc.expectedIsolate || explicit != tc.expectedExplicit {
 				t.Errorf("Expected (%v, %v), but got (%v, %v)", tc.expectedIsolate, tc.expectedExplicit, isolate, explicit)
 			}
@@ -317,6 +364,44 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			},
 			expectedFull:     0,
 			expectedFraction: 2000,
+		},
+		// effective annotation tests
+		{
+			name: "return request's value for guaranteed QoS and isolate",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+				},
+			},
+			expectedFull:    1,
+			expectedIsolate: true,
+		},
+		{
+			name: "return request's value for guaranteed QoS and no isolate",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "false",
+				},
+			},
+			expectedFull: 1,
 		},
 	}
 	for _, tc := range tcases {
