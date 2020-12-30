@@ -162,6 +162,7 @@ func TestPodSharedCPUPreference(t *testing.T) {
 		{
 			name:           "return defaults",
 			pod:            &mockPod{},
+			container:      &mockContainer{},
 			expectedShared: opt.PreferShared,
 		},
 		{
@@ -170,6 +171,7 @@ func TestPodSharedCPUPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:      &mockContainer{},
 			expectedShared: true,
 		},
 		{
@@ -178,6 +180,7 @@ func TestPodSharedCPUPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "UNPARSABLE",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:      &mockContainer{},
 			expectedShared: opt.PreferShared,
 		},
 		{
@@ -186,7 +189,8 @@ func TestPodSharedCPUPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "key: true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
-			disabled: true,
+			container: &mockContainer{},
+			disabled:  true,
 		},
 		{
 			name: "return defaults for missing preferences",
@@ -218,13 +222,54 @@ func TestPodSharedCPUPreference(t *testing.T) {
 			},
 			expectedShared: opt.PreferShared,
 		},
+		// effective annotation tests
+		{
+			name: "prefer resmgr's annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "true",
+				},
+			},
+			container:      &mockContainer{name: "c0"},
+			expectedShared: true,
+		},
+		{
+			name: "prefer resmgr's annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "false",
+				},
+			},
+			container:      &mockContainer{name: "c0"},
+			expectedShared: false,
+		},
+		{
+			name: "return defaults for unparsable annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "blah",
+				},
+			},
+			container:      &mockContainer{name: "c0"},
+			expectedShared: opt.PreferShared,
+		},
+		{
+			name: "return defaults for missing preferences",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "true",
+				},
+			},
+			container:      &mockContainer{name: "c1"},
+			expectedShared: opt.PreferShared,
+		},
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			shared := podSharedCPUPreference(tc.pod, tc.container)
+			shared, _ := sharedCPUsPreference(tc.pod, tc.container)
 			if shared != tc.expectedShared {
 				t.Errorf("Expected %v, but got %v", tc.expectedShared, shared)
 			}
@@ -402,6 +447,25 @@ func TestCpuAllocationPreferences(t *testing.T) {
 				},
 			},
 			expectedFull: 1,
+		},
+		{
+			name: "prefer shared",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.testcontainer": "true",
+				},
+			},
+			expectedFull:     0,
+			expectedFraction: 2000,
 		},
 	}
 	for _, tc := range tcases {
