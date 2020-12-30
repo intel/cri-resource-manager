@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
@@ -46,6 +47,8 @@ const (
 	preferSharedCPUsKey = keySharedCPUPreference + "." + kubernetes.ResmgrKeyNamespace
 	// effective annotation key for memory type preference
 	preferMemoryTypeKey = keyMemoryTypePreference + "." + kubernetes.ResmgrKeyNamespace
+	// effective annotation key for "cold start" preference
+	preferColdStartKey = keyColdStartPreference + "." + kubernetes.ResmgrKeyNamespace
 )
 
 // cpuClass is a type of CPU to allocate
@@ -165,6 +168,38 @@ func memoryTypePreference(pod cache.Pod, container cache.Container) memoryType {
 	return mtype
 }
 
+// coldStartPreference figures out 'cold start' preferences for the container, IOW
+// if the container memory should be allocated for an initial 'cold start' period
+// from PMEM, and how long this initial period should be.
+//
+// If the effective annotations are not found, this function falls back to
+// looking for the deprecated syntax by calling podColdStartPreference.
+func coldStartPreference(pod cache.Pod, container cache.Container) (ColdStartPreference, error) {
+	key := preferColdStartKey
+	value, ok := pod.GetEffectiveAnnotation(key, container.GetName())
+	if !ok {
+		return podColdStartPreference(pod, container)
+	}
+
+	preference := ColdStartPreference{}
+	if err := yaml.Unmarshal([]byte(value), &preference); err != nil {
+		log.Error("failed to parse cold start preference (%q, %q): %v",
+			keyColdStartPreference, value, err)
+		return ColdStartPreference{}, policyError("invalid cold start preference %q: %v",
+			value, err)
+	}
+
+	if preference.Duration < 0 || time.Duration(preference.Duration) > time.Hour {
+		return ColdStartPreference{}, policyError("cold start duration %s out of range",
+			preference.Duration.String())
+	}
+
+	log.Debug("%s: effective cold start preference %v",
+		container.PrettyName(), preference.Duration.String())
+
+	return preference, nil
+}
+
 // podIsolationPreference checks if containers explicitly prefers to run on multiple isolated CPUs.
 // The first return value indicates whether the container is isolated or not.
 // The second return value indicates whether that decision was explicit (true) or implicit (false).
@@ -246,49 +281,42 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, boo
 // greater than 0, cold start is enabled and the DRAM controller is added to the container
 // after the duration has passed.
 type ColdStartPreference struct {
-	duration time.Duration
+	Duration config.Duration // `json:"duration,omitempty"`
 }
 
-type coldStartPreferenceYaml struct {
-	Duration string // `yaml:"duration,omitempty"`
-}
-
-// coldStartPreference figures out if the container memory should be first allocated from PMEM.
+// podColdStartPreference figures out if the container memory should be first allocated from PMEM.
 // It returns the time (in milliseconds) after which DRAM controller should be added to the mix.
-func coldStartPreference(pod cache.Pod, container cache.Container) (ColdStartPreference, error) {
-	value, ok := pod.GetResmgrAnnotation(keyColdStartPreference)
+func podColdStartPreference(pod cache.Pod, container cache.Container) (ColdStartPreference, error) {
+	key := keyColdStartPreference
+	value, ok := pod.GetResmgrAnnotation(key)
 	if !ok {
 		return ColdStartPreference{}, nil
 	}
-	preferences := map[string]coldStartPreferenceYaml{}
+
+	log.Warn("WARNING: using deprecated annotation %q", key)
+	log.Warn("WARNING: consider using instead")
+	log.Warn("WARNING:     %q, or", preferColdStartKey+"/container."+container.GetName())
+	log.Warn("WARNING:     %q", preferColdStartKey+"/pod")
+
+	preferences := map[string]ColdStartPreference{}
 	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
 		log.Error("failed to parse cold start preference %s = '%s': %v",
-			keyColdStartPreference, value, err)
+			key, value, err)
 		return ColdStartPreference{}, err
 	}
 	name := container.GetName()
-	coldStartPreference, ok := preferences[name]
+	preference, ok := preferences[name]
 	if !ok {
 		log.Debug("container %s has no entry among cold start preferences", container.PrettyName())
 		return ColdStartPreference{}, nil
 	}
 
-	// Parse the cold start data.
-	duration, err := time.ParseDuration(coldStartPreference.Duration)
-	if err != nil {
-		log.Error("failed to parse cold start timeout %s: %v",
-			coldStartPreference.Duration, err)
-		return ColdStartPreference{}, err
-	}
-
-	if duration < 0 || duration > time.Hour {
+	if preference.Duration < 0 || time.Duration(preference.Duration) > time.Hour {
 		// Duration can't be negative. We also reject durations which are longer than one hour.
-		return ColdStartPreference{}, fmt.Errorf("failed to validate cold start timeout %s: value out of scope", duration.String())
+		return ColdStartPreference{}, fmt.Errorf("failed to validate cold start timeout %s: value out of scope", preference.Duration.String())
 	}
 
-	return ColdStartPreference{
-		duration: duration,
-	}, nil
+	return preference, nil
 }
 
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.

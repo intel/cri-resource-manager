@@ -849,11 +849,11 @@ func newRequest(container cache.Container) Request {
 		if err != nil {
 			log.Error("Failed to parse cold start preference")
 		} else {
-			if parsedColdStart.duration > 0 {
+			if parsedColdStart.Duration > 0 {
 				if coldStartOff {
 					log.Error("coldstart disabled (movable non-DRAM memory zones present)")
 				} else {
-					coldStart = parsedColdStart.duration
+					coldStart = time.Duration(parsedColdStart.Duration)
 				}
 			}
 		}
