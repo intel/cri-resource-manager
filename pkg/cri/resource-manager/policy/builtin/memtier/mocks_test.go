@@ -44,6 +44,10 @@ func (fake *mockSystemNode) PackageID() system.ID {
 	return 0
 }
 
+func (fake *mockSystemNode) DieID() system.ID {
+	return 0
+}
+
 func (fake *mockSystemNode) ID() system.ID {
 	return fake.id
 }
@@ -231,6 +235,9 @@ func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus system.IDSet
 }
 func (fake *mockSystem) SetCpusOnline(online bool, cpus system.IDSet) (system.IDSet, error) {
 	return system.NewIDSet(), nil
+}
+func (fake *mockSystem) NodeDistance(system.ID, system.ID) int {
+	return 10
 }
 
 type mockContainer struct {

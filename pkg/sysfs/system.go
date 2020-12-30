@@ -82,6 +82,7 @@ type System interface {
 	CPUSet() cpuset.CPUSet
 	Package(id ID) CPUPackage
 	Node(id ID) Node
+	NodeDistance(from, to ID) int
 	CPU(id ID) CPU
 	Offlined() cpuset.CPUSet
 	Isolated() cpuset.CPUSet
@@ -124,6 +125,7 @@ type cpuPackage struct {
 type Node interface {
 	ID() ID
 	PackageID() ID
+	DieID() ID
 	CPUSet() cpuset.CPUSet
 	Distance() []int
 	DistanceFrom(id ID) int
@@ -136,6 +138,7 @@ type node struct {
 	path       string     // sysfs path
 	id         ID         // node id
 	pkg        ID         // package id
+	die        ID         // die id
 	cpus       IDSet      // cpus in this node
 	memoryType MemoryType // node memory type
 	normalMem  bool       // node has memory in a normal (kernel space allocatable) zone
@@ -282,6 +285,17 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 			for _, nodeID := range pkg.nodes.SortedMembers() {
 				if node, ok := sys.nodes[nodeID]; ok {
 					node.pkg = pkg.id
+				} else {
+					return sysfsError("NUMA nodes", "can't find NUMA node for ID %d", nodeID)
+				}
+			}
+			for _, dieID := range pkg.DieIDs() {
+				for _, nodeID := range pkg.DieNodeIDs(dieID) {
+					if node, ok := sys.nodes[nodeID]; ok {
+						node.die = dieID
+					} else {
+						return sysfsError("NUMA nodes", "can't find NUMA node for ID %d", nodeID)
+					}
 				}
 			}
 		}
@@ -303,6 +317,8 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 			sys.Debug("node #%d:", id)
 			sys.Debug("      cpus: %s", node.cpus)
 			sys.Debug("  distance: %v", node.distance)
+			sys.Debug("   package: #%d", node.pkg)
+			sys.Debug("       die: #%d", node.die)
 		}
 
 		for id, cpu := range sys.cpus {
@@ -484,6 +500,11 @@ func (sys *system) Package(id ID) CPUPackage {
 // Node gets the node with a given node id.
 func (sys *system) Node(id ID) Node {
 	return sys.nodes[id]
+}
+
+// NodeDistance gets the distance between two NUMA nodes.
+func (sys *system) NodeDistance(from, to ID) int {
+	return sys.nodes[from].DistanceFrom(to)
 }
 
 // CPU gets the CPU with a given CPU id.
@@ -811,9 +832,14 @@ func (n *node) ID() ID {
 	return n.id
 }
 
-// PackageID returns the id of this node.
+// PackageID returns the package id for this node.
 func (n *node) PackageID() ID {
 	return n.pkg
+}
+
+// DieID returns the die id for this node.
+func (n *node) DieID() ID {
+	return n.die
 }
 
 // CPUSet returns the CPUSet for all cores/threads in this node.

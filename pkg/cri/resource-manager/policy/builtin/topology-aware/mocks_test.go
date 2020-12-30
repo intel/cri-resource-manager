@@ -39,6 +39,9 @@ func (fake *mockSystemNode) MemoryInfo() (*system.MemInfo, error) {
 func (fake *mockSystemNode) PackageID() system.ID {
 	return fake.packageID
 }
+func (fake *mockSystemNode) DieID() system.ID {
+	return 0
+}
 func (fake *mockSystemNode) ID() system.ID {
 	return fake.id
 }
@@ -186,6 +189,9 @@ func (fake *mockSystem) PackageIDs() []system.ID {
 }
 func (fake *mockSystem) NodeIDs() []system.ID {
 	return []system.ID{0, 1}
+}
+func (fake *mockSystem) NodeDistance(system.ID, system.ID) int {
+	return 10
 }
 
 type mockContainer struct {
