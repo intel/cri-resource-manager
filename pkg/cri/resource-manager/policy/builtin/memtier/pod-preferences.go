@@ -44,6 +44,8 @@ const (
 	preferIsolatedCPUsKey = keyIsolationPreference + "." + kubernetes.ResmgrKeyNamespace
 	// effective annotation key for shared CPU preference
 	preferSharedCPUsKey = keySharedCPUPreference + "." + kubernetes.ResmgrKeyNamespace
+	// effective annotation key for memory type preference
+	preferMemoryTypeKey = keyMemoryTypePreference + "." + kubernetes.ResmgrKeyNamespace
 )
 
 // cpuClass is a type of CPU to allocate
@@ -139,6 +141,28 @@ func sharedCPUsPreference(pod cache.Pod, container cache.Container) (bool, bool)
 	log.Debug("%s: effective shared CPU preference %v", container.PrettyName(), preference)
 
 	return preference, true
+}
+
+// memoryTypePreference returns what type of memory should be allocated for the container.
+//
+// If the effective annotations are not found, this function falls back to
+// looking for the deprecated syntax by calling podMemoryTypePreference.
+func memoryTypePreference(pod cache.Pod, container cache.Container) memoryType {
+	key := preferMemoryTypeKey
+	value, ok := pod.GetEffectiveAnnotation(key, container.GetName())
+	if !ok {
+		return podMemoryTypePreference(pod, container)
+	}
+
+	mtype, err := parseMemoryType(value)
+	if err != nil {
+		log.Error("invalid memory type preference (%q, %q): %v", key, value, err)
+		return memoryUnspec
+	}
+
+	log.Debug("%s: effective cold start preference %v", container.PrettyName(), mtype)
+
+	return mtype
 }
 
 // podIsolationPreference checks if containers explicitly prefers to run on multiple isolated CPUs.
@@ -320,11 +344,17 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 
 // podMemoryTypePreference returns what type of memory should be allocated for the container.
 func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
-	value, ok := pod.GetResmgrAnnotation(keyMemoryTypePreference)
+	key := keyMemoryTypePreference
+	value, ok := pod.GetResmgrAnnotation(key)
 	if !ok {
 		log.Debug("pod %s has no memory preference annotations", pod.GetName())
 		return memoryUnspec
 	}
+
+	log.Warn("WARNING: using deprecated annotation %q", key)
+	log.Warn("WARNING: consider using instead")
+	log.Warn("WARNING:     %q, or", keyMemoryTypePreference+"/container."+c.GetName())
+	log.Warn("WARNING:     %q", keyMemoryTypePreference+"/pod")
 
 	// Try to parse as per-container preference. Assume common for all containers if fails.
 	pref := ""
@@ -354,7 +384,7 @@ func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
 // memoryAllocationPreference returns the amount and kind of memory to allocate.
 func memoryAllocationPreference(pod cache.Pod, c cache.Container) (uint64, uint64, memoryType) {
 	resources := c.GetResourceRequirements()
-	mtype := podMemoryTypePreference(pod, c)
+	mtype := memoryTypePreference(pod, c)
 	req, lim := uint64(0), uint64(0)
 
 	if memReq, ok := resources.Requests[corev1.ResourceMemory]; ok {
