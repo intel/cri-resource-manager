@@ -282,6 +282,8 @@ func TestCpuAllocationPreferences(t *testing.T) {
 		name             string
 		pod              *mockPod
 		container        *mockContainer
+		preferIsolated   bool
+		preferShared     bool
 		expectedFull     int
 		expectedFraction int
 		expectedIsolate  bool
@@ -294,6 +296,7 @@ func TestCpuAllocationPreferences(t *testing.T) {
 		},
 		{
 			name:      "no resource requirements",
+			pod:       &mockPod{},
 			container: &mockContainer{},
 		},
 		{
@@ -353,22 +356,76 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			expectedFraction: 2000,
 		},
 		{
-			name: "return request's value for guaranteed QoS",
+			name: "guaranteed QoS with sub-core request",
 			container: &mockContainer{
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						corev1.ResourceCPU: resapi.MustParse("2"),
+						corev1.ResourceCPU: resapi.MustParse("750m"),
 					},
 				},
 			},
 			pod: &mockPod{
 				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
 			},
-			expectedFull:    2,
-			expectedIsolate: opt.PreferIsolated,
+			expectedFull:     0,
+			expectedFraction: 750,
+			expectedIsolate:  false,
 		},
 		{
-			name: "return request's value for guaranteed QoS and isolate",
+			name: "guaranteed QoS with sub-core request, prefer isolated",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("750m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferIsolated:   true,
+			expectedFull:     0,
+			expectedFraction: 750,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with sub-core request, prefer shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("750m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferShared:     true,
+			expectedFull:     0,
+			expectedFraction: 750,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with sub-core request, prefer isolated & shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("750m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferIsolated:   true,
+			preferShared:     true,
+			expectedFull:     0,
+			expectedFraction: 750,
+			expectedIsolate:  false,
+		},
+
+		{
+			name: "guaranteed QoS with single full core request, prefer isolated",
 			container: &mockContainer{
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
@@ -379,13 +436,13 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			pod: &mockPod{
 				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
 			},
+			preferIsolated:  true,
 			expectedFull:    1,
 			expectedIsolate: true,
 		},
 		{
-			name: "return request's value for guaranteed QoS and no isolate",
+			name: "guaranteed QoS with single full core request, prefer no isolated",
 			container: &mockContainer{
-				name: "testcontainer",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
 						corev1.ResourceCPU: resapi.MustParse("1"),
@@ -393,33 +450,49 @@ func TestCpuAllocationPreferences(t *testing.T) {
 				},
 			},
 			pod: &mockPod{
-				returnValueFotGetQOSClass:          corev1.PodQOSGuaranteed,
-				returnValue1FotGetResmgrAnnotation: "testcontainer: false",
-				returnValue2FotGetResmgrAnnotation: true,
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
 			},
-			expectedFull: 1,
+			preferIsolated:  false,
+			expectedFull:    1,
+			expectedIsolate: false,
 		},
 		{
-			name: "prefer shared",
+			name: "guaranteed QoS with single full core request, prefer shared",
 			container: &mockContainer{
-				name: "testcontainer",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
 					Requests: v1.ResourceList{
-						corev1.ResourceCPU: resapi.MustParse("2"),
+						corev1.ResourceCPU: resapi.MustParse("1"),
 					},
 				},
 			},
 			pod: &mockPod{
-				returnValueFotGetQOSClass:          corev1.PodQOSGuaranteed,
-				returnValue1FotGetResmgrAnnotation: "testcontainer: true",
-				returnValue2FotGetResmgrAnnotation: true,
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
 			},
-			expectedFull:     0,
-			expectedFraction: 2000,
+			preferShared:     true,
+			expectedFull:     1,
+			expectedFraction: 0,
+			expectedIsolate:  false,
 		},
-		// effective annotation tests
 		{
-			name: "return request's value for guaranteed QoS and isolate",
+			name: "guaranteed QoS with single full core request, prefer isolated & shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferIsolated:   true,
+			preferShared:     true,
+			expectedFull:     1,
+			expectedFraction: 0,
+			expectedIsolate:  true,
+		},
+		{
+			name: "guaranteed QoS with single full core request, annotated shared",
 			container: &mockContainer{
 				name: "testcontainer",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
@@ -431,14 +504,17 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			pod: &mockPod{
 				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
 				annotations: map[string]string{
-					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+					preferSharedCPUsKey + "/container.testcontainer": "true",
 				},
 			},
-			expectedFull:    1,
-			expectedIsolate: true,
+			preferIsolated:   true,
+			preferShared:     true,
+			expectedFull:     0,
+			expectedFraction: 1000,
+			expectedIsolate:  false,
 		},
 		{
-			name: "return request's value for guaranteed QoS and no isolate",
+			name: "guaranteed QoS with single full core request, annotated no isolated",
 			container: &mockContainer{
 				name: "testcontainer",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
@@ -453,10 +529,165 @@ func TestCpuAllocationPreferences(t *testing.T) {
 					preferIsolatedCPUsKey + "/container.testcontainer": "false",
 				},
 			},
-			expectedFull: 1,
+			preferIsolated:   true,
+			preferShared:     true,
+			expectedFull:     1,
+			expectedFraction: 0,
+			expectedIsolate:  false,
 		},
 		{
-			name: "prefer shared",
+			name: "guaranteed QoS with potential mixed request",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			expectedFull:     1,
+			expectedFraction: 500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with potential mixed request, prefer isolated",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferIsolated:   true,
+			expectedFull:     1,
+			expectedFraction: 500,
+			expectedIsolate:  true,
+		},
+		{
+			name: "guaranteed QoS with potential mixed request, prefer shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferShared:     true,
+			expectedFull:     0,
+			expectedFraction: 1500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with potential mixed request, prefer isolated & shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferIsolated:   true,
+			preferShared:     true,
+			expectedFull:     0,
+			expectedFraction: 1500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core full request",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			expectedFull:    2,
+			expectedIsolate: false,
+		},
+		{
+			name: "guaranteed QoS with multi-core full request, prefer isolated",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferIsolated:  true,
+			expectedFull:    2,
+			expectedIsolate: false,
+		},
+		{
+			name: "guaranteed QoS with multi-core full request, prefer shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferShared:    true,
+			expectedFull:    2,
+			expectedIsolate: false,
+		},
+		{
+			name: "guaranteed QoS with multi-core full request, prefer isolated & shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			preferIsolated:  true,
+			preferShared:    true,
+			expectedFull:    2,
+			expectedIsolate: false,
+		},
+		{
+			name: "guaranteed QoS with multi-core full request, annotate isolated",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+				},
+			},
+			expectedFull:    2,
+			expectedIsolate: true,
+		},
+		{
+			name: "guaranteed QoS with multi-core full request, annotate shared",
 			container: &mockContainer{
 				name: "testcontainer",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
@@ -473,6 +704,194 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			},
 			expectedFull:     0,
 			expectedFraction: 2000,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core full request, annotate isolated & shared",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+					preferSharedCPUsKey + "/container.testcontainer":   "true",
+				},
+			},
+			expectedFull:     0,
+			expectedFraction: 2000,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			expectedFull:     0,
+			expectedFraction: 2500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, prefer isolated",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			expectedFull:     0,
+			expectedFraction: 2500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, prefer shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			expectedFull:     0,
+			expectedFraction: 2500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, prefer isolated & shared",
+			container: &mockContainer{
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+			},
+			expectedFull:     0,
+			expectedFraction: 2500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, annotate isolated",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+				},
+			},
+			expectedFull:     0,
+			expectedFraction: 2500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, annotate shared",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.testcontainer": "true",
+				},
+			},
+			expectedFull:     0,
+			expectedFraction: 2500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, annotate isolated & shared",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+					preferSharedCPUsKey + "/container.testcontainer":   "true",
+				},
+			},
+			expectedFull:     0,
+			expectedFraction: 2500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, annotate no shared",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.testcontainer": "false",
+				},
+			},
+			expectedFull:     2,
+			expectedFraction: 500,
+			expectedIsolate:  false,
+		},
+		{
+			name: "guaranteed QoS with multi-core mixed request, annotate isolated, no shared",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2500m"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+					preferSharedCPUsKey + "/container.testcontainer":   "false",
+				},
+			},
+			expectedFull:     2,
+			expectedFraction: 500,
+			expectedIsolate:  true,
 		},
 	}
 	for _, tc := range tcases {
@@ -480,6 +899,7 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
+			opt.PreferIsolated, opt.PreferShared = tc.preferIsolated, tc.preferShared
 			full, fraction, isolate, cpuType := cpuAllocationPreferences(tc.pod, tc.container)
 			if full != tc.expectedFull || fraction != tc.expectedFraction ||
 				isolate != tc.expectedIsolate || cpuType != tc.expectedCpuType {
