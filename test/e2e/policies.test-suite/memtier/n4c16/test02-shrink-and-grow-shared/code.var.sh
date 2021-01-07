@@ -28,13 +28,19 @@ report allowed
 
 # Next squeeze the besteffort containers to the minimum.
 
-# pod2: 4 guaranteed containers, each requiring 4 CPUs.
+# pod2: 4 guaranteed containers, each requiring 3 CPUs.
 CPU=3 CONTCOUNT=4 create guaranteed
 report allowed
 verify \
     'len(cpus["pod2c0"]) == len(cpus["pod2c1"]) == len(cpus["pod2c2"]) == len(cpus["pod2c3"]) == 3' \
     'disjoint_sets(cpus["pod2c0"], cpus["pod2c1"], cpus["pod2c2"], cpus["pod2c3"])'
 
-# pod3: 3 guaranteed containers, each requiring 1 CPU.
-CPU=1 CONTCOUNT=3 create guaranteed
+# pod3: 1 guaranteed container taking the last non-reserved CPU
+# that can be taken from shared pools.
+CPU=1 create guaranteed
 report allowed
+verify \
+    'disjoint_sets(
+         set.union(cpus["pod1c0"], cpus["pod1c1"]),
+         set.union(cpus["pod3c0"],
+                   cpus["pod2c0"], cpus["pod2c1"], cpus["pod2c2"], cpus["pod2c3"]))'

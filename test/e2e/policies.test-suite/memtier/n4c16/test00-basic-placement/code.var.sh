@@ -29,7 +29,7 @@ kubectl delete pods --all --now
 
 # pod2: Test that 4 burstable containers not eligible for isolated/exclusive CPU allocation
 # gets evenly spread over NUMA nodes.
-CONTCOUNT=4 CPUREQ=3 CPULIM=4 create burstable
+CONTCOUNT=4 CPUREQ=2 CPULIM=4 create burstable
 report allowed
 verify \
     'disjoint_sets(cpus["pod2c0"], cpus["pod2c1"], cpus["pod2c2"], cpus["pod2c3"])' \

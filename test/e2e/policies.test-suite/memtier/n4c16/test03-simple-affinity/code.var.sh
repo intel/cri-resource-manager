@@ -49,21 +49,21 @@ CONTCOUNT=4 CPU=1 create guaranteed+affinity
 report allowed
 
 verify \
-    'nodes["pod0c0"] == {"node0"}' \
-    'nodes["pod0c1"] == {"node1"}' \
-    'nodes["pod0c2"] == {"node2"}' \
-    'nodes["pod0c3"] == {"node3"}'
+    'nodes["pod0c0"] == {"node1"}' \
+    'nodes["pod0c1"] == {"node2"}' \
+    'nodes["pod0c2"] == {"node3"}' \
+    'nodes["pod0c3"] == {"node0"}'
 
 kubectl delete pods --all --now
 
 # pod1
-# 4 containers, affinites [0,1], [2,3] => colocate c0,c1 in node0, c2,c3 in node1
+# 4 containers, affinites [0,1], [2,3] => colocate c0,c1 in node1, c2,c3 in node2
 CONTCOUNT=4 AFFINITIES="pod1c0:pod1c1 pod1c2:pod1c3" CPU=1 create guaranteed+affinity
 report allowed
 
 verify \
-    'nodes["pod1c0"] == nodes["pod1c1"] == {"node0"}' \
-    'nodes["pod1c2"] == nodes["pod1c3"] == {"node1"}'
+    'nodes["pod1c0"] == nodes["pod1c1"] == {"node1"}' \
+    'nodes["pod1c2"] == nodes["pod1c3"] == {"node2"}'
 
 kubectl delete pods --all --now
 
@@ -77,4 +77,3 @@ report allowed
 verify \
     'disjoint_sets(nodes["pod2c4"], nodes["pod2c0"], nodes["pod2c1"], nodes["pod2c2"])' \
     'disjoint_sets(nodes["pod2c5"], nodes["pod2c0"], nodes["pod2c2"], nodes["pod2c3"])'
-

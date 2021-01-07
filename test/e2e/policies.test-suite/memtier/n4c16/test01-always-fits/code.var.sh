@@ -5,16 +5,16 @@
 CPU=1 create guaranteed
 report allowed
 verify \
-    'node_ids(nodes["pod0c0"]) == {0}' \
-    'cpu_ids(cpus["pod0c0"]) == {0}'
+    'node_ids(nodes["pod0c0"]) == {1}' \
+    'cpu_ids(cpus["pod0c0"]) == {4}'
 
 # pod1, takes full core - from a different node than pod0
 CPU=2 create guaranteed
 report allowed
 verify \
-    'cpu_ids(cpus["pod0c0"]) == {0}' \
-    'node_ids(nodes["pod1c0"]) == {1}' \
-    'cpu_ids(cpus["pod1c0"]) == {4, 5}'
+    'cpu_ids(cpus["pod0c0"]) == {4}' \
+    'node_ids(nodes["pod1c0"]) == {2}' \
+    'cpu_ids(cpus["pod1c0"]) == {8, 9}'
 
 # pod2, does not fit in a core but fits in a node
 CPU=3 create guaranteed
@@ -63,14 +63,15 @@ verify \
     'len(dies["pod4c0"]) == 1'
 
 # pod5, takes a full die/package
-CPU=8 create guaranteed
+# cpu0 is reserved, so allocating 7 CPUs is expected to fill package0/die0
+CPU=7 create guaranteed
 report allowed
 verify \
     'len(cpus["pod4c0"]) == 5' \
     'len(cores["pod4c0"]) == 3' \
     'len(nodes["pod4c0"]) == 2' \
     'len(dies["pod4c0"]) == 1' \
-    'len(cpus["pod5c0"]) == 8' \
+    'len(cpus["pod5c0"]) == 7' \
     'len(cores["pod5c0"]) == 4' \
     'len(dies["pod5c0"]) == 1' \
     'disjoint_sets(cpus["pod4c0"], cpus["pod5c0"])'
@@ -120,14 +121,14 @@ verify \
 
 kubectl delete pods pod3 --now
 
-# pod4, pod5 (and existing pod2) take 5 CPUs each. As there are 8
+# pod4, pod5 (and existing pod2) take 5 and 4 CPUs. As there are 8
 # CPUs/node, pod2 and pod4 have consumed free node
 # pairs/dies/packages. pod5 will be spread across nodes.
 CPUREQ=5 CPULIM=$(( CPUREQ + 1 )) create burstable
 report allowed
-CPUREQ=5 CPULIM=$(( CPUREQ + 1 )) create burstable
+CPUREQ=4 CPULIM=$(( CPUREQ + 1 )) create burstable
 report allowed
 verify \
     'len(cpus["pod2c0"]) >= 5' \
     'len(cpus["pod4c0"]) >= 5' \
-    'len(cpus["pod5c0"]) >= 5'
+    'len(cpus["pod5c0"]) >= 4'

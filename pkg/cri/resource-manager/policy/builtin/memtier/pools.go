@@ -337,11 +337,17 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 
 	request := newRequest(container)
 
+	if p.root.FreeSupply().ReservedCPUs().IsEmpty() && request.CPUType() == cpuReserved {
+		// Fallback to allocating reserved CPUs from the shared pool
+		// if there are no reserved CPUs.
+		request.SetCPUType(cpuNormal)
+	}
+
 	// Assumption: in the beginning the CPUs and memory will be allocated from
 	// the same pool. This assumption can be relaxed later, requires separate
 	// (but connected) scoring of memory and CPU.
 
-	if container.GetNamespace() == kubernetes.NamespaceSystem {
+	if request.CPUType() == cpuNormal && container.GetNamespace() == kubernetes.NamespaceSystem {
 		pool = p.root
 	} else {
 		affinity := p.calculatePoolAffinities(request.GetContainer())
@@ -576,23 +582,34 @@ func (p *policy) applyGrant(grant Grant) {
 	log.Debug("* applying grant %s", grant)
 
 	container := grant.GetContainer()
+	cpuType := grant.CPUType()
 	exclusive := grant.ExclusiveCPUs()
+	reserved := grant.ReservedCPUs()
 	shared := grant.SharedCPUs()
-	portion := grant.SharedPortion()
+	cpuPortion := grant.SharedPortion()
 
 	cpus := ""
 	kind := ""
-	if exclusive.IsEmpty() {
-		cpus = shared.String()
-		kind = "shared"
-	} else {
-		kind = "exclusive"
-		if portion > 0 {
-			kind += "+shared"
-			cpus = exclusive.Union(shared).String()
+	if cpuType == cpuNormal {
+		if exclusive.IsEmpty() {
+			cpus = shared.String()
+			kind = "shared"
 		} else {
-			cpus = exclusive.String()
+			kind = "exclusive"
+			if cpuPortion > 0 {
+				kind += "+shared"
+				cpus = exclusive.Union(shared).String()
+			} else {
+				cpus = exclusive.String()
+			}
 		}
+	} else if cpuType == cpuReserved {
+		kind = "reserved"
+		cpus = reserved.String()
+		cpuPortion = grant.ReservedPortion()
+	} else {
+		log.Debug("unsupported granted cpuType %s", cpuType)
+		return
 	}
 
 	mems := ""
@@ -609,7 +626,7 @@ func (p *policy) applyGrant(grant Grant) {
 		}
 		container.SetCpusetCpus(cpus)
 		if exclusive.IsEmpty() {
-			container.SetCPUShares(int64(cache.MilliCPUToShares(portion)))
+			container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
 		} else {
 			// Notes:
 			//   Hmm... I think setting CPU shares according to the normal formula
@@ -623,7 +640,7 @@ func (p *policy) applyGrant(grant Grant) {
 			//   itself to the shared subset will not get properly weighted wrt. other
 			//   processes sharing the same CPUs.
 			//
-			container.SetCPUShares(int64(cache.MilliCPUToShares(portion)))
+			container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
 		}
 	}
 
@@ -665,11 +682,21 @@ func (p *policy) updateSharedAllocations(grant *Grant) {
 		log.Debug("* updating shared allocations")
 	}
 
+	if grant.CPUType() == cpuReserved {
+		log.Debug("  this grant uses reserved CPUs, does not affect shared allocations")
+		return
+	}
+
 	for _, other := range p.allocations.grants {
 		if grant != nil {
 			if other.GetContainer().GetCacheID() == (*grant).GetContainer().GetCacheID() {
 				continue
 			}
+		}
+
+		if other.CPUType() == cpuReserved {
+			log.Debug("  => %s not affected (only reserved CPUs)...", other)
+			continue
 		}
 
 		if other.SharedPortion() == 0 && !other.ExclusiveCPUs().IsEmpty() {
@@ -858,8 +885,9 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	depth1, depth2 := node1.RootDistance(), node2.RootDistance()
 	id1, id2 := node1.NodeID(), node2.NodeID()
 	score1, score2 := scores[id1], scores[id2]
-	isolated1, shared1 := score1.IsolatedCapacity(), score1.SharedCapacity()
-	isolated2, shared2 := score2.IsolatedCapacity(), score2.SharedCapacity()
+	cpuType := request.CPUType()
+	isolated1, reserved1, shared1 := score1.IsolatedCapacity(), score1.ReservedCapacity(), score1.SharedCapacity()
+	isolated2, reserved2, shared2 := score2.IsolatedCapacity(), score2.ReservedCapacity(), score2.SharedCapacity()
 	a1 := affinityScore(affinity, node1)
 	a2 := affinityScore(affinity, node2)
 
@@ -872,37 +900,46 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	//
 	// Our scoring/score sorting algorithm is:
 	//
-	// 1) - insufficient isolated or shared capacity loses
+	// 1) - insufficient isolated, reserved or shared capacity loses
 	// 2) - if we have affinity, the higher affinity score wins
 	// 3) - if only one node matches the memory type request, it wins
 	// 4) - if we have topology hints
 	//       * better hint score wins
 	//       * for a tie, prefer the lower node then the smaller id
 	// 5) - if a node is lower in the tree it wins
-	// 6) - for isolated allocations
+	// 6) - for reserved allocations
+	//       * more unallocated reserved capacity per colocated container wins
+	// 7) - for (non-reserved) isolated allocations
 	//       * more isolated capacity wins
 	//       * for a tie, prefer the smaller id
-	// 7) - for exclusive allocations
+	// 8) - for (non-reserved) exclusive allocations
 	//       * more slicable (shared) capacity wins
 	//       * for a tie, prefer the smaller id
-	// 8) - for shared-only allocations
+	// 9) - for (non-reserved) shared-only allocations
 	//       * fewer colocated containers win
-	//       * for a tie prefer more shared capacity then the smaller id
+	//       * for a tie prefer more shared capacity
+	// 10) - lower id wins
 	//
 	// Before this comparison is reached, nodes with insufficient uncompressible resources
 	// (memory) have been filtered out.
 
 	// 1) a node with insufficient isolated or shared capacity loses
 	switch {
-	case (isolated2 < 0 && isolated1 >= 0) || (shared2 <= 0 && shared1 > 0):
+	case cpuType == cpuNormal && ((isolated2 < 0 && isolated1 >= 0) || (shared2 <= 0 && shared1 > 0)):
 		log.Debug("  => %s loses, insufficent isolated or shared", node2.Name())
 		return true
-	case (isolated1 < 0 && isolated2 >= 0) || (shared1 <= 0 && shared2 > 0):
+	case cpuType == cpuNormal && ((isolated1 < 0 && isolated2 >= 0) || (shared1 <= 0 && shared2 > 0)):
 		log.Debug("  => %s loses, insufficent isolated or shared", node1.Name())
+		return false
+	case cpuType == cpuReserved && reserved2 < 0 && reserved1 >= 0:
+		log.Debug("  => %s loses, insufficent reserved", node2.Name())
+		return true
+	case cpuType == cpuReserved && reserved1 < 0 && reserved2 >= 0:
+		log.Debug("  => %s loses, insufficent reserved", node1.Name())
 		return false
 	}
 
-	log.Debug("  - isolated/shared inusfficiency is a TIE")
+	log.Debug("  - isolated/reserved/shared insufficiency is a TIE")
 
 	// 2) higher affinity score wins
 	if a1 > a2 {
@@ -991,61 +1028,76 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 
 	log.Debug("  - depth is a TIE")
 
-	// 6) more isolated capacity wins
-	if request.Isolate() && (isolated1 > 0 || isolated2 > 0) {
-		if isolated1 > isolated2 {
+	if request.CPUType() == cpuReserved {
+		// 6) if requesting reserved CPUs, more reserved
+		//    capacity per colocated container wins. Reserved
+		//    CPUs cannot be precisely accounted as they run
+		//    also BestEffort containers that do not carry
+		//    information on their CPU needs.
+		if reserved1/(score1.Colocated()+1) > reserved2/(score2.Colocated()+1) {
 			return true
 		}
-		if isolated2 > isolated1 {
+		if reserved2/(score2.Colocated()+1) > reserved1/(score1.Colocated()+1) {
+			return false
+		}
+		log.Debug("  - reserved capacity is a TIE")
+	} else if request.CPUType() == cpuNormal {
+		// 7) more isolated capacity wins
+		if request.Isolate() && (isolated1 > 0 || isolated2 > 0) {
+			if isolated1 > isolated2 {
+				return true
+			}
+			if isolated2 > isolated1 {
+				return false
+			}
+
+			log.Debug("  => %s WINS based on equal isolated capacity, lower id",
+				map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
+
+			return id1 < id2
+		}
+
+		// 8) more slicable shared capacity wins
+		if request.FullCPUs() > 0 && (shared1 > 0 || shared2 > 0) {
+			if shared1 > shared2 {
+				log.Debug("  => %s WINS on more slicable capacity", node1.Name())
+				return true
+			}
+			if shared2 > shared1 {
+				log.Debug("  => %s WINS on more slicable capacity", node2.Name())
+				return false
+			}
+
+			log.Debug("  => %s WINS based on equal slicable capacity, lower id",
+				map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
+
+			return id1 < id2
+		}
+
+		// 9) fewer colocated containers win
+		if score1.Colocated() < score2.Colocated() {
+			log.Debug("  => %s WINS on colocation score", node1.Name())
+			return true
+		}
+		if score2.Colocated() < score1.Colocated() {
+			log.Debug("  => %s WINS on colocation score", node2.Name())
 			return false
 		}
 
-		log.Debug("  => %s WINS based on equal isolated capacity, lower id",
-			map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
+		log.Debug("  - colocation score is a TIE")
 
-		return id1 < id2
-	}
-
-	// 7) more slicable shared capacity wins
-	if request.FullCPUs() > 0 && (shared1 > 0 || shared2 > 0) {
+		// more shared capacity wins
 		if shared1 > shared2 {
-			log.Debug("  => %s WINS on more slicable capacity", node1.Name())
+			log.Debug("  => %s WINS on more shared capacity", node1.Name())
 			return true
 		}
 		if shared2 > shared1 {
-			log.Debug("  => %s WINS on more slicable capacity", node2.Name())
+			log.Debug("  => %s WINS on more shared capacity", node2.Name())
 			return false
 		}
-
-		log.Debug("  => %s WINS based on equal slicable capacity, lower id",
-			map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
-
-		return id1 < id2
 	}
 
-	// 8) fewer colocated containers win
-	if score1.Colocated() < score2.Colocated() {
-		log.Debug("  => %s WINS on colocation score", node1.Name())
-		return true
-	}
-	if score2.Colocated() < score1.Colocated() {
-		log.Debug("  => %s WINS on colocation score", node2.Name())
-		return false
-	}
-
-	log.Debug("  - colocation score is a TIE")
-
-	// more shared capacity wins
-	if shared1 > shared2 {
-		log.Debug("  => %s WINS on more shared capacity", node1.Name())
-		return true
-	}
-	if shared2 > shared1 {
-		log.Debug("  => %s WINS on more shared capacity", node2.Name())
-		return false
-	}
-
-	// lower id wins
+	// 10) lower id wins
 	log.Debug("  => %s WINS based on lower id",
 		map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
