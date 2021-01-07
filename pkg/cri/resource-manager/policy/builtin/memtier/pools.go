@@ -332,7 +332,7 @@ func (p *policy) checkHWTopology() error {
 }
 
 // Pick a pool and allocate resource from it to the container.
-func (p *policy) allocatePool(container cache.Container) (Grant, error) {
+func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant, error) {
 	var pool Node
 
 	request := newRequest(container)
@@ -360,7 +360,22 @@ func (p *policy) allocatePool(container cache.Container) (Grant, error) {
 				container.PrettyName())
 		}
 
-		pool = pools[0]
+		if poolHint != "" {
+			for idx, p := range pools {
+				if p.Name() == poolHint {
+					log.Debug("* using hinted pool %q (#%d best fit)", poolHint, idx+1)
+					pool = p
+					break
+				}
+			}
+			if pool == nil {
+				log.Debug("* cannot use hinted pool %q", poolHint)
+			}
+		}
+
+		if pool == nil {
+			pool = pools[0]
+		}
 	}
 
 	supply := pool.FreeSupply()
@@ -643,12 +658,18 @@ func (p *policy) releasePool(container cache.Container) (Grant, bool) {
 }
 
 // Update shared allocations effected by agrant.
-func (p *policy) updateSharedAllocations(grant Grant) {
-	log.Debug("* updating shared allocations affected by %s", grant)
+func (p *policy) updateSharedAllocations(grant *Grant) {
+	if grant != nil {
+		log.Debug("* updating shared allocations affected by %s", (*grant).String())
+	} else {
+		log.Debug("* updating shared allocations")
+	}
 
 	for _, other := range p.allocations.grants {
-		if other.GetContainer().GetCacheID() == grant.GetContainer().GetCacheID() {
-			continue
+		if grant != nil {
+			if other.GetContainer().GetCacheID() == (*grant).GetContainer().GetCacheID() {
+				continue
+			}
 		}
 
 		if other.SharedPortion() == 0 && !other.ExclusiveCPUs().IsEmpty() {

@@ -94,7 +94,7 @@ func TestColdStart(t *testing.T) {
 				allocations: allocations{
 					grants: make(map[string]Grant, 0),
 				},
-				options: policyapi.BackendOptions{},
+				options: &policyapi.BackendOptions{},
 			}
 			policy.allocations.policy = policy
 			policy.options.SendEvent = sendEvent
@@ -103,7 +103,7 @@ func TestColdStart(t *testing.T) {
 				t.Errorf("failed to build topology pool")
 			}
 
-			grant, err := policy.allocatePool(tc.container)
+			grant, err := policy.allocatePool(tc.container, "")
 			if err != nil {
 				panic(err)
 			}

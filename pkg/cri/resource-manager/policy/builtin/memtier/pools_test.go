@@ -720,19 +720,19 @@ func TestContainerMove(t *testing.T) {
 			policy := CreateMemtierPolicy(policyOptions).(*policy)
 			log.EnableDebug(false)
 
-			grant1, err := policy.allocatePool(tc.container1)
+			grant1, err := policy.allocatePool(tc.container1, "")
 			if err != nil {
 				panic(err)
 			}
 			fmt.Printf("grant 1 memsets: dram %s, pmem %s\n", grant1.GetMemoryNode().GetMemset(memoryDRAM), grant1.GetMemoryNode().GetMemset(memoryPMEM))
 
-			grant2, err := policy.allocatePool(tc.container2)
+			grant2, err := policy.allocatePool(tc.container2, "")
 			if err != nil {
 				panic(err)
 			}
 			fmt.Printf("grant 2 memsets: dram %s, pmem %s\n", grant2.GetMemoryNode().GetMemset(memoryDRAM), grant2.GetMemoryNode().GetMemset(memoryPMEM))
 
-			grant3, err := policy.allocatePool(tc.container3)
+			grant3, err := policy.allocatePool(tc.container3, "")
 			if err != nil {
 				panic(err)
 			}

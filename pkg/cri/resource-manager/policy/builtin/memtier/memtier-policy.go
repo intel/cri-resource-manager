@@ -19,6 +19,8 @@ import (
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -49,7 +51,7 @@ type allocations struct {
 
 // policy is our runtime state for the memtier policy.
 type policy struct {
-	options      policyapi.BackendOptions  // options we were created or reconfigured with
+	options      *policyapi.BackendOptions // options we were created or reconfigured with
 	cache        cache.Cache               // pod/container cache
 	sys          system.System             // system/HW topology info
 	allowed      cpuset.CPUSet             // bounding set of CPUs we're allowed to use
@@ -77,24 +79,17 @@ func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
 	p := &policy{
 		cache:        opts.Cache,
 		sys:          opts.System,
-		options:      *opts,
+		options:      opts,
 		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
 	}
 
-	p.nodes = make(map[string]Node)
-	p.allocations = allocations{policy: p, grants: make(map[string]Grant, 32)}
-
-	if err := p.checkConstraints(); err != nil {
-		log.Fatal("failed to create memtier policy: %v", err)
-	}
-
-	if err := p.buildPoolsByTopology(); err != nil {
-		log.Fatal("failed to create memtier policy: %v", err)
+	if err := p.initialize(); err != nil {
+		log.Fatal("failed to initialize %s policy: %v", PolicyName, err)
 	}
 
 	p.addImplicitAffinities()
 
-	config.GetModule(PolicyPath).AddNotify(p.configNotify)
+	config.GetModule(policyapi.ConfigPath).AddNotify(p.configNotify)
 
 	return p
 }
@@ -143,13 +138,13 @@ func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
 func (p *policy) AllocateResources(container cache.Container) error {
 	log.Debug("allocating resources for %s...", container.PrettyName())
 
-	grant, err := p.allocatePool(container)
+	grant, err := p.allocatePool(container, "")
 	if err != nil {
 		return policyError("failed to allocate resources for %s: %v",
 			container.PrettyName(), err)
 	}
 	p.applyGrant(grant)
-	p.updateSharedAllocations(grant)
+	p.updateSharedAllocations(&grant)
 
 	p.root.Dump("<post-alloc>")
 
@@ -161,7 +156,7 @@ func (p *policy) ReleaseResources(container cache.Container) error {
 	log.Debug("releasing resources of %s...", container.PrettyName())
 
 	if grant, found := p.releasePool(container); found {
-		p.updateSharedAllocations(grant)
+		p.updateSharedAllocations(&grant)
 	}
 
 	p.root.Dump("<post-release>")
@@ -324,6 +319,39 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	return data
 }
 
+// reallocateResources reallocates the given containers using the given pool hints
+func (p *policy) reallocateResources(containers []cache.Container, pools map[string]string) error {
+	var errors *multierror.Error
+
+	log.Info("reallocating resources...")
+
+	cache.SortContainers(containers)
+
+	for _, c := range containers {
+		p.releasePool(c)
+	}
+	for _, c := range containers {
+		log.Debug("reallocating resources for %s...", c.PrettyName())
+
+		grant, err := p.allocatePool(c, pools[c.GetCacheID()])
+		if err != nil {
+			errors = multierror.Append(errors, err)
+		} else {
+			p.applyGrant(grant)
+		}
+	}
+
+	if err := errors.ErrorOrNil(); err != nil {
+		return err
+	}
+
+	p.updateSharedAllocations(nil)
+
+	p.root.Dump("<post-realloc>")
+
+	return nil
+}
+
 func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("configuration %s:", event)
 	log.Info("  - pin containers to CPUs: %v", opt.PinCPU)
@@ -331,12 +359,101 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
 	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
 
-	// TODO: We probably should release and reallocate resources for all containers
-	//   to honor the latest configuration. Depending on the changes that might be
-	//   disruptive to some containers, so whether we do so or not should probably
-	//   be part of the configuration as well.
+	var allowed, reserved cpuset.CPUSet
+	var reinit bool
+
+	if cpus, ok := p.options.Available[policyapi.DomainCPU]; ok {
+		if cset, ok := cpus.(cpuset.CPUSet); ok {
+			allowed = cset
+		}
+	}
+	if cpus, ok := p.options.Reserved[policyapi.DomainCPU]; ok {
+		switch v := cpus.(type) {
+		case cpuset.CPUSet:
+			reserved = v
+		case resapi.Quantity:
+			reserveCnt := (int(v.MilliValue()) + 999) / 1000
+			if reserveCnt != p.reserveCnt {
+				log.Warn("CPU reservation has changed (%v, was %v)",
+					reserveCnt, p.reserveCnt)
+				reinit = true
+			}
+		}
+	}
+
+	if !allowed.Equals(p.allowed) {
+		if !(allowed.Size() == 0 && p.allowed.Size() == 0) {
+			log.Warn("allowed cpuset changed (%s, was %s)",
+				p.allowed.String(), allowed.String())
+			reinit = true
+		}
+	}
+	if !reserved.Equals(p.reserved) {
+		if !(reserved.Size() == 0 && p.reserved.Size() == 0) {
+			log.Warn("reserved cpuset changed (%s, was %s)",
+				p.reserved.String(), reserved.String())
+			reinit = true
+		}
+	}
+
+	//
+	// Notes:
+	//   If the allowed or reserved resources have changed, we need to
+	//   rebuild our pool hierarchy using the updated constraints and
+	//   also update the existing allocations accordingly. We do this
+	//   first reinitializing the policy then reloading the allocations
+	//   from the cache. If we fail, we restore the original state of
+	//   the policy and reject the new configuration.
+	//
+
+	if reinit {
+		log.Warn("reinitializing memtier policy...")
+
+		savedPolicy := *p
+		allocations := savedPolicy.allocations.clone()
+
+		if err := p.initialize(); err != nil {
+			*p = savedPolicy
+			return policyError("failed to reconfigure: %v", err)
+		}
+
+		for _, grant := range allocations.grants {
+			if err := grant.RefetchNodes(); err != nil {
+				*p = savedPolicy
+				return policyError("failed to reconfigure: %v", err)
+			}
+		}
+
+		log.Warn("updating existing allocations...")
+		if err := p.restoreAllocations(&allocations); err != nil {
+			*p = savedPolicy
+			return policyError("failed to reconfigure: %v", err)
+		}
+
+		p.root.Dump("<post-config>")
+	}
 
 	p.saveConfig()
+
+	return nil
+}
+
+// Initialize or reinitialize the policy.
+func (p *policy) initialize() error {
+	p.nodes = nil
+	p.pools = nil
+	p.root = nil
+	p.nodeCnt = 0
+	p.depth = 0
+	p.allocations = p.newAllocations()
+
+	if err := p.checkConstraints(); err != nil {
+		return err
+	}
+
+	if err := p.buildPoolsByTopology(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -386,10 +503,13 @@ func (p *policy) restoreCache() error {
 		p.saveConfig()
 	}
 
-	if err := p.restoreAllocations(); err != nil {
-		return policyError("failed to restore cached allocations: %v", err)
+	allocations := p.newAllocations()
+	if p.cache.GetPolicyEntry(keyAllocations, &allocations) {
+		if err := p.restoreAllocations(&allocations); err != nil {
+			return policyError("failed to restore allocations from cache: %v", err)
+		}
+		p.allocations.Dump(log.Info, "restored ")
 	}
-	p.allocations.Dump(log.Info, "restored ")
 	p.saveAllocations()
 
 	return nil
@@ -406,6 +526,32 @@ func (p *policy) checkColdstartOff() {
 			}
 		}
 	}
+}
+
+// newAllocations returns a new initialized empty set of allocations.
+func (p *policy) newAllocations() allocations {
+	return allocations{policy: p, grants: make(map[string]Grant)}
+}
+
+// clone creates a copy of the allocation.
+func (a *allocations) clone() allocations {
+	o := allocations{policy: a.policy, grants: make(map[string]Grant)}
+	for id, grant := range a.grants {
+		o.grants[id] = grant.Clone()
+	}
+	return o
+}
+
+// getContainerPoolHints creates container pool hints for the current grants.
+func (a *allocations) getContainerPoolHints() ([]cache.Container, map[string]string) {
+	containers := make([]cache.Container, 0, len(a.grants))
+	hints := make(map[string]string)
+	for _, grant := range a.grants {
+		c := grant.GetContainer()
+		containers = append(containers, c)
+		hints[c.GetCacheID()] = grant.GetCPUNode().Name()
+	}
+	return containers, hints
 }
 
 // Register us as a policy implementation.
