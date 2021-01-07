@@ -682,7 +682,7 @@ func (p *policy) updateSharedAllocations(grant *Grant) {
 		log.Debug("* updating shared allocations")
 	}
 
-	if grant.CPUType() == cpuReserved {
+	if (*grant).CPUType() == cpuReserved {
 		log.Debug("  this grant uses reserved CPUs, does not affect shared allocations")
 		return
 	}
