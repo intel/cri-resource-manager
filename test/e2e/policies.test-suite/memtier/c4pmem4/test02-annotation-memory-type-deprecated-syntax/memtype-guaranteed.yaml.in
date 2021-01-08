@@ -3,9 +3,10 @@ kind: Pod
 metadata:
   name: ${NAME}
   annotations:
-    memory-type.cri-resource-manager.intel.com/container.${NAME}c0: ${MEMTYPEC0}
-    memory-type.cri-resource-manager.intel.com/container.${NAME}c1: ${MEMTYPEC1}
-    memory-type.cri-resource-manager.intel.com/container.${NAME}c2: ${MEMTYPEC2}
+    cri-resource-manager.intel.com/memory-type: |
+      ${NAME}c0: ${MEMTYPEC0}
+      ${NAME}c1: ${MEMTYPEC1}
+      ${NAME}c2: ${MEMTYPEC2}
 spec:
   containers:
     $(for CONT in 0 1 2; do echo "

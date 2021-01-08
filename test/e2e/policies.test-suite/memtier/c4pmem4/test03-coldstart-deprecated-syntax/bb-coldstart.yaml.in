@@ -3,9 +3,11 @@ kind: Pod
 metadata:
   name: ${NAME}
   annotations:
-    memory-type.cri-resource-manager.intel.com/container.${NAME}c0: dram,pmem
-    cold-start.cri-resource-manager.intel.com/container.${NAME}c0: |
-      duration: ${DURATION}
+    cri-resource-manager.intel.com/memory-type: |
+      ${NAME}c0: dram,pmem
+    cri-resource-manager.intel.com/cold-start: |
+      ${NAME}c0:
+        duration: ${DURATION}
 spec:
   containers:
     - name: ${NAME}c0

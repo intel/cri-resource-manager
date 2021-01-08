@@ -3,7 +3,11 @@ kind: Pod
 metadata:
   name: ${NAME}
   annotations:
-    memory-type.cri-resource-manager.intel.com/pod: dram,pmem
+    cri-resource-manager.intel.com/memory-type: |
+      pod0c0: dram,pmem
+      pod0c1: dram,pmem
+      pod0c2: dram,pmem
+      pod0c3: dram,pmem
 spec:
   containers:
     - name: ${NAME}c0
