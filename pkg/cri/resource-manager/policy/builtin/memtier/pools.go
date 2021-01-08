@@ -678,13 +678,12 @@ func (p *policy) releasePool(container cache.Container) (Grant, bool) {
 func (p *policy) updateSharedAllocations(grant *Grant) {
 	if grant != nil {
 		log.Debug("* updating shared allocations affected by %s", (*grant).String())
+		if (*grant).CPUType() == cpuReserved {
+			log.Debug("  this grant uses reserved CPUs, does not affect shared allocations")
+			return
+		}
 	} else {
 		log.Debug("* updating shared allocations")
-	}
-
-	if (*grant).CPUType() == cpuReserved {
-		log.Debug("  this grant uses reserved CPUs, does not affect shared allocations")
-		return
 	}
 
 	for _, other := range p.allocations.grants {
