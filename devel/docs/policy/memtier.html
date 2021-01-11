@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Memtier Policy &mdash; CRI Resource Manager 0.4.0-357-gea3bbd7 documentation</title>
+  <title>Memtier Policy &mdash; CRI Resource Manager 0.4.0-364-g0b1b5c7 documentation</title>
   
 
   
@@ -232,10 +232,17 @@ Intel® Optane™ memory.</p></li>
 <li><p>HBM (high-bandwidth memory) is high speed memory, typically found
 on some special-purpose computing systems.</p></li>
 </ul>
-<p>In order to configure a pod to use a certain memory type, use
-<code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/memory-type</span></code> annotation in the pod spec.
-For example, to make a container request both <code class="docutils literal notranslate"><span class="pre">PMEM</span></code> and <code class="docutils literal notranslate"><span class="pre">DRAM</span></code> memory
+<p>In order to configure a container to use a certain memory type, use the
+<code class="docutils literal notranslate"><span class="pre">memory-type.cri-resource-manager.intel.com</span></code> effective annotation in the pod
+spec. For example, to make <code class="docutils literal notranslate"><span class="pre">container1</span></code> request both <code class="docutils literal notranslate"><span class="pre">PMEM</span></code> and <code class="docutils literal notranslate"><span class="pre">DRAM</span></code> memory
 types, you could use pod metadata such as this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
+  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">memory</span><span class="o">-</span><span class="nb">type</span><span class="o">.</span><span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">container</span><span class="o">.</span><span class="n">container1</span><span class="p">:</span> <span class="n">dram</span><span class="p">,</span><span class="n">pmem</span>
+</pre></div>
+</div>
+<p>Alternatively, you can use the following deprecated syntax to achieve the same,
+but support for this syntax is subject to be dropped in a future release:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
   <span class="n">annotations</span><span class="p">:</span>
     <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">memory</span><span class="o">-</span><span class="nb">type</span><span class="p">:</span> <span class="o">|</span>
@@ -253,6 +260,16 @@ controller is added to the workload only after the cold start timeout is
 done. The effect of this is that allocated large unused memory areas of
 memory don’t need to be migrated to PMEM, because it was allocated there to
 begin with. Cold start is configured like this in the pod metadata:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
+  <span class="n">annotations</span><span class="p">:</span>
+    <span class="n">memory</span><span class="o">-</span><span class="nb">type</span><span class="o">.</span><span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">container</span><span class="o">.</span><span class="n">container1</span><span class="p">:</span> <span class="n">dram</span><span class="p">,</span><span class="n">pmem</span>
+    <span class="n">cold</span><span class="o">-</span><span class="n">start</span><span class="o">.</span><span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">container</span><span class="o">.</span><span class="n">container1</span><span class="p">:</span> <span class="o">|</span>
+      <span class="n">duration</span><span class="p">:</span> <span class="mi">60</span><span class="n">s</span>
+</pre></div>
+</div>
+<p>Again, alternatively you can use the following deprecated annotation syntax to
+achieve the same, but support for this syntax is subject to be dropped in a
+future release:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">metadata</span><span class="p">:</span>
   <span class="n">annotations</span><span class="p">:</span>
     <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">memory</span><span class="o">-</span><span class="nb">type</span><span class="p">:</span> <span class="o">|</span>
