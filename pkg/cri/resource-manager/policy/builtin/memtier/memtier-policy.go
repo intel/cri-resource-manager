@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	// PolicyName is the symbol used to pull us in as a builtin policy.
+	// PolicyName is the name used to activate this policy implementation.
 	PolicyName = "memtier"
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A policy for prototyping memory tiering."
