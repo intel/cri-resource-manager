@@ -39,6 +39,7 @@ func TestPodIsolationPreference(t *testing.T) {
 		{
 			name:            "return defaults",
 			pod:             &mockPod{},
+			container:       &mockContainer{},
 			expectedIsolate: opt.PreferIsolated,
 		},
 		{
@@ -47,6 +48,7 @@ func TestPodIsolationPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:        &mockContainer{},
 			expectedIsolate:  true,
 			expectedExplicit: true,
 		},
@@ -56,6 +58,7 @@ func TestPodIsolationPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "UNPARSABLE",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:       &mockContainer{},
 			expectedIsolate: opt.PreferIsolated,
 		},
 		{
@@ -64,7 +67,8 @@ func TestPodIsolationPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "key: true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
-			disabled: true,
+			container: &mockContainer{},
+			disabled:  true,
 		},
 		{
 			name: "return defaults for missing preferences",
@@ -86,13 +90,56 @@ func TestPodIsolationPreference(t *testing.T) {
 			},
 			expectedExplicit: true,
 		},
+		// effective annotation tests
+		{
+			name: "prefer resmgr's annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "true",
+				},
+			},
+			container:        &mockContainer{name: "c0"},
+			expectedIsolate:  true,
+			expectedExplicit: true,
+		},
+		{
+			name: "prefer resmgr's annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "false",
+				},
+			},
+			container:        &mockContainer{name: "c0"},
+			expectedIsolate:  false,
+			expectedExplicit: true,
+		},
+		{
+			name: "return defaults for unparsable annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "blah",
+				},
+			},
+			container:       &mockContainer{name: "c0"},
+			expectedIsolate: opt.PreferIsolated,
+		},
+		{
+			name: "return defaults for missing preferences",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.c0": "true",
+				},
+			},
+			container:       &mockContainer{name: "c1"},
+			expectedIsolate: opt.PreferIsolated,
+		},
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			isolate, explicit := podIsolationPreference(tc.pod, tc.container)
+			isolate, explicit := isolatedCPUsPreference(tc.pod, tc.container)
 			if isolate != tc.expectedIsolate || explicit != tc.expectedExplicit {
 				t.Errorf("Expected (%v, %v), but got (%v, %v)", tc.expectedIsolate, tc.expectedExplicit, isolate, explicit)
 			}
@@ -102,12 +149,11 @@ func TestPodIsolationPreference(t *testing.T) {
 
 func TestPodSharedCPUPreference(t *testing.T) {
 	tcases := []struct {
-		name            string
-		pod             *mockPod
-		container       *mockContainer
-		expectedShared  bool
-		expectedElevate int
-		disabled        bool
+		name           string
+		pod            *mockPod
+		container      *mockContainer
+		expectedShared bool
+		disabled       bool
 	}{
 		{
 			name:     "podSharedCPUPreference() should handle nil pod arg gracefully",
@@ -116,6 +162,7 @@ func TestPodSharedCPUPreference(t *testing.T) {
 		{
 			name:           "return defaults",
 			pod:            &mockPod{},
+			container:      &mockContainer{},
 			expectedShared: opt.PreferShared,
 		},
 		{
@@ -124,6 +171,7 @@ func TestPodSharedCPUPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:      &mockContainer{},
 			expectedShared: true,
 		},
 		{
@@ -132,6 +180,7 @@ func TestPodSharedCPUPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "UNPARSABLE",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
+			container:      &mockContainer{},
 			expectedShared: opt.PreferShared,
 		},
 		{
@@ -140,7 +189,8 @@ func TestPodSharedCPUPreference(t *testing.T) {
 				returnValue1FotGetResmgrAnnotation: "key: true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
-			disabled: true,
+			container: &mockContainer{},
+			disabled:  true,
 		},
 		{
 			name: "return defaults for missing preferences",
@@ -172,28 +222,46 @@ func TestPodSharedCPUPreference(t *testing.T) {
 			},
 			expectedShared: opt.PreferShared,
 		},
+		// effective annotation tests
 		{
-			name: "return defaults for elevate gt 0", // FIXME(rojkov): what ever that means... This looks strange the value can be of either bool or int type
+			name: "prefer resmgr's annotation value",
 			pod: &mockPod{
-				returnValue1FotGetResmgrAnnotation: "testcontainer: 12",
-				returnValue2FotGetResmgrAnnotation: true,
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "true",
+				},
 			},
-			container: &mockContainer{
-				name: "testcontainer",
+			container:      &mockContainer{name: "c0"},
+			expectedShared: true,
+		},
+		{
+			name: "prefer resmgr's annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "false",
+				},
 			},
+			container:      &mockContainer{name: "c0"},
+			expectedShared: false,
+		},
+		{
+			name: "return defaults for unparsable annotation value",
+			pod: &mockPod{
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "blah",
+				},
+			},
+			container:      &mockContainer{name: "c0"},
 			expectedShared: opt.PreferShared,
 		},
 		{
-			name: "return negative annotation value",
+			name: "return defaults for missing preferences",
 			pod: &mockPod{
-				returnValue1FotGetResmgrAnnotation: "testcontainer: -9",
-				returnValue2FotGetResmgrAnnotation: true,
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.c0": "true",
+				},
 			},
-			container: &mockContainer{
-				name: "testcontainer",
-			},
-			expectedShared:  true,
-			expectedElevate: -9,
+			container:      &mockContainer{name: "c1"},
+			expectedShared: opt.PreferShared,
 		},
 	}
 	for _, tc := range tcases {
@@ -201,9 +269,9 @@ func TestPodSharedCPUPreference(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			shared, elevate := podSharedCPUPreference(tc.pod, tc.container)
-			if shared != tc.expectedShared || elevate != tc.expectedElevate {
-				t.Errorf("Expected (%v, %v), but got (%v, %v)", tc.expectedShared, tc.expectedElevate, shared, elevate)
+			shared, _ := sharedCPUsPreference(tc.pod, tc.container)
+			if shared != tc.expectedShared {
+				t.Errorf("Expected %v, but got %v", tc.expectedShared, shared)
 			}
 		})
 	}
@@ -218,7 +286,6 @@ func TestCpuAllocationPreferences(t *testing.T) {
 		expectedFraction int
 		expectedIsolate  bool
 		expectedCpuType  cpuClass
-		expectedElevate  int
 		disabled         bool
 	}{
 		{
@@ -337,12 +404,68 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			},
 			pod: &mockPod{
 				returnValueFotGetQOSClass:          corev1.PodQOSGuaranteed,
-				returnValue1FotGetResmgrAnnotation: "testcontainer: -9",
+				returnValue1FotGetResmgrAnnotation: "testcontainer: true",
 				returnValue2FotGetResmgrAnnotation: true,
 			},
 			expectedFull:     0,
 			expectedFraction: 2000,
-			expectedElevate:  9,
+		},
+		// effective annotation tests
+		{
+			name: "return request's value for guaranteed QoS and isolate",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "true",
+				},
+			},
+			expectedFull:    1,
+			expectedIsolate: true,
+		},
+		{
+			name: "return request's value for guaranteed QoS and no isolate",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("1"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferIsolatedCPUsKey + "/container.testcontainer": "false",
+				},
+			},
+			expectedFull: 1,
+		},
+		{
+			name: "prefer shared",
+			container: &mockContainer{
+				name: "testcontainer",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+				annotations: map[string]string{
+					preferSharedCPUsKey + "/container.testcontainer": "true",
+				},
+			},
+			expectedFull:     0,
+			expectedFraction: 2000,
 		},
 	}
 	for _, tc := range tcases {
@@ -350,13 +473,12 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
-			full, fraction, isolate, cpuType, elevate := cpuAllocationPreferences(tc.pod, tc.container)
+			full, fraction, isolate, cpuType := cpuAllocationPreferences(tc.pod, tc.container)
 			if full != tc.expectedFull || fraction != tc.expectedFraction ||
-				isolate != tc.expectedIsolate || elevate != tc.expectedElevate ||
-				cpuType != tc.expectedCpuType {
-				t.Errorf("Expected (%v, %v, %v, %v, %v), but got (%v, %v, %v, %v, %v)",
-					tc.expectedFull, tc.expectedFraction, tc.expectedIsolate, tc.expectedCpuType, tc.expectedElevate,
-					full, fraction, isolate, cpuType, elevate)
+				isolate != tc.expectedIsolate || cpuType != tc.expectedCpuType {
+				t.Errorf("Expected (%v, %v, %v, %s), but got (%v, %v, %v, %s)",
+					tc.expectedFull, tc.expectedFraction, tc.expectedIsolate, tc.expectedCpuType,
+					full, fraction, isolate, cpuType)
 			}
 		})
 	}

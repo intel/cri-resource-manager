@@ -40,10 +40,19 @@ The `memtier` policy knows of three kinds of memory: `DRAM`, `PMEM`, and
   * HBM (high-bandwidth memory) is high speed memory, typically found
     on some special-purpose computing systems.
 
-In order to configure a pod to use a certain memory type, use
-`cri-resource-manager.intel.com/memory-type` annotation in the pod spec.
-For example, to make a container request both `PMEM` and `DRAM` memory
+In order to configure a container to use a certain memory type, use the
+`memory-type.cri-resource-manager.intel.com` effective annotation in the pod
+spec. For example, to make `container1` request both `PMEM` and `DRAM` memory
 types, you could use pod metadata such as this:
+
+```
+metadata:
+  annotations:
+    memory-type.cri-resource-manager.intel.com/container.container1: dram,pmem
+```
+
+Alternatively, you can use the following deprecated syntax to achieve the same,
+but support for this syntax is subject to be dropped in a future release:
 
 ```
 metadata:
@@ -64,6 +73,18 @@ controller is added to the workload only after the cold start timeout is
 done. The effect of this is that allocated large unused memory areas of
 memory don't need to be migrated to PMEM, because it was allocated there to
 begin with. Cold start is configured like this in the pod metadata:
+
+```
+metadata:
+  annotations:
+    memory-type.cri-resource-manager.intel.com/container.container1: dram,pmem
+    cold-start.cri-resource-manager.intel.com/container.container1: |
+      duration: 60s
+```
+
+Again, alternatively you can use the following deprecated annotation syntax to
+achieve the same, but support for this syntax is subject to be dropped in a
+future release:
 
 ```
 metadata:
