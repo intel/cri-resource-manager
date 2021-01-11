@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	// PolicyName is the symbol used to pull us in as a builtin policy.
+	// PolicyName is the name used to activate this policy implementation.
 	PolicyName = "none"
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A no-op policy, doing pretty much nothing."
