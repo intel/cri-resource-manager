@@ -143,7 +143,7 @@ def isHTTPLink(uri):
     return uri.startswith('http://') or uri.startswith('https://')
 
 def isMDFileLink(uri):
-    return uri.endswith('.md')
+    return uri.endswith('.md') or '.md#' in uri
 
 def isRSTFileLink(uri):
     return uri.endswith('.rst')
