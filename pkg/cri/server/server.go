@@ -342,6 +342,7 @@ func (s *server) intercept(ctx context.Context, req interface{},
 	}
 
 	s.collectStatistics(kind, name, start, send, recv, end)
+	logger.Flush()
 
 	return rpl, err
 }

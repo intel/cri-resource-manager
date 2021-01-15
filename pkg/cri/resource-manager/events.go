@@ -78,6 +78,7 @@ func (m *resmgr) startEventProcessing() error {
 					evtlog.Error("rebalancing failed: %v", err)
 				}
 			}
+			logger.Flush()
 		}
 	}()
 
