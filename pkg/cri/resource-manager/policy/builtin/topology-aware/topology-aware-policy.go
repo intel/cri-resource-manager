@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memtier
+package topologyaware
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -33,11 +33,15 @@ import (
 
 const (
 	// PolicyName is the name used to activate this policy implementation.
-	PolicyName = "memtier"
+	PolicyName = "topology-aware"
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A policy for prototyping memory tiering."
 	// PolicyPath is the path of this policy in the configuration hierarchy.
 	PolicyPath = "policy." + PolicyName
+	// AliasName is the 'memtier' alias name for this policy.
+	AliasName = "memtier"
+	// AliasPath is the 'memtier' alias configuration path for this policy.
+	AliasPath = "policy." + AliasName
 
 	// ColdStartDone is the event generated for the end of a container cold start period.
 	ColdStartDone = "cold-start-done"
@@ -49,7 +53,7 @@ type allocations struct {
 	grants map[string]Grant
 }
 
-// policy is our runtime state for the memtier policy.
+// policy is our runtime state for this policy.
 type policy struct {
 	options      *policyapi.BackendOptions // options we were created or reconfigured with
 	cache        cache.Cache               // pod/container cache
@@ -66,6 +70,7 @@ type policy struct {
 	allocations  allocations               // container pool assignments
 	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
 	coldstartOff bool                      // coldstart forced off (have movable PMEM zones)
+	isAlias      bool                      // whether started by referencing AliasName
 }
 
 // Make sure policy implements the policy.Backend interface.
@@ -74,13 +79,28 @@ var _ policyapi.Backend = &policy{}
 // Whether we have coldstart forced off due to PMEM in movable memory zones.
 var coldStartOff bool
 
-// CreateMemtierPolicy creates a new policy instance.
+// CreateTopologyAwarePolicy creates a new policy instance.
+func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
+	return createPolicy(opts, false)
+}
+
+// CreateMemtierPolicy creates a new policy instance, aliased as 'memtier'.
 func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
+	return createPolicy(opts, true)
+}
+
+// createPolicy creates a new policy instance.
+func createPolicy(opts *policyapi.BackendOptions, isAlias bool) policyapi.Backend {
 	p := &policy{
 		cache:        opts.Cache,
 		sys:          opts.System,
 		options:      opts,
 		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
+		isAlias:      isAlias,
+	}
+
+	if isAlias {
+		*opt = *aliasOpt
 	}
 
 	if err := p.initialize(); err != nil {
@@ -353,7 +373,12 @@ func (p *policy) reallocateResources(containers []cache.Container, pools map[str
 }
 
 func (p *policy) configNotify(event config.Event, source config.Source) error {
-	log.Info("configuration %s:", event)
+	policyName := PolicyName
+	if p.isAlias {
+		policyName = AliasName
+		*opt = *aliasOpt
+	}
+	log.Info("%s configuration %s:", policyName, event)
 	log.Info("  - pin containers to CPUs: %v", opt.PinCPU)
 	log.Info("  - pin containers to memory: %v", opt.PinMemory)
 	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
@@ -407,7 +432,7 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	//
 
 	if reinit {
-		log.Warn("reinitializing memtier policy...")
+		log.Warn("reinitializing %s policy...", PolicyName)
 
 		savedPolicy := *p
 		allocations := savedPolicy.allocations.clone()
@@ -565,5 +590,6 @@ func (a *allocations) getContainerPoolHints() ([]cache.Container, map[string]str
 
 // Register us as a policy implementation.
 func init() {
-	policyapi.Register(PolicyName, PolicyDescription, CreateMemtierPolicy)
+	policyapi.Register(PolicyName, PolicyDescription, CreateTopologyAwarePolicy)
+	policyapi.Register(AliasName, PolicyDescription, CreateMemtierPolicy)
 }

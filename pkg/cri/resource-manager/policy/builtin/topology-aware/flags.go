@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memtier
+package topologyaware
 
 import (
 	config "github.com/intel/cri-resource-manager/pkg/config"
@@ -21,9 +21,9 @@ import (
 
 // Options captures our configurable policy parameters.
 type options struct {
-	// PinCPU controls CPU pinning in the memtier policy.
+	// PinCPU controls CPU pinning in this policy.
 	PinCPU bool
-	// PinMemory controls memory pinning in the memtier policy.
+	// PinMemory controls memory pinning in this policy.
 	PinMemory bool
 	// PreferIsolated controls whether isolated CPUs are preferred for isolated allocations.
 	PreferIsolated bool `json:"PreferIsolatedCPUs"`
@@ -35,6 +35,7 @@ type options struct {
 
 // Our runtime configuration.
 var opt = defaultOptions().(*options)
+var aliasOpt = defaultOptions().(*options)
 
 // fakeHints is our flag.Value for per-pod or per-container faked topology.Hints.
 type fakehints map[string]topology.Hints
@@ -65,4 +66,5 @@ func defaultOptions() interface{} {
 // Register us for configuration handling.
 func init() {
 	config.Register(PolicyPath, PolicyDescription, opt, defaultOptions)
+	config.Register(AliasPath, PolicyDescription, aliasOpt, defaultOptions)
 }
