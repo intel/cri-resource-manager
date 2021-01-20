@@ -39,7 +39,9 @@ func TestAllocatorHelper(t *testing.T) {
 	}
 
 	// Discover mock system from the testdata
-	sys, err := sysfs.DiscoverSystemAt(path.Join(tmpdir, "sysfs", "2-socket-4-node-40-core", "sys"))
+	sys, err := sysfs.DiscoverSystemAt(
+		path.Join(tmpdir, "sysfs", "2-socket-4-node-40-core", "sys"),
+		sysfs.DiscoverCPUTopology, sysfs.DiscoverMemTopology)
 	if err != nil {
 		t.Fatalf("failed to discover mock system: %v", err)
 	}

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
@@ -46,12 +47,14 @@ const (
 	DiscoverMemTopology
 	// DiscoverCache requests discovering CPU cache details.
 	DiscoverCache
+	// DiscoverSst requests discovering details of Intel Speed Select Technology
+	DiscoverSst
 	// DiscoverNone is the zero value for discovery flags.
 	DiscoverNone DiscoveryFlag = 0
 	// DiscoverAll requests full supported discovery.
 	DiscoverAll DiscoveryFlag = 0xffffffff
 	// DiscoverDefault is the default set of discovery flags.
-	DiscoverDefault DiscoveryFlag = (DiscoverCPUTopology | DiscoverMemTopology)
+	DiscoverDefault DiscoveryFlag = (DiscoverCPUTopology | DiscoverMemTopology | DiscoverSst)
 )
 
 // MemoryType is an enum for the Node memory
@@ -110,15 +113,17 @@ type CPUPackage interface {
 	NodeIDs() []ID
 	DieNodeIDs(ID) []ID
 	DieCPUSet(ID) cpuset.CPUSet
+	SstInfo() SstPackageInfo
 }
 
 type cpuPackage struct {
-	id       ID           // package id
-	cpus     IDSet        // CPUs in this package
-	nodes    IDSet        // nodes in this package
-	dies     IDSet        // dies in this package
-	dieCPUs  map[ID]IDSet // CPUs per die
-	dieNodes map[ID]IDSet // NUMA nodes per die
+	id       ID             // package id
+	cpus     IDSet          // CPUs in this package
+	nodes    IDSet          // nodes in this package
+	dies     IDSet          // dies in this package
+	dieCPUs  map[ID]IDSet   // CPUs per die
+	dieNodes map[ID]IDSet   // NUMA nodes per die
+	sstInfo  SstPackageInfo // Speed Select Technology info
 }
 
 // Node represents a NUMA node.
@@ -159,6 +164,7 @@ type CPU interface {
 	Online() bool
 	Isolated() bool
 	SetFrequencyLimits(min, max uint64) error
+	SstClos() int
 }
 
 type cpu struct {
@@ -174,6 +180,7 @@ type cpu struct {
 	epp      EPP     // Energy Performance Preference from cpufreq governor
 	online   bool    // whether this CPU is online
 	isolated bool    // whether this CPU is isolated
+	sstClos  int     // SST-CP CLOS the CPU is associated with
 }
 
 // CPUFreq is a CPU frequency scaling range
@@ -262,7 +269,7 @@ func DiscoverSystemAt(path string, args ...DiscoveryFlag) (System, error) {
 func (sys *system) Discover(flags DiscoveryFlag) error {
 	sys.flags |= (flags &^ DiscoverCache)
 
-	if (sys.flags & (DiscoverCPUTopology | DiscoverCache)) != 0 {
+	if (sys.flags & (DiscoverCPUTopology | DiscoverCache | DiscoverSst)) != 0 {
 		if err := sys.discoverCPUs(); err != nil {
 			return err
 		}
@@ -271,6 +278,13 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 		}
 		if err := sys.discoverPackages(); err != nil {
 			return err
+		}
+	}
+
+	if (sys.flags & DiscoverSst) != 0 {
+		if err := sys.discoverSst(); err != nil {
+			// Just consider SST unsupported if our detection fails for some reason
+			sys.Warn("%v", err)
 		}
 	}
 
@@ -547,7 +561,7 @@ func (sys *system) discoverCPUs() error {
 
 // Discover details of the given CPU.
 func (sys *system) discoverCPU(path string) error {
-	cpu := &cpu{path: path, id: getEnumeratedID(path), online: true}
+	cpu := &cpu{path: path, id: getEnumeratedID(path), online: true, sstClos: -1}
 
 	cpu.isolated = sys.isolated.Has(cpu.id)
 
@@ -662,6 +676,12 @@ func (c *cpu) Online() bool {
 // Isolated returns if this CPU is isolated.
 func (c *cpu) Isolated() bool {
 	return c.isolated
+}
+
+// SstClos returns the Speed Select Core Power CLOS number assigned to the CPU
+// -1 implies that no SST prioritization is in effect
+func (c *cpu) SstClos() int {
+	return c.sstClos
 }
 
 // SetFrequencyLimits sets the frequency scaling limits for this CPU.
@@ -941,6 +961,35 @@ func (sys *system) discoverPackages() error {
 	return nil
 }
 
+func (sys *system) discoverSst() error {
+	if !SstSupported() {
+		sys.Info("Speed Select Technology (SST) support not detected")
+		return nil
+	}
+
+	for _, pkg := range sys.packages {
+		sstInfo, err := getSstPackageInfo(pkg)
+		if err != nil {
+			return fmt.Errorf("failed to get SST info for package %d: %v", pkg.id, err)
+		}
+		sys.DebugBlock("", "Speed Select Technology info detected for package %d:\n%s", pkg.id, utils.DumpJSON(sstInfo))
+
+		if sstInfo.CPEnabled {
+			ids := pkg.cpus.SortedMembers()
+			clos, err := getCPUClosIDs(ids)
+			if err != nil {
+				return fmt.Errorf("failed to get SST-CP clos ids for package %d: %v", pkg.id, err)
+			}
+			for i, id := range ids {
+				sys.cpus[id].sstClos = clos[i]
+			}
+		}
+		pkg.sstInfo = sstInfo
+	}
+
+	return nil
+}
+
 // ID returns the id of this package.
 func (p *cpuPackage) ID() ID {
 	return p.id
@@ -975,6 +1024,10 @@ func (p *cpuPackage) DieCPUSet(id ID) cpuset.CPUSet {
 		return dieCPUs.CPUSet()
 	}
 	return cpuset.NewCPUSet()
+}
+
+func (p *cpuPackage) SstInfo() SstPackageInfo {
+	return p.sstInfo
 }
 
 // Discover cache associated with the given CPU.
