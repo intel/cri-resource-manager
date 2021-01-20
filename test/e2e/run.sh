@@ -450,7 +450,7 @@ launch() { # script API
     #                deploy cri-resmgr-webhook from the image on VM.
     #
     # Example:
-    #   cri_resmgr_cfg=/tmp/memtier.cfg launch cri-resmgr
+    #   cri_resmgr_cfg=/tmp/topology-aware.cfg launch cri-resmgr
     local target="$1"
     local launch_cmd
     local adjustment_schema="$HOST_PROJECT_DIR/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml"
@@ -945,7 +945,7 @@ cri=${cri:=containerd}
 TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
 vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
 vm_files=${vm_files:-""}
-cri_resmgr_cfg=${cri_resmgr_cfg:-"${SCRIPT_DIR}/cri-resmgr-memtier.cfg"}
+cri_resmgr_cfg=${cri_resmgr_cfg:-"${SCRIPT_DIR}/cri-resmgr-topology-aware.cfg"}
 cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
 cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
 cleanup=${cleanup:-0}

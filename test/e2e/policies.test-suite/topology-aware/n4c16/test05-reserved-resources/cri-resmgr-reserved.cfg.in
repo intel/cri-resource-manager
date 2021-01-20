@@ -1,8 +1,8 @@
 policy:
-  Active: memtier
+  Active: topology-aware
   AvailableResources:
     cpu: ${AVAILABLE_CPU}
   ReservedResources:
-    cpu: cpuset:11
+    cpu: ${RESERVED_CPU}
 logger:
   Debug: cri-resmgr,resource-manager,cache,policy
