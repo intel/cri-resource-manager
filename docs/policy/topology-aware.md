@@ -1,4 +1,4 @@
-# Memtier Policy
+# Topology-Aware Policy
 
 ## Background
 
@@ -28,11 +28,11 @@ in hardware or, in other words, hardware topology awareness.
 
 ## Overview
 
-The memtier policy automatically builds a tree of pools based on the detected
-hardware topology. Each pool has a set of CPUs and memory zones assigned as
-their resources. Resource allocation for workloads happens by first picking
-the pool which is considered to fit the best the resource requirements of
-the workload and then assigning CPU and memory from this pool.
+The `topology-aware` policy automatically builds a tree of pools based on the
+detected hardware topology. Each pool has a set of CPUs and memory zones
+assigned as their resources. Resource allocation for workloads happens by
+first picking the pool which is considered to fit the best the resource
+requirements of the workload and then assigning CPU and memory from this pool.
 
 The pool nodes at various depths from bottom to top represent the NUMA nodes,
 dies, sockets, and finally the whole of the system at the root node. Leaf NUMA
@@ -65,9 +65,9 @@ which has no other common ancestor than the root, the resources of these
 workloads should be as well isolated from each other as possible on the given
 hardware.
 
-With such an arrangement, the memtier policy should handle topology-aware
-alignment of resources without any special or extra configuration. When
-allocating resources, the policy
+With such an arrangement, this policy should handle topology-aware alignment
+of resources without any special or extra configuration. When allocating
+resources, the policy
 
   - filters out all pools with insufficient free capacity
   - runs a scoring algorithm for the remaining ones
@@ -84,7 +84,7 @@ implementation evolves, its basic principles are roughly
 
 ## Features
 
-The memtier policy has the following features:
+The `topology-aware` policy has the following features:
 
   - topologically aligned allocation of CPU and memory
     * assign CPU and memory to workloads with tightest available alignment
@@ -117,12 +117,12 @@ The memtier policy has the following features:
 
 ## Activating the Policy
 
-You can activate the `memtier` policy by using the following configuration
+You can activate the `topology-aware` policy by using the following configuration
 fragment in the configuration for `cri-resmgr`:
 
 ```yaml
 policy:
-  Active: memtier
+  Active: topology-aware
   ReservedResources:
     CPU: 750m
 ```
@@ -149,8 +149,8 @@ configuration options are
 
 ## Policy CPU Allocation Preferences
 
-There are a number of workload properties the memtier policy actively checks to
-decide if the workload could potentially benefit from extra resource allocation
+There are a number of workload properties this policy actively checks to decide
+if the workload could potentially benefit from extra resource allocation
 optimizations. Unless configured differently, containers fulfilling certain
 corresponding criteria are considered eligible for these optimizations. This
 will be reflected in the assigned resources whenever that is possible at the
@@ -273,10 +273,10 @@ exclusive allocation.
 
 `CRI Resource Manager` automatically generates HW `Topology Hints` for devices
 assigned to a container, prior to handing the container off to the active policy
-for resource allocation. The `memtier` policy is hint-aware and normally takes
-topology hints into account when picking the best a pool to allocate resources.
-Hints indicate optimal `HW locality` for device access and they can alter
-significantly which pool gets picked for a container.
+for resource allocation. The `topology-aware` policy is hint-aware and normally
+takes topology hints into account when picking the best a pool to allocate
+resources. Hints indicate optimal `HW locality` for device access and they can
+alter significantly which pool gets picked for a container.
 
 Since device topology hints are implicitly generated, there are cases where one
 would like the policy to disregard them altogether. For instance, when a local
@@ -302,8 +302,8 @@ opt out from hint-aware pool selection.
 
 ## Cold Start
 
-The `memtier` policy supports "cold start" functionality. When cold start is
-enabled and the workload is allocated to a topology node with both DRAM and
+The `topology-aware` policy supports "cold start" functionality. When cold start
+is enabled and the workload is allocated to a topology node with both DRAM and
 PMEM memory, the initial memory controller is only the PMEM controller. DRAM
 controller is added to the workload only after the cold start timeout is
 done. The effect of this is that allocated large unused memory areas of
@@ -338,19 +338,18 @@ added to the container memset.
 
 ## Dynamic Page Demotion
 
-The `memtier` policy also supports dynamic page demotion. The idea is to move
-rarely-used pages from DRAM to PMEM for those workloads for which both DRAM
-and PMEM memory types have been assigned. The configuration for this feature
-is done on the memtier policy configuration using three configuration keys:
-`DirtyBitScanPeriod`, `PageMovePeriod`, and `PageMoveCount`. All of the three
-parameters need to be set to non-zero values in order for the dynamic page
-demotion feature to be enabled. See this configuration file fragment as an
-example:
+The `topology-aware` policy also supports dynamic page demotion. With dynamic
+demotion enabled, rarely-used pages are periodically moved from DRAM to PMEM
+for those workloads which are assigned to use both DRAM and PMEM memory types.
+The configuration for this feature is done using three configuration keys:
+`DirtyBitScanPeriod`, `PageMovePeriod`, and `PageMoveCount`. All of these
+parameters need to be set to non-zero values in order for dynamic page demotion
+to get enabled. See this configuration file fragment as an example:
 
 ```yaml
 policy:
-  Active: memtier
-  memtier:
+  Active: topology-aware
+  topology-aware:
     DirtyBitScanPeriod: 10s
     PageMovePeriod: 2s
     PageMoveCount: 1000
