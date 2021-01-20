@@ -322,52 +322,123 @@ func podColdStartPreference(pod cache.Pod, container cache.Container) (ColdStart
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.
 // Returned values:
 // 1. full: number of full CPUs
-// 2. fraction: number of milli-CPUs
-// 3. isolate: (bool) isolate full CPUs
-// 4. cpuType: (cpuClass) the type of preferred of CPUs
+// 2. fraction: amount of fractional CPU in milli-CPU
+// 3. isolate: (bool) whether to prefer isolated full CPUs
+// 4. cpuType: (cpuClass) class of CPU to allocate (reserved vs. normal)
 func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, int, bool, cpuClass) {
-	cpuType := cpuNormal
-	if container.GetNamespace() == metav1.NamespaceSystem {
-		cpuType = cpuReserved
-	}
+	//
+	// CPU allocation preferences for a container consist of
+	//
+	//   - the number of exclusive cores to allocate
+	//   - the amount of fractional cores to allocate (in milli-CPU)
+	//   - whether kernel-isolated cores are preferred for exclusive allocation
+	//   - cpu class IOW, whether reserved or normal cores should be allocated
+	//
+	// The rules for determining these preferences are:
+	//
+	//   - reserved cores are only and always preferred for kube-system namespace containers
+	//   - kube-system namespace containers:
+	//       => fractional/shared (reserved) cores
+	//   - BestEffort QoS class containers:
+	//       => fractional/shared cores
+	//   - Burstable QoS class containers:
+	//       => fractional/shared cores
+	//   - Guaranteed QoS class containers:
+	//      - 1 full core > CPU request
+	//          => fractional/shared cores
+	//      - 1 full core <= CPU request < 2 full cores:
+	//          a. fractional allocation:
+	//            - shared preference explicitly annotated/configured false:
+	//              => mixed cores, prefer isolated, unless annotated/configured otherwise (*)
+	//            - shared preference explicitly annotated/configured true:
+	//              => shared cores
+	//          b. non-fractional allocation:
+	//            - shared preference explicitly annotated true:
+	//              => shared cores
+	//            - isolated default preference false or explicitly annotated false:
+	//              => exclusive cores
+	//            - isolated default preference true or explicitly annotated true:
+	//              => exclusive cores, prefer isolated (*)
+	//      - 2 full cores <= CPU request
+	//          a. fractional allocation:
+	//            - shared preference explicitly annotated false:
+	//              => mixed cores, prefer isolated only if explicitly annotated (**)
+	//            - otherwise (no shared annotation):
+	//              => shared cores
+	//          b. non-fractional allocation:
+	//            - shared preference explicitly annotated true:
+	//              => shared cores
+	//            - otherwise (no shared annotation):
+	//              => exclusive cores, prefer isolated only if explicitly annotated (**)
+	//
+	//   - Rationale for isolation defaults:
+	//     *)
+	//        In the single core case, a workload does not need to do anything extra to
+	//        benefit from running on isolated vs. ordinary exclusive cores. Therefore,
+	//        allocating isolated cores is a safe default choice.
+	//     **)
+	//        In the multiple cores case, a workload needs to be 'isolation-aware' to
+	//        benefit (or actually to not even get hindered) by running on isolated vs.
+	//        ordinary exclusive cores. If it gets isolated cores allocated, it needs
+	//        to actively spread itself/its correct processes over the cores, because
+	//        the scheduler is not going to do load-balancing for it. Therefore, the
+	//        safe choice in this case is to not allocate isolated cores by default.
+	//
 
-	req, ok := container.GetResourceRequirements().Requests[corev1.ResourceCPU]
-	if !ok {
-		return 0, 0, false, cpuType
-	}
+	namespace := container.GetNamespace()
+	request := container.GetResourceRequirements().Requests[corev1.ResourceCPU]
+	qosClass := pod.GetQOSClass()
+	fraction := int(request.MilliValue())
 
-	qos := pod.GetQOSClass()
-
-	preferIsol, explicit := isolatedCPUsPreference(pod, container)
-	preferShared, _ := sharedCPUsPreference(pod, container)
-
-	full, fraction, isolate := 0, 0, false
+	// easy cases: kube-system namespace, Burstable or BestEffort QoS class containers
 	switch {
-	case container.GetNamespace() == metav1.NamespaceSystem:
-		full, fraction = 0, int(req.MilliValue())
-
-	case qos == corev1.PodQOSBurstable || preferShared:
-		full, fraction = 0, int(req.MilliValue())
-
-	case qos == corev1.PodQOSGuaranteed:
-		full = int(req.MilliValue()) / 1000
-		fraction = int(req.MilliValue()) % 1000
+	case namespace == metav1.NamespaceSystem:
+		return 0, fraction, false, cpuReserved
+	case qosClass == corev1.PodQOSBurstable:
+		return 0, fraction, false, cpuNormal
+	case qosClass == corev1.PodQOSBestEffort:
+		return 0, 0, false, cpuNormal
 	}
 
-	if !preferShared {
-		switch {
-		case full == 1:
-			if explicit {
-				isolate = preferIsol
-			} else {
-				isolate = true
+	// complex case: Guaranteed QoS class containers
+	cores := fraction / 1000
+	fraction = fraction % 1000
+	preferIsolated, explicitIsolated := isolatedCPUsPreference(pod, container)
+	preferShared, explicitShared := sharedCPUsPreference(pod, container)
+
+	switch {
+	// sub-core CPU request
+	case cores == 0:
+		return 0, fraction, false, cpuNormal
+		// 1 <= CPU request < 2
+	case cores < 2:
+		// fractional allocation, potentially mixed
+		if fraction > 0 {
+			if preferShared {
+				return 0, 1000*cores + fraction, false, cpuNormal
 			}
-		case full > 1:
-			isolate = preferIsol && explicit
+			return cores, fraction, preferIsolated, cpuNormal
 		}
+		// non-fractional allocation
+		if preferShared && explicitShared {
+			return 0, 1000*cores + fraction, false, cpuNormal
+		}
+		return cores, fraction, preferIsolated, cpuNormal
+		// CPU request >= 2
+	default:
+		// fractional allocation, only mixed if explicitly annotated as unshared
+		if fraction > 0 {
+			if !preferShared && explicitShared {
+				return cores, fraction, preferIsolated && explicitIsolated, cpuNormal
+			}
+			return 0, 1000*cores + fraction, false, cpuNormal
+		}
+		// non-fractional allocation
+		if preferShared && explicitShared {
+			return 0, 1000 * cores, false, cpuNormal
+		}
+		return cores, fraction, preferIsolated && explicitIsolated, cpuNormal
 	}
-
-	return full, fraction, isolate, cpuType
 }
 
 // podMemoryTypePreference returns what type of memory should be allocated for the container.
