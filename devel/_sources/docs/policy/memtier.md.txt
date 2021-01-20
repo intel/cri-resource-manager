@@ -1,70 +1,306 @@
 # Memtier Policy
 
+## Background
+
+On server-grade hardware the CPU cores, I/O devices and other peripherals
+form a rather complex network together with the memory controllers, the
+I/O bus hierarchy and the CPU interconnect. When a combination of these
+resources are allocated to a single workload, the performance of that
+workload can vary greatly, depending on how efficiently data is transferred
+between them or, in other words, on how well the resources are aligned.
+
+There are a number of inherent architectural hardware properties that,
+unless properly taken into account, can cause resource misalignment and
+workload performance degradation. There are a multitude of CPU cores
+available to run workloads. There are a multitude of memory controllers
+these workloads can use to store and retrieve data from main memory. There
+are a multitude of I/O devices attached to a number of I/O buses the same
+workloads can access. The CPU cores can be divided into a number of groups,
+with each group having different access latency and bandwidth to each
+memory controller and I/O device.
+
+If a workload is not assigned to run with a properly aligned set of CPU,
+memory and devices, it will not be able to achieve optimal performance.
+Given the idiosyncrasies of hardware, allocating a properly aligned set
+of resources for optimal workload performance requires identifying and
+understanding the multiple dimensions of access latency locality present
+in hardware or, in other words, hardware topology awareness.
+
 ## Overview
 
-The `memtier` policy extends the `topology-aware` policy. It supports
-the same features and configuration options, such as `topology hints`
-and `annotations`, which the `topology-aware` policy does. Please see
-the [documentation for topology-aware
-policy](topology-aware.md) for the description of how
-`topology-aware`policy works and how it is configured.
+The memtier policy automatically builds a tree of pools based on the detected
+hardware topology. Each pool has a set of CPUs and memory zones assigned as
+their resources. Resource allocation for workloads happens by first picking
+the pool which is considered to fit the best the resource requirements of
+the workload and then assigning CPU and memory from this pool.
 
-The main goal of `memtier` policy is to let workloads choose the kinds
-of memory it wants to use. The `topology-aware` policy scoring algorithm
-for selecting topology nodes is changed so that a workload can belong to
-both a CPU node and a memory node in the topology tree -- the CPU
-allocation is reserved from the CPU node and the memory controllers are
-selected from the memory node. Typically the aim is that the CPU and
-memory allocations are done from the same node so that the memory
-locality is as good as possible, but the memory allocation may happen
-also from a wider pool of memory controllers if the amount of free
-memory on a topology node is too low.
+The pool nodes at various depths from bottom to top represent the NUMA nodes,
+dies, sockets, and finally the whole of the system at the root node. Leaf NUMA
+nodes are assigned the memory behind their controllers / zones and CPU cores
+with the smallest distance / access penalty to this memory. If the machine
+has multiple types of memory separately visible to both the kernel and user
+space, for instance both DRAM and [PMEM](https://www.intel.com/content/www/us/en/products/memory-storage/optane-dc-persistent-memory.html), each zone of special type of memory
+is assigned to the closest NUMA node pool.
 
-## Activation of the Memtier Policy
+Each non-leaf pool node in the tree is assigned the union of the resources of
+its children. So in practice, dies nodes end up containing all the CPU cores
+and the memory zones in the corresponding die, sockets nodes end up containing
+the CPU cores and memory zones in the corresponding socket's dies, and the root
+ends up containing all CPU cores and memory zones in all sockets.
 
-You can activate the `memtier` policy by setting `--policy` parameter of
-`cri-resmgr` to `memtier`. For example:
+With this setup, each pool in the tree has a topologically aligned set of CPU
+and memory resources. The amount of available resources gradually increases in
+the tree from bottom to top, while the strictness of alignment is gradually
+relaxed. In other words, as one moves from bottom to top in the tree, it is
+getting gradually easier to fit in a workload, but the price paid for this is
+a gradually increasing maximum potential cost or penalty for memory access and
+data transfer between CPU cores.
 
+Another property of this setup is that the resource sets of sibling pools at
+the same depth in the tree are disjoint while the resource sets of descendant
+pools along the same path in the tree partially overlap, with the intersection
+decreasing as the the distance between pools increases. This makes it easy to 
+isolate workloads from each other. As long as workloads are assigned to pools
+which has no other common ancestor than the root, the resources of these
+workloads should be as well isolated from each other as possible on the given
+hardware.
+
+With such an arrangement, the memtier policy should handle topology-aware
+alignment of resources without any special or extra configuration. When
+allocating resources, the policy
+
+  - filters out all pools with insufficient free capacity
+  - runs a scoring algorithm for the remaining ones
+  - picks the one with the best score
+  - assigns resources to the workload from there
+
+Although the details of the scoring algorithm are subject to change as the
+implementation evolves, its basic principles are roughly
+
+  - prefer pools lower in the tree, IOW stricter alignment and lower latency
+  - prefer idle pools over busy ones, IOW more remaining free capacity and
+    fewer workloads
+  - prefer pools with better overall device alignment
+
+## Features
+
+The memtier policy has the following features:
+
+  - topologically aligned allocation of CPU and memory
+    * assign CPU and memory to workloads with tightest available alignment
+  - aligned allocation of devices
+    * pick pool for workload based on locality of devices already assigned
+  - shared allocation of CPU cores
+    * assign workload to shared subset of pool CPUs
+  - exclusive allocation of CPU cores
+    * dynamically slice off CPU cores from shared subset and assign to workload
+  - mixed allocation of CPU cores
+    * assign both exclusive and shared CPU cores to workload
+  - discovering and using kernel-isolated CPU cores (['isolcpus'](https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html#cpu-lists))
+    * use kernel-isolated CPU cores for exclusively assigned CPU cores
+  - exposing assigned resources to workloads
+  - notifying workloads about changes in resource assignment
+  - dynamic relaxation of memory alignment to prevent OOM
+    * dynamically widen workload memory set to avoid pool/workload OOM
+  - multi-tier memory allocation
+    * assign workloads to memory zones of their preferred type
+    * the policy knows about three kinds of memory:
+      - DRAM is regular system main memory
+      - PMEM is large-capacity memory, such as
+        [Intel® Optane™ memory](https://www.intel.com/content/www/us/en/products/memory-storage/optane-dc-persistent-memory.html)
+      - [HBM](https://en.wikipedia.org/wiki/High_Bandwidth_Memory) is high speed memory,
+        typically found on some special-purpose computing systems
+  - cold start
+    * pin workload exclusively to PMEM for an initial warm-up period
+  - dynamic page demotion
+    * forcibly migrate read-only and idle container memory pages to PMEM
+
+## Activating the Policy
+
+You can activate the `memtier` policy by using the following configuration
+fragment in the configuration for `cri-resmgr`:
+
+```yaml
+policy:
+  Active: memtier
+  ReservedResources:
+    CPU: 750m
 ```
-cri-resmgr --policy memtier --reserved-resources cpu=750m
-```
 
-## Configuration
+## Configuring the Policy
 
-The `memtier` policy knows of three kinds of memory: `DRAM`, `PMEM`, and
-`HBM`. The various memory types are accessed via separate memory controllers.
+The policy has a number of configuration options which affect its default behavior.
+These options can be supplied as part of the
+[dynamic configuration](../setup.md#using-cri-resource-manager-agent-and-a-configmap)
+received via the [`node agent`](../node-agent.md), or in a fallback or forced
+[configuration file](../setup.md#using-a-local-configuration-from-a-file). These
+configuration options are
 
-  * DRAM (dynamic random-access memory) is regular system main memory.
-  * PMEM (persistent memory) is large-capacity memory, such as
-    Intel® Optane™ memory.
-  * HBM (high-bandwidth memory) is high speed memory, typically found
-    on some special-purpose computing systems.
+  - `PinCPU`
+    * whether to pin workloads to assigned pool CPU sets
+  - `PinMemory`
+    * whether to pin workloads to assigned pool memory zones
+  - `PreferIsolatedCPUs`
+    * whether isolated CPUs are preferred by default for workloads that are
+      eligible for exclusive CPU allocation
+  - `PreferSharedCPUs`
+    * whether shared allocation is preferred by default for workloads that
+      would be otherwise eligible for exclusive CPU allocation
 
-In order to configure a container to use a certain memory type, use the
-`memory-type.cri-resource-manager.intel.com` effective annotation in the pod
-spec. For example, to make `container1` request both `PMEM` and `DRAM` memory
-types, you could use pod metadata such as this:
+## Policy CPU Allocation Preferences
 
-```
+There are a number of workload properties the memtier policy actively checks to
+decide if the workload could potentially benefit from extra resource allocation
+optimizations. Unless configured differently, containers fulfilling certain
+corresponding criteria are considered eligible for these optimizations. This
+will be reflected in the assigned resources whenever that is possible at the
+time the container's creation / resource allocation request hits the policy.
+
+The set of these extra optimizations consist of
+
+  - assignment of `kube-reserved` CPUs
+  - assignment of exclusively allocated CPU cores
+  - usage of kernel-isolated CPU cores (for exclusive allocation)
+
+The policy uses a combination of the QoS class and the resource requirements of
+the container to decide if any of these extra allocation preferences should be
+applied. Containers are divided into five groups, with each group having a
+slightly different set of criteria for eligibility.
+
+  - `kube-system` group
+    * all containers in the `kube-system` namespace
+  - `low-priority` group
+    * containers in the `BestEffort` or `Burstable` QoS class
+  - `sub-core` group
+    * Guaranteed QoS class containers with `CPU request < 1 CPU`
+  - `mixed` group
+    * Guaranteed QoS class containers with `1 <= CPU request < 2`
+  - `multi-core` group
+    * Guaranteed QoS class containers with `CPU request >= 2`
+
+The eligibility rules for extra optimization are slightly different among these
+groups.
+
+  - `kube-system`
+    * not eligible for extra optimizations
+    * eligible to run on `kube-reserved` CPU cores
+    * always run on shared CPU cores
+  - `low-priority`
+    * not eligible for extra optimizations
+    * always run on shared CPU cores
+  - `sub-core`
+    * not eligible for extra optimizations
+    * always run on shared CPU cores
+  - `mixed`
+    * by default eligible for exclusive and isolated allocation
+    * not eligible for either if `PreferSharedCPUs` is set to true
+    * not eligible for either if annotated to opt out from exclusive allocation
+    * not eligible for isolated allocation if annotated to opt out
+  - `multi-core`
+    * CPU request fractional (`(CPU request % 1000 milli-CPU) != 0`):
+      - by default not eligible for extra optimizations
+      - eligible for exclusive and isolated allocation if annotated to opt in
+    * CPU request not fractional:
+      - by default eligible for exclusive allocation
+      - by default not eligible for isolated allocation
+      - not eligible for exclusive allocation if annotated to opt out
+      - eligible for isolated allocation if annotated to opt in
+
+Eligibility for kube-reserved CPU core allocation should always be possible to
+honor. If this is not the case, it is probably due to an incorrect configuration
+which underdeclares `ReservedResources`. In that case, ordinary shared CPU cores
+will be used instead of kube-reserved ones.
+
+Eligibility for exclusive CPU allocation should always be possible to honor.
+Eligibility for isolated core allocation is only honored if there are enough
+isolated cores available to fulfill the exclusive part of the container's CPU
+request with isolated cores alone. Otherwise ordinary CPUs will be allocated,
+by slicing them off for exclusive usage from the shared subset of CPU cores in
+the container's assigned pool.
+
+Containers in the kube-system group are pinned to share all kube-reserved CPU
+cores. Containers in the low-priority or sub-core groups, and containers which
+are only eligible for shared CPU core allocation in the mixed and multi-core
+groups, are all pinned to run on the shared subset of CPU cores in the
+container's assigned pool. This shared subset can and usually does change
+dynamically as exclusive CPU cores are allocated and released in the pool.
+
+## Container CPU Allocation Preference Annotations
+
+Containers can be annotated to diverge from the default CPU allocation
+preferences the policy would otherwise apply to them. These Pod annotations
+can be given both with per pod and per container resolution. If for any
+container both of these exist, the container-specific one takes precedence.
+
+### Shared, Exclusive, and Isolated CPU Preference
+
+A container can opt in to or opt out from shared CPU allocation using the
+following Pod annotation.
+
+```yaml
 metadata:
   annotations:
-    memory-type.cri-resource-manager.intel.com/container.container1: dram,pmem
+    # opt in container C1 to shared CPU core allocation
+    prefer-shared-cpus.cri-resource-manager.intel.com/container.C1: "true"
+    # opt in the whole pod to shared CPU core allocation
+    prefer-shared-cpus.cri-resource-manager.intel.com/pod: "true"
+    # selectively opt out container C2 from shared CPU core allocation
+    prefer-shared-cpus.cri-resource-manager.intel.com/container.C2: "false"
 ```
 
-Alternatively, you can use the following deprecated syntax to achieve the same,
-but support for this syntax is subject to be dropped in a future release:
+Opting in to exclusive allocation happens by opting out from shared allocation,
+and opting out from exclusive allocation happens by opting in to shared
+allocation.
 
-```
+A container can opt in to or opt out from isolated exclusive CPU core
+allocation using the following Pod annotation.
+
+```yaml
 metadata:
   annotations:
-    cri-resource-manager.intel.com/memory-type: |
-      container1: dram,pmem
+    # opt in container C1 to isolated exclusive CPU core allocation
+    prefer-isolated-cpus.cri-resource-manager.intel.com/container.C1: "true"
+    # opt in the whole pod to isolated exclusive CPU core allocation
+    prefer-isolated-cpus.cri-resource-manager.intel.com/pod: "true"
+    # selectively opt out container C2 from isolated exclusive CPU core allocation
+    prefer-isolated-cpus.cri-resource-manager.intel.com/container.C2: "false"
 ```
 
-The `memtier` policy will then aim to allocate resources from a topology
-node which can satisfy the memory requirements.
+These Pod annotations have no effect on containers which are not eligible for
+exclusive allocation.
 
-### Cold Start
+### Implicit Hardware Topology Hints
+
+`CRI Resource Manager` automatically generates HW `Topology Hints` for devices
+assigned to a container, prior to handing the container off to the active policy
+for resource allocation. The `memtier` policy is hint-aware and normally takes
+topology hints into account when picking the best a pool to allocate resources.
+Hints indicate optimal `HW locality` for device access and they can alter
+significantly which pool gets picked for a container.
+
+Since device topology hints are implicitly generated, there are cases where one
+would like the policy to disregard them altogether. For instance, when a local
+volume is used by a container but not in any performance critical manner.
+
+Containers can be annotated to opt out from and selectively opt in to hint-aware
+pool selection using the following Pod annotations.
+
+```yaml
+metadata:
+  annotations:
+    # only disregard hints for container C1
+    topologyhints.cri-resource-manager.intel.com/container.C1: "false"
+    # disregard hints for all containers by default
+    topologyhints.cri-resource-manager.intel.com/pod: "false"
+    # but take hints into account for container C2
+    topologyhints.cri-resource-manager.intel.com/container.C2: "true"
+```
+
+Topology hint generation is globally enabled by default. Therefore, using the
+Pod annotation as opt in only has an effect when the whole pod is annotated to
+opt out from hint-aware pool selection.
+
+## Cold Start
 
 The `memtier` policy supports "cold start" functionality. When cold start is
 enabled and the workload is allocated to a topology node with both DRAM and
@@ -74,7 +310,7 @@ done. The effect of this is that allocated large unused memory areas of
 memory don't need to be migrated to PMEM, because it was allocated there to
 begin with. Cold start is configured like this in the pod metadata:
 
-```
+```yaml
 metadata:
   annotations:
     memory-type.cri-resource-manager.intel.com/container.container1: dram,pmem
@@ -82,11 +318,11 @@ metadata:
       duration: 60s
 ```
 
-Again, alternatively you can use the following deprecated annotation syntax to
-achieve the same, but support for this syntax is subject to be dropped in a
+Again, alternatively you can use the following deprecated Pod annotation syntax
+to achieve the same, but support for this syntax is subject to be dropped in a
 future release:
 
-```
+```yaml
 metadata:
   annotations:
     cri-resource-manager.intel.com/memory-type: |
@@ -100,7 +336,7 @@ In the above example, `container1` would be initially granted only PMEM
 memory controller, but after 60 seconds the DRAM controller would be
 added to the container memset.
 
-### Dynamic Page Demotion
+## Dynamic Page Demotion
 
 The `memtier` policy also supports dynamic page demotion. The idea is to move
 rarely-used pages from DRAM to PMEM for those workloads for which both DRAM
@@ -111,7 +347,7 @@ parameters need to be set to non-zero values in order for the dynamic page
 demotion feature to be enabled. See this configuration file fragment as an
 example:
 
-```
+```yaml
 policy:
   Active: memtier
   memtier:
@@ -131,33 +367,6 @@ every two seconds from DRAM to PMEM.
 Due to inaccuracies in how `cri-resmgr` calculates memory requests for
 pods in QoS class `Burstable`, you should either use `Limit` for setting
 the amount of memory for containers in `Burstable` pods or run the
-resource-annotating webhook as described in the top-level README file.
-
-## Implicit Hardware Topology Hints
-
-`CRI Resource Manager` automatically generates HW `Topology Hints` for
-containers before resource allocation by a policy. The `memtier` policy
-is hint-aware and takes these hints into account. Since hints indicate
-optimal or preferred `HW locality` for devices and potentially local
-volumes used by the container, they can alter significantly how resources
-are assigned to the container.
-
-Using the 'topologyhints' resource manager annotation key it is possible
-to opt out from automatic topology hint generation on a per pod or container
-basis.
-
-Use this annotation to opt out a full pod:
-```
-  annotations:
-    topologyhints.cri-resource-manager.intel.com/pod: "false"
-```
-
-Use this annotation to opt out container 'foo' in the pod:
-```
-  annotations:
-    topologyhints.cri-resource-manager.intel.com/container.foo: "false"
-```
-
-Currently topology hint generation is enabled by default, so using the
-annotation as opt in (setting it to "true") should have no effect on the
-placement of containers of a pod. This might change in the future however.
+[resource-annotating webhook](../webhook.md) to provide `cri-resmgr` with
+an exact copy of the resource requirements from the Pod Spec as an extra
+Pod annotation.
