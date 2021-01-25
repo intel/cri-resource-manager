@@ -29,7 +29,7 @@ path.
 The choice of policy to use along with any potential parameters specific to that
 policy are taken from the configuration file. You can take a look at the
 [sample configurations](/sample-configs) for some minimal/trivial examples. For instance,
-you can use [sample-configs/memtier-policy.cfg](/sample-configs/memtier-policy.cfg)
+you can use [sample-configs/topology-aware-policy.cfg](/sample-configs/topology-aware-policy.cfg)
 as `<config-file>` to activate the topology aware policy with memory tiering support.
 
 **NOTE**: Currently the available policies are work in progress.

@@ -247,7 +247,7 @@ current policies of kubelet can be implemented in CRI-RM.
 A fairly simplistic policy similar in spirit to the static policy of
 CPU Manager in kubelet, with a few extra features.
 
-#### [Memtier](/pkg/cri/resource-manager/policy/builtin/memtier/)
+#### [Topology Aware](/pkg/cri/resource-manager/policy/builtin/topology-aware/)
 
 A topology-aware policy capable of handling multiple tiers/types of memory,
 typically a DRAM/PMEM combination configured in 2-layer memory mode.
