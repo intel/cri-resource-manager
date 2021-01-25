@@ -25,7 +25,7 @@ import (
 func UncompressTbz2(archive string, dir string) error {
 	file, err := os.Open(archive)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer file.Close()
 
