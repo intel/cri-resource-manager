@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
+	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -724,7 +725,7 @@ func (cs *supply) ReserveMemory(g Grant) error {
 
 // takeCPUs takes up to cnt CPUs from a given CPU set to another.
 func (cs *supply) takeCPUs(from, to *cpuset.CPUSet, cnt int) (cpuset.CPUSet, error) {
-	cset, err := cs.node.Policy().cpuAllocator.AllocateCpus(from, cnt, true)
+	cset, err := cs.node.Policy().cpuAllocator.AllocateCpus(from, cnt, cpuallocator.PriorityHigh)
 	if err != nil {
 		return cset, err
 	}

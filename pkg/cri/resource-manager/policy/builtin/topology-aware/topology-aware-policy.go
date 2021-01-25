@@ -520,7 +520,7 @@ func (p *policy) checkConstraints() error {
 		// Use CpuAllocator to pick reserved CPUs among
 		// allowed ones. Because using those CPUs is allowed,
 		// they remain (they are put back) in the allowed set.
-		cset, err := p.cpuAllocator.AllocateCpus(&p.allowed, p.reserveCnt, false)
+		cset, err := p.cpuAllocator.AllocateCpus(&p.allowed, p.reserveCnt, cpuallocator.PriorityNormal)
 		p.allowed = p.allowed.Union(cset)
 		if err != nil {
 			log.Fatal("cannot reserve %dm CPUs for ReservedResources from AvailableResources: %s", qty.MilliValue(), err)

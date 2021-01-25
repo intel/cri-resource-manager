@@ -48,7 +48,7 @@ type allocatorHelper struct {
 	topology      topologyCache // cached topology information
 	flags         AllocFlag     // allocation preferences
 	from          cpuset.CPUSet // set of CPUs to allocate from
-	preferred     cpuset.CPUSet // set of preferred CPUs
+	prefer        CPUPriority   // CPU priority to prefer
 	cnt           int           // number of CPUs to allocate
 	result        cpuset.CPUSet // set of CPUs allocated
 
@@ -58,15 +58,24 @@ type allocatorHelper struct {
 
 // CPUAllocator is an interface for a generic CPU allocator
 type CPUAllocator interface {
-	AllocateCpus(*cpuset.CPUSet, int, bool) (cpuset.CPUSet, error)
-	ReleaseCpus(*cpuset.CPUSet, int, bool) (cpuset.CPUSet, error)
+	AllocateCpus(from *cpuset.CPUSet, cnt int, prefer CPUPriority) (cpuset.CPUSet, error)
+	ReleaseCpus(from *cpuset.CPUSet, cnt int, prefer CPUPriority) (cpuset.CPUSet, error)
 }
+
+type CPUPriority int
+
+const (
+	PriorityHigh CPUPriority = iota
+	PriorityNormal
+	PriorityLow
+	NumCPUPriorities
+	PriorityNone = NumCPUPriorities
+)
 
 type cpuAllocator struct {
 	logger.Logger
 	sys           sysfs.System  // wrapped sysfs.System instance
 	topologyCache topologyCache // topology lookups
-	priorityCpus  cpuset.CPUSet // set of CPUs having higher priority
 }
 
 // topologyCache caches topology lookups
@@ -74,7 +83,11 @@ type topologyCache struct {
 	pkg  map[sysfs.ID]cpuset.CPUSet
 	node map[sysfs.ID]cpuset.CPUSet
 	core map[sysfs.ID]cpuset.CPUSet
+
+	cpuPriorities cpuPriorities // CPU priority mapping
 }
+
+type cpuPriorities [NumCPUPriorities]cpuset.CPUSet
 
 // IDFilter helps filtering Ids.
 type IDFilter func(sysfs.ID) bool
@@ -93,8 +106,6 @@ func NewCPUAllocator(sys sysfs.System) CPUAllocator {
 		topologyCache: newTopologyCache(sys),
 	}
 
-	ca.discoverPriorityCpus()
-
 	return &ca
 }
 
@@ -111,64 +122,6 @@ func pickIds(idSlice []sysfs.ID, f IDFilter) []sysfs.ID {
 	}
 
 	return ids[0:idx]
-}
-
-func (ca *cpuAllocator) discoverPriorityCpus() {
-	ca.priorityCpus = cpuset.NewCPUSet()
-	if ca.sys == nil {
-		return
-	}
-
-	// Group cpus by base frequency and energy performance profile
-	freqs := map[uint64][]sysfs.ID{}
-	epps := map[sysfs.EPP][]sysfs.ID{}
-	for _, id := range ca.sys.CPUIDs() {
-		cpu := ca.sys.CPU(id)
-		bf := cpu.BaseFrequency()
-		freqs[bf] = append(freqs[bf], id)
-
-		epp := cpu.EPP()
-		epps[epp] = append(epps[epp], id)
-	}
-
-	// Construct a sorted lists of detected frequencies and epp values
-	freqList := []uint64{}
-	for freq := range freqs {
-		if freq > 0 {
-			freqList = append(freqList, freq)
-		}
-	}
-	utils.SortUint64s(freqList)
-
-	eppList := []int{}
-	for e := range epps {
-		if e != sysfs.EPPUnknown {
-			eppList = append(eppList, int(e))
-		}
-	}
-	sort.Ints(eppList)
-
-	priorityCpus := []sysfs.ID{}
-	// All cpus NOT in the lowest base frequency bin are considered high prio
-	if len(freqList) > 0 {
-		for _, freq := range freqList[1:] {
-			priorityCpus = append(priorityCpus, freqs[freq]...)
-		}
-	}
-
-	// All cpus NOT in the lowest performance epp are considered high prio
-	if len(eppList) > 1 {
-		for _, epp := range eppList[0 : len(eppList)-1] {
-			priorityCpus = append(priorityCpus, epps[sysfs.EPP(epp)]...)
-		}
-	}
-	ca.priorityCpus = sysfs.NewIDSet(priorityCpus...).CPUSet()
-
-	if ca.priorityCpus.Size() > 0 {
-		log.Debug("discovered high priority cpus: %v", ca.priorityCpus)
-	} else {
-		log.Debug("no high priority cpus detected")
-	}
 }
 
 // newAllocatorHelper creates a new CPU allocatorHelper.
@@ -199,10 +152,8 @@ func (a *allocatorHelper) takeIdlePackages() {
 	// sorted by number of preferred cpus and then by cpu id
 	sort.Slice(pkgs,
 		func(i, j int) bool {
-			iPref := a.topology.pkg[pkgs[i]].Intersection(a.preferred).Size()
-			jPref := a.topology.pkg[pkgs[j]].Intersection(a.preferred).Size()
-			if iPref != jPref {
-				return iPref > jPref
+			if res := a.topology.cpuPriorities.cmpCPUSet(a.topology.pkg[pkgs[i]], a.topology.pkg[pkgs[j]], a.prefer); res != 0 {
+				return res > 0
 			}
 			return pkgs[i] < pkgs[j]
 		})
@@ -245,10 +196,8 @@ func (a *allocatorHelper) takeIdleCores() {
 	// sorted by id
 	sort.Slice(cores,
 		func(i, j int) bool {
-			iPref := a.topology.core[cores[i]].Intersection(a.preferred).Size()
-			jPref := a.topology.core[cores[j]].Intersection(a.preferred).Size()
-			if iPref != jPref {
-				return iPref > jPref
+			if res := a.topology.cpuPriorities.cmpCPUSet(a.topology.core[cores[i]], a.topology.core[cores[j]], a.prefer); res != 0 {
+				return res > 0
 			}
 			return cores[i] < cores[j]
 		})
@@ -287,7 +236,7 @@ func (a *allocatorHelper) takeIdleThreads() {
 	// sorted for preference by id, mimicking cpus_assignment.go for now:
 	//   IOW, prefer CPUs
 	//     - from packages with higher number of CPUs/cores already in a.result
-	//     - from the list of preferred cpus
+	//     - from the list of cpus with preferred priority
 	//     - from packages with fewer remaining free CPUs/cores in a.from
 	//     - from cores with fewer remaining free CPUs/cores in a.from
 	//     - from packages with lower id
@@ -306,28 +255,29 @@ func (a *allocatorHelper) takeIdleThreads() {
 
 			iPkgColo := iPkgSet.Intersection(a.result).Size()
 			jPkgColo := jPkgSet.Intersection(a.result).Size()
+			if iPkgColo != jPkgColo {
+				return iPkgColo > jPkgColo
+			}
+
+			iCset := cpuset.NewCPUSet(int(cores[i]))
+			jCset := cpuset.NewCPUSet(int(cores[j]))
+			if res := a.topology.cpuPriorities.cmpCPUSet(iCset, jCset, a.prefer); res != 0 {
+				return res > 0
+			}
 
 			iPkgFree := iPkgSet.Intersection(a.from).Size()
 			jPkgFree := jPkgSet.Intersection(a.from).Size()
+			if iPkgFree != jPkgFree {
+				return iPkgFree < jPkgFree
+			}
 
 			iCoreFree := iCoreSet.Intersection(a.from).Size()
 			jCoreFree := jCoreSet.Intersection(a.from).Size()
-
-			iPreferred := a.preferred.Contains(int(cores[i]))
-			jPreferred := a.preferred.Contains(int(cores[j]))
-
-			switch {
-			case iPkgColo != jPkgColo:
-				return iPkgColo > jPkgColo
-			case iPreferred != jPreferred:
-				return iPreferred
-			case iPkgFree != jPkgFree:
-				return iPkgFree < jPkgFree
-			case iCoreFree != jCoreFree:
+			if iCoreFree != jCoreFree {
 				return iCoreFree < jCoreFree
-			default:
-				return iCore < jCore
 			}
+
+			return iCore < jCore
 		})
 
 	a.Debug(" => idle threads sorted: %v", cores)
@@ -351,8 +301,7 @@ func (a *allocatorHelper) takeIdleThreads() {
 func (a *allocatorHelper) takeAny() {
 	a.Debug("* takeAnyCores()...")
 
-	cpus := a.from.Intersection(a.preferred).ToSlice()
-	cpus = append(cpus, a.from.Difference(a.preferred).ToSlice()...)
+	cpus := a.from.ToSlice()
 
 	if len(cpus) >= a.cnt {
 		cset := cpuset.NewCPUSet(cpus[0:a.cnt]...)
@@ -384,7 +333,7 @@ func (a *allocatorHelper) allocate() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func (ca *cpuAllocator) allocateCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
+func (ca *cpuAllocator) allocateCpus(from *cpuset.CPUSet, cnt int, prefer CPUPriority) (cpuset.CPUSet, error) {
 	var result cpuset.CPUSet
 	var err error
 
@@ -397,33 +346,27 @@ func (ca *cpuAllocator) allocateCpus(from *cpuset.CPUSet, cnt int, preferHighPri
 		a := newAllocatorHelper(ca.sys, ca.topologyCache)
 		a.from = from.Clone()
 		a.cnt = cnt
-
-		if preferHighPrio {
-			a.preferred = ca.priorityCpus
-		} else {
-			// Try to avoid high priority cpus
-			a.preferred = from.Difference(ca.priorityCpus)
-		}
+		a.prefer = prefer
 
 		result, err, *from = a.allocate(), nil, a.from.Clone()
 
-		a.Debug("%d cpus from #%v (preferring #%v) => #%v", cnt, from.Union(result), a.preferred, result)
+		a.Debug("%d cpus from #%v (preferring #%v) => #%v", cnt, from.Union(result), a.prefer, result)
 	}
 
 	return result, err
 }
 
 // AllocateCpus allocates a number of CPUs from the given set.
-func (ca *cpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
-	result, err := ca.allocateCpus(from, cnt, preferHighPrio)
+func (ca *cpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, prefer CPUPriority) (cpuset.CPUSet, error) {
+	result, err := ca.allocateCpus(from, cnt, prefer)
 	return result, err
 }
 
 // ReleaseCpus releases a number of CPUs from the given set.
-func (ca *cpuAllocator) ReleaseCpus(from *cpuset.CPUSet, cnt int, preferHighPrio bool) (cpuset.CPUSet, error) {
+func (ca *cpuAllocator) ReleaseCpus(from *cpuset.CPUSet, cnt int, prefer CPUPriority) (cpuset.CPUSet, error) {
 	oset := from.Clone()
 
-	result, err := ca.allocateCpus(from, from.Size()-cnt, preferHighPrio)
+	result, err := ca.allocateCpus(from, from.Size()-cnt, prefer)
 
 	ca.Debug("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset, cnt, from, result)
 
@@ -446,5 +389,119 @@ func newTopologyCache(sys sysfs.System) topologyCache {
 			c.core[id] = sys.CPU(id).ThreadCPUSet()
 		}
 	}
+
+	c.discoverCPUPriorities(sys)
+
 	return c
+}
+
+func (c *topologyCache) discoverCPUPriorities(sys sysfs.System) {
+	if sys == nil {
+		return
+	}
+	var cpuPriorities [NumCPUPriorities][]sysfs.ID
+
+	// Group cpus by base frequency and energy performance profile
+	freqs := map[uint64][]sysfs.ID{}
+	epps := map[sysfs.EPP][]sysfs.ID{}
+	for _, id := range sys.CPUIDs() {
+		cpu := sys.CPU(id)
+		bf := cpu.BaseFrequency()
+		freqs[bf] = append(freqs[bf], id)
+
+		epp := cpu.EPP()
+		epps[epp] = append(epps[epp], id)
+	}
+
+	// Construct a sorted lists of detected frequencies and epp values
+	freqList := []uint64{}
+	for freq := range freqs {
+		if freq > 0 {
+			freqList = append(freqList, freq)
+		}
+	}
+	utils.SortUint64s(freqList)
+
+	eppList := []int{}
+	for e := range epps {
+		if e != sysfs.EPPUnknown {
+			eppList = append(eppList, int(e))
+		}
+	}
+	sort.Ints(eppList)
+
+	// Finally, determine priority of each CPU
+	for _, id := range sys.CPUIDs() {
+		cpu := sys.CPU(id)
+		p := PriorityNormal
+
+		if len(freqList) > 1 {
+			bf := cpu.BaseFrequency()
+
+			// All cpus NOT in the lowest base frequency bin are considered high prio
+			if bf > freqList[0] {
+				p = PriorityHigh
+			} else {
+				p = PriorityLow
+			}
+		}
+
+		// All cpus NOT in the lowest performance epp are considered high prio
+		// NOTE: higher EPP value denotes lower performance preference
+		if len(eppList) > 1 {
+			epp := cpu.EPP()
+			if int(epp) < eppList[len(eppList)-1] {
+				p = PriorityHigh
+			} else {
+				p = PriorityLow
+			}
+		}
+
+		cpuPriorities[p] = append(cpuPriorities[p], id)
+	}
+
+	for p, cpus := range cpuPriorities {
+		c.cpuPriorities[p] = sysfs.NewIDSet(cpus...).CPUSet()
+		log.Debug("discovered %d %s priority cpus: %v", c.cpuPriorities[p].Size(), CPUPriority(p), c.cpuPriorities[p])
+	}
+}
+
+func (p CPUPriority) String() string {
+	switch p {
+	case PriorityHigh:
+		return "high"
+	case PriorityNormal:
+		return "normal"
+	case PriorityLow:
+		return "low"
+	}
+	return "none"
+}
+
+// cmpCPUSet compares two cpusets in terms of preferred cpu priority. Returns:
+//   > 0 if cpuset A is preferred
+//   < 0 if cpuset B is preferred
+//   0 if cpusets A and B are equal in terms of cpu priority
+func (c *cpuPriorities) cmpCPUSet(csetA, csetB cpuset.CPUSet, prefer CPUPriority) int {
+	if prefer == PriorityNone {
+		return 0
+	}
+
+	// Favor cpuset having CPUs with priorities equal to or lower than what was requested
+	for prio := prefer; prio < NumCPUPriorities; prio++ {
+		prefA := csetA.Intersection(c[prio]).Size()
+		prefB := csetB.Intersection(c[prio]).Size()
+		if prefA != prefB {
+			return prefA - prefB
+		}
+	}
+	// Repel cpuset having CPUs with higher priority than what was requested
+	for prio := PriorityHigh; prio < prefer; prio++ {
+		nonprefA := csetA.Intersection(c[prio]).Size()
+		nonprefB := csetB.Intersection(c[prio]).Size()
+		if nonprefA != nonprefB {
+			return nonprefB - nonprefA
+		}
+	}
+	return 0
 }

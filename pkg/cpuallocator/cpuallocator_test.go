@@ -15,49 +15,80 @@
 package cpuallocator
 
 import (
+	"io/ioutil"
+	"os"
+	"path"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	//"github.com/google/go-cmp/cmp"
+
+	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 func TestAllocatorHelper(t *testing.T) {
+	// Create tmpdir and decompress testdata there
+	tmpdir, err := ioutil.TempDir("", "cri-resource-manager-test-")
+	if err != nil {
+		t.Fatalf("failed to create tmpdir: %v", err)
+	}
+	defer os.RemoveAll(tmpdir)
+
+	if err := utils.UncompressTbz2(path.Join("testdata", "sysfs.tar.bz2"), tmpdir); err != nil {
+		t.Fatalf("failed to decompress testdata: %v", err)
+	}
+
+	// Discover mock system from the testdata
+	sys, err := sysfs.DiscoverSystemAt(path.Join(tmpdir, "sysfs", "2-socket-4-node-40-core", "sys"))
+	if err != nil {
+		t.Fatalf("failed to discover mock system: %v", err)
+	}
+	topoCache := newTopologyCache(sys)
+
+	// Fake cpu priorities: 5 cores from pkg #0 as high prio
+	// Package CPUs: #0: [0-19,40-59], #1: [20-39,60-79]
+	topoCache.cpuPriorities = [NumCPUPriorities]cpuset.CPUSet{
+		cpuset.MustParse("2,5,8,15,17,42,45,48,55,57"),
+		cpuset.MustParse("20-39,60-79"),
+		cpuset.MustParse("0,1,3,4,6,7,9-14,16,18,19,40,41,43,44,46,47,49-54,56,58,59"),
+	}
+
 	tcs := []struct {
 		description string
 		from        cpuset.CPUSet
-		preferred   cpuset.CPUSet
+		prefer      CPUPriority
 		cnt         int
 		expected    cpuset.CPUSet
 	}{
 		{
 			description: "too few available CPUs",
-			from:        cpuset.NewCPUSet(2, 3, 10, 11, 12, 13, 14, 20),
-			preferred:   cpuset.NewCPUSet(10, 13, 20, 23),
+			from:        cpuset.MustParse("2,3,10-14,20"),
+			prefer:      PriorityNormal,
 			cnt:         9,
 			expected:    cpuset.NewCPUSet(),
 		},
 		{
 			description: "request all available CPUs",
-			from:        cpuset.NewCPUSet(2, 3, 10, 11, 12, 13, 14, 20),
-			preferred:   cpuset.NewCPUSet(2, 3),
+			from:        cpuset.MustParse("2,3,10-14,20"),
+			prefer:      PriorityNormal,
 			cnt:         8,
-			expected:    cpuset.NewCPUSet(2, 3, 10, 11, 12, 13, 14, 20),
+			expected:    cpuset.MustParse("2,3,10-14,20"),
 		},
 		{
 			description: "prefer high priority cpus",
-			from:        cpuset.NewCPUSet(2, 3, 10, 11, 12, 13, 14, 20),
-			preferred:   cpuset.NewCPUSet(10, 13, 20, 23),
+			from:        cpuset.MustParse("2,3,10-25"),
+			prefer:      PriorityHigh,
 			cnt:         4,
-			expected:    cpuset.NewCPUSet(2, 10, 13, 20),
+			expected:    cpuset.NewCPUSet(2, 3, 15, 17),
 		},
 	}
 
 	// Run tests
 	for _, tc := range tcs {
 		t.Run(tc.description, func(t *testing.T) {
-			a := newAllocatorHelper(nil, newTopologyCache(nil))
+			a := newAllocatorHelper(sys, topoCache)
 			a.from = tc.from
-			a.preferred = tc.preferred
+			a.prefer = tc.prefer
 			a.cnt = tc.cnt
 			result := a.allocate()
 			if !result.Equals(tc.expected) {
