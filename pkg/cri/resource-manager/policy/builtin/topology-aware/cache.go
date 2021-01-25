@@ -16,8 +16,12 @@ package topologyaware
 
 import (
 	"encoding/json"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"time"
+
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
 const (
@@ -30,8 +34,64 @@ func (p *policy) saveAllocations() {
 	p.cache.Save()
 }
 
-func (p *policy) restoreAllocations() bool {
-	return p.cache.GetPolicyEntry(keyAllocations, &p.allocations)
+func (p *policy) restoreAllocations(allocations *allocations) error {
+	savedAllocations := allocations.clone()
+	p.allocations = p.newAllocations()
+
+	//
+	// Try to reinstate all grants with the exact same resource assignments
+	// as saved. If that fails, release and try to reallocate all corresponding
+	// containers with pool hints pointing to the currently assigned pools. If
+	// this fails too, save the original allocations unchanged to the cache and
+	// return an error.
+	//
+
+	if err := p.reinstateGrants(allocations.grants); err != nil {
+		log.Error("failed to reinstate grants verbatim: %v", err)
+		containers, poolHints := allocations.getContainerPoolHints()
+		if err := p.reallocateResources(containers, poolHints); err != nil {
+			p.allocations = savedAllocations
+			p.saveAllocations() // undo any potential changes in saved cache
+			return err
+		}
+	}
+
+	return nil
+}
+
+// reinstateGrants tries to restore the given grants exactly as such.
+func (p *policy) reinstateGrants(grants map[string]Grant) error {
+	for id, grant := range grants {
+		c := grant.GetContainer()
+
+		pool := grant.GetCPUNode()
+		supply := pool.FreeSupply()
+
+		if err := supply.Reserve(grant); err != nil {
+			return policyError("failed to update pool %q with CPU grant of %q: %v",
+				pool.Name(), c.PrettyName(), err)
+		}
+
+		log.Info("updated pool %q with reinstated CPU grant of %q",
+			pool.Name(), c.PrettyName())
+
+		pool = grant.GetMemoryNode()
+		if err := supply.ReserveMemory(grant); err != nil {
+			grant.GetCPUNode().FreeSupply().ReleaseCPU(grant)
+			return policyError("failed to update pool %q with extra memory of %q: %v",
+				pool.Name(), c.PrettyName(), err)
+		}
+
+		log.Info("updated pool %q with reinstanted memory reservation of %q",
+			pool.Name(), c.PrettyName())
+
+		p.allocations.grants[id] = grant
+		p.applyGrant(grant)
+	}
+
+	p.updateSharedAllocations(nil)
+
+	return nil
 }
 
 func (p *policy) saveConfig() error {
@@ -52,23 +112,40 @@ func (p *policy) restoreConfig() bool {
 }
 
 type cachedGrant struct {
-	Exclusive string
-	Part      int
-	Container string
-	Pool      string
+	Exclusive   string
+	Part        int
+	CPUType     cpuClass
+	Container   string
+	Pool        string
+	MemoryPool  string
+	MemType     memoryType
+	Memset      system.IDSet
+	MemoryLimit memoryMap
+	ColdStart   time.Duration
 }
 
-func newCachedGrant(cg CPUGrant) *cachedGrant {
+func newCachedGrant(cg Grant) *cachedGrant {
 	ccg := &cachedGrant{}
 	ccg.Exclusive = cg.ExclusiveCPUs().String()
-	ccg.Part = cg.SharedPortion()
+	ccg.Part = cg.CPUPortion()
+	ccg.CPUType = cg.CPUType()
 	ccg.Container = cg.GetContainer().GetCacheID()
-	ccg.Pool = cg.GetNode().Name()
+	ccg.Pool = cg.GetCPUNode().Name()
+	ccg.MemoryPool = cg.GetMemoryNode().Name()
+	ccg.MemType = cg.MemoryType()
+	ccg.Memset = cg.Memset().Clone()
+
+	ccg.MemoryLimit = make(memoryMap)
+	for key, value := range cg.MemLimit() {
+		ccg.MemoryLimit[key] = value
+	}
+
+	ccg.ColdStart = cg.ColdStart()
 
 	return ccg
 }
 
-func (ccg *cachedGrant) ToCPUGrant(policy *policy) (CPUGrant, error) {
+func (ccg *cachedGrant) ToGrant(policy *policy) (Grant, error) {
 	node, ok := policy.nodes[ccg.Pool]
 	if !ok {
 		return nil, policyError("cache error: failed to restore %v, unknown pool/node", *ccg)
@@ -78,23 +155,35 @@ func (ccg *cachedGrant) ToCPUGrant(policy *policy) (CPUGrant, error) {
 		return nil, policyError("cache error: failed to restore %v, unknown container", *ccg)
 	}
 
-	return newCPUGrant(
+	g := newGrant(
 		node,
 		container,
+		ccg.CPUType,
 		cpuset.MustParse(ccg.Exclusive),
 		ccg.Part,
-	), nil
+		ccg.MemType,
+		ccg.MemType,
+		ccg.MemoryLimit,
+		ccg.ColdStart,
+	)
+
+	if g.Memset().String() != ccg.Memset.String() {
+		log.Error("cache error: mismatch in stored/recalculated memset: %s != %s",
+			ccg.Memset, g.Memset())
+	}
+
+	return g, nil
 }
 
-func (cg *cpuGrant) MarshalJSON() ([]byte, error) {
+func (cg *grant) MarshalJSON() ([]byte, error) {
 	return json.Marshal(newCachedGrant(cg))
 }
 
-func (cg *cpuGrant) UnmarshalJSON(data []byte) error {
+func (cg *grant) UnmarshalJSON(data []byte) error {
 	ccg := cachedGrant{}
 
 	if err := json.Unmarshal(data, &ccg); err != nil {
-		return policyError("failed to restore cpuGrant: %v", err)
+		return policyError("failed to restore grant: %v", err)
 	}
 
 	cg.exclusive = cpuset.MustParse(ccg.Exclusive)
@@ -104,7 +193,7 @@ func (cg *cpuGrant) UnmarshalJSON(data []byte) error {
 
 func (a *allocations) MarshalJSON() ([]byte, error) {
 	cgrants := make(map[string]*cachedGrant)
-	for id, cg := range a.CPU {
+	for id, cg := range a.grants {
 		cgrants[id] = newCachedGrant(cg)
 	}
 
@@ -119,14 +208,14 @@ func (a *allocations) UnmarshalJSON(data []byte) error {
 		return policyError("failed to restore allocations: %v", err)
 	}
 
-	a.CPU = make(map[string]CPUGrant, 32)
+	a.grants = make(map[string]Grant, 32)
 	for id, ccg := range cgrants {
-		a.CPU[id], err = ccg.ToCPUGrant(a.policy)
+		a.grants[id], err = ccg.ToGrant(a.policy)
 		if err != nil {
 			log.Error("removing unresolvable cached grant %v: %v", *ccg, err)
-			delete(a.CPU, id)
+			delete(a.grants, id)
 		} else {
-			log.Debug("resolved cache grant: %v", a.CPU[id].String())
+			log.Debug("resolved cache grant: %v", a.grants[id].String())
 		}
 	}
 
@@ -148,14 +237,14 @@ func (a *allocations) Set(value interface{}) {
 		from = value.(*allocations)
 	}
 
-	a.CPU = make(map[string]CPUGrant, 32)
-	for id, cg := range from.CPU {
-		a.CPU[id] = cg
+	a.grants = make(map[string]Grant, 32)
+	for id, cg := range from.grants {
+		a.grants[id] = cg
 	}
 }
 
 func (a *allocations) Dump(logfn func(format string, args ...interface{}), prefix string) {
-	for _, cg := range a.CPU {
+	for _, cg := range a.grants {
 		logfn(prefix+"%s", cg)
 	}
 }

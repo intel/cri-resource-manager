@@ -29,7 +29,7 @@ verify \
     'disjoint_sets(cpus["pod0c0"], cpus["pod1c0"], cpus["pod2c0"])'
 
 # pod3, tries to fully exhaust the shared subset of a (NUMA node) pool
-# Currently memtier refuses to exhaust even idle shared CPU subsets of
+# Currently topology-aware refuses to exhaust even idle shared CPU subsets of
 # a pool. Therefore such attempts will try to squeeze the container to
 # another pool at the same level or, if none found, push the container
 # one level up to the parent pool.

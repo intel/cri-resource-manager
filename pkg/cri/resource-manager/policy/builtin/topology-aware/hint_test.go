@@ -147,20 +147,20 @@ func TestSocketHintScore(t *testing.T) {
 func TestHintCpus(t *testing.T) {
 	tcases := []struct {
 		name     string
-		supply   *cpuSupply
+		supply   *supply
 		hint     topology.Hint
 		expected cpuset.CPUSet
 	}{
 		{
 			name:   "handle unparsable Sockets gracefully",
-			supply: &cpuSupply{},
+			supply: &supply{},
 			hint: topology.Hint{
 				Sockets: "unparsable",
 			},
 		},
 		{
 			name: "non-zero Sockets hint and empty system.Package",
-			supply: &cpuSupply{
+			supply: &supply{
 				node: &node{
 					policy: &policy{
 						sys: &mockSystem{},
@@ -173,14 +173,14 @@ func TestHintCpus(t *testing.T) {
 		},
 		{
 			name:   "handle unparsable NUMAs gracefully",
-			supply: &cpuSupply{},
+			supply: &supply{},
 			hint: topology.Hint{
 				NUMAs: "unparsable",
 			},
 		},
 		{
 			name: "non-zero NUMAs hint and empty system.Node",
-			supply: &cpuSupply{
+			supply: &supply{
 				node: &node{
 					policy: &policy{
 						sys: &mockSystem{},
@@ -194,7 +194,7 @@ func TestHintCpus(t *testing.T) {
 		// TODO(rojkov): add tests for non-empty system.Package's (can't be done while system.Package is closed struct)
 		{
 			name:   "non-zero CPUs hint",
-			supply: &cpuSupply{},
+			supply: &supply{},
 			hint: topology.Hint{
 				CPUs: "1",
 			},

@@ -21,7 +21,7 @@ import (
 )
 
 // Create our logger instance.
-var log logger.Logger = logger.NewLogger(PolicyName)
+var log logger.Logger = logger.NewLogger("policy")
 
 // indent produces an indentation string for the given level.
 const (

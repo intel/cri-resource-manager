@@ -38,7 +38,7 @@ type migration struct {
 	cache      cache.Cache           // resource manager cache
 	sync.Mutex                       // protect access from multiple goroutines
 	containers map[string]*container // containers we migrate
-	demoter    *demoter              // demoter adopted from memtier policy
+	demoter    *demoter              // demoter adopted from topology-aware policy
 }
 
 //

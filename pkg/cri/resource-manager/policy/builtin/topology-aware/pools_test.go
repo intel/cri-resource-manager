@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memtier
+package topologyaware
 
 import (
 	"archive/tar"
@@ -433,7 +433,7 @@ func TestPoolCreation(t *testing.T) {
 			}
 
 			log.EnableDebug(true)
-			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
 			log.EnableDebug(false)
 
 			if policy.root.GetSupply().SharableCPUs().Size()+policy.root.GetSupply().IsolatedCPUs().Size()+policy.root.GetSupply().ReservedCPUs().Size() != tc.expectedRootNodeCPUs {
@@ -568,7 +568,7 @@ func TestWorkloadPlacement(t *testing.T) {
 			}
 
 			log.EnableDebug(true)
-			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
 			log.EnableDebug(false)
 
 			scores, filteredPools := policy.sortPoolsByScore(tc.req, tc.affinities)
@@ -717,7 +717,7 @@ func TestContainerMove(t *testing.T) {
 			}
 
 			log.EnableDebug(true)
-			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
 			log.EnableDebug(false)
 
 			grant1, err := policy.allocatePool(tc.container1, "")
@@ -988,7 +988,7 @@ func TestAffinities(t *testing.T) {
 			}
 
 			log.EnableDebug(true)
-			policy := CreateMemtierPolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
 			log.EnableDebug(false)
 
 			affinities := map[int]int32{}

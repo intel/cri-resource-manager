@@ -16,6 +16,7 @@ package topologyaware
 
 import (
 	"os"
+	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -28,80 +29,95 @@ import (
 )
 
 type mockSystemNode struct {
-	id        system.ID // node id
-	packageID system.ID // node id
-	distance  int
+	id       system.ID // node id
+	memFree  uint64
+	memTotal uint64
+	memType  system.MemoryType
+	distance []int
 }
 
 func (fake *mockSystemNode) MemoryInfo() (*system.MemInfo, error) {
-	return nil, nil
+	return &system.MemInfo{MemFree: fake.memFree, MemTotal: fake.memTotal}, nil
 }
+
 func (fake *mockSystemNode) PackageID() system.ID {
-	return fake.packageID
+	return 0
 }
+
 func (fake *mockSystemNode) DieID() system.ID {
 	return 0
 }
+
 func (fake *mockSystemNode) ID() system.ID {
 	return fake.id
 }
-func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
-}
-func (fake *mockSystemNode) Distance() []int {
-	return []int{}
-}
-func (fake *mockSystemNode) DistanceFrom(id system.ID) int {
-	return 0
-}
+
 func (fake *mockSystemNode) GetMemoryType() system.MemoryType {
-	return system.MemoryTypeDRAM
+	return fake.memType
 }
 
 func (fake *mockSystemNode) HasNormalMemory() bool {
 	return true
 }
 
-type mockSystemCPUPackage struct {
-	id system.ID // package id
+func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
+	return cpuset.NewCPUSet()
 }
 
-func (fake *mockSystemCPUPackage) ID() system.ID {
-	return fake.id
+func (fake *mockSystemNode) Distance() []int {
+	if len(fake.distance) == 0 {
+		return []int{0}
+	}
+	return fake.distance
 }
-func (fake *mockSystemCPUPackage) CPUSet() cpuset.CPUSet {
+
+func (fake *mockSystemNode) DistanceFrom(id system.ID) int {
+	return 0
+}
+
+type mockCPUPackage struct {
+}
+
+func (p *mockCPUPackage) ID() system.ID {
+	return system.ID(0)
+}
+
+func (p *mockCPUPackage) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
-func (fake *mockSystemCPUPackage) NodeIDs() []system.ID {
+
+func (p *mockCPUPackage) NodeIDs() []system.ID {
 	return []system.ID{}
 }
-func (p *mockSystemCPUPackage) DieIDs() []system.ID {
+
+func (p *mockCPUPackage) DieIDs() []system.ID {
 	return []system.ID{0}
 }
-func (p *mockSystemCPUPackage) DieCPUSet(system.ID) cpuset.CPUSet {
+
+func (p *mockCPUPackage) DieCPUSet(system.ID) cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
-func (p *mockSystemCPUPackage) DieNodeIDs(system.ID) []system.ID {
+
+func (p *mockCPUPackage) DieNodeIDs(system.ID) []system.ID {
 	return []system.ID{}
 }
 
 type mockCPU struct {
-	id            system.ID
-	node          mockSystemNode
-	pkg           mockSystemCPUPackage
-	isolated      bool
-	online        bool
-	baseFrequency uint64
+	isolated cpuset.CPUSet
+	online   cpuset.CPUSet
+	id       system.ID
+	node     mockSystemNode
+	pkg      mockCPUPackage
 }
 
 func (c *mockCPU) BaseFrequency() uint64 {
-	return c.baseFrequency
+	return 0
 }
 func (c *mockCPU) EPP() system.EPP {
 	return system.EPPUnknown
 }
 func (c *mockCPU) ID() system.ID {
-	return c.id
+	return system.ID(0)
 }
 func (c *mockCPU) PackageID() system.ID {
 	return c.pkg.ID()
@@ -122,48 +138,46 @@ func (c *mockCPU) FrequencyRange() system.CPUFreq {
 	return system.CPUFreq{}
 }
 func (c *mockCPU) Online() bool {
-	return c.online
+	return true
 }
 func (c *mockCPU) Isolated() bool {
-	return c.isolated
+	return false
 }
 func (c *mockCPU) SetFrequencyLimits(min, max uint64) error {
 	return nil
 }
 
 type mockSystem struct {
-	isolatedCPU int
+	isolatedCPU  int
+	nodes        []system.Node
+	cpuCount     int
+	packageCount int
+	socketCount  int
+}
+
+func (fake *mockSystem) Node(id system.ID) system.Node {
+	for _, node := range fake.nodes {
+		if node.ID() == id {
+			return node
+		}
+	}
+	return &mockSystemNode{}
 }
 
 func (fake *mockSystem) CPU(system.ID) system.CPU {
 	return &mockCPU{}
 }
 func (fake *mockSystem) CPUCount() int {
-	return 0
+	if fake.cpuCount == 0 {
+		return 1
+	}
+	return fake.cpuCount
 }
 func (fake *mockSystem) Discover(flags system.DiscoveryFlag) error {
 	return nil
 }
-func (fake *mockSystem) CPUIDs() []system.ID {
-	return []system.ID{}
-}
-func (fake *mockSystem) PackageCount() int {
-	return 0
-}
-func (fake *mockSystem) ThreadCount() int {
-	return 0
-}
-func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus system.IDSet) error {
-	return nil
-}
-func (fake *mockSystem) SetCpusOnline(online bool, cpus system.IDSet) (system.IDSet, error) {
-	return system.NewIDSet(), nil
-}
-func (fake *mockSystem) Node(id system.ID) system.Node {
-	return &mockSystemNode{id: id}
-}
-func (fake *mockSystem) Package(id system.ID) system.CPUPackage {
-	return &mockSystemCPUPackage{id: id}
+func (fake *mockSystem) Package(system.ID) system.CPUPackage {
+	return &mockCPUPackage{}
 }
 func (fake *mockSystem) Offlined() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
@@ -178,17 +192,49 @@ func (fake *mockSystem) Isolated() cpuset.CPUSet {
 func (fake *mockSystem) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
+func (fake *mockSystem) CPUIDs() []system.ID {
+	return []system.ID{}
+}
+func (fake *mockSystem) PackageCount() int {
+	if fake.packageCount == 0 {
+		return 1
+	}
+	return fake.packageCount
+}
 func (fake *mockSystem) SocketCount() int {
-	return 2
+	if fake.socketCount == 0 {
+		return 1
+	}
+	return fake.socketCount
 }
 func (fake *mockSystem) NUMANodeCount() int {
-	return 2
+	return len(fake.nodes)
+}
+func (fake *mockSystem) ThreadCount() int {
+	if fake.cpuCount == 0 {
+		return 1
+	}
+	return fake.cpuCount
 }
 func (fake *mockSystem) PackageIDs() []system.ID {
-	return []system.ID{0, 1}
+	ids := make([]system.ID, len(fake.nodes))
+	for i, node := range fake.nodes {
+		ids[i] = node.PackageID()
+	}
+	return ids
 }
 func (fake *mockSystem) NodeIDs() []system.ID {
-	return []system.ID{0, 1}
+	ids := make([]system.ID, len(fake.nodes))
+	for i, node := range fake.nodes {
+		ids[i] = node.ID()
+	}
+	return ids
+}
+func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus system.IDSet) error {
+	return nil
+}
+func (fake *mockSystem) SetCpusOnline(online bool, cpus system.IDSet) (system.IDSet, error) {
+	return system.NewIDSet(), nil
 }
 func (fake *mockSystem) NodeDistance(system.ID, system.ID) int {
 	return 10
@@ -199,16 +245,24 @@ type mockContainer struct {
 	namespace                             string
 	returnValueForGetResourceRequirements v1.ResourceRequirements
 	returnValueForGetCacheID              string
+	returnValueForGetID                   string
+	memoryLimit                           int64
+	cpuset                                cpuset.CPUSet
+	returnValueForQOSClass                v1.PodQOSClass
+	pod                                   cache.Pod
 }
 
 func (m *mockContainer) PrettyName() string {
 	return m.name
 }
 func (m *mockContainer) GetPod() (cache.Pod, bool) {
-	return &mockPod{}, false
+	if m.pod == nil {
+		return &mockPod{}, false
+	}
+	return m.pod, true
 }
 func (m *mockContainer) GetID() string {
-	panic("unimplemented")
+	return m.returnValueForGetID
 }
 func (m *mockContainer) GetPodID() string {
 	panic("unimplemented")
@@ -233,7 +287,11 @@ func (m *mockContainer) GetState() cache.ContainerState {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetQOSClass() v1.PodQOSClass {
-	panic("unimplemented")
+	if len(m.returnValueForQOSClass) == 0 {
+		return v1.PodQOSGuaranteed
+	}
+
+	return m.returnValueForQOSClass
 }
 func (m *mockContainer) GetImage() string {
 	panic("unimplemented")
@@ -271,8 +329,12 @@ func (m *mockContainer) GetResmgrAnnotationKeys() []string {
 func (m *mockContainer) GetResmgrAnnotation(string, interface{}) (string, bool) {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetEffectiveAnnotation(string) (string, bool) {
-	panic("unimplemented")
+func (m *mockContainer) GetEffectiveAnnotation(key string) (string, bool) {
+	pod, ok := m.GetPod()
+	if !ok {
+		return "", false
+	}
+	return pod.GetEffectiveAnnotation(key, m.name)
 }
 func (m *mockContainer) GetAnnotations() map[string]string {
 	panic("unimplemented")
@@ -356,13 +418,13 @@ func (m *mockContainer) GetCPUShares() int64 {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetMemoryLimit() int64 {
-	panic("unimplemented")
+	return m.memoryLimit
 }
 func (m *mockContainer) GetOomScoreAdj() int64 {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetCpusetCpus() string {
-	panic("unimplemented")
+	return m.cpuset.String()
 }
 func (m *mockContainer) GetCpusetMems() string {
 	panic("unimplemented")
@@ -387,7 +449,6 @@ func (m *mockContainer) SetOomScoreAdj(int64) {
 func (m *mockContainer) SetCpusetCpus(string) {
 }
 func (m *mockContainer) SetCpusetMems(string) {
-	panic("unimplemented")
 }
 func (m *mockContainer) UpdateCriCreateRequest(*cri.CreateContainerRequest) error {
 	panic("unimplemented")
@@ -417,10 +478,10 @@ func (m *mockContainer) GetToptierLimit() int64 {
 	panic("unimplemented")
 }
 func (m *mockContainer) SetPageMigration(*cache.PageMigrate) {
-	panic("unimplemented")
+	return
 }
 func (m *mockContainer) GetPageMigration() *cache.PageMigrate {
-	panic("unimplemented")
+	return nil
 }
 func (m *mockContainer) SetCRIRequest(req interface{}) error {
 	panic("unimplemented")
@@ -470,6 +531,9 @@ type mockPod struct {
 	returnValueFotGetQOSClass          v1.PodQOSClass
 	returnValue1FotGetResmgrAnnotation string
 	returnValue2FotGetResmgrAnnotation bool
+	coldStartTimeout                   time.Duration
+	coldStartContainerName             string
+	annotations                        map[string]string
 }
 
 func (m *mockPod) GetInitContainers() []cache.Container {
@@ -524,13 +588,23 @@ func (m *mockPod) GetResmgrAnnotationKeys() []string {
 	panic("unimplemented")
 }
 func (m *mockPod) GetResmgrAnnotation(key string) (string, bool) {
+	if key == keyColdStartPreference && len(m.coldStartContainerName) > 0 {
+		return m.coldStartContainerName + ": { duration: " + m.coldStartTimeout.String() + " }", true
+	}
 	return m.returnValue1FotGetResmgrAnnotation, m.returnValue2FotGetResmgrAnnotation
 }
 func (m *mockPod) GetResmgrAnnotationObject(string, interface{}, func([]byte, interface{}) error) (bool, error) {
 	panic("unimplemented")
 }
-func (m *mockPod) GetEffectiveAnnotation(string, string) (string, bool) {
-	panic("unimplemented")
+func (m *mockPod) GetEffectiveAnnotation(key, container string) (string, bool) {
+	if v, ok := m.annotations[key+"/container."+container]; ok {
+		return v, true
+	}
+	if v, ok := m.annotations[key+"/pod"]; ok {
+		return v, true
+	}
+	v, ok := m.annotations[key]
+	return v, ok
 }
 func (m *mockPod) GetCgroupParentDir() string {
 	panic("unimplemented")
@@ -605,7 +679,7 @@ func (m *mockCache) EvaluateAffinity(*cache.Affinity) map[string]int32 {
 	}
 }
 func (m *mockCache) AddImplicitAffinities(map[string]*cache.ImplicitAffinity) error {
-	panic("unimplemented")
+	return nil
 }
 func (m *mockCache) GetActivePolicy() string {
 	panic("unimplemented")
@@ -634,7 +708,7 @@ func (m *mockCache) SetAdjustment(*config.Adjustment) (bool, map[string]error) {
 	panic("unimplemented")
 }
 func (m *mockCache) Save() error {
-	panic("unimplemented")
+	return nil
 }
 func (m *mockCache) Refresh(interface{}) ([]cache.Pod, []cache.Pod, []cache.Container, []cache.Container) {
 	panic("unimplemented")

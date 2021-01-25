@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
-func TestToCPUGrant(t *testing.T) {
+func TestToGrant(t *testing.T) {
 	tcases := []struct {
 		name          string
 		policy        *policy
@@ -68,7 +68,7 @@ func TestToCPUGrant(t *testing.T) {
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := tc.cgrant.ToCPUGrant(tc.policy)
+			_, err := tc.cgrant.ToGrant(tc.policy)
 			if tc.expectedError && err == nil {
 				t.Errorf("Expected error, but got success")
 			}
@@ -88,11 +88,11 @@ func TestAllocationMarshalling(t *testing.T) {
 	}{
 		{
 			name: "non-zero Exclusive",
-			data: []byte(`{"key1":{"Exclusive":"1","Part":1,"Container":"1","Pool":"testnode"}}`),
+			data: []byte(`{"key1":{"Exclusive":"1","Part":1,"CPUType":0,"Container":"1","Pool":"testnode","MemoryPool":"testnode","MemType":"DRAM,PMEM,HBM","Memset":"","MemoryLimit":{},"ColdStart":0}}`),
 		},
 		{
 			name: "zero Exclusive",
-			data: []byte(`{"key1":{"Exclusive":"","Part":1,"Container":"1","Pool":"testnode"}}`),
+			data: []byte(`{"key1":{"Exclusive":"","Part":1,"CPUType":0,"Container":"1","Pool":"testnode","MemoryPool":"testnode","MemType":"DRAM,PMEM,HBM","Memset":"","MemoryLimit":{},"ColdStart":0}}`),
 		},
 	}
 	for _, tc := range tcases {
@@ -104,8 +104,8 @@ func TestAllocationMarshalling(t *testing.T) {
 							node: node{
 								name:    "testnode",
 								kind:    UnknownNode,
-								nodecpu: newCPUSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0),
-								freecpu: newCPUSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0),
+								noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(0, 0, 0), createMemoryMap(0, 0, 0)),
+								freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(0, 0, 0), createMemoryMap(0, 0, 0)),
 							},
 						},
 					},
@@ -127,7 +127,7 @@ func TestAllocationMarshalling(t *testing.T) {
 
 			out, marshallingErr := alloc.MarshalJSON()
 			if !bytes.Equal(out, tc.data) {
-				t.Errorf("Expected %q, but got %q", tc.data, out)
+				t.Errorf("Expected\n%q\nBut got\n%q", tc.data, out)
 			}
 			if tc.expectedMarshallingError && marshallingErr == nil {
 				t.Errorf("Expected marshalling error, but got success")
