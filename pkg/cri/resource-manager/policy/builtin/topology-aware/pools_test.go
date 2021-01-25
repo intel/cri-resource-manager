@@ -15,10 +15,7 @@
 package topologyaware
 
 import (
-	"archive/tar"
-	"compress/bzip2"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -31,6 +28,7 @@ import (
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/utils"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -72,54 +70,6 @@ func setLinks(nodes []Node, tree map[int][]int) {
 	}
 	if len(orphans) != 1 {
 		panic(fmt.Sprintf("expected one root node, got %d with IDs %v", len(orphans), orphans))
-	}
-}
-
-func uncompress(archive string, dir string) error {
-	file, err := os.Open(archive)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	data := bzip2.NewReader(file)
-	tr := tar.NewReader(data)
-	for {
-		header, err := tr.Next()
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-		if header.Typeflag == tar.TypeDir {
-			// Create a directory.
-			err = os.MkdirAll(path.Join(dir, header.Name), 0755)
-			if err != nil {
-				return err
-			}
-		} else if header.Typeflag == tar.TypeReg {
-			// Create a regular file.
-			targetFile, err := os.Create(path.Join(dir, header.Name))
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(targetFile, tr)
-			targetFile.Close()
-			if err != nil {
-				return err
-			}
-		} else if header.Typeflag == tar.TypeSymlink {
-			// Create a symlink and all the directories it needs.
-			err = os.MkdirAll(path.Dir(path.Join(dir, header.Name)), 0755)
-			if err != nil {
-				return err
-			}
-			err := os.Symlink(header.Linkname, path.Join(dir, header.Name))
-			if err != nil {
-				return err
-			}
-		}
 	}
 }
 
@@ -343,7 +293,7 @@ func TestPoolCreation(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// Uncompress the test data to the directory.
-	err = uncompress(path.Join("testdata", "sysfs.tar.bz2"), dir)
+	err = utils.UncompressTbz2(path.Join("testdata", "sysfs.tar.bz2"), dir)
 	if err != nil {
 		panic(err)
 	}
@@ -494,7 +444,7 @@ func TestWorkloadPlacement(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// Uncompress the test data to the directory.
-	err = uncompress(path.Join("testdata", "sysfs.tar.bz2"), dir)
+	err = utils.UncompressTbz2(path.Join("testdata", "sysfs.tar.bz2"), dir)
 	if err != nil {
 		panic(err)
 	}
@@ -611,7 +561,7 @@ func TestContainerMove(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// Uncompress the test data to the directory.
-	err = uncompress(path.Join("testdata", "sysfs.tar.bz2"), dir)
+	err = utils.UncompressTbz2(path.Join("testdata", "sysfs.tar.bz2"), dir)
 	if err != nil {
 		panic(err)
 	}
@@ -774,7 +724,7 @@ func TestAffinities(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	// Uncompress the test data to the directory.
-	err = uncompress(path.Join("testdata", "sysfs.tar.bz2"), dir)
+	err = utils.UncompressTbz2(path.Join("testdata", "sysfs.tar.bz2"), dir)
 	if err != nil {
 		panic(err)
 	}
