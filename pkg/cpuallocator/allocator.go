@@ -236,6 +236,8 @@ func (a *allocatorHelper) takeIdleThreads() {
 	// sorted for preference by id, mimicking cpus_assignment.go for now:
 	//   IOW, prefer CPUs
 	//     - from packages with higher number of CPUs/cores already in a.result
+	//     - from packages having larger number of available cpus with preferred priority
+	//     - from a single package
 	//     - from the list of cpus with preferred priority
 	//     - from packages with fewer remaining free CPUs/cores in a.from
 	//     - from cores with fewer remaining free CPUs/cores in a.from
@@ -257,6 +259,14 @@ func (a *allocatorHelper) takeIdleThreads() {
 			jPkgColo := jPkgSet.Intersection(a.result).Size()
 			if iPkgColo != jPkgColo {
 				return iPkgColo > jPkgColo
+			}
+
+			// Always sort cores in package order
+			if res := a.topology.cpuPriorities.cmpCPUSet(iPkgSet.Intersection(a.from), jPkgSet.Intersection(a.from), a.prefer); res != 0 {
+				return res > 0
+			}
+			if iPkg != jPkg {
+				return iPkg < jPkg
 			}
 
 			iCset := cpuset.NewCPUSet(int(cores[i]))
