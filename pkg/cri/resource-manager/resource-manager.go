@@ -57,7 +57,7 @@ type ResourceManager interface {
 // resmgr is the implementation of ResourceManager.
 type resmgr struct {
 	logger.Logger
-	sync.Mutex
+	sync.RWMutex
 	relay        relay.Relay        // our CRI relay
 	cache        cache.Cache        // cached state
 	policy       policy.Policy      // resource manager policy
@@ -446,6 +446,7 @@ func (m *resmgr) setupRelay() error {
 		RelaySocket:   opt.RelaySocket,
 		ImageSocket:   opt.ImageSocket,
 		RuntimeSocket: opt.RuntimeSocket,
+		QualifyReqFn:  m.disambiguate,
 	}
 	if m.relay, err = relay.NewRelay(options); err != nil {
 		return resmgrError("failed to create CRI relay: %v", err)

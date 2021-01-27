@@ -48,6 +48,8 @@ type Options struct {
 	Group int
 	// Mode is the permission mode bits for our gRPC socket.
 	Mode os.FileMode
+	// QualifyReqFn produces return context for disambiguating a CRI request/reply.
+	QualifyReqFn func(interface{}) string
 }
 
 // Handler is a CRI server generic request handler.
@@ -324,7 +326,8 @@ func (s *server) intercept(ctx context.Context, req interface{},
 		}
 	}
 
-	dump.RequestMessage(kind, info.FullMethod, req, sync)
+	qualif := s.qualifier(req)
+	dump.RequestMessage(kind, info.FullMethod, qualif, req, sync)
 
 	if span := trace.FromContext(ctx); span != nil {
 		span.AddAttributes(trace.StringAttribute("kind", kind))
@@ -336,9 +339,9 @@ func (s *server) intercept(ctx context.Context, req interface{},
 	elapsed := end.Sub(start)
 
 	if err != nil {
-		dump.ReplyMessage(kind, info.FullMethod, err, elapsed, false)
+		dump.ReplyMessage(kind, info.FullMethod, qualif, err, elapsed, false)
 	} else {
-		dump.ReplyMessage(kind, info.FullMethod, rpl, elapsed, false)
+		dump.ReplyMessage(kind, info.FullMethod, qualif, rpl, elapsed, false)
 	}
 
 	s.collectStatistics(kind, name, start, send, recv, end)
@@ -371,6 +374,14 @@ func (s server) trainMessageDumper() {
 		}
 	}
 	dump.Train(methods)
+}
+
+// qualifier pulls a qualifier for disambiguation from a CRI request message.
+func (s server) qualifier(msg interface{}) string {
+	if fn := s.options.QualifyReqFn; fn != nil {
+		return fn(msg)
+	}
+	return ""
 }
 
 // Return a formatter server error.

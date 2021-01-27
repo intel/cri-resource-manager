@@ -155,8 +155,8 @@ func (ft *filterTest) setup(train bool) *testlog {
 func (ft *filterTest) dumpMessages(logger *testlog) []string {
 	// dump all test messages and a fake reply for each
 	for _, msg := range ft.messages {
-		RequestMessage(marker, msgname(msg), msg, false)
-		ReplyMessage(marker, msgname(msg), Reply, time.Duration(0), false)
+		RequestMessage(marker, msgname(msg), "", msg, false)
+		ReplyMessage(marker, msgname(msg), "", Reply, time.Duration(0), false)
 	}
 	dump.sync()
 

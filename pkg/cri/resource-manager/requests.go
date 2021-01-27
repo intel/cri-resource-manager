@@ -51,6 +51,75 @@ func (m *resmgr) setupRequestProcessing() error {
 	return nil
 }
 
+// disambiguate produces disambiguation context for a request/reply dump.
+func (m *resmgr) disambiguate(msg interface{}) string {
+	var qualifier string
+
+	m.RLock()
+	defer m.RUnlock()
+
+	switch req := msg.(type) {
+	case *criapi.RunPodSandboxRequest:
+		if req.Config != nil && req.Config.Metadata != nil {
+			qualifier = req.Config.Metadata.Name
+		}
+	case *criapi.StopPodSandboxRequest:
+		if pod, ok := m.cache.LookupPod(req.PodSandboxId); ok {
+			qualifier = pod.GetName()
+		} else {
+			qualifier = "unknown pod " + req.PodSandboxId
+		}
+	case *criapi.RemovePodSandboxRequest:
+		if pod, ok := m.cache.LookupPod(req.PodSandboxId); ok {
+			qualifier = pod.GetName()
+		} else {
+			qualifier = "unknown pod " + req.PodSandboxId
+		}
+
+	case *criapi.CreateContainerRequest:
+		switch {
+		case req.SandboxConfig == nil || req.SandboxConfig.Metadata == nil:
+			qualifier = "missing pod metadata in request"
+		case req.Config == nil || req.Config.Metadata == nil:
+			qualifier = "missing metadata in request"
+		default:
+			qualifier = req.SandboxConfig.Metadata.Name + ":" + req.Config.Metadata.Name
+		}
+
+	case *criapi.StartContainerRequest:
+		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
+			qualifier = container.PrettyName()
+		} else {
+			qualifier = "unknown container " + req.ContainerId
+		}
+	case *criapi.StopContainerRequest:
+		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
+			qualifier = container.PrettyName()
+		} else {
+			qualifier = "unknown container " + req.ContainerId
+		}
+	case *criapi.RemoveContainerRequest:
+		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
+			qualifier = container.PrettyName()
+		} else {
+			qualifier = "unknown container " + req.ContainerId
+		}
+
+	case *criapi.UpdateContainerResourcesRequest:
+		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
+			qualifier = container.PrettyName()
+		} else {
+			qualifier = "unknown container " + req.ContainerId
+		}
+	}
+
+	if qualifier != "" {
+		return "<" + qualifier + ">"
+	}
+
+	return ""
+}
+
 // startRequestProcessing starts request processing by starting the active policy.
 func (m *resmgr) startRequestProcessing() error {
 	ctx := context.Background()
