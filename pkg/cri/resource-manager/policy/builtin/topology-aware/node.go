@@ -301,8 +301,15 @@ func (n *node) Dump(prefix string, level ...int) {
 	log.Debug("%s  - HBM memory: %v", idt, n.hbm)
 	log.Debug("%s  - PMEM memory: %v", idt, n.pMem)
 	for _, grant := range n.policy.allocations.grants {
-		if grant.GetCPUNode().NodeID() == n.id {
-			log.Debug("%s    + %s", idt, grant)
+		cpuNodeID := grant.GetCPUNode().NodeID()
+		memNodeID := grant.GetMemoryNode().NodeID()
+		switch {
+		case cpuNodeID == n.id && memNodeID == n.id:
+			log.Debug("%s    + cpu+mem %s", idt, grant)
+		case cpuNodeID == n.id:
+			log.Debug("%s    + cpuonly %s", idt, grant)
+		case memNodeID == n.id:
+			log.Debug("%s    + memonly %s", idt, grant)
 		}
 	}
 	if !n.Parent().IsNil() {
