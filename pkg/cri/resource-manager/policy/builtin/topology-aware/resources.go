@@ -1276,7 +1276,7 @@ func (cg *grant) String() string {
 		mem = ", MemLimit: " + mem
 	}
 
-	return fmt.Sprintf("<CPU grant for %s from %s: %s%s%s%s%s%s>",
+	return fmt.Sprintf("<grant for %s from %s: %s%s%s%s%s%s>",
 		cg.container.PrettyName(), cg.node.Name(), cpuType, isolated, exclusive, reserved, shared, mem)
 }
 

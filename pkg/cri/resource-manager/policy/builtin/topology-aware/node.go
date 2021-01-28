@@ -297,20 +297,35 @@ func (n *node) Dump(prefix string, level ...int) {
 	n.self.node.dump(prefix, lvl)
 	log.Debug("%s  - %s", idt, n.noderes.DumpCapacity())
 	log.Debug("%s  - %s", idt, n.freeres.DumpAllocatable())
-	log.Debug("%s  - normal memory: %v", idt, n.mem)
-	log.Debug("%s  - HBM memory: %v", idt, n.hbm)
-	log.Debug("%s  - PMEM memory: %v", idt, n.pMem)
+	if n.mem.Size() > 0 {
+		log.Debug("%s  - normal memory: %v", idt, n.mem)
+	}
+	if n.hbm.Size() > 0 {
+		log.Debug("%s  - HBM memory: %v", idt, n.hbm)
+	}
+	if n.pMem.Size() > 0 {
+		log.Debug("%s  - PMEM memory: %v", idt, n.pMem)
+	}
 	for _, grant := range n.policy.allocations.grants {
-		if grant.GetCPUNode().NodeID() == n.id {
-			log.Debug("%s    + %s", idt, grant)
+		cpuNodeID := grant.GetCPUNode().NodeID()
+		memNodeID := grant.GetMemoryNode().NodeID()
+		switch {
+		case cpuNodeID == n.id && memNodeID == n.id:
+			log.Debug("%s    + cpu+mem %s", idt, grant)
+		case cpuNodeID == n.id:
+			log.Debug("%s    + cpuonly %s", idt, grant)
+		case memNodeID == n.id:
+			log.Debug("%s    + memonly %s", idt, grant)
 		}
 	}
 	if !n.Parent().IsNil() {
 		log.Debug("%s  - parent: <%s>", idt, n.Parent().Name())
 	}
-	log.Debug("%s  - children:", idt)
-	for _, c := range n.children {
-		c.Dump(prefix, lvl+1)
+	if len(n.children) > 0 {
+		log.Debug("%s  - children:", idt)
+		for _, c := range n.children {
+			c.Dump(prefix, lvl+1)
+		}
 	}
 }
 
