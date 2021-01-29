@@ -452,110 +452,78 @@ func (cs *supply) AccountReleaseCPU(g Grant) {
 	cs.sharable = cs.sharable.Union(sharable)
 }
 
+// allocateMemory tries to fulfill the memory allocation part of a request.
 func (cs *supply) allocateMemory(r Request) (memoryMap, error) {
-	memType := r.MemoryType()
-	allocatedMem := createMemoryMap(0, 0, 0)
-
-	if memType == memoryUnspec {
-		memType = memoryAll
+	reqType := r.MemoryType()
+	if reqType == memoryUnspec {
+		reqType = memoryAll
 	}
 
-	amount := r.MemAmountToAllocate()
-	remaining := amount
+	allocated := createMemoryMap(0, 0, 0)
+	requested := r.MemAmountToAllocate()
+	remaining := requested
 
-	log.Debug("%s: need to allocate %s from %s",
-		r.GetContainer().PrettyName(), prettyMem(amount), cs.GetNode().Name())
+	//
+	// Notes:
+	//   We try to allocate PMEM, then DRAM, and finally HBM, honoring
+	//   the types allowed by the request. We don't need to care about
+	//   extra memory reservations for this node as all the nodes with
+	//   insufficient memory have been filtered out before allocation.
+	//
+	//   However, for cold started containers we do check if there is
+	//   enough PMEM free to accomodate the full request and bail out
+	//   if that check fails.
+	//
 
-	// First allocate from PMEM, then DRAM, finally HBM. No need to care about
-	// extra memory reservations since the nodes into which the request won't
-	// fit have already been filtered out.
+	for _, memType := range []memoryType{memoryPMEM, memoryDRAM, memoryHBM} {
+		if remaining > 0 && (reqType&memType) != 0 {
+			available := cs.mem[memType]
 
-	if remaining > 0 && memType&memoryPMEM != 0 {
-		available := cs.mem[memoryPMEM] - cs.grantedMem[memoryPMEM]
+			log.Debug("%s: trying %s %s of %s available",
+				r.GetContainer().PrettyName(),
+				prettyMem(remaining), memType.String(), prettyMem(available))
 
-		log.Debug("%s: trying %s from PMEM, available %s",
-			r.GetContainer().PrettyName(),
-			prettyMem(remaining), prettyMem(available))
+			if remaining <= available {
+				allocated[memType] = remaining
+			} else {
+				allocated[memType] = available
+			}
 
-		if remaining < available {
-			cs.grantedMem[memoryPMEM] += remaining
-			cs.mem[memoryPMEM] -= remaining
-			allocatedMem[memoryPMEM] = remaining
-			remaining = 0
-		} else {
-			cs.grantedMem[memoryPMEM] += available
-			cs.mem[memoryPMEM] = 0
-			allocatedMem[memoryPMEM] = available
-			remaining -= available
+			cs.grantedMem[memType] += allocated[memType]
+			cs.mem[memType] -= allocated[memType]
+			remaining -= allocated[memType]
 		}
-	}
 
-	if remaining > 0 && r.ColdStart() > 0 {
-		cs.mem[memoryPMEM] += amount - remaining
-		cs.grantedMem[memoryPMEM] = amount - remaining
-		return nil, policyError("internal error: not enough memory at %s, short circuit due to cold start", cs.GetNode().Name())
-	}
-
-	if remaining > 0 && memType&memoryDRAM != 0 {
-		available := cs.mem[memoryDRAM] - cs.grantedMem[memoryDRAM]
-
-		log.Debug("%s: trying %s from DRAM, available %s",
-			r.GetContainer().PrettyName(),
-			prettyMem(remaining), prettyMem(available))
-
-		if remaining < available {
-			cs.grantedMem[memoryDRAM] += remaining
-			cs.mem[memoryDRAM] -= remaining
-			allocatedMem[memoryDRAM] = remaining
-			remaining = 0
+		if remaining > 0 {
+			if r.ColdStart() > 0 && memType == memoryPMEM {
+				return nil, policyError("internal error: "+
+					"not enough PMEM for cold start at %s", cs.GetNode().Name())
+			}
 		} else {
-			cs.grantedMem[memoryDRAM] += available
-			cs.mem[memoryDRAM] = 0
-			allocatedMem[memoryDRAM] = available
-			remaining -= available
-		}
-	}
-
-	if remaining > 0 && memType&memoryHBM != 0 {
-		available := cs.mem[memoryHBM] - cs.grantedMem[memoryHBM]
-
-		log.Debug("%s: trying %s from HBMEM, available %s",
-			r.GetContainer().PrettyName(),
-			prettyMem(remaining), prettyMem(available))
-
-		if remaining < available {
-			cs.grantedMem[memoryHBM] += remaining
-			cs.mem[memoryHBM] -= remaining
-			allocatedMem[memoryHBM] = remaining
-			remaining = 0
-		} else {
-			cs.grantedMem[memoryHBM] += available
-			cs.mem[memoryHBM] = 0
-			allocatedMem[memoryHBM] = available
-			remaining -= available
+			break
 		}
 	}
 
 	if remaining > 0 {
-		log.Debug("%s: allocation from %s fell short %s",
-			r.GetContainer().PrettyName(), cs.GetNode().Name(),
-			prettyMem(remaining))
+		log.Debug("%s: %s allocation from %s fell short %s",
+			r.GetContainer().PrettyName(),
+			reqType.String(), cs.GetNode().Name(), prettyMem(remaining))
 
-		for memType, a := range allocatedMem {
-			if a > 0 {
-				cs.grantedMem[memType] -= a
-				cs.mem[memType] += a
+		for memType, amount := range allocated {
+			if amount > 0 {
+				cs.grantedMem[memType] -= amount
+				cs.mem[memType] += amount
 			}
 		}
 
-		return nil, policyError("internal error: not enough memory at %s", cs.node.Name())
+		return nil, policyError("internal error: "+
+			"not enough memory at %s", cs.node.Name())
 	}
 
-	// TODO: do we need to track the overall memory use or would the individual types be enough?
-	cs.mem[memoryAll] -= amount
-	cs.grantedMem[memoryAll] += amount
+	cs.grantedMem[memoryAll] += requested
+	cs.mem[memoryAll] -= requested
 
-	return allocatedMem, nil
+	return allocated, nil
 }
 
 // Allocate allocates a grant from the supply.
