@@ -391,7 +391,11 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 			request, supply.DumpAllocatable(), err)
 	}
 
-	log.Debug("allocated req '%s' to memory node '%s' (memset %s,%s)", container.GetCacheID(), grant.GetMemoryNode().Name(), grant.GetMemoryNode().GetMemset(memoryDRAM), grant.GetMemoryNode().GetMemset(memoryPMEM))
+	log.Debug("allocated req '%s' to memory node '%s' (memset %s,%s,%s)",
+		container.PrettyName(), grant.GetMemoryNode().Name(),
+		grant.GetMemoryNode().GetMemset(memoryDRAM),
+		grant.GetMemoryNode().GetMemset(memoryPMEM),
+		grant.GetMemoryNode().GetMemset(memoryHBM))
 
 	// In case the workload is assigned to a memory node with multiple
 	// child nodes, there is no guarantee that the workload will
@@ -563,7 +567,8 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 					return nil, err
 				}
 				if changed {
-					log.Debug("* moved container %s upward to node %s to guarantee memory", oldGrant.GetContainer().GetCacheID(), oldGrant.GetMemoryNode().Name())
+					log.Debug("* moved container %s upward to node %s to guarantee memory",
+						oldGrant.GetContainer().PrettyName(), oldGrant.GetMemoryNode().Name())
 					break
 				}
 			}
