@@ -347,7 +347,7 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 	// the same pool. This assumption can be relaxed later, requires separate
 	// (but connected) scoring of memory and CPU.
 
-	if request.CPUType() == cpuNormal && container.GetNamespace() == kubernetes.NamespaceSystem {
+	if request.CPUType() == cpuReserved || container.GetNamespace() == kubernetes.NamespaceSystem {
 		pool = p.root
 	} else {
 		affinity := p.calculatePoolAffinities(request.GetContainer())
