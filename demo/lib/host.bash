@@ -32,6 +32,7 @@ host-get-vm-config() {
     if [ -z "$VM_NAME" ] || [ -z "$VM_DISTRO" ] || [ -z "$VM_CRI" ] || [ -z "$VM_SSH_USER" ]; then
         return 1
     fi
+    VM_COMPOSE_YAML="$HOST_VM_DATA_DIR/govm-compose.yaml"
 }
 
 host-set-vm-config() {
