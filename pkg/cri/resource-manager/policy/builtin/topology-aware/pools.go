@@ -618,8 +618,7 @@ func (p *policy) applyGrant(grant Grant) {
 	}
 
 	mems := ""
-	node := grant.GetMemoryNode()
-	if !node.IsRootNode() && opt.PinMemory {
+	if opt.PinMemory {
 		mems = grant.Memset().String()
 	}
 

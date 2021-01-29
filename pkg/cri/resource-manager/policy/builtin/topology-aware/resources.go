@@ -1390,7 +1390,6 @@ func (cg *grant) RestoreMemset() {
 
 func (cg *grant) ExpandMemset() (bool, error) {
 	supply := cg.GetMemoryNode().FreeSupply()
-	mems := cg.MemLimit()
 	node := cg.GetMemoryNode()
 	parent := node.Parent()
 
@@ -1398,29 +1397,14 @@ func (cg *grant) ExpandMemset() (bool, error) {
 	// the allocations have been made from DRAM and so on).
 
 	// Figure out if there is enough memory now to have grant as-is.
-	fits := true
-	for memType, limit := range mems {
-		if limit > 0 {
-			// This memory type was granted.
-			extra := supply.ExtraMemoryReservation(memType)
-			granted := supply.GrantedMemory(memType)
-			limit := supply.MemoryLimit()[memType]
-
-			if extra+granted > limit {
-				log.Debug("%s: %s: extra:%d + granted: %d > limit:%d -> moving from %s to %s",
-					cg.GetContainer().PrettyName(), memType,
-					extra, granted, limit,
-					node.Name(), parent.Name())
-				fits = false
-				break
-			}
-		}
-	}
-
-	if fits {
+	extra := supply.ExtraMemoryReservation(memoryAll)
+	free := supply.MemoryLimit()[memoryAll]
+	if extra <= free {
+		// The grant fits in the node even with extra reservations
 		return false, nil
 	}
 	// Else it doesn't fit, so move the grant up in the memory tree.
+	log.Debug("out-of-memory risk in %s: extra reservations %d > free %d -> moving from %s to %s", cg, extra, free, node.Name(), parent.Name())
 
 	if parent.IsNil() {
 		return false, fmt.Errorf("trying to move a grant up past the root of the tree")
