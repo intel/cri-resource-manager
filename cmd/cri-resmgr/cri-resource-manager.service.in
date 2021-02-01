@@ -2,6 +2,8 @@
 Description=A CRI proxy with (hardware) resource aware container placement policies.
 Documentation=https://github.com/intel/cri-resource-manager
 Before=kubelet.service
+LogRateLimitIntervalSec=5
+LogRateLimitBurst=100000
 
 [Service]
 Type=simple
