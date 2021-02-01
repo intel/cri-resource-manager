@@ -172,6 +172,16 @@ func wrapKlogFlag(f *flag.Flag) {
 			klog.Errorf("klog flag %q: invalid environment default %s=%q: %v",
 				f.Name, name, value, err)
 		}
+	} else {
+		// Unless explicitly configured in the environment, by default
+		// turn off headers (date, timestamp, etc.) when we're logging
+		// to a journald stream.
+		if f.Name == "skip_headers" {
+			if value, _ := os.LookupEnv("JOURNAL_STREAM"); value != "" {
+				klog.Infof("Logging to journald, forcing headers off...")
+				klogf.Set("true")
+			}
+		}
 	}
 }
 
