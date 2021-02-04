@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.4.0-394-g615752d documentation</title>
+  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.4.0-398-gccb411a documentation</title>
   
 
   
@@ -39,7 +39,7 @@
     
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Container Affinity and Anti-Affinity" href="container-affinity.html" />
+    <link rel="next" title="Podpools Policy" href="podpools.html" />
     <link rel="prev" title="Topology-Aware Policy" href="topology-aware.html" /> 
 </head>
 
@@ -117,6 +117,7 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="podpools.html">Podpools Policy</a></li>
 <li class="toctree-l2"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
 <li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
 <li class="toctree-l2"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
@@ -278,7 +279,7 @@ and taint.</p>
   <span class="l l-Scalar l-Scalar-Plain">...</span>
 </pre></div>
 </div>
-<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/615752df6a061aa5439470e84e40c7cc428f0c95/sample-configs/cri-resmgr-configmap.example.yaml">sample configmap</a>
+<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/ccb411ad992724e76acc4f65d924023291696a32/sample-configs/cri-resmgr-configmap.example.yaml">sample configmap</a>
 for a complete example containing all available configuration options.</p>
 <p>If dynamic configuration via the <a class="reference internal" href="../node-agent.html"><span class="doc">node agent</span></a> is in use the
 policy options, including pools configuration, may be altered at runtime.</p>
@@ -335,7 +336,7 @@ global config:</p>
 </div>
 <p>Format of the configuration file is similar to the pools config used in the
 global CRI-RM config. You can also see the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/615752df6a061aa5439470e84e40c7cc428f0c95/sample-configs/static-pools-policy.conf.example">example config file</a>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/ccb411ad992724e76acc4f65d924023291696a32/sample-configs/static-pools-policy.conf.example">example config file</a>
 for a starting point.</p>
 </div>
 <div class="section" id="cmk-directory-tree">
@@ -454,7 +455,7 @@ pool.</p>
           </div>
           <footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="container-affinity.html" class="btn btn-neutral float-right" title="Container Affinity and Anti-Affinity" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="podpools.html" class="btn btn-neutral float-right" title="Podpools Policy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
         <a href="topology-aware.html" class="btn btn-neutral float-left" title="Topology-Aware Policy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
