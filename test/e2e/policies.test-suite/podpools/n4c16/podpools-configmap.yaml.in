@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cri-resmgr-config.default
+  namespace: kube-system
+data:
+  policy: |+
+    Active: podpools
+    ReservedResources:
+      CPU: 1
+    podpools:
+      Pools:
+        - Name: $NAME
+          Instances: $INSTANCES
+          CPU: $CPU
+          MaxPods: $MAXPODS
+  logger: |+
+    Debug: resource-manager,cache,policy,memory
