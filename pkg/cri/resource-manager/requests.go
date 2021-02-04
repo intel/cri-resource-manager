@@ -264,6 +264,8 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 func (m *resmgr) StopPod(ctx context.Context, method string, request interface{},
 	handler server.Handler) (interface{}, error) {
 
+	reply, rqerr := handler(ctx, request)
+
 	m.Lock()
 	defer m.Unlock()
 
@@ -272,13 +274,6 @@ func (m *resmgr) StopPod(ctx context.Context, method string, request interface{}
 
 	if !ok {
 		m.Warn("%s: failed to look up pod %s, just passing request through", method, podID)
-	} else {
-		m.Info("%s: stopping pod %s (%s)...", method, pod.GetName(), podID)
-	}
-
-	reply, rqerr := handler(ctx, request)
-
-	if !ok {
 		return reply, rqerr
 	}
 
@@ -286,6 +281,8 @@ func (m *resmgr) StopPod(ctx context.Context, method string, request interface{}
 		m.Error("%s: failed to stop pod %s: %v", method, podID, rqerr)
 		return reply, rqerr
 	}
+
+	m.Info("%s: stopped pod %s (%s)...", method, pod.GetName(), podID)
 
 	released := []cache.Container{}
 	for _, c := range pod.GetInitContainers() {
@@ -319,6 +316,8 @@ func (m *resmgr) StopPod(ctx context.Context, method string, request interface{}
 func (m *resmgr) RemovePod(ctx context.Context, method string, request interface{},
 	handler server.Handler) (interface{}, error) {
 
+	reply, rqerr := handler(ctx, request)
+
 	m.Lock()
 	defer m.Unlock()
 
@@ -327,18 +326,13 @@ func (m *resmgr) RemovePod(ctx context.Context, method string, request interface
 
 	if !ok {
 		m.Warn("%s: failed to look up pod %s, just passing request through", method, podID)
-	} else {
-		m.Info("%s: removing pod %s (%s)...", method, pod.GetName(), podID)
-	}
-
-	reply, rqerr := handler(ctx, request)
-
-	if !ok {
 		return reply, rqerr
 	}
 
 	if rqerr != nil {
 		m.Error("%s: failed to remove pod %s: %v", method, podID, rqerr)
+	} else {
+		m.Info("%s: removed pod %s (%s)...", method, pod.GetName(), podID)
 	}
 
 	del := []cache.Container{}
@@ -497,6 +491,8 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 func (m *resmgr) StopContainer(ctx context.Context, method string, request interface{},
 	handler server.Handler) (interface{}, error) {
 
+	reply, rqerr := handler(ctx, request)
+
 	m.Lock()
 	defer m.Unlock()
 
@@ -506,13 +502,6 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 	if !ok {
 		m.Warn("%s: failed to look up container %s, just passing request through",
 			method, containerID)
-	} else {
-		m.Info("%s: stopping container %s...", method, container.PrettyName())
-	}
-
-	reply, rqerr := handler(ctx, request)
-
-	if !ok {
 		return reply, rqerr
 	}
 
@@ -520,6 +509,8 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 		m.Error("%s: failed to stop container %s: %v", method, container.PrettyName(), rqerr)
 		return reply, rqerr
 	}
+
+	m.Info("%s: stopped container %s...", method, container.PrettyName())
 
 	// Notes:
 	//   For now, we assume any error replies from CRI are about the container not
@@ -545,6 +536,8 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 func (m *resmgr) RemoveContainer(ctx context.Context, method string, request interface{},
 	handler server.Handler) (interface{}, error) {
 
+	reply, rqerr := handler(ctx, request)
+
 	m.Lock()
 	defer m.Unlock()
 
@@ -554,18 +547,13 @@ func (m *resmgr) RemoveContainer(ctx context.Context, method string, request int
 	if !ok {
 		m.Warn("%s: failed to look up container %s, just passing request through",
 			method, containerID)
-	} else {
-		m.Info("%s: removing container %s...", method, container.PrettyName())
-	}
-
-	reply, rqerr := handler(ctx, request)
-
-	if !ok {
 		return reply, rqerr
 	}
 
 	if rqerr != nil {
 		m.Error("%s: failed to remove container %s: %v", method, container.PrettyName(), rqerr)
+	} else {
+		m.Info("%s: removed container %s...", method, container.PrettyName())
 	}
 
 	if err := m.policy.ReleaseResources(container); err != nil {
