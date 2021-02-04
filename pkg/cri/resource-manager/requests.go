@@ -335,14 +335,14 @@ func (m *resmgr) RemovePod(ctx context.Context, method string, request interface
 		m.Info("%s: removed pod %s (%s)...", method, pod.GetName(), podID)
 	}
 
-	del := []cache.Container{}
+	released := []cache.Container{}
 	for _, c := range pod.GetInitContainers() {
 		m.Info("%s: removing stale init-container %s...", method, c.PrettyName())
 		if err := m.policy.ReleaseResources(c); err != nil {
 			m.Warn("%s: failed to release init-container %s: %v", method, c.PrettyName(), err)
 		}
 		c.UpdateState(cache.ContainerStateStale)
-		del = append(del, c)
+		released = append(released, c)
 	}
 	for _, c := range pod.GetContainers() {
 		m.Info("%s: removing stale container %s...", method, c.PrettyName())
@@ -350,10 +350,10 @@ func (m *resmgr) RemovePod(ctx context.Context, method string, request interface
 			m.Warn("%s: failed to release container %s: %v", method, c.PrettyName(), err)
 		}
 		c.UpdateState(cache.ContainerStateStale)
-		del = append(del, c)
+		released = append(released, c)
 	}
 
-	if err := m.runPostReleaseHooks(ctx, method, del...); err != nil {
+	if err := m.runPostReleaseHooks(ctx, method, released...); err != nil {
 		m.Error("%s: failed to run post-release hooks for pod %s: %v",
 			method, pod.GetName(), err)
 	}
@@ -521,12 +521,13 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 			method, container.PrettyName(), err)
 	}
 
+	container.UpdateState(cache.ContainerStateExited)
+
 	if err := m.runPostReleaseHooks(ctx, method, container); err != nil {
 		m.Error("%s: failed to run post-release hooks for %s: %v",
 			method, container.PrettyName(), err)
 	}
 
-	container.UpdateState(cache.ContainerStateExited)
 	m.updateIntrospection()
 
 	return reply, rqerr
@@ -561,12 +562,13 @@ func (m *resmgr) RemoveContainer(ctx context.Context, method string, request int
 			method, container.PrettyName(), err)
 	}
 
+	container.UpdateState(cache.ContainerStateStale)
+
 	if err := m.runPostReleaseHooks(ctx, method, container); err != nil {
 		m.Error("%s: failed to run post-release hooks for %s: %v",
 			method, container.PrettyName(), err)
 	}
 
-	m.cache.DeleteContainer(container.GetCacheID())
 	m.updateIntrospection()
 
 	return reply, rqerr
@@ -804,19 +806,24 @@ func (m *resmgr) runPostStartHooks(ctx context.Context, method string, c cache.C
 }
 
 // runPostReleaseHooks runs the necessary hooks after releaseing resources of some containers
-func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string, del ...cache.Container) error {
-	for _, c := range del {
+func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string, released ...cache.Container) error {
+	for _, c := range released {
 		if err := m.control.RunPostStopHooks(c); err != nil {
 			m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
 		}
+		if c.GetState() == cache.ContainerStateStale {
+			m.cache.DeleteContainer(c.GetCacheID())
+		}
 	}
 	for _, c := range m.cache.GetPendingContainers() {
-		switch c.GetState() {
+		switch state := c.GetState(); state {
 		case cache.ContainerStateStale, cache.ContainerStateExited:
 			if err := m.control.RunPostStopHooks(c); err != nil {
 				m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
 			}
-			m.cache.DeleteContainer(c.GetCacheID())
+			if state == cache.ContainerStateStale {
+				m.cache.DeleteContainer(c.GetCacheID())
+			}
 		case cache.ContainerStateRunning, cache.ContainerStateCreated:
 			if err := m.control.RunPostUpdateHooks(c); err != nil {
 				m.Warn("post-update hook failed for %s: %v", c.PrettyName(), err)
