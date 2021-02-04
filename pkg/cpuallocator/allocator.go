@@ -165,7 +165,7 @@ func (a *allocatorHelper) takeIdlePackages() {
 		cset := a.topology.pkg[id].Difference(offline)
 		a.Debug(" => considering package %v (#%s)...", id, cset)
 		if a.cnt >= cset.Size() {
-			a.Debug(" => taking pakcage %v...", id)
+			a.Debug(" => taking package %v...", id)
 			a.result = a.result.Union(cset)
 			a.from = a.from.Difference(cset)
 			a.cnt -= cset.Size()
