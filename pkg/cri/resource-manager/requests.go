@@ -60,6 +60,20 @@ func (m *resmgr) startRequestProcessing() error {
 		return err
 	}
 
+	//
+	// Notes:
+	//   While normally it is enough to release stale containers and allocate
+	//   newly discovered ones, if we are switching policies we need to force
+	//   reallocating everything. Otherwise containers already present in the
+	//   cache would not get properly updated by the new policy.
+	//
+	if m.policySwitch {
+		containers := m.cache.GetContainers()
+		cache.SortContainers(containers)
+		add, del = containers, containers
+		m.policySwitch = false
+	}
+
 	if err := m.policy.Start(add, del); err != nil {
 		return resmgrError("failed to start policy %s: %v", policy.ActivePolicy(), err)
 	}

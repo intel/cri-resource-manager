@@ -61,6 +61,7 @@ type resmgr struct {
 	relay        relay.Relay        // our CRI relay
 	cache        cache.Cache        // cached state
 	policy       policy.Policy      // resource manager policy
+	policySwitch bool               // active policy is being switched
 	configServer config.Server      // configuration management server
 	control      control.Control    // policy controllers/enforcement
 	agent        agent.Interface    // connection to cri-resmgr agent
@@ -426,6 +427,7 @@ func (m *resmgr) setupPolicy() error {
 			}
 		}
 		m.cache.SetActivePolicy(active)
+		m.policySwitch = true
 	}
 
 	options := &policy.Options{AgentCli: m.agent, SendEvent: m.SendEvent}
