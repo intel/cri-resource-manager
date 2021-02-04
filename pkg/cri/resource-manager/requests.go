@@ -32,6 +32,7 @@ import (
 func (m *resmgr) setupRequestProcessing() error {
 	interceptors := map[string]server.Interceptor{
 		"RunPodSandbox":    m.RunPod,
+		"StopPodSandbox":   m.StopPod,
 		"RemovePodSandbox": m.RemovePod,
 
 		"CreateContainer": m.CreateContainer,
@@ -187,6 +188,61 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 	m.Info("created pod %s (%s)", pod.GetName(), podID)
 
 	return reply, nil
+}
+
+// StopPod intercepts CRI requests for stopping Pods.
+func (m *resmgr) StopPod(ctx context.Context, method string, request interface{},
+	handler server.Handler) (interface{}, error) {
+
+	m.Lock()
+	defer m.Unlock()
+
+	podID := request.(*criapi.StopPodSandboxRequest).PodSandboxId
+	pod, ok := m.cache.LookupPod(podID)
+
+	if !ok {
+		m.Warn("%s: failed to look up pod %s, just passing request through", method, podID)
+	} else {
+		m.Info("%s: stopping pod %s (%s)...", method, pod.GetName(), podID)
+	}
+
+	reply, rqerr := handler(ctx, request)
+
+	if !ok {
+		return reply, rqerr
+	}
+
+	if rqerr != nil {
+		m.Error("%s: failed to stop pod %s: %v", method, podID, rqerr)
+		return reply, rqerr
+	}
+
+	released := []cache.Container{}
+	for _, c := range pod.GetInitContainers() {
+		m.Info("%s: releasing resources for %s...", method, c.PrettyName())
+		if err := m.policy.ReleaseResources(c); err != nil {
+			m.Warn("%s: failed to release init-container %s: %v", method, c.PrettyName(), err)
+		}
+		c.UpdateState(cache.ContainerStateExited)
+		released = append(released, c)
+	}
+	for _, c := range pod.GetContainers() {
+		m.Info("%s: releasing resources for container %s...", method, c.PrettyName())
+		if err := m.policy.ReleaseResources(c); err != nil {
+			m.Warn("%s: failed to release container %s: %v", method, c.PrettyName(), err)
+		}
+		c.UpdateState(cache.ContainerStateExited)
+		released = append(released, c)
+	}
+
+	if err := m.runPostReleaseHooks(ctx, method, released...); err != nil {
+		m.Error("%s: failed to run post-release hooks for pod %s: %v",
+			method, pod.GetName(), err)
+	}
+
+	m.updateIntrospection()
+
+	return reply, rqerr
 }
 
 // RemovePod intercepts CRI requests for Pod removal.
