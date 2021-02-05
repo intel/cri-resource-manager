@@ -152,7 +152,7 @@ func (a *allocatorHelper) takeIdlePackages() {
 	// sorted by number of preferred cpus and then by cpu id
 	sort.Slice(pkgs,
 		func(i, j int) bool {
-			if res := a.topology.cpuPriorities.cmpCPUSet(a.topology.pkg[pkgs[i]], a.topology.pkg[pkgs[j]], a.prefer); res != 0 {
+			if res := a.topology.cpuPriorities.cmpCPUSet(a.topology.pkg[pkgs[i]], a.topology.pkg[pkgs[j]], a.prefer, -1); res != 0 {
 				return res > 0
 			}
 			return pkgs[i] < pkgs[j]
@@ -196,7 +196,7 @@ func (a *allocatorHelper) takeIdleCores() {
 	// sorted by id
 	sort.Slice(cores,
 		func(i, j int) bool {
-			if res := a.topology.cpuPriorities.cmpCPUSet(a.topology.core[cores[i]], a.topology.core[cores[j]], a.prefer); res != 0 {
+			if res := a.topology.cpuPriorities.cmpCPUSet(a.topology.core[cores[i]], a.topology.core[cores[j]], a.prefer, -1); res != 0 {
 				return res > 0
 			}
 			return cores[i] < cores[j]
@@ -262,7 +262,7 @@ func (a *allocatorHelper) takeIdleThreads() {
 			}
 
 			// Always sort cores in package order
-			if res := a.topology.cpuPriorities.cmpCPUSet(iPkgSet.Intersection(a.from), jPkgSet.Intersection(a.from), a.prefer); res != 0 {
+			if res := a.topology.cpuPriorities.cmpCPUSet(iPkgSet.Intersection(a.from), jPkgSet.Intersection(a.from), a.prefer, a.cnt); res != 0 {
 				return res > 0
 			}
 			if iPkg != jPkg {
@@ -271,7 +271,7 @@ func (a *allocatorHelper) takeIdleThreads() {
 
 			iCset := cpuset.NewCPUSet(int(cores[i]))
 			jCset := cpuset.NewCPUSet(int(cores[j]))
-			if res := a.topology.cpuPriorities.cmpCPUSet(iCset, jCset, a.prefer); res != 0 {
+			if res := a.topology.cpuPriorities.cmpCPUSet(iCset, jCset, a.prefer, 0); res != 0 {
 				return res > 0
 			}
 
@@ -492,7 +492,7 @@ func (p CPUPriority) String() string {
 //   > 0 if cpuset A is preferred
 //   < 0 if cpuset B is preferred
 //   0 if cpusets A and B are equal in terms of cpu priority
-func (c *cpuPriorities) cmpCPUSet(csetA, csetB cpuset.CPUSet, prefer CPUPriority) int {
+func (c *cpuPriorities) cmpCPUSet(csetA, csetB cpuset.CPUSet, prefer CPUPriority, cpuCnt int) int {
 	if prefer == PriorityNone {
 		return 0
 	}
@@ -501,6 +501,11 @@ func (c *cpuPriorities) cmpCPUSet(csetA, csetB cpuset.CPUSet, prefer CPUPriority
 	for prio := prefer; prio < NumCPUPriorities; prio++ {
 		prefA := csetA.Intersection(c[prio]).Size()
 		prefB := csetB.Intersection(c[prio]).Size()
+		if cpuCnt > 0 && prio == prefer && prefA >= cpuCnt && prefB >= cpuCnt {
+			// Prefer the tightest fitting if both cpusets satisfy the
+			// requested amount of CPUs with the preferred priority
+			return prefB - prefA
+		}
 		if prefA != prefB {
 			return prefA - prefB
 		}
