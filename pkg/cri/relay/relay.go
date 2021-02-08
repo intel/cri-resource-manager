@@ -37,6 +37,8 @@ type Options struct {
 	ImageSocket string
 	// RuntimeSocket is the socket path for the (real) CRI runtime services.
 	RuntimeSocket string
+	// QualifyReqFn produces context for disambiguating a CRI request/reply.
+	QualifyReqFn func(interface{}) string
 }
 
 // Relay is the interface we expose for controlling our CRI relay.
@@ -81,10 +83,11 @@ func NewRelay(options Options) (Relay, error) {
 	}
 
 	srvopts := server.Options{
-		Socket: r.options.RelaySocket,
-		User:   -1,
-		Group:  -1,
-		Mode:   0660,
+		Socket:       r.options.RelaySocket,
+		User:         -1,
+		Group:        -1,
+		Mode:         0660,
+		QualifyReqFn: r.options.QualifyReqFn,
 	}
 	if r.server, err = server.NewServer(srvopts); err != nil {
 		return nil, relayError("failed to create relay server: %v", err)

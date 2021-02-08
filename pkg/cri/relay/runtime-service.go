@@ -23,8 +23,17 @@ import (
 
 func (r *relay) dump(method string, req interface{}) {
 	if r.DebugEnabled() {
-		dump.RequestMessage("relayed", method, req, true)
+		qualif := r.qualifier(req)
+		dump.RequestMessage("relayed", method, qualif, req, true)
 	}
+}
+
+// qualifier pulls a qualifier for disambiguation from a CRI request message.
+func (r *relay) qualifier(msg interface{}) string {
+	if fn := r.options.QualifyReqFn; fn != nil {
+		return fn(msg)
+	}
+	return ""
 }
 
 func (r *relay) Version(ctx context.Context,
