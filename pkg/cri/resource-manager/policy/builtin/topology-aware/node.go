@@ -297,6 +297,7 @@ func (n *node) Dump(prefix string, level ...int) {
 	n.self.node.dump(prefix, lvl)
 	log.Debug("%s  - %s", idt, n.noderes.DumpCapacity())
 	log.Debug("%s  - %s", idt, n.freeres.DumpAllocatable())
+	n.freeres.DumpMemoryState(idt + "  ")
 	if n.mem.Size() > 0 {
 		log.Debug("%s  - normal memory: %v", idt, n.mem)
 	}
