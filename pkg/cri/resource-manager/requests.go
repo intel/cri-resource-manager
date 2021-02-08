@@ -448,6 +448,7 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 
 	if rqerr != nil {
 		m.Error("%s: failed to stop container %s: %v", method, container.PrettyName(), rqerr)
+		return reply, rqerr
 	}
 
 	// Notes:
