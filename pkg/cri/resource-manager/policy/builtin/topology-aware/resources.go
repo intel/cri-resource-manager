@@ -82,6 +82,8 @@ type Supply interface {
 	DumpCapacity() string
 	// DumpAllocatable returns a printable representation of the supply's alloctable resources.
 	DumpAllocatable() string
+	// DumpMemoryState dumps the state of the available and allocated memory.
+	DumpMemoryState(string)
 }
 
 // Request represents CPU and memory resources requested by a container.
@@ -318,18 +320,24 @@ func (m memoryMap) AddHBM(hbm uint64) {
 func (m memoryMap) String() string {
 	mem, sep := "", ""
 
-	dram, pmem, hbm := m[memoryDRAM], m[memoryPMEM], m[memoryHBM]
+	dram, pmem, hbm, types := m[memoryDRAM], m[memoryPMEM], m[memoryHBM], 0
 	if dram > 0 || pmem > 0 || hbm > 0 {
 		if dram > 0 {
-			mem += "dram:" + strconv.FormatUint(dram, 10)
+			mem += "DRAM " + prettyMem(dram)
 			sep = ", "
+			types++
 		}
 		if pmem > 0 {
-			mem += sep + "pmem:" + strconv.FormatUint(pmem, 10)
+			mem += sep + "PMEM " + prettyMem(pmem)
 			sep = ", "
+			types++
 		}
 		if hbm > 0 {
-			mem += sep + "hbm:" + strconv.FormatUint(hbm, 10)
+			mem += sep + "HBM " + prettyMem(hbm)
+			types++
+		}
+		if types > 1 {
+			mem += sep + "total " + prettyMem(pmem+dram+hbm)
 		}
 	}
 
@@ -828,6 +836,74 @@ func (cs *supply) DumpAllocatable() string {
 	allocatable += ">"
 
 	return allocatable
+}
+
+// prettyMem formats the given amount as k, M, G, or T units.
+func prettyMem(value uint64) string {
+	units := []string{"k", "M", "G", "T"}
+	coeffs := []uint64{1 << 10, 1 << 20, 1 << 30, 1 << 40}
+
+	c, u := uint64(1), ""
+	for i := 0; i < len(units); i++ {
+		if coeffs[i] > value {
+			break
+		}
+		c, u = coeffs[i], units[i]
+	}
+	v := float64(value) / float64(c)
+
+	return strconv.FormatFloat(v, 'f', 2, 64) + u
+}
+
+// DumpMemoryState dumps the state of the available and allocated memory.
+func (cs *supply) DumpMemoryState(prefix string) {
+	memTypes := []memoryType{memoryDRAM, memoryPMEM, memoryHBM}
+	totalFree := uint64(0)
+	totalGranted := uint64(0)
+	for _, kind := range memTypes {
+		free := cs.mem[kind]
+		granted := cs.grantedMem[kind]
+		if free != 0 || granted != 0 {
+			log.Debug(prefix+"- %s: free: %s, granted %s",
+				kind, prettyMem(free), prettyMem(granted))
+		}
+		totalFree += free
+		totalGranted += granted
+	}
+	log.Debug(prefix+"- total free: %s, total granted %s",
+		prettyMem(totalFree), prettyMem(totalGranted))
+
+	printHdr := true
+	if len(cs.extraMemReservations) > 0 {
+		for g, memMap := range cs.extraMemReservations {
+			split := ""
+			sep := ""
+			total := uint64(0)
+			if mem := memMap[memoryDRAM]; mem > 0 {
+				split = "DRAM " + prettyMem(mem)
+				sep = ", "
+				total += mem
+			}
+			if mem := memMap[memoryPMEM]; mem > 0 {
+				split += sep + "PMEM " + prettyMem(mem)
+				sep = ", "
+				total += mem
+			}
+			if mem := memMap[memoryHBM]; mem > 0 {
+				split += sep + "HBMEM " + prettyMem(mem)
+				sep = ", "
+				total += mem
+			}
+			if total > 0 {
+				if printHdr {
+					log.Debug(prefix + "- extra reservations:")
+					printHdr = false
+				}
+				log.Debug(prefix+"  - %s: %s (%s)",
+					g.GetContainer().PrettyName(), prettyMem(total), split)
+			}
+		}
+	}
 }
 
 // newRequest creates a new request for the given container.
@@ -1331,7 +1407,10 @@ func (cg *grant) ExpandMemset() (bool, error) {
 			limit := supply.MemoryLimit()[memType]
 
 			if extra+granted > limit {
-				log.Debug("%s: extra():%d + granted(): %d > limit: %d -> moving from %s to %s", memType, extra, granted, limit, node.Name(), parent.Name())
+				log.Debug("%s: %s: extra:%d + granted: %d > limit:%d -> moving from %s to %s",
+					cg.GetContainer().PrettyName(), memType,
+					extra, granted, limit,
+					node.Name(), parent.Name())
 				fits = false
 				break
 			}
