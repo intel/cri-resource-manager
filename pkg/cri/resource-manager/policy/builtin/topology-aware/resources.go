@@ -49,10 +49,10 @@ type Supply interface {
 	Cumulate(Supply)
 	// AssignMemory adds extra memory to this supply (for extra NUMA nodes assigned to a pool).
 	AssignMemory(mem memoryMap)
-	// AccountAllocate accounts for (removes) allocated exclusive capacity from the supply.
-	AccountAllocate(Grant)
-	// AccountRelease accounts for (reinserts) released exclusive capacity into the supply.
-	AccountRelease(Grant)
+	// AccountAllocateCPU accounts for (removes) allocated exclusive capacity from the supply.
+	AccountAllocateCPU(Grant)
+	// AccountReleaseCPU accounts for (reinserts) released exclusive capacity into the supply.
+	AccountReleaseCPU(Grant)
 	// GetScore calculates how well this supply fits/fulfills the given request.
 	GetScore(Request) Score
 	// AllocatableSharedCPU calculates the allocatable amount of shared CPU of this supply.
@@ -112,6 +112,10 @@ type Request interface {
 
 // Grant represents CPU and memory capacity allocated to a container from a node.
 type Grant interface {
+	// SetCPUPortion sets the fraction CPU portion for the grant.
+	SetCPUPortion(fraction int)
+	// SetMemoryAllocation sets the memory allocation for the grant.
+	SetMemoryAllocation(memoryType, memoryMap, time.Duration)
 	// Clone creates a copy of this grant.
 	Clone() Grant
 	// RefetchNodes updates the stored cpu and memory nodes of this grant by name.
@@ -156,10 +160,10 @@ type Grant interface {
 	String() string
 	// Release releases the grant from all the Supplys it uses.
 	Release()
-	// AccountAllocate accounts for (removes) allocated exclusive capacity for this grant.
-	AccountAllocate()
-	// AccountRelease accounts for (reinserts) released exclusive capacity for this grant.
-	AccountRelease()
+	// AccountAllocateCPU accounts for (removes) allocated exclusive capacity for this grant.
+	AccountAllocateCPU()
+	// AccountReleaseCPU accounts for (reinserts) released exclusive capacity for this grant.
+	AccountReleaseCPU()
 	// UpdateExtraMemoryReservation() updates the reservations in the subtree
 	// of nodes under the node from which the memory was granted.
 	UpdateExtraMemoryReservation()
@@ -422,19 +426,18 @@ func (cs *supply) AssignMemory(mem memoryMap) {
 	}
 }
 
-// AccountAllocate accounts for (removes) allocated exclusive capacity from the supply.
-func (cs *supply) AccountAllocate(g Grant) {
+// AccountAllocateCPU accounts for (removes) allocated exclusive capacity from the supply.
+func (cs *supply) AccountAllocateCPU(g Grant) {
 	if cs.node.IsSameNode(g.GetCPUNode()) {
 		return
 	}
 	exclusive := g.ExclusiveCPUs()
 	cs.isolated = cs.isolated.Difference(exclusive)
 	cs.sharable = cs.sharable.Difference(exclusive)
-	// TODO: same for memory
 }
 
-// AccountRelease accounts for (reinserts) released exclusive capacity into the supply.
-func (cs *supply) AccountRelease(g Grant) {
+// AccountReleaseCPU accounts for (reinserts) released exclusive capacity into the supply.
+func (cs *supply) AccountReleaseCPU(g Grant) {
 	if cs.node.IsSameNode(g.GetCPUNode()) {
 		return
 	}
@@ -447,89 +450,102 @@ func (cs *supply) AccountRelease(g Grant) {
 	sharable := grantcpus.Intersection(ncs.SharableCPUs())
 	cs.isolated = cs.isolated.Union(isolated)
 	cs.sharable = cs.sharable.Union(sharable)
-	// For memory the extra allocations be released elsewhere.
 }
 
-func (cs *supply) allocateMemory(cr *request) (memoryMap, error) {
-	memType := cr.MemoryType()
-	allocatedMem := createMemoryMap(0, 0, 0)
-
-	if memType == memoryUnspec {
-		memType = memoryAll
+// allocateMemory tries to fulfill the memory allocation part of a request.
+func (cs *supply) allocateMemory(r Request) (memoryMap, error) {
+	reqType := r.MemoryType()
+	if reqType == memoryUnspec {
+		reqType = memoryAll
 	}
 
-	amount := cr.MemAmountToAllocate()
-	remaining := amount
+	allocated := createMemoryMap(0, 0, 0)
+	requested := r.MemAmountToAllocate()
+	remaining := requested
 
-	// First allocate from PMEM, then DRAM, finally HBM. No need to care about
-	// extra memory reservations since the nodes into which the request won't
-	// fit have already been filtered out.
+	//
+	// Notes:
+	//   We try to allocate PMEM, then DRAM, and finally HBM, honoring
+	//   the types allowed by the request. We don't need to care about
+	//   extra memory reservations for this node as all the nodes with
+	//   insufficient memory have been filtered out before allocation.
+	//
+	//   However, for cold started containers we do check if there is
+	//   enough PMEM free to accomodate the full request and bail out
+	//   if that check fails.
+	//
 
-	if remaining > 0 && memType&memoryPMEM != 0 {
-		available := cs.mem[memoryPMEM] - cs.grantedMem[memoryPMEM]
-		if remaining < available {
-			cs.grantedMem[memoryPMEM] += remaining
-			cs.mem[memoryPMEM] -= remaining
-			allocatedMem[memoryPMEM] = remaining
-			remaining = 0
-		} else {
-			cs.grantedMem[memoryPMEM] += available
-			cs.mem[memoryPMEM] = 0
-			allocatedMem[memoryPMEM] = available
-			remaining -= available
+	for _, memType := range []memoryType{memoryPMEM, memoryDRAM, memoryHBM} {
+		if remaining > 0 && (reqType&memType) != 0 {
+			available := cs.mem[memType]
+
+			log.Debug("%s: trying %s %s of %s available",
+				r.GetContainer().PrettyName(),
+				prettyMem(remaining), memType.String(), prettyMem(available))
+
+			if remaining <= available {
+				allocated[memType] = remaining
+			} else {
+				allocated[memType] = available
+			}
+
+			cs.grantedMem[memType] += allocated[memType]
+			cs.mem[memType] -= allocated[memType]
+			remaining -= allocated[memType]
 		}
-	}
 
-	if remaining > 0 && cr.ColdStart() > 0 {
-		cs.mem[memoryPMEM] += amount - remaining
-		cs.grantedMem[memoryPMEM] = amount - remaining
-		return nil, policyError("internal error: not enough memory at %s, short circuit due to cold start", cs.node.Name())
-	}
-
-	if remaining > 0 && memType&memoryDRAM != 0 {
-		available := cs.mem[memoryDRAM] - cs.grantedMem[memoryDRAM]
-		if remaining < available {
-			cs.grantedMem[memoryDRAM] += remaining
-			cs.mem[memoryDRAM] -= remaining
-			allocatedMem[memoryDRAM] = remaining
-			remaining = 0
+		if remaining > 0 {
+			if r.ColdStart() > 0 && memType == memoryPMEM {
+				return nil, policyError("internal error: "+
+					"not enough PMEM for cold start at %s", cs.GetNode().Name())
+			}
 		} else {
-			cs.grantedMem[memoryDRAM] += available
-			cs.mem[memoryDRAM] = 0
-			allocatedMem[memoryDRAM] = available
-			remaining -= available
-		}
-	}
-
-	if remaining > 0 && memType&memoryHBM != 0 {
-		available := cs.mem[memoryHBM] - cs.grantedMem[memoryHBM]
-		if remaining < available {
-			cs.grantedMem[memoryHBM] += remaining
-			cs.mem[memoryHBM] -= remaining
-			allocatedMem[memoryHBM] = remaining
-			remaining = 0
-		} else {
-			cs.grantedMem[memoryHBM] += available
-			cs.mem[memoryHBM] = 0
-			allocatedMem[memoryHBM] = available
-			remaining -= available
+			break
 		}
 	}
 
 	if remaining > 0 {
-		// FIXME: restore the already allocated memory to the supply
-		return nil, policyError("internal error: not enough memory at %s", cs.node.Name())
+		log.Debug("%s: %s allocation from %s fell short %s",
+			r.GetContainer().PrettyName(),
+			reqType.String(), cs.GetNode().Name(), prettyMem(remaining))
+
+		for memType, amount := range allocated {
+			if amount > 0 {
+				cs.grantedMem[memType] -= amount
+				cs.mem[memType] += amount
+			}
+		}
+
+		return nil, policyError("internal error: "+
+			"not enough memory at %s", cs.node.Name())
 	}
 
-	// TODO: do we need to track the overall memory use or would the individual types be enough?
-	cs.mem[memoryAll] -= amount
-	cs.grantedMem[memoryAll] += amount
+	cs.grantedMem[memoryAll] += requested
+	cs.mem[memoryAll] -= requested
 
-	return allocatedMem, nil
+	return allocated, nil
 }
 
 // Allocate allocates a grant from the supply.
 func (cs *supply) Allocate(r Request) (Grant, error) {
+	grant, err := cs.AllocateCPU(r)
+	if err != nil {
+		return nil, err
+	}
+
+	memory, err := cs.allocateMemory(r)
+	if err != nil {
+		cs.ReleaseCPU(grant)
+		return nil, err
+	}
+
+	grant.SetMemoryAllocation(r.MemoryType(), memory, r.ColdStart())
+
+	return grant, nil
+}
+
+// AllocateCPU allocates CPU for a grant from the supply.
+func (cs *supply) AllocateCPU(r Request) (Grant, error) {
 	var exclusive cpuset.CPUSet
 	var err error
 
@@ -543,6 +559,7 @@ func (cs *supply) Allocate(r Request) (Grant, error) {
 		fraction += full * 1000
 		full = 0
 	}
+
 	// allocate isolated exclusive CPUs or slice them off the sharable set
 	switch {
 	case full > 0 && cs.isolated.Size() >= full && cr.isolate:
@@ -567,10 +584,14 @@ func (cs *supply) Allocate(r Request) (Grant, error) {
 			cs.node.Name(), full, cs.sharable, cs.AllocatableSharedCPU())
 	}
 
+	grant := newGrant(cs.node, cr.GetContainer(), cr.cpuType, exclusive, 0, 0, nil, 0)
+	grant.AccountAllocateCPU()
+
 	if fraction > 0 {
 		if cr.cpuType == cpuNormal {
 			// allocate requested portion of shared CPUs
 			if cs.AllocatableSharedCPU() < fraction {
+				cs.ReleaseCPU(grant)
 				return nil, policyError("internal error: "+
 					"%s: not enough %dm sharable CPU for %dm, %dm available",
 					cs.node.Name(), fraction, cs.sharable, cs.AllocatableSharedCPU())
@@ -579,34 +600,26 @@ func (cs *supply) Allocate(r Request) (Grant, error) {
 		} else if cr.cpuType == cpuReserved {
 			// allocate requested portion of reserved CPUs
 			if cs.AllocatableReservedCPU() < fraction {
+				cs.ReleaseCPU(grant)
 				return nil, policyError("internal error: "+
 					"%s: not enough reserved CPU: %dm requested, %dm available",
 					cs.node.Name(), fraction, cs.AllocatableReservedCPU())
 			}
 			cs.grantedReserved += fraction
 		}
+		grant.SetCPUPortion(fraction)
 	}
-
-	allocatedMem, err := cs.allocateMemory(cr)
-	if err != nil {
-		return nil, err
-	}
-
-	// allocate only limited memory set due to cold start
-	memType := memoryPMEM
-	coldStart := cr.ColdStart()
-	if coldStart <= 0 {
-		memType = cr.memType
-	}
-
-	grant := newGrant(cs.node, cr.GetContainer(), cr.cpuType, exclusive, fraction, memType, cr.memType, allocatedMem, coldStart)
-
-	grant.AccountAllocate()
 
 	return grant, nil
 }
 
 func (cs *supply) ReallocateMemory(g Grant) error {
+	log.Debug("%s: reallocating memory (%s) from %s to %s",
+		g.GetContainer().PrettyName(),
+		g.MemLimit().String(),
+		g.GetMemoryNode().Name(),
+		cs.GetNode().Name())
+
 	// The grant has been previously allocated from another supply. Reallocate it here.
 	g.GetMemoryNode().FreeSupply().ReleaseMemory(g)
 
@@ -634,12 +647,17 @@ func (cs *supply) ReleaseCPU(g Grant) {
 	cs.grantedReserved -= g.ReservedPortion()
 	cs.grantedShared -= g.SharedPortion()
 
-	g.AccountRelease()
+	g.AccountReleaseCPU()
 }
 
 // ReleaseMemory returns memory from the given grant to the supply.
 func (cs *supply) ReleaseMemory(g Grant) {
 	releasedMemory := uint64(0)
+
+	log.Debug("%s: releasing granted memory (%s) from %s",
+		g.GetContainer().PrettyName(),
+		g.MemLimit().String(), cs.GetNode().Name())
+
 	for key, value := range g.MemLimit() {
 		cs.grantedMem[key] -= value
 		cs.mem[key] += value
@@ -663,7 +681,12 @@ func (cs *supply) ExtraMemoryReservation(memType memoryType) uint64 {
 }
 
 func (cs *supply) ReleaseExtraMemoryReservation(g Grant) {
-	delete(cs.extraMemReservations, g)
+	if mems, ok := cs.extraMemReservations[g]; ok {
+		log.Debug("%s: releasing extra memory reservation (%s) from %s",
+			g.GetContainer().PrettyName(), mems.String(),
+			cs.GetNode().Name())
+		delete(cs.extraMemReservations, g)
+	}
 }
 
 func (cs *supply) SetExtraMemoryReservation(g Grant) {
@@ -706,9 +729,7 @@ func (cs *supply) Reserve(g Grant) error {
 		cs.grantedReserved += sharedPortion
 	}
 
-	g.AccountAllocate()
-
-	// TODO: do the same for memory
+	g.AccountAllocateCPU()
 
 	return nil
 }
@@ -1193,27 +1214,45 @@ func (score *score) String() string {
 }
 
 // newGrant creates a CPU grant from the given node for the container.
-func newGrant(n Node, c cache.Container, cpuType cpuClass, exclusive cpuset.CPUSet, cpuPortion int, initialMt, mt memoryType, allocatedMem memoryMap, coldStart time.Duration) Grant {
-	mems := n.GetMemset(initialMt)
+func newGrant(n Node, c cache.Container, cpuType cpuClass, exclusive cpuset.CPUSet, cpuPortion int, mt memoryType, allocated memoryMap, coldstart time.Duration) Grant {
+	grant := &grant{
+		node:       n,
+		memoryNode: n,
+		container:  c,
+		cpuType:    cpuType,
+		exclusive:  exclusive,
+		cpuPortion: cpuPortion,
+	}
+	if allocated != nil {
+		grant.SetMemoryAllocation(mt, allocated, coldstart)
+	}
+	return grant
+}
+
+// SetCPUPortion sets the fractional CPU portion for the grant.
+func (cg *grant) SetCPUPortion(fraction int) {
+	cg.cpuPortion = fraction
+}
+
+// SetMemoryAllocation sets the memory allocation for the grant.
+func (cg *grant) SetMemoryAllocation(mt memoryType, allocated memoryMap, coldstart time.Duration) {
+	initial := memoryPMEM
+	if coldstart <= 0 {
+		initial = mt
+	}
+	mems := cg.node.GetMemset(initial)
 	if mems.Size() == 0 {
-		mems = n.GetMemset(memoryDRAM)
+		mems = cg.node.GetMemset(memoryDRAM)
 		if mems.Size() == 0 {
-			mems = n.GetMemset(memoryAll)
+			mems = cg.node.GetMemset(memoryAll)
 		}
 	}
+	mems = mems.Clone()
 
-	return &grant{
-		node:         n,
-		memoryNode:   n,
-		container:    c,
-		cpuType:      cpuType,
-		exclusive:    exclusive,
-		cpuPortion:   cpuPortion,
-		memType:      mt,
-		memset:       mems.Clone(),
-		allocatedMem: allocatedMem,
-		coldStart:    coldStart,
-	}
+	cg.memType = mt
+	cg.memset = mems
+	cg.allocatedMem = allocated
+	cg.coldStart = coldstart
 }
 
 // Clone creates a copy of this grant.
@@ -1356,13 +1395,13 @@ func (cg *grant) String() string {
 		cg.container.PrettyName(), cg.node.Name(), cpuType, isolated, exclusive, reserved, shared, mem)
 }
 
-func (cg *grant) AccountAllocate() {
+func (cg *grant) AccountAllocateCPU() {
 	cg.node.DepthFirst(func(n Node) error {
-		n.FreeSupply().AccountAllocate(cg)
+		n.FreeSupply().AccountAllocateCPU(cg)
 		return nil
 	})
 	for node := cg.node.Parent(); !node.IsNil(); node = node.Parent() {
-		node.FreeSupply().AccountAllocate(cg)
+		node.FreeSupply().AccountAllocateCPU(cg)
 	}
 }
 
@@ -1372,13 +1411,13 @@ func (cg *grant) Release() {
 	cg.StopTimer()
 }
 
-func (cg *grant) AccountRelease() {
+func (cg *grant) AccountReleaseCPU() {
 	cg.node.DepthFirst(func(n Node) error {
-		n.FreeSupply().AccountRelease(cg)
+		n.FreeSupply().AccountReleaseCPU(cg)
 		return nil
 	})
 	for node := cg.node.Parent(); !node.IsNil(); node = node.Parent() {
-		node.FreeSupply().AccountRelease(cg)
+		node.FreeSupply().AccountReleaseCPU(cg)
 	}
 }
 
@@ -1390,7 +1429,6 @@ func (cg *grant) RestoreMemset() {
 
 func (cg *grant) ExpandMemset() (bool, error) {
 	supply := cg.GetMemoryNode().FreeSupply()
-	mems := cg.MemLimit()
 	node := cg.GetMemoryNode()
 	parent := node.Parent()
 
@@ -1398,29 +1436,14 @@ func (cg *grant) ExpandMemset() (bool, error) {
 	// the allocations have been made from DRAM and so on).
 
 	// Figure out if there is enough memory now to have grant as-is.
-	fits := true
-	for memType, limit := range mems {
-		if limit > 0 {
-			// This memory type was granted.
-			extra := supply.ExtraMemoryReservation(memType)
-			granted := supply.GrantedMemory(memType)
-			limit := supply.MemoryLimit()[memType]
-
-			if extra+granted > limit {
-				log.Debug("%s: %s: extra:%d + granted: %d > limit:%d -> moving from %s to %s",
-					cg.GetContainer().PrettyName(), memType,
-					extra, granted, limit,
-					node.Name(), parent.Name())
-				fits = false
-				break
-			}
-		}
-	}
-
-	if fits {
+	extra := supply.ExtraMemoryReservation(memoryAll)
+	free := supply.MemoryLimit()[memoryAll]
+	if extra <= free {
+		// The grant fits in the node even with extra reservations
 		return false, nil
 	}
 	// Else it doesn't fit, so move the grant up in the memory tree.
+	log.Debug("out-of-memory risk in %s: extra reservations %d > free %d -> moving from %s to %s", cg, extra, free, node.Name(), parent.Name())
 
 	if parent.IsNil() {
 		return false, fmt.Errorf("trying to move a grant up past the root of the tree")

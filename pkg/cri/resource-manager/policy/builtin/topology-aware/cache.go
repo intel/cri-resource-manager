@@ -162,7 +162,6 @@ func (ccg *cachedGrant) ToGrant(policy *policy) (Grant, error) {
 		cpuset.MustParse(ccg.Exclusive),
 		ccg.Part,
 		ccg.MemType,
-		ccg.MemType,
 		ccg.MemoryLimit,
 		ccg.ColdStart,
 	)
