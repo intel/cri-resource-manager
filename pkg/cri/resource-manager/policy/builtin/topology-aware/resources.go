@@ -554,10 +554,21 @@ func (cs *supply) AllocateCPU(r Request) (Grant, error) {
 	full := cr.full
 	fraction := cr.fraction
 
-	if cr.cpuType == cpuReserved && full > 0 {
+	cpuType := cr.cpuType
+
+	if cpuType == cpuReserved && full > 0 {
 		log.Warn("exclusive reserved CPUs not supported, allocating %d full CPUs as fractions", full)
 		fraction += full * 1000
 		full = 0
+	}
+
+	if cpuType == cpuReserved && fraction > 0 && cs.AllocatableReservedCPU() < fraction {
+		log.Warn("possible misconfiguration of reserved resources:")
+		log.Warn("  %s: allocatable %s", cs.GetNode().Name(), cs.DumpAllocatable())
+		log.Warn("  %s: needs %d reserved, only %d available",
+			cr.GetContainer().PrettyName(), fraction, cs.AllocatableReservedCPU())
+		log.Warn("  falling back to using normal unreserved CPUs instead...")
+		cpuType = cpuNormal
 	}
 
 	// allocate isolated exclusive CPUs or slice them off the sharable set
@@ -584,11 +595,11 @@ func (cs *supply) AllocateCPU(r Request) (Grant, error) {
 			cs.node.Name(), full, cs.sharable, cs.AllocatableSharedCPU())
 	}
 
-	grant := newGrant(cs.node, cr.GetContainer(), cr.cpuType, exclusive, 0, 0, nil, 0)
+	grant := newGrant(cs.node, cr.GetContainer(), cpuType, exclusive, 0, 0, nil, 0)
 	grant.AccountAllocateCPU()
 
 	if fraction > 0 {
-		if cr.cpuType == cpuNormal {
+		if cpuType == cpuNormal {
 			// allocate requested portion of shared CPUs
 			if cs.AllocatableSharedCPU() < fraction {
 				cs.ReleaseCPU(grant)
@@ -597,7 +608,7 @@ func (cs *supply) AllocateCPU(r Request) (Grant, error) {
 					cs.node.Name(), fraction, cs.sharable, cs.AllocatableSharedCPU())
 			}
 			cs.grantedShared += fraction
-		} else if cr.cpuType == cpuReserved {
+		} else if cpuType == cpuReserved {
 			// allocate requested portion of reserved CPUs
 			if cs.AllocatableReservedCPU() < fraction {
 				cs.ReleaseCPU(grant)
