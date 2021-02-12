@@ -102,6 +102,10 @@ func (p *mockCPUPackage) DieNodeIDs(system.ID) []system.ID {
 	return []system.ID{}
 }
 
+func (p *mockCPUPackage) SstInfo() system.SstPackageInfo {
+	return system.SstPackageInfo{}
+}
+
 type mockCPU struct {
 	isolated cpuset.CPUSet
 	online   cpuset.CPUSet
@@ -145,6 +149,10 @@ func (c *mockCPU) Isolated() bool {
 }
 func (c *mockCPU) SetFrequencyLimits(min, max uint64) error {
 	return nil
+}
+
+func (c *mockCPU) SstClos() int {
+	return -1
 }
 
 type mockSystem struct {

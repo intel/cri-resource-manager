@@ -409,12 +409,154 @@ func (c *topologyCache) discoverCPUPriorities(sys sysfs.System) {
 	if sys == nil {
 		return
 	}
-	var cpuPriorities [NumCPUPriorities][]sysfs.ID
+	var prio cpuPriorities
+
+	// Discover on per-package basis
+	for id := range c.pkg {
+		cpuPriorities, sstActive := c.discoverSstCPUPriority(sys, id)
+
+		if !sstActive {
+			cpuPriorities = c.discoverCpufreqPriority(sys, id)
+		}
+
+		for p, cpus := range cpuPriorities {
+			source := map[bool]string{true: "sst", false: "cpufreq"}[sstActive]
+			cset := sysfs.NewIDSet(cpus...).CPUSet()
+			log.Debug("package #%d (%s): %d %s priority cpus (%v)", id, source, len(cpus), CPUPriority(p), cset)
+			prio[p] = prio[p].Union(cset)
+		}
+	}
+}
+
+func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID sysfs.ID) ([NumCPUPriorities][]sysfs.ID, bool) {
+	active := false
+
+	pkg := sys.Package(pkgID)
+	sst := pkg.SstInfo()
+	cpuIDs := c.pkg[pkgID].ToSlice()
+	prios := make(map[sysfs.ID]CPUPriority, len(cpuIDs))
+
+	// Determine SST-based priority. Based on experimentation there is some
+	// hierarchy between the SST features. Without trying to be too smart
+	// we follow the principles below:
+	// 1. SST-TF has highest preference, mastering over SST-BF and making most
+	//    of SST-CP settings ineffective
+	// 2. SST-CP dictates over SST-BF
+	// 3. SST-BF is meaningful if neither SST-TF nor SST-CP is enabled
+	switch {
+	case sst.TFEnabled:
+		log.Debug("package #%d: using SST-TF based CPU prioritization", pkgID)
+		// We only look at the CLOS id as SST-TF (seems to) follows ordered CLOS priority
+		for _, i := range cpuIDs {
+			id := sysfs.ID(i)
+			p := PriorityLow
+			// First two CLOSes are prioritized by SST
+			if sys.CPU(id).SstClos() < 2 {
+				p = PriorityHigh
+			}
+			prios[id] = p
+		}
+		active = true
+	case sst.CPEnabled:
+		closPrio := c.sstClosPriority(sys, pkgID)
+		log.Debug("package #%d: using SST-CP based CPU prioritization with CLOS mapping %v", pkgID, closPrio)
+
+		active = false
+		for _, i := range cpuIDs {
+			id := sysfs.ID(i)
+			clos := sys.CPU(id).SstClos()
+			p := closPrio[clos]
+			if p != PriorityNormal {
+				active = true
+			}
+			prios[id] = p
+		}
+	}
+
+	if !active && sst.BFEnabled {
+		log.Debug("package #%d: using SST-BF based CPU prioritization", pkgID)
+		for _, i := range cpuIDs {
+			id := sysfs.ID(i)
+			p := PriorityLow
+			if sst.BFCores.Has(id) {
+				p = PriorityHigh
+			}
+			prios[id] = p
+		}
+		active = true
+	}
+
+	var ret [NumCPUPriorities][]sysfs.ID
+
+	for cpu, prio := range prios {
+		ret[prio] = append(ret[prio], cpu)
+	}
+	return ret, active
+}
+
+func (c *topologyCache) sstClosPriority(sys sysfs.System, pkgID sysfs.ID) map[int]CPUPriority {
+	sortedKeys := func(m map[int]int) []int {
+		keys := make([]int, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Ints(keys)
+		return keys
+	}
+
+	pkg := sys.Package(pkgID)
+	sst := pkg.SstInfo()
+
+	// Get a list of unique CLOS proportional priority values
+	closPps := make(map[int]int)
+	closIds := make(map[int]int)
+	for _, cpuID := range c.pkg[pkgID].ToSlice() {
+		clos := sys.CPU(sysfs.ID(cpuID)).SstClos()
+		pp := sst.ClosInfo[clos].ProportionalPriority
+		closPps[pp] = clos
+		closIds[clos] = 0 // 0 is a dummy value here
+	}
+
+	// Form a list of (active) CLOS ids in sorted order
+	var closSorted []int
+	if sst.CPPriority == sysfs.Ordered {
+		// In ordered mode the priority is simply the CLOS id
+		closSorted = sortedKeys(closIds)
+		log.Debug("package #%d, ordered SST-CP priority with CLOS ids %v", pkgID, closSorted)
+	} else {
+		// In proportional mode we sort by the proportional priority parameter
+		closPpSorted := sortedKeys(closPps)
+
+		for _, pp := range closPpSorted {
+			closSorted = append(closSorted, closPps[pp])
+		}
+		log.Debug("package #%d, proportional SST-CP priority with PP-to-CLOS parity %v", pkgID, closPps)
+	}
+
+	// Map from CLOS id to cpuallocator CPU priority
+	closPriority := make(map[int]CPUPriority, len(closSorted))
+	for _, id := range closSorted {
+		// Default to normal priority
+		closPriority[id] = PriorityNormal
+	}
+	if len(closSorted) > 1 {
+		// Highest CLOS id maps to high CPU priority
+		closPriority[closSorted[0]] = PriorityHigh
+		closPriority[closSorted[len(closSorted)-1]] = PriorityLow
+	}
+
+	return closPriority
+}
+
+func (c *topologyCache) discoverCpufreqPriority(sys sysfs.System, pkgID sysfs.ID) [NumCPUPriorities][]sysfs.ID {
+	var prios [NumCPUPriorities][]sysfs.ID
 
 	// Group cpus by base frequency and energy performance profile
 	freqs := map[uint64][]sysfs.ID{}
 	epps := map[sysfs.EPP][]sysfs.ID{}
-	for _, id := range sys.CPUIDs() {
+	cpuIDs := c.pkg[pkgID].ToSlice()
+	for _, num := range cpuIDs {
+		id := sysfs.ID(num)
 		cpu := sys.CPU(id)
 		bf := cpu.BaseFrequency()
 		freqs[bf] = append(freqs[bf], id)
@@ -441,7 +583,8 @@ func (c *topologyCache) discoverCPUPriorities(sys sysfs.System) {
 	sort.Ints(eppList)
 
 	// Finally, determine priority of each CPU
-	for _, id := range sys.CPUIDs() {
+	for _, num := range cpuIDs {
+		id := sysfs.ID(num)
 		cpu := sys.CPU(id)
 		p := PriorityNormal
 
@@ -467,13 +610,10 @@ func (c *topologyCache) discoverCPUPriorities(sys sysfs.System) {
 			}
 		}
 
-		cpuPriorities[p] = append(cpuPriorities[p], id)
+		prios[p] = append(prios[p], id)
 	}
 
-	for p, cpus := range cpuPriorities {
-		c.cpuPriorities[p] = sysfs.NewIDSet(cpus...).CPUSet()
-		log.Debug("discovered %d %s priority cpus: %v", c.cpuPriorities[p].Size(), CPUPriority(p), c.cpuPriorities[p])
-	}
+	return prios
 }
 
 func (p CPUPriority) String() string {

@@ -31,7 +31,7 @@ script:
   - go get -u github.com/shurcooL/vfsgen/cmd/vfsgendev
   - make format
   - make
-  - KERNEL_SRC_DIR=/lib/modules/5.3.0-23-generic/build make libexec/avx512.o
+  - KERNEL_HEADERS_DIR=/lib/modules/5.3.0-23-generic/build make libexec/avx512.o
   - make golangci-lint
   - make test
 

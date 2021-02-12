@@ -10,3 +10,4 @@ Policies
    container-affinity.md
    blockio.md
    rdt.md
+   cpu-allocator.md

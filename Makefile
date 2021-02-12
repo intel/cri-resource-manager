@@ -31,8 +31,10 @@ SHELLCHECK := shellcheck
 
 CLANG := clang
 KERNEL_VERSION ?= $(shell uname -r)
-KERNEL_SRC_DIR ?= /lib/modules/$(KERNEL_VERSION)/source
+KERNEL_HEADERS_DIR ?= /lib/modules/$(KERNEL_VERSION)/source
 KERNEL_BUILD_DIR ?= /lib/modules/$(KERNEL_VERSION)/build
+# Directory for full kernel sources
+KERNEL_SRC_DIR ?= /usr/src/linux
 
 # Binaries and directories for installation.
 INSTALL    := install
@@ -71,7 +73,7 @@ UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
 
 # Right now we don't depend on libexec/%.o on purpose so make sure the file
 # is always up-to-date when elf/avx512.c is changed.
-GEN_TARGETS := pkg/avx/programbytes_gendata.go
+GEN_TARGETS := pkg/avx/programbytes_gendata.go pkg/sysfs/sst_types_amd64.go pkg/sysfs/sst_types_priv.go
 
 # Determine binary version and buildid, and versions for rpm, deb, and tar packages.
 BUILD_VERSION := $(shell scripts/build/get-buildid --version --shell=no)
@@ -234,10 +236,10 @@ KERNEL_INCLUDE_DIRS = /include \
                       /arch/x86/include/uapi \
                       /arch/x86/include/generated/uapi
 
-KERNEL_INCLUDES := $(strip $(foreach kernel_dir,$(KERNEL_SRC_DIR) $(KERNEL_BUILD_DIR),$(addprefix -I,$(wildcard $(addprefix $(kernel_dir),$(KERNEL_INCLUDE_DIRS))))))
+KERNEL_INCLUDES := $(strip $(foreach kernel_dir,$(KERNEL_HEADERS_DIR) $(KERNEL_BUILD_DIR),$(addprefix -I,$(wildcard $(addprefix $(kernel_dir),$(KERNEL_INCLUDE_DIRS))))))
 
 libexec/%.o: elf/%.c
-	$(Q)if [ -z "$(KERNEL_INCLUDES)" ]; then echo "Cannot build $@: invalid KERNEL_SRC_DIR=$(KERNEL_SRC_DIR)"; exit 1; fi
+	$(Q)if [ -z "$(KERNEL_INCLUDES)" ]; then echo "Cannot build $@: invalid KERNEL_HEADERS_DIR=$(KERNEL_HEADERS_DIR)"; exit 1; fi
 	$(Q)echo "Building $@"
 	$(Q)mkdir -p libexec
 	$(Q)$(CLANG) -nostdinc -D __KERNEL__ $(KERNEL_INCLUDES) -O2 -Wall -target bpf -c $< -o $@
@@ -638,6 +640,11 @@ clean-ui-assets:
 	cd $(dir $@) && \
 	    $(GO_GEN) || exit 1 && \
 	cd - > /dev/null
+
+pkg/sysfs/sst_types%.go: pkg/sysfs/_sst_types%.go pkg/sysfs/gen_sst_types.sh
+	$(Q)cd $(@D) && \
+	    KERNEL_SRC_DIR=$(KERNEL_SRC_DIR) $(GO_GEN)
+
 
 #
 # API generation
