@@ -480,6 +480,11 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 			container.PrettyName(), container.GetState())
 	}
 
+	if err := m.runPreStartHooks(ctx, method, container); err != nil {
+		m.Error("%s: failed to run post-start hooks for %s: %v",
+			method, container.PrettyName(), err)
+	}
+
 	reply, rqerr := handler(ctx, request)
 
 	if rqerr != nil {
@@ -814,6 +819,14 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 			m.Warn("%s: skipping container %s (in state %v)", method,
 				c.PrettyName(), c.GetState())
 		}
+	}
+	return nil
+}
+
+// runPreStartHooks runs the necessary hooks after having started a container.
+func (m *resmgr) runPreStartHooks(ctx context.Context, method string, c cache.Container) error {
+	if err := m.control.RunPreStartHooks(c); err != nil {
+		m.Error("%s: pre-start hook failed for %s: %v", method, c.PrettyName(), err)
 	}
 	return nil
 }
