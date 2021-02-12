@@ -994,7 +994,7 @@ func (cr *request) GetContainer() cache.Container {
 
 // String returns aprintable representation of the CPU request.
 func (cr *request) String() string {
-	mem := "<Memory request: limit:" + strconv.FormatUint(cr.memLim, 10) + ", req:" + strconv.FormatUint(cr.memReq, 10) + ">"
+	mem := "<Memory request: limit:" + prettyMem(cr.memLim) + ", req:" + prettyMem(cr.memReq) + ">"
 	isolated := map[bool]string{false: "", true: "isolated "}[cr.isolate]
 	switch {
 	case cr.full == 0 && cr.fraction == 0:
@@ -1455,7 +1455,8 @@ func (cg *grant) ExpandMemset() (bool, error) {
 		return false, nil
 	}
 	// Else it doesn't fit, so move the grant up in the memory tree.
-	log.Debug("out-of-memory risk in %s: extra reservations %d > free %d -> moving from %s to %s", cg, extra, free, node.Name(), parent.Name())
+	log.Debug("out-of-memory risk in %s: extra reservations %d > free %d -> moving from %s to %s",
+		cg, prettyMem(extra), prettyMem(free), node.Name(), parent.Name())
 
 	if parent.IsNil() {
 		return false, fmt.Errorf("trying to move a grant up past the root of the tree")
