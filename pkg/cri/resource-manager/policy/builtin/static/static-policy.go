@@ -315,7 +315,7 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 // allocateOrdinaryCPUs tries to take a number of non-isolated CPUs.
 func (s *static) allocateOrdinaryCPUs(numCPUs int) (cpuset.CPUSet, error) {
 	assignable := s.assignableCPUs(numCPUs)
-	result, err := s.takeByTopology(assignable, numCPUs, true)
+	result, err := s.takeByTopology(assignable, numCPUs, cpuallocator.PriorityHigh)
 
 	if err != nil {
 		return cpuset.NewCPUSet(), err
@@ -328,7 +328,7 @@ func (s *static) allocateOrdinaryCPUs(numCPUs int) (cpuset.CPUSet, error) {
 
 // allocateIsolatedCPUs tries to take a number of isolated CPUs, falling back to ordinary ones.
 func (s *static) allocateIsolatedCPUs(numCPUs int, prefer bool) (cpuset.CPUSet, error) {
-	result, err := s.takeByTopology(s.isolatedCpus, numCPUs, true)
+	result, err := s.takeByTopology(s.isolatedCpus, numCPUs, cpuallocator.PriorityHigh)
 
 	switch {
 	case err != nil:
@@ -431,7 +431,7 @@ func (s *static) allocateReserved() error {
 		qty := cpus.(resource.Quantity)
 		count := (int(qty.MilliValue()) + 999) / 1000
 		from := s.availableCpus.Clone()
-		if reserved, err = s.takeByTopology(from, count, false); err != nil {
+		if reserved, err = s.takeByTopology(from, count, cpuallocator.PriorityNormal); err != nil {
 			return policyError("failed to reserve %d CPUs: %v", cpus.(int), err)
 		}
 	}
@@ -509,9 +509,9 @@ func (s *static) validateState(state cache.Cache) error {
 }
 
 // Topology-aware-like allocation wrapper.
-func (s *static) takeByTopology(available cpuset.CPUSet, numCPUs int, preferHighPrio bool) (cpuset.CPUSet, error) {
+func (s *static) takeByTopology(available cpuset.CPUSet, numCPUs int, preferredPrio cpuallocator.CPUPriority) (cpuset.CPUSet, error) {
 	from := &available
-	cset, err := s.cpuAllocator.AllocateCpus(from, numCPUs, preferHighPrio)
+	cset, err := s.cpuAllocator.AllocateCpus(from, numCPUs, preferredPrio)
 	if err != nil {
 		return cset, err
 	}

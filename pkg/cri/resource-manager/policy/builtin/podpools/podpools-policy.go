@@ -143,7 +143,7 @@ func CreatePodpoolsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
 			p.reserved = p.allowed.Intersection(v)
 		case resapi.Quantity:
 			reserveCnt := (int(v.MilliValue()) + 999) / 1000
-			cpus, err := p.cpuAllocator.AllocateCpus(&p.allowed, reserveCnt, false)
+			cpus, err := p.cpuAllocator.AllocateCpus(&p.allowed, reserveCnt, cpuallocator.PriorityNone)
 			if err != nil {
 				log.Fatal("failed to allocate reserved CPUs: %s", err)
 			}
@@ -501,7 +501,7 @@ func (p *podpools) applyPoolDef(pools *[]*Pool, poolDef *PoolDef, freeCpus *cpus
 			if poolCount != 1 {
 				return podpoolsError("pool %q: cannot change the number of instances", poolDef.Name)
 			}
-			cpus, err := p.cpuAllocator.AllocateCpus(freeCpus, cpusPerPool, false)
+			cpus, err := p.cpuAllocator.AllocateCpus(freeCpus, cpusPerPool, cpuallocator.PriorityNormal)
 			if err != nil {
 				return podpoolsError("could not allocate %d CPUs for pool %q: %w", cpusPerPool, poolDef.Name, err)
 			}
@@ -526,7 +526,7 @@ func (p *podpools) applyPoolDef(pools *[]*Pool, poolDef *PoolDef, freeCpus *cpus
 			if cpusPerPool > freeCpus.Size() {
 				return podpoolsError("insufficient CPUs when trying to allocate %d CPUs for pool %s[%d]", cpusPerPool, poolDef.Name, poolIndex)
 			}
-			cpus, err := p.cpuAllocator.AllocateCpus(freeCpus, cpusPerPool, false)
+			cpus, err := p.cpuAllocator.AllocateCpus(freeCpus, cpusPerPool, cpuallocator.PriorityNormal)
 			if err != nil {
 				return podpoolsError("could not allocate %d CPUs for instance %d of pool %q: %w", cpusPerPool, poolIndex, poolDef.Name, err)
 			}

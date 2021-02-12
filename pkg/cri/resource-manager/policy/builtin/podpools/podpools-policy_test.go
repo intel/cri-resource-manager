@@ -20,6 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+
+	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 )
 
 func validateError(t *testing.T, expectedError string, err error) bool {
@@ -60,7 +62,7 @@ func assertEqualPools(t *testing.T, expectedPool, gotPool Pool) bool {
 
 type mockCpuAllocator struct{}
 
-func (mca *mockCpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, dontcare bool) (cpuset.CPUSet, error) {
+func (mca *mockCpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, dontcare cpuallocator.CPUPriority) (cpuset.CPUSet, error) {
 	switch {
 	case from.Size() < cnt:
 		return cpuset.NewCPUSet(), fmt.Errorf("cpuset %s does not have %d CPUs", from, cnt)
@@ -81,7 +83,7 @@ func (mca *mockCpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, dontcare
 	}
 }
 
-func (mca *mockCpuAllocator) ReleaseCpus(*cpuset.CPUSet, int, bool) (cpuset.CPUSet, error) {
+func (mca *mockCpuAllocator) ReleaseCpus(*cpuset.CPUSet, int, cpuallocator.CPUPriority) (cpuset.CPUSet, error) {
 	return cpuset.NewCPUSet(), nil
 }
 
