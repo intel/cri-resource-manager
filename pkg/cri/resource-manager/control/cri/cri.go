@@ -90,7 +90,16 @@ func (ctl *crictl) PreCreateHook(c cache.Container) error {
 	if create.Config.Linux == nil {
 		create.Config.Linux = &criapi.LinuxContainerConfig{}
 	}
+
 	create.Config.Linux.Resources = c.GetLinuxResources()
+
+	if class := c.GetRuntimeClass(); class != CRIController {
+		log.Info("%s: RuntimeClass is %q, leaving cpuset CPU/memory unset...",
+			c.PrettyName(), class)
+
+		create.Config.Linux.Resources.CpusetCpus = ""
+		create.Config.Linux.Resources.CpusetMems = ""
+	}
 
 	c.ClearPending(CRIController)
 
@@ -113,6 +122,12 @@ func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 
 	if !c.HasPending(CRIController) {
 		log.Debug("post-update hook: no changes for %s", c.PrettyName())
+		return nil
+	}
+
+	if class := c.GetRuntimeClass(); class != CRIController {
+		log.Info("%s: RuntimeClass is %q, omitting container update...",
+			c.PrettyName(), class)
 		return nil
 	}
 
