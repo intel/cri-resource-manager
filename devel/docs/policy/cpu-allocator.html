@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Demos &mdash; CRI Resource Manager 0.4.0-427-g9cff111 documentation</title>
+  <title>CPU Allocator &mdash; CRI Resource Manager 0.4.0-427-g9cff111 documentation</title>
   
 
   
@@ -39,8 +39,8 @@
     
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Block I/O Demo" href="blockio.html" />
-    <link rel="prev" title="End-to-End tests" href="../developers-guide/e2e-test.html" /> 
+    <link rel="next" title="Node Agent" href="../node-agent.html" />
+    <link rel="prev" title="RDT (Intel® Resource Director Technology)" href="rdt.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -95,14 +95,28 @@
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../policy/index.html">Policies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Policies</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="topology-aware.html">Topology-Aware Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="podpools.html">Podpools Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">CPU Allocator</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#topology-based-allocation">Topology Based Allocation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cpu-prioritization">CPU Prioritization</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#intel-speed-select-technology-sst">Intel Speed Select Technology (SST)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#linux-cpufreq">Linux CPUFreq</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../developers-guide/index.html">Developer’s Guide</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Demos</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="blockio.html">Block I/O Demo</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
@@ -155,13 +169,15 @@
     
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
         
-      <li>Demos</li>
+          <li><a href="index.html">Policies</a> &raquo;</li>
+        
+      <li>CPU Allocator</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
           
-            <a href="../../_sources/docs/demos/index.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/docs/policy/cpu-allocator.md.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -174,12 +190,64 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="demos">
-<h1>Demos<a class="headerlink" href="#demos" title="Permalink to this headline">¶</a></h1>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="blockio.html">Block I/O Demo</a></li>
+  <div class="section" id="cpu-allocator">
+<h1>CPU Allocator<a class="headerlink" href="#cpu-allocator" title="Permalink to this headline">¶</a></h1>
+<p>CRI Resource Manager has a separate CPU allocator component that helps policies
+make educated allocation of CPU cores for workloads.  Currently all policies
+except for <a class="reference internal" href="static-pools.html"><span class="doc">static-pools</span></a> utilize the built-in CPU allocator.
+See policy specific documentation for more details.</p>
+<div class="section" id="topology-based-allocation">
+<h2>Topology Based Allocation<a class="headerlink" href="#topology-based-allocation" title="Permalink to this headline">¶</a></h2>
+<p>The CPU allocator tries to optimize the allocation of CPUs in terms of the
+hardware topology. More specifically, it aims at packing all CPUs of one
+request “near” each other in order to minimize memory latencies between CPUs.</p>
+</div>
+<div class="section" id="cpu-prioritization">
+<h2>CPU Prioritization<a class="headerlink" href="#cpu-prioritization" title="Permalink to this headline">¶</a></h2>
+<p>The CPU allocator also does automatic CPU prioritization by detecting CPU
+features and their configuration parameters. Currently, CRI Resource Manager
+supports CPU priority detection based on the <code class="docutils literal notranslate"><span class="pre">intel_pstate</span></code> scaling
+driver in the Linux CPUFreq subsystem, and, Intel Speed Select Technology
+(SST).</p>
+<p>CPUs are divided into three priority classes, i.e. <em>hight</em>, <em>normal</em> and <em>low</em>.
+Policies utilizing the CPU allocator may choose to prefer certain priority
+class for certain types of workloads. For example, prefer (and preserve) high
+priority CPUs for high priority workloads.</p>
+<div class="section" id="intel-speed-select-technology-sst">
+<h3>Intel Speed Select Technology (SST)<a class="headerlink" href="#intel-speed-select-technology-sst" title="Permalink to this headline">¶</a></h3>
+<p>CRI Resource Manager supports detection of all Intel Speed Select Technology
+(SST) features, i.e. Speed Select Technology Performance Profile (SST-PP), Base
+Frequency (SST-BF), Turbo Frequency (SST-TF) and Core Power (SST-CP).</p>
+<p>CPU prioritization is based on detection of the currently active SST features
+and their parameterization:</p>
+<ol class="simple">
+<li><p>If SST-TF has been enabled, all CPUs prioritized by SST-TF are flagged as
+high priority.</p></li>
+<li><p>If SST-CP is enabled but SST-TF disabled, the CPU allocator examines the
+active Classes of Service (CLOSes) and their parameters. CPUs associated
+with the highest priority CLOS will be flagged as high priority, lowest
+priority CLOS will be flagged as low priority and possible “middle priority”
+CLOS as normal priority.</p></li>
+<li><p>If SST-BF has been enabled and SST-TF and SST-CP are inactive, all BF high
+priority cores (having higher guaranteed base frequency) will be flagged
+as high priority.</p></li>
+</ol>
+</div>
+<div class="section" id="linux-cpufreq">
+<h3>Linux CPUFreq<a class="headerlink" href="#linux-cpufreq" title="Permalink to this headline">¶</a></h3>
+<p>CPUFreq based prioritization only takes effect if Intel Speed Select Technology
+(SST) is disabled (or not supported). CRI-RM divides CPU cores into priority
+classes based on two parameters:</p>
+<ul class="simple">
+<li><p>base frequency</p></li>
+<li><p>EPP (Energy-Performance Preference)</p></li>
 </ul>
+<p>CPU cores with high base frequency (relative to the other cores in the system)
+will be flagged as high priority.  Low base frequency will map to low priority,
+correspondingly.</p>
+<p>CPU cores with high EPP priority (relative to the other cores in the system)
+will be marked as high priority cores.</p>
+</div>
 </div>
 </div>
 
@@ -189,8 +257,8 @@
           </div>
           <footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="blockio.html" class="btn btn-neutral float-right" title="Block I/O Demo" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-        <a href="../developers-guide/e2e-test.html" class="btn btn-neutral float-left" title="End-to-End tests" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../node-agent.html" class="btn btn-neutral float-right" title="Node Agent" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="rdt.html" class="btn btn-neutral float-left" title="RDT (Intel® Resource Director Technology)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
