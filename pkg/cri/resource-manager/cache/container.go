@@ -485,7 +485,8 @@ func (c *container) GetLinuxResources() *cri.LinuxContainerResources {
 		return nil
 	}
 
-	return &(*c.LinuxReq)
+	resources := *c.LinuxReq
+	return &resources
 }
 
 func (c *container) setEffectiveAdjustment(name string) string {
