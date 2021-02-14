@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
+	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 
@@ -767,6 +768,18 @@ func (c *container) GetAffinity() []*Affinity {
 	return affinity
 }
 
+func (c *container) GetCgroupDir() string {
+	if c.CgroupDir != "" {
+		return c.CgroupDir
+	}
+	if pod, ok := c.GetPod(); ok {
+		parent, podID := pod.GetCgroupParentDir(), pod.GetID()
+		ID, class := c.GetID(), c.GetRuntimeClass()
+		c.CgroupDir = cgroups.FindContainerDir(parent, podID, ID, class)
+	}
+	return c.CgroupDir
+}
+
 func (c *container) GetRuntimeHandler() string {
 	if pod, ok := c.GetPod(); ok {
 		return pod.GetRuntimeHandler()
@@ -834,6 +847,22 @@ func (c *container) SetPageMigration(p *PageMigrate) {
 
 func (c *container) GetPageMigration() *PageMigrate {
 	return c.PageMigrate
+}
+
+func (c *container) GetProcesses() ([]string, error) {
+	dir := c.GetCgroupDir()
+	if dir == "" {
+		return nil, cacheError("%s: unknown cgroup directory", c.PrettyName())
+	}
+	return cgroups.Cpu.Group(dir).GetProcesses()
+}
+
+func (c *container) GetTasks() ([]string, error) {
+	dir := c.GetCgroupDir()
+	if dir == "" {
+		return nil, cacheError("%s: unknown cgroup directory", c.PrettyName())
+	}
+	return cgroups.Cpu.Group(dir).GetTasks()
 }
 
 func (c *container) SetCRIRequest(req interface{}) error {

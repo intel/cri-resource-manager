@@ -177,6 +177,12 @@ type Pod interface {
 	GetRuntimeType() string
 	// GetRuntimeClass returns the runtime controller for this pod.
 	GetRuntimeClass() string
+	// GetProcesses returns the pids of all processes in the pod either excluding
+	// container processes, if called with false, or including those if called with true.
+	GetProcesses(bool) ([]string, error)
+	// GetTasks returns the pids of all threads in the pod either excluding cotnainer
+	// processes, if called with false, or including those if called with true.
+	GetTasks(bool) ([]string, error)
 }
 
 // PodInfo is extra pod information extracted from the runtime.
@@ -368,6 +374,9 @@ type Container interface {
 	// GetAffinity returns the annotated affinity expressions for this container.
 	GetAffinity() []*Affinity
 
+	// GetCgroupDir returns the relative path of the cgroup directory for the container.
+	GetCgroupDir() string
+
 	// GetRuntimeHandler returns the runtime handler for this container.
 	GetRuntimeHandler() string
 	// GetRuntimeType returns the runtime type for this container.
@@ -394,6 +403,11 @@ type Container interface {
 	SetPageMigration(*PageMigrate)
 	// GetPageMigration returns the current page migration policy/options for the container.
 	GetPageMigration() *PageMigrate
+
+	// GetProcesses returns the pids of processes in the container.
+	GetProcesses() ([]string, error)
+	// GetTasks returns the pids of threads in the container.
+	GetTasks() ([]string, error)
 
 	// SetCRIRequest sets the current pending CRI request of the container.
 	SetCRIRequest(req interface{}) error
@@ -449,6 +463,7 @@ type container struct {
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 	req       *interface{}                 // pending CRI request
 
+	CgroupDir    string       // cgroup directory relative to a(ny) controller.
 	RuntimeClass string       // runtime controller name
 	RDTClass     string       // RDT class this container is assigned to.
 	BlockIOClass string       // Block I/O class this container is assigned to.
