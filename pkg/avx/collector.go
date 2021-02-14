@@ -219,7 +219,7 @@ func NewCollector() (prometheus.Collector, error) {
 	}
 
 	return &collector{
-		root: cgroups.V2path,
+		root: cgroups.GetV2Dir(),
 		ebpf: collection,
 		fds:  []int{ffd, sfd},
 	}, nil
