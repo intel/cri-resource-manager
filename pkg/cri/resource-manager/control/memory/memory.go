@@ -19,11 +19,11 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
@@ -127,37 +127,21 @@ func (ctl *memctl) checkToptierLimitSupport() bool {
 
 // setToptierLimit sets the top tier memory (soft) limit for the container.
 func (ctl *memctl) setToptierLimit(c cache.Container) error {
-	pod, ok := c.GetPod()
-	if !ok {
-		return memctlError("%s: failed to get Pod", c.PrettyName())
-	}
-
-	limit := c.GetToptierLimit()
-
-	podDir := memoryCgroupPath + "/" + pod.GetCgroupParentDir()
-	containerDir := utils.GetContainerCgroupDir(podDir, c.GetID())
-	if containerDir == "" {
-		return memctlError("%s: failed to find memory controller cgroup directory",
+	dir := c.GetCgroupDir()
+	if dir == "" {
+		return memctlError("%q: failed to determine cgroup directory",
 			c.PrettyName())
 	}
 
-	path := containerDir + "/" + toptierSoftLimitControl
+	limit := strconv.FormatInt(c.GetToptierLimit(), 10)
+	group := cgroups.Memory.Group(dir)
+	entry := toptierSoftLimitControl
 
-	log.Debug("%q: setting %s to %v", c.PrettyName(), path, limit)
-
-	f, err := os.OpenFile(path, os.O_WRONLY, 0644)
-	if err != nil {
-		return memctlError("%s: failed to open cgroup entry %s: %v",
-			c.PrettyName(), path, err)
-	}
-	defer f.Close()
-
-	if _, err := f.WriteString(strconv.FormatInt(limit, 10) + "\n"); err != nil {
-		return memctlError("%s: failed to update top tier memory soft limit: %v",
-			c.PrettyName(), err)
+	if err := group.Write(entry, limit+"\n"); err != nil {
+		return err
 	}
 
-	log.Info("%q: memory limit set to %v", c.PrettyName(), limit)
+	log.Info("%q: memory toptier soft limit set to %v", c.PrettyName(), limit)
 
 	return nil
 }
