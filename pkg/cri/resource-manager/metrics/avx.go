@@ -37,14 +37,14 @@ func (m *Metrics) collectAvxEvents(raw map[string]*model.MetricFamily) *events.A
 
 	ratio := map[string]float64{}
 	for _, v := range avx.Metric {
-		cgroup, err := filepath.Rel(cgroups.V2path, v.Label[0].GetValue())
+		cgroup, err := filepath.Rel(cgroups.GetV2Dir(), v.Label[0].GetValue())
 		if err != nil {
 			continue
 		}
 		ratio[cgroup] = v.Gauge.GetValue()
 	}
 	for _, v := range all.Metric {
-		cgroup, err := filepath.Rel(cgroups.V2path, v.Label[0].GetValue())
+		cgroup, err := filepath.Rel(cgroups.GetV2Dir(), v.Label[0].GetValue())
 		if err != nil {
 			continue
 		}
