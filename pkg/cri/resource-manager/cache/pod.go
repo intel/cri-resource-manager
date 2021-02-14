@@ -23,6 +23,7 @@ import (
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
+	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
 
@@ -443,6 +444,59 @@ func (p *pod) Eval(key string) interface{} {
 	default:
 		return cacheError("Pod cannot evaluate of %q", key)
 	}
+}
+
+// GetProcesses returns the pids of processes in a pod.
+func (p *pod) GetProcesses(recursive bool) ([]string, error) {
+	return p.getTasks(recursive, true)
+}
+
+// GetTasks returns the pids of threads in a pod.
+func (p *pod) GetTasks(recursive bool) ([]string, error) {
+	return p.getTasks(recursive, false)
+}
+
+// getTasks returns the pids of processes or threads in a pod.
+func (p *pod) getTasks(recursive, processes bool) ([]string, error) {
+	var pids, childPids []string
+	var err error
+
+	dir := p.GetCgroupParentDir()
+	if dir == "" {
+		return nil, cacheError("%s: unknown cgroup parent directory", p.Name)
+	}
+
+	if processes {
+		pids, err = cgroups.Cpu.Group(dir).GetProcesses()
+	} else {
+		pids, err = cgroups.Cpu.Group(dir).GetTasks()
+	}
+	if err != nil {
+		return nil, cacheError("%s: failed to read pids: %v", p.Name, err)
+	}
+
+	if !recursive {
+		return pids, nil
+	}
+
+	for _, c := range append(p.GetInitContainers(), p.GetContainers()...) {
+		if c.GetState() == ContainerStateRunning {
+			if processes {
+				childPids, err = c.GetProcesses()
+			} else {
+				childPids, err = c.GetTasks()
+			}
+			if err == nil {
+				pids = append(pids, childPids...)
+				continue
+			}
+
+			p.cache.Error("%s: failed to read pids of %s: %v", p.Name,
+				c.PrettyName(), err)
+		}
+	}
+
+	return pids, nil
 }
 
 // ParsePodStatus parses a PodSandboxStatusResponse into a PodStatus.
