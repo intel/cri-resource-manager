@@ -25,7 +25,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/metrics"
-	"github.com/intel/cri-resource-manager/pkg/utils"
 	"github.com/intel/goresctrl/pkg/rdt"
 )
 
@@ -195,7 +194,13 @@ func (ctl *rdtctl) assignClass(c cache.Container, class string) error {
 		return rdtError("%q: failed to get pod", c.PrettyName())
 	}
 
-	pids, err := utils.GetTasksInContainer(pod.GetCgroupParentDir(), c.GetPodID(), c.GetID())
+	dir := c.GetCgroupDir()
+	if dir == "" {
+		return rdtError("%q: failed to determine cgroup directory",
+			c.PrettyName())
+	}
+
+	pids, err := c.GetProcesses()
 	if err != nil {
 		return rdtError("%q: failed to get process list: %v", c.PrettyName(), err)
 	}

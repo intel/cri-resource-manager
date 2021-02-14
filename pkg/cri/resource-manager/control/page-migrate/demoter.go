@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/config"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 // Support dynamic pushing of unused pages from DRAM to PMEM.
@@ -249,7 +249,9 @@ func resetDirtyBit(pid string) error {
 
 // resetDirtyBit unsets soft-dirty bits for all processes in a container.
 func (d *demoter) resetDirtyBit(c *container) error {
-	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetPodID(), c.GetID())
+	group := cgroups.Memory.Group(c.cgroupDir)
+
+	pids, err := group.GetProcesses()
 	if err != nil {
 		return err
 	}
@@ -257,7 +259,8 @@ func (d *demoter) resetDirtyBit(c *container) error {
 	for _, pid := range pids {
 		err = resetDirtyBit(pid)
 		if err != nil {
-			log.Error("Failed to reset dirty bit for process %s: %v", pid, err)
+			log.Error("%s: failed to reset dirty but for process %s: %v",
+				c.prettyName, pid, err)
 			return err
 		}
 	}
@@ -308,7 +311,9 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 		pages:        make(map[int][]page, 0),
 		longestRange: 0,
 	}
-	pids, err := utils.GetProcessesInContainer(c.GetCgroupParentDir(), c.GetPodID(), c.GetID())
+
+	group := cgroups.Memory.Group(c.cgroupDir)
+	pids, err := group.GetProcesses()
 	if err != nil {
 		return pagePool{}, err
 	}

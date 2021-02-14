@@ -71,12 +71,12 @@ type migration struct {
 
 // container is the per container data we track locally.
 type container struct {
-	cacheID    string
-	id         string
-	podID      string
-	prettyName string
-	parentDir  string
-	pm         *cache.PageMigrate
+	cacheID      string
+	id           string
+	runtimeClass string
+	prettyName   string
+	cgroupDir    string
+	pm           *cache.PageMigrate
 }
 
 // Our logger instance.
@@ -162,22 +162,16 @@ func (m *migration) insertContainer(cc cache.Container) error {
 		return nil
 	}
 
-	pod, ok := cc.GetPod()
-	if !ok {
-		return migrationError("can't find pod for container %s",
-			cc.PrettyName())
-	}
-
 	c := &container{
-		cacheID:    cc.GetCacheID(),
-		id:         cc.GetID(),
-		podID:      cc.GetPodID(),
-		prettyName: cc.PrettyName(),
-		parentDir:  pod.GetCgroupParentDir(),
-		pm:         pm.Clone(),
+		cacheID:      cc.GetCacheID(),
+		id:           cc.GetID(),
+		prettyName:   cc.PrettyName(),
+		runtimeClass: cc.GetRuntimeClass(),
+		cgroupDir:    cc.GetCgroupDir(),
+		pm:           pm.Clone(),
 	}
-	if c.parentDir == "" {
-		return migrationError("can't find cgroup parent dir for container %s",
+	if c.cgroupDir == "" {
+		return migrationError("can't find cgroup dir for container %s",
 			c.prettyName)
 	}
 
@@ -214,19 +208,14 @@ func (c *container) GetCacheID() string {
 	return c.cacheID
 }
 
-// GetPodID replicates the respective cache.Container function.
-func (c *container) GetPodID() string {
-	return c.podID
-}
-
 // GetID replicates the respective cache.Container function.
 func (c *container) GetID() string {
 	return c.id
 }
 
-// GetCgroupParentDir replicates the respective cache.Pod function.
-func (c *container) GetCgroupParentDir() string {
-	return c.parentDir
+// GetCgroupDir replicates the respective cache.Container function.
+func (c *container) GetCgroupDir() string {
+	return c.GetCgroupDir()
 }
 
 // GetPageMigration replicates the respective cache.Container function.
