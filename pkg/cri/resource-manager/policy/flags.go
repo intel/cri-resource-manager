@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
+	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/config"
-	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
@@ -163,8 +163,9 @@ func (cs *ConstraintSet) parseCPUQuantity(value string) error {
 }
 
 func (cs *ConstraintSet) parseCPUFromCgroup(dir string) error {
-	if !strings.HasPrefix(dir, utils.CpusetCgroupDir+"/") {
-		dir = filepath.Join(utils.CpusetCgroupDir, dir)
+	cpusetDir := cgroups.Cpuset.Path()
+	if !strings.HasPrefix(dir, cpusetDir+"/") {
+		dir = filepath.Join(cpusetDir, dir)
 	}
 	path := filepath.Join(dir, "cpuset.cpus")
 	bytes, err := ioutil.ReadFile(path)
