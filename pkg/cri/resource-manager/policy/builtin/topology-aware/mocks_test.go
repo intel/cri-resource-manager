@@ -533,6 +533,15 @@ func (m *mockContainer) String() string {
 func (m *mockContainer) Eval(string) interface{} {
 	panic("unimplemented")
 }
+func (m *mockContainer) GetProcesses() ([]string, error) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetTasks() ([]string, error) {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetCgroupDir() string {
+	panic("unimplemented")
+}
 
 type mockPod struct {
 	name                               string
@@ -630,6 +639,12 @@ func (m *mockPod) String() string {
 	return "mockPod"
 }
 func (m *mockPod) Eval(string) interface{} {
+	panic("unimplemented")
+}
+func (m *mockPod) GetProcesses(bool) ([]string, error) {
+	panic("unimplemented")
+}
+func (m *mockPod) GetTasks(bool) ([]string, error) {
 	panic("unimplemented")
 }
 

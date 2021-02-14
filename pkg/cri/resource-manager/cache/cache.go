@@ -164,6 +164,13 @@ type Pod interface {
 	GetContainerAffinity(string) []*Affinity
 	// ScopeExpression returns an affinity expression for defining this pod as the scope.
 	ScopeExpression() *resmgr.Expression
+
+	// GetProcesses returns the pids of all processes in the pod either excluding
+	// container processes, if called with false, or including those if called with true.
+	GetProcesses(bool) ([]string, error)
+	// GetTasks returns the pids of all threads in the pod either excluding cotnainer
+	// processes, if called with false, or including those if called with true.
+	GetTasks(bool) ([]string, error)
 }
 
 // A cached pod.
@@ -343,6 +350,9 @@ type Container interface {
 	// GetAffinity returns the annotated affinity expressions for this container.
 	GetAffinity() []*Affinity
 
+	// GetCgroupDir returns the relative path of the cgroup directory for the container.
+	GetCgroupDir() string
+
 	// SetRDTClass assigns this container to the given RDT class.
 	SetRDTClass(string)
 	// GetRDTClass returns the RDT class for this container.
@@ -362,6 +372,11 @@ type Container interface {
 	SetPageMigration(*PageMigrate)
 	// GetPageMigration returns the current page migration policy/options for the container.
 	GetPageMigration() *PageMigrate
+
+	// GetProcesses returns the pids of processes in the container.
+	GetProcesses() ([]string, error)
+	// GetTasks returns the pids of threads in the container.
+	GetTasks() ([]string, error)
 
 	// SetCRIRequest sets the current pending CRI request of the container.
 	SetCRIRequest(req interface{}) error
@@ -417,6 +432,7 @@ type container struct {
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 	req       *interface{}                 // pending CRI request
 
+	CgroupDir    string       // cgroup directory relative to a(ny) controller.
 	RDTClass     string       // RDT class this container is assigned to.
 	BlockIOClass string       // Block I/O class this container is assigned to.
 	ToptierLimit int64        // Top tier memory limit.
