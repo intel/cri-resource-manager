@@ -163,10 +163,6 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 	c.Annotations = lrc.Annotations
 	c.Tags = make(map[string]string)
 
-	if pod.CgroupParent == "" {
-		pod.discoverCgroupParentDir(c.ID)
-	}
-
 	if pod.Resources != nil {
 		if r, ok := pod.Resources.InitContainers[c.Name]; ok {
 			c.Resources = r
