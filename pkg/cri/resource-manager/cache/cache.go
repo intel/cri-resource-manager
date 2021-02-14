@@ -925,22 +925,18 @@ func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
 func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) (Container, error) {
 	c, ok := cch.Containers[cacheID]
 	if !ok {
-		return nil, cacheError("failed to update container id, container %s not found", cacheID)
+		return nil, cacheError("%s: failed to update ID, container not found",
+			cacheID)
 	}
 
-	switch msg.(type) {
-	case *cri.CreateContainerResponse:
-		c.ID = msg.(*cri.CreateContainerResponse).ContainerId
-	default:
-		return nil, cacheError("can't update container id from message %T", msg)
+	reply, ok := msg.(*cri.CreateContainerResponse)
+	if !ok {
+		return nil, cacheError("%s: failed to update ID from message %T",
+			c.PrettyName(), msg)
 	}
 
+	c.ID = reply.ContainerId
 	cch.Containers[c.ID] = c
-	if pod, ok := cch.Pods[c.PodID]; ok {
-		if pod.CgroupParent == "" {
-			pod.discoverCgroupParentDir(c.ID)
-		}
-	}
 
 	cch.Save()
 
@@ -1502,15 +1498,13 @@ func (cch *cache) Restore(data []byte) error {
 	for _, p := range cch.Pods {
 		p.cache = cch
 		p.containers = make(map[string]string)
+		p.discoverCgroupParentDir()
 	}
 	for _, c := range cch.Containers {
 		c.cache = cch
 		cch.Containers[c.CacheID] = c
 		if c.ID != "" {
 			cch.Containers[c.ID] = c
-			if p, ok := c.GetPod(); ok && p.GetCgroupParentDir() == "" {
-				p.(*pod).discoverCgroupParentDir(c.ID)
-			}
 		}
 	}
 
