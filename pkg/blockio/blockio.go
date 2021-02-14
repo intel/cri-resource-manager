@@ -34,7 +34,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
 const (
@@ -125,23 +124,19 @@ func UpdateOciConfig(ignoreErrors bool) error {
 
 // SetContainerClass assigns the pod in a container to a blockio class.
 func SetContainerClass(c cache.Container, class string) error {
-	pod, ok := c.GetPod()
-	if !ok {
-		return blockioError("failed to get Pod for %s", c.PrettyName())
-	}
-
 	ociBlockIO, classIsStatic := staticOciBlockIO[class]
 	if !classIsStatic {
 		return blockioError("no OCI BlockIO parameters for class %#v", class)
 	}
 
-	blkioCgroupPodDir := cgroups.GetBlkioDir() + "/" + pod.GetCgroupParentDir()
-	containerCgroupDir := utils.GetContainerCgroupDir(blkioCgroupPodDir, c.GetID())
+	blkioCgroupRoot := cgroups.Blkio.Path()
+	containerCgroupDir := c.GetCgroupDir()
 	if containerCgroupDir == "" {
-		return blockioError("failed to find cgroup directory for container %s under %#v, container id %#v", c.PrettyName(), blkioCgroupPodDir, c.GetID())
+		return blockioError("failed to find cgroup directory for container %s under %#v, container id %#v", c.PrettyName(), blkioCgroupRoot, c.GetID())
 	}
+	containerCgroupPath := filepath.Join(blkioCgroupRoot, containerCgroupDir)
 
-	err := cgroups.ResetBlkioParameters(containerCgroupDir, ociBlockIO)
+	err := cgroups.ResetBlkioParameters(containerCgroupPath, ociBlockIO)
 	if err != nil {
 		return blockioError("assigning container %v to class %#v failed: %w", c.PrettyName(), class, err)
 	}
