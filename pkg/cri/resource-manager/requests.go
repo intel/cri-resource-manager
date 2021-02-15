@@ -153,7 +153,7 @@ func (m *resmgr) startRequestProcessing() error {
 		m.Error("startup: failed to run post-release hooks: %v", err)
 	}
 
-	return nil
+	return m.cache.Save()
 }
 
 // syncWithCRI synchronizes cache pods and containers with the CRI runtime.
