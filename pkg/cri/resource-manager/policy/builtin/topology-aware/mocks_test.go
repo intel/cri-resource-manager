@@ -632,6 +632,13 @@ func (m *mockPod) GetEffectiveAnnotation(key, container string) (string, bool) {
 	v, ok := m.annotations[key]
 	return v, ok
 }
+func (m *mockPod) GetPodAnnotation(key string) (string, bool) {
+	if v, ok := m.annotations[key+"/pod"]; ok {
+		return v, true
+	}
+	v, ok := m.annotations[key]
+	return v, ok
+}
 func (m *mockPod) GetCgroupParentDir() string {
 	panic("unimplemented")
 }
@@ -663,6 +670,12 @@ func (m *mockPod) GetProcesses(bool) ([]string, error) {
 	panic("unimplemented")
 }
 func (m *mockPod) GetTasks(bool) ([]string, error) {
+	panic("unimplemented")
+}
+func (m *mockPod) GetRDTClass() string {
+	panic("unimplemented")
+}
+func (m *mockPod) GetBlockIOClass() string {
 	panic("unimplemented")
 }
 
