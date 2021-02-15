@@ -161,6 +161,12 @@ type Pod interface {
 	//     $K
 	// and return the value of the first key found.
 	GetEffectiveAnnotation(key, container string) (string, bool)
+	// GetPodAnnotation returns the pod-level annotation for the given key.
+	// For any given key $K it will look for annotations in this order and
+	// return the first one found:
+	//     $K/pod
+	//     $K
+	GetPodAnnotation(string) (string, bool)
 	// GetCgroupParentDir returns the pods cgroup parent directory.
 	GetCgroupParentDir() string
 	// GetPodResourceRequirements returns container resource requirements if the
