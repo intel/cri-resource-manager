@@ -159,6 +159,12 @@ type Pod interface {
 	//     $K
 	// and return the value of the first key found.
 	GetEffectiveAnnotation(key, container string) (string, bool)
+	// GetPodAnnotation returns the pod-level annotation for the given key.
+	// For any given key $K it will look for annotations in this order and
+	// return the first one found:
+	//     $K/pod
+	//     $K
+	GetPodAnnotation(string) (string, bool)
 	// GetCgroupParentDir returns the pods cgroup parent directory.
 	GetCgroupParentDir() string
 	// GetPodResourceRequirements returns container resource requirements if the
@@ -175,6 +181,11 @@ type Pod interface {
 	GetRuntimeType() string
 	// GetRuntimeClass returns the runtime controller for this pod.
 	GetRuntimeClass() string
+
+	// GetRDTClass returns the pod-level RDT class.
+	GetRDTClass() string
+	// GetBlockIOClass returns the pod-level BlockIO class.
+	GetBlockIOClass() string
 
 	// GetProcesses returns the pids of all processes in the pod either excluding
 	// container processes, if called with false, or including those if called with true.
@@ -204,6 +215,9 @@ type pod struct {
 	RuntimeHandler string // runtime handler for this pod (from run request)
 	RuntimeType    string // runtime type for this pod (from status response)
 	RuntimeClass   string // runtime controller name
+
+	RDTClass     string // RDT class this container is assigned to.
+	BlockIOClass string // Block I/O class this container is assigned to.
 }
 
 // ContainerState is the container state in the runtime.
