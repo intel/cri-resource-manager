@@ -1526,8 +1526,13 @@ func (cch *cache) Save() error {
 		return cacheError("failed to save cache: %v", err)
 	}
 
-	if err = ioutil.WriteFile(cch.filePath, data, cacheFilePerm.prefer); err != nil {
-		return cacheError("failed to write cache to file '%s': %v", cch.filePath, err)
+	tmpPath := cch.filePath + ".saving"
+	if err = ioutil.WriteFile(tmpPath, data, cacheFilePerm.prefer); err != nil {
+		return cacheError("failed to write cache to file %q: %v", tmpPath, err)
+	}
+	if err := os.Rename(tmpPath, cch.filePath); err != nil {
+		return cacheError("failed to rename %q to %q: %v",
+			tmpPath, cch.filePath, err)
 	}
 
 	return nil
