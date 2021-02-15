@@ -863,7 +863,7 @@ func (cch *cache) DeletePod(id string) Pod {
 		return nil
 	}
 
-	cch.Debug("removing pod %s", p.ID)
+	cch.Debug("removing pod %s (%s)", p.Name, p.ID)
 	delete(cch.Pods, id)
 
 	cch.Save()
@@ -954,7 +954,7 @@ func (cch *cache) DeleteContainer(id string) Container {
 		return nil
 	}
 
-	cch.Debug("removing container %s/%s", c.ID, c.CacheID)
+	cch.Debug("removing container %s", c.PrettyName())
 	cch.removeContainerDirectory(c.CacheID)
 	delete(cch.Containers, c.ID)
 	delete(cch.Containers, c.CacheID)
