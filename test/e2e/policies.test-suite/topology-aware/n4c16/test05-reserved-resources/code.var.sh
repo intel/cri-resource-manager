@@ -43,8 +43,7 @@ report allowed
 verify "cpus['pod0c0'] == cpus['pod0c1'] == cpus['pod0c2'] == {'cpu10', 'cpu11'}"
 kubectl delete -n kube-system pods pod0
 
-# Test that BestEffort containers are pinned and balanced to separate
-# Reserved CPUs when the CPUs are on different NUMA nodes.
+# Test that BestEffort containers are pinned to reserved CPUs.
 terminate cri-resmgr
 RESERVED_CPU="cpuset:7,11"
 cri_resmgr_cfg=$(instantiate cri-resmgr-reserved.cfg)
@@ -52,23 +51,14 @@ launch cri-resmgr
 
 namespace=kube-system CONTCOUNT=4 create besteffort
 report allowed
-verify "len(cpus['pod1c0']) == 1" \
-       "len(cpus['pod1c1']) == 1" \
-       "len(cpus['pod1c2']) == 1" \
-       "len(cpus['pod1c3']) == 1" \
-       "set.intersection(cpus['pod1c0'], cpus['pod1c1'], cpus['pod1c2'], cpus['pod1c3']) == set()" \
-       "set.union(cpus['pod1c0'], cpus['pod1c1'], cpus['pod1c2'], cpus['pod1c3']) == {'cpu07', 'cpu11'}"
+verify "cpus['pod1c0'] == cpus['pod1c1'] == cpus['pod1c2'] == cpus['pod1c3']" \
+       "cpus['pod1c0'] == {'cpu07', 'cpu11'}"
 
-# Test that kube-system pods are pinned to Reserved CPUs.
-# Check balancing to Reserved CPU groups on separate NUMA nodes.
+# Test that guaranteed kube-system pods are pinned to Reserved CPUs.
 namespace=kube-system CPU=200m CONTCOUNT=4 create guaranteed
 report allowed
-verify "len(cpus['pod2c0']) == 1" \
-       "len(cpus['pod2c1']) == 1" \
-       "len(cpus['pod2c2']) == 1" \
-       "len(cpus['pod2c3']) == 1" \
-       "set.intersection(cpus['pod2c0'], cpus['pod2c1'], cpus['pod2c2'], cpus['pod2c3']) == set()" \
-       "set.union(cpus['pod2c0'], cpus['pod2c1'], cpus['pod2c2'], cpus['pod2c3']) == {'cpu07', 'cpu11'}"
+verify "cpus['pod2c0'] == cpus['pod2c1'] == cpus['pod2c2'] == cpus['pod2c3']" \
+       "cpus['pod2c0'] == {'cpu07', 'cpu11'}"
 
 # Test requesting more reserved CPUs than available on single node
 # but what fits in the node tree.
@@ -85,13 +75,11 @@ for pod in pod3 pod4; do
     kubectl delete -n kube-system pods/$pod --now
 done
 
-# Test requesting more reserved CPUs than available in the system
-( wait_t=2s namespace=kube-system CPU=2 CONTCOUNT=1 create guaranteed ) && error "pod created but timeout expected" || {
-        echo "failed as expected"
-}
-vm-run-until "kubectl describe pod pod5 -n kube-system | grep 'not enough reserved CPU'" || {
-    error 'cannot find "not enough reserved CPU" when looking for reason why it is not running'
-}
+# Test requesting more reserved CPUs than available in the system.
+# pod5 is expected to run on shared CPUs.
+namespace=kube-system CPU=2 CONTCOUNT=1 create guaranteed
+report allowed
+verify "cpus['pod5c0'] == {'cpu04', 'cpu05', 'cpu06', 'cpu08', 'cpu09', 'cpu10', 'cpu12', 'cpu13'}"
 
 cleanup-kube-system
 
