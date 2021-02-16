@@ -55,7 +55,9 @@ func isstIoctl(ioctl uintptr, req uintptr) error {
 }
 
 // getCPUMapping gets mapping of Linux logical CPU numbers to (package-specific)
-// PUNIT CPU number for one cpu
+// PUNIT CPU number for one cpu. This is needed because the PUNIT CPU/core
+// numbering differs from the Linux kernel numbering (exposed via sysfs) which
+// is based on APIC.
 func getCPUMapping(cpu ID) (ID, error) {
 	req := isstIfCPUMaps{
 		Cmd_count: 1,
