@@ -1455,11 +1455,29 @@ func (cg *grant) ExpandMemset() (bool, error) {
 		return false, nil
 	}
 	// Else it doesn't fit, so move the grant up in the memory tree.
-	log.Debug("out-of-memory risk in %s: extra reservations %d > free %d -> moving from %s to %s",
-		cg, prettyMem(extra), prettyMem(free), node.Name(), parent.Name())
+	required := uint64(0)
+	for _, memType := range []memoryType{memoryPMEM, memoryDRAM, memoryHBM} {
+		required += cg.MemLimit()[memType]
+	}
+	log.Debug("out-of-memory risk in %s: extra reservations %s > free %s -> moving up %s total memory grant from %s",
+		cg, prettyMem(extra), prettyMem(free), prettyMem(required), node.Name())
 
-	if parent.IsNil() {
-		return false, fmt.Errorf("trying to move a grant up past the root of the tree")
+	// Find an ancestor where the grant fits. As reservations in
+	// child nodes do not show up in free + extra in parent nodes,
+	// releasing the grant is not necessary before searching.
+	for ; !parent.IsNil(); parent = parent.Parent() {
+		pSupply := parent.FreeSupply()
+		parentFree := pSupply.MemoryLimit()[memoryAll]
+		parentExtra := pSupply.ExtraMemoryReservation(memoryAll)
+		if parentExtra+required <= parentFree {
+			required = 0
+			break
+		}
+		log.Debug("- %s has %s free but %s extra reservations, moving further up",
+			parent.Name(), prettyMem(parentFree), prettyMem(parentExtra))
+	}
+	if required > 0 {
+		return false, fmt.Errorf("internal error: cannot find enough memory (%s) for %s from ancestors of %s", prettyMem(required), cg, node.Name())
 	}
 
 	// Release granted memory from the node and allocate it from the parent node.
