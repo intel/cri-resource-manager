@@ -174,6 +174,10 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 		}
 	}
 
+	if c.GetRuntimeClass() == cache.Kata {
+		ctl.checkPodClass(c, class)
+	}
+
 	err := ctl.assignClass(c, class)
 	if err != nil && class != rdt.RootClassName {
 		log.Warn("%v; falling back to system root class", err)
@@ -223,6 +227,22 @@ func (ctl *rdtctl) assignClass(c cache.Container, class string) error {
 	log.Info("%q: assigned to class %q", pretty, class)
 
 	return nil
+}
+
+// checkPodClass check (kata) pod-level and container classes for consistency.
+func (ctl *rdtctl) checkPodClass(c cache.Container, cClass string) {
+	pod, ok := c.GetPod()
+	if !ok || len(pod.GetContainers()) < 2 {
+		return
+	}
+
+	pClass := pod.GetRDTClass()
+	if pClass == cClass {
+		return
+	}
+
+	log.Warn("%q: class mismatch for multi-container kata pod, pod:%s != container:%s",
+		c.PrettyName(), pClass, cClass)
 }
 
 // monitor starts monitoring a container.
