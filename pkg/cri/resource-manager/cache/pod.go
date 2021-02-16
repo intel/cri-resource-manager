@@ -70,6 +70,7 @@ func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest, info *PodInfo) error
 	}
 
 	p.parseResourceAnnotations()
+	p.setDefaults()
 
 	return nil
 }
@@ -106,7 +107,25 @@ func (p *pod) fromListResponse(pod *cri.PodSandbox, info *PodInfo) error {
 		p.discoverCgroupParentDir()
 	}
 
+	p.setDefaults()
+
 	return nil
+}
+
+// setDefaults sets up pod-level defaults.
+func (p *pod) setDefaults() {
+	qosClass := string(p.GetQOSClass())
+	class, ok := p.GetPodAnnotation(RDTClassKey)
+	if !ok {
+		class = qosClass
+	}
+	p.RDTClass = class
+
+	class, ok = p.GetPodAnnotation(BlockIOClassKey)
+	if !ok {
+		class = qosClass
+	}
+	p.BlockIOClass = class
 }
 
 // Get the init containers of a pod.
@@ -463,6 +482,16 @@ func (p *pod) GetRuntimeType() string {
 // GetRuntimeClass returns the runtime controller for this pod.
 func (p *pod) GetRuntimeClass() string {
 	return p.RuntimeClass
+}
+
+// GetRDTClass returns the pod-level RDT class.
+func (p *pod) GetRDTClass() string {
+	return p.RDTClass
+}
+
+// GetBlockIOClass returns the pod-level BlockIO class.
+func (p *pod) GetBlockIOClass() string {
+	return p.BlockIOClass
 }
 
 // GetProcesses returns the pids of processes in a pod.

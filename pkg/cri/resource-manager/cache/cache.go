@@ -183,6 +183,12 @@ type Pod interface {
 	GetRuntimeType() string
 	// GetRuntimeClass returns the runtime controller for this pod.
 	GetRuntimeClass() string
+
+	// GetRDTClass returns the pod-level RDT class.
+	GetRDTClass() string
+	// GetBlockIOClass returns the pod-level BlockIO class.
+	GetBlockIOClass() string
+
 	// GetProcesses returns the pids of all processes in the pod either excluding
 	// container processes, if called with false, or including those if called with true.
 	GetProcesses(bool) ([]string, error)
@@ -219,6 +225,9 @@ type pod struct {
 	RuntimeHandler string // runtime handler for this pod (from run request)
 	RuntimeType    string // runtime type for this pod (from status response)
 	RuntimeClass   string // runtime controller name
+
+	RDTClass     string // RDT class this container is assigned to.
+	BlockIOClass string // Block I/O class this container is assigned to.
 }
 
 // ContainerState is the container state in the runtime.
