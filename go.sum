@@ -420,8 +420,8 @@ github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJ
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/influxdata/influxdb1-client v0.0.0-20191209144304-8bf82d3c094d/go.mod h1:qj24IKcXYK6Iy9ceXlo3Tc+vtHo9lIhSX5JddghvEPo=
-github.com/intel/goresctrl v0.0.0-20201221180043-c1bbf3a22bce h1:T9NS/TAXUa6BCc/0lKtYLKaoyqMcky3avaK5Rn4kaa4=
-github.com/intel/goresctrl v0.0.0-20201221180043-c1bbf3a22bce/go.mod h1:fNHIcnsTDZtMoWI+PlAjniZM8xG/gRO5n6vyq363Qyk=
+github.com/intel/goresctrl v0.0.0-20210216084728-8e0ae5411bf4 h1:TU7hKzEkL/i2fuWeeyZC9wubq5QWrWLxx9Xl5uv237w=
+github.com/intel/goresctrl v0.0.0-20210216084728-8e0ae5411bf4/go.mod h1:fNHIcnsTDZtMoWI+PlAjniZM8xG/gRO5n6vyq363Qyk=
 github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5/go.mod h1:DM4VvS+hD/kDi1U1QsX2fnZowwBhqD0Dk3bRPKF/Oc8=
 github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a/go.mod h1:wK6yTYYcgjHE1Z1QtXACPDjcFJyBskHEdagmnq3vsP8=
 github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8/go.mod h1:Nht3zPeWKUH0NzdCt2Blrr5ys8VGpn0CEB0cQHVjt7k=
