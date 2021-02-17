@@ -76,7 +76,7 @@ while (( round < max_rounds )); do
     # Validate PMEM page migration speed.
     # Allow double the configured speed because stats polling interval > 1s.
     for wxrx in wmrm wmrn worm worn; do
-        pmem_pages_now="$(awk -F'[ =]' "BEGIN{pmem=0}/round $round $wxrx .*pages: N[0-3].* N[4-7]/{pmem+=\$13}END{print pmem}" < "$memload_stats")"
+        pmem_pages_now="$(grep "round $round $wxrx .*pages:" < "$memload_stats" | awk 'BEGIN{RS=" ";FS="=";pmem=0}/N[4-9]/{pmem+=$2}END{print pmem}')"
         if (( pmem_pages_now - pmem_pages_prev[$wxrx] > 2 * pages_per_second_per_process )); then
             error "number of PMEM pages of $wxrx grew too quickly on this round"
         fi
@@ -85,7 +85,7 @@ while (( round < max_rounds )); do
 
     # Check that write-once-read-never (worn) has migrated and stays in PMEM.
     if (( round > 20 )); then
-        worn_pmem_pages="$(awk -F'[ =]' "/round $round worn .*pages: N[0-3].* N[4-7]/{pmem+=\$13}END{print pmem}" < "$memload_stats")"
+        worn_pmem_pages="$(grep "round $round worn .*pages:" < "$memload_stats" | awk 'BEGIN{RS=" ";FS="=";pmem=0}/N[4-9]/{pmem+=$2}END{print pmem}')"
         if (( worn_pmem_pages < fully_migrated_threshold )); then
             error "write-once-read-never was expected to end up and stay in PMEM, but only $worn_pmem_pages pages in PMEM."
         fi
@@ -93,7 +93,7 @@ while (( round < max_rounds )); do
 
     # Check that write-many-read-many and -read-never (wmrm and wmrn) stay in DRAM.
     for wmrx in wmrm wmrn; do
-        wmrx_pmem_pages="$(awk -F'[ =]' "/round $round $wmrx .*pages: N[0-3].* N[4-7]/{pmem+=\$13}END{print pmem}" < "$memload_stats")"
+        wmrx_pmem_pages="$(grep "round $round $wmrx .*pages:" < "$memload_stats" | awk 'BEGIN{RS=" ";FS="=";pmem=0}/N[4-9]/{pmem+=$2}END{print pmem}')"
         if (( wmrx_pmem_pages > not_migrated_threshold )); then
             error "$wmrx was expected to stay in DRAM, but $wmrx_pmem_pages pages migrated to PMEM."
         fi
