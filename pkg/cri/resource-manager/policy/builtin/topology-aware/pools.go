@@ -812,7 +812,7 @@ func (p *policy) calculateContainerAffinity(container cache.Container) map[strin
 }
 
 func (p *policy) filterInsufficientResources(req Request, originals []Node) []Node {
-	filtered := make([]Node, 0)
+	sufficient := make([]Node, 0)
 
 	for _, node := range originals {
 		// TODO: Need to filter based on the memory demotion scheme here. For example, if the request is
@@ -821,44 +821,43 @@ func (p *policy) filterInsufficientResources(req Request, originals []Node) []No
 		// system?
 
 		supply := node.FreeSupply()
-		memType := req.MemoryType()
+		reqMemType := req.MemoryType()
 
-		if memType == memoryUnspec {
+		if reqMemType == memoryUnspec {
 			// The algorithm for handling unspecified memory allocations is the same as for handling a request
 			// with memory type all.
-			memType = memoryAll
+			reqMemType = memoryAll
 		}
-		bitsToFit := req.MemAmountToAllocate()
 
-		if memType&memoryPMEM != 0 {
-			if supply.MemoryLimit()[memoryPMEM]-supply.ExtraMemoryReservation(memoryPMEM) >= bitsToFit {
-				filtered = append(filtered, node)
-				continue
-			} else {
-				// Can't go negative
-				bitsToFit -= supply.MemoryLimit()[memoryPMEM] - supply.ExtraMemoryReservation(memoryPMEM)
+		required := req.MemAmountToAllocate()
+
+		for _, memType := range []memoryType{memoryPMEM, memoryDRAM, memoryHBM} {
+			if reqMemType&memType != 0 {
+				extra := supply.ExtraMemoryReservation(memType)
+				free := supply.MemoryLimit()[memType]
+				if extra > free {
+					continue
+				}
+				if required+extra <= free {
+					sufficient = append(sufficient, node)
+					required = 0
+					break
+				}
+				if req.ColdStart() > 0 {
+					// For a "cold start" request, the memory request must fit completely in the PMEM. So reject the node.
+					break
+				}
+				// Subtracting unsigned integers.
+				// Here free >= extra, that is, (free - extra) is non-negative,
+				// and required > free - extra, that is, required stays positive.
+				required -= (free - extra)
 			}
 		}
-		if req.ColdStart() > 0 {
-			// For a "cold start" request, the memory request must fit completely in the PMEM. So reject the node.
-			continue
-		}
-		if memType&memoryDRAM != 0 {
-			if supply.MemoryLimit()[memoryDRAM]-supply.ExtraMemoryReservation(memoryDRAM) >= bitsToFit {
-				filtered = append(filtered, node)
-				continue
-			} else {
-				bitsToFit -= supply.MemoryLimit()[memoryDRAM] - supply.ExtraMemoryReservation(memoryDRAM)
-			}
-		}
-		if memType&memoryHBM != 0 {
-			if supply.MemoryLimit()[memoryHBM]-supply.ExtraMemoryReservation(memoryHBM) >= bitsToFit {
-				filtered = append(filtered, node)
-			}
+		if required > 0 {
+			log.Debug("%s: filtered out %s with insufficient memory", req.GetContainer().PrettyName(), node.Name())
 		}
 	}
-
-	return filtered
+	return sufficient
 }
 
 // Score pools against the request and sort them by score.

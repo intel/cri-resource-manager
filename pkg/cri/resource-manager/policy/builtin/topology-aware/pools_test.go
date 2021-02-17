@@ -618,6 +618,7 @@ func TestContainerMove(t *testing.T) {
 			path: path.Join(dir, "sysfs", "server", "sys"),
 			name: "workload placement on a server system non-leaf node",
 			container1: &mockContainer{
+				name: "c1",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU:    resapi.MustParse("2"),
@@ -627,26 +628,28 @@ func TestContainerMove(t *testing.T) {
 				returnValueForGetCacheID: "first",
 			},
 			container2: &mockContainer{
+				name: "c2",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU:    resapi.MustParse("2"),
-						v1.ResourceMemory: resapi.MustParse("190000000000"), // 800 GB
+						v1.ResourceMemory: resapi.MustParse("190000000000"), // 180 GB
 					},
 				},
 				returnValueForGetCacheID: "second",
 			},
 			container3: &mockContainer{
+				name: "c3",
 				returnValueForGetResourceRequirements: v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU:    resapi.MustParse("2"),
-						v1.ResourceMemory: resapi.MustParse("140000000000"), // 900 GB
+						v1.ResourceMemory: resapi.MustParse("140000000000"), // 130 GB
 					},
 				},
 				returnValueForGetCacheID: "third",
 			},
 			expectedLeafNodeForContainer1: false,
 			expectedLeafNodeForContainer2: false,
-			expectedLeafNodeForContainer3: true,
+			expectedLeafNodeForContainer3: false,
 			expectedChangeForContainer1:   true,
 		},
 	}
