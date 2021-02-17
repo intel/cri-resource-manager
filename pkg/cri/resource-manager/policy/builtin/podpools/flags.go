@@ -25,9 +25,9 @@ import (
 // PodpoolsOptions contains configuration options specific to this policy.
 type PodpoolsOptions struct {
 	// PinCPU controls pinning containers to CPUs.
-	PinCPU bool `json:"PinCPU",omitempty`
+	PinCPU bool `json:"PinCPU,omitempty"`
 	// PinMemory controls pinning containers to memory nodes.
-	PinMemory bool `json:"PinMemory",omitempty`
+	PinMemory bool `json:"PinMemory,omitempty"`
 	// PoolDefs contains pool definitions
 	PoolDefs []*PoolDef `json:"Pools,omitempty"`
 }
