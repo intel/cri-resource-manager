@@ -10,10 +10,10 @@ control groups. Resource allocation is specified on the group level and each
 task (process/thread) is assigned to one group. In the context of CRI Resource
 we use the term 'RDT class' instead of 'resource control group'.
 
-CRI Resource Manager supports all available RDT technologies, i.e. L3 Cache
-Allocation (CAT) with Code and Data Prioritization (CDP) and Memory Bandwidth
-Allocation (MBA) plus Cache Monitoring (CMT) and Memory Bandwidth Monitoring
-(MBM).
+CRI Resource Manager supports all available RDT technologies, i.e. L2 and L3
+Cache Allocation (CAT) with Code and Data Prioritization (CDP) and Memory
+Bandwidth Allocation (MBA) plus Cache Monitoring (CMT) and Memory Bandwidth
+Monitoring (MBM).
 
 
 ## Overview
@@ -63,11 +63,12 @@ classes.
 #### Partitions
 
 Partitions represent a logical grouping of the underlying classes, each
-partition specifying a portion of the available resources (L3/MB) which will be
-shared by the classes under it. Partitions guarantee non-overlapping exclusive
-cache allocation - i.e. no overlap on the cache ways between partitions is
-allowed. However, by technology, MB allocations are not exclusive. Thus, it is
-possible to assign all partitions 100% of memory bandwidth, for example.
+partition specifying a portion of the available resources (L2/L3/MB) which will
+be shared by the classes under it. Partitions guarantee non-overlapping
+exclusive cache allocation - i.e. no overlap on the cache ways between
+partitions is allowed. However, by technology, MB allocations are not
+exclusive. Thus, it is possible to assign all partitions 100% of memory
+bandwidth, for example.
 
 #### Classes
 
@@ -82,8 +83,8 @@ exceeded.
 
 ### Example
 
-Below is a config snippet that would allocate (ca.) 60% of the cache lines
-exclusively to the Guarenteed class. The remaining 40% is for Burstable and
+Below is a config snippet that would allocate (ca.) 60% of the L3 cache lines
+exclusively to the Guarenteed class. The remaining 40% L3 is for Burstable and
 Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
 memory bandwidth whereas the other classes are throttled to 50%.
 
@@ -100,33 +101,43 @@ data:
       mode: Full
       # Set to true to disable creation of monitoring groups
       monitoringDisabled: false
+      l2:
+        # Make this false if L2 CAT must be available
+        optional: true
       l3:
-        # Make this false if CAT must be available
+        # Make this false if L3 CAT must be available
         optional: true
       mb:
         # Make this false if MBA must be available
         optional: true
     partitions:
       exclusive:
-        # Allocate 60% of all cache IDs to the "exclusive" partition
+        # Allocate 80% of all L2 cache IDs to the "exclusive" partition
+        l2Allocation: "80%"
+        # Allocate 60% of all L3 cache IDs to the "exclusive" partition
         l3Allocation: "60%"
         mbAllocation: ["100%"]
         classes:
           Guaranteed:
-            # Allocate all of the partitions cache lines to "Guarenteed"
+            # Allocate all of the partitions cache lines to "Guaranteed"
+            l2Schema: "100%"
             l3Schema: "100%"
       shared:
-        # Allocate 40% of all cache IDs to the "shared" partition
+        # Allocate 20% of L2 and 40% L3 cache IDs to the "shared" partition
         # These will NOT overlap with the cache lines allocated for "exclusive" partition
+        l2Allocation: "20%"
         l3Allocation: "40%"
         mbAllocation: ["50%"]
         classes:
           Burstable:
             # Allow "Burstable" to use all cache lines of the "shared" partition
+            l2Schema: "100%"
             l3Schema: "100%"
           BestEffort:
-            # Allow "Besteffort" to use half of the cache lines of the "shared" partition
+            # Allow "Besteffort" to use all L2 but only half of the L3 cache
+            # lines of the "shared" partition.
             # These will overlap with those used by "Burstable"
+            l2Schema: "100%"
             l3Schema: "50%"
 ```
 
