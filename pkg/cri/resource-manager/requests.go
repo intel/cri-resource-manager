@@ -221,7 +221,7 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 	defer m.Unlock()
 
 	podID := reply.(*criapi.RunPodSandboxResponse).PodSandboxId
-	pod := m.cache.InsertPod(podID, request)
+	pod := m.cache.InsertPod(podID, request, nil)
 	m.updateIntrospection()
 
 	// search for any lingering old version and clean up if found

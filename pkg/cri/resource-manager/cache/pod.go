@@ -17,6 +17,7 @@ package cache
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -32,7 +33,7 @@ const (
 )
 
 // Create a pod from a run request.
-func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
+func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest, info *PodInfo) error {
 	cfg := req.Config
 	if cfg == nil {
 		return cacheError("pod %s has no config", p.ID)
@@ -57,13 +58,24 @@ func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
 		p.cache.Info("%s: QoS class %s", p.Name, p.QOSClass)
 	}
 
+	if info != nil {
+		p.RuntimeHandler = info.RuntimeHandler
+		p.RuntimeType = info.RuntimeType
+	}
+	for t, c := range runtimeTypes {
+		if p.RuntimeType == t || (t != "" && strings.HasPrefix(p.RuntimeType, t)) {
+			p.RuntimeClass = c
+			break
+		}
+	}
+
 	p.parseResourceAnnotations()
 
 	return nil
 }
 
 // Create a pod from a list response.
-func (p *pod) fromListResponse(pod *cri.PodSandbox) error {
+func (p *pod) fromListResponse(pod *cri.PodSandbox, info *PodInfo) error {
 	meta := pod.Metadata
 	if meta == nil {
 		return cacheError("pod %s has no reply metadata", p.ID)
@@ -76,6 +88,17 @@ func (p *pod) fromListResponse(pod *cri.PodSandbox) error {
 	p.State = PodState(int32(pod.State))
 	p.Labels = pod.Labels
 	p.Annotations = pod.Annotations
+
+	if info != nil {
+		p.RuntimeHandler = info.RuntimeHandler
+		p.RuntimeType = info.RuntimeType
+	}
+	for t, c := range runtimeTypes {
+		if p.RuntimeType == t || (t != "" && strings.HasPrefix(p.RuntimeType, t)) {
+			p.RuntimeClass = c
+			break
+		}
+	}
 
 	p.parseResourceAnnotations()
 
@@ -415,4 +438,19 @@ func (p *pod) Eval(key string) interface{} {
 	default:
 		return cacheError("Pod cannot evaluate of %q", key)
 	}
+}
+
+// GetRuntimeHandler returns the runtime handler for this pod.
+func (p *pod) GetRuntimeHandler() string {
+	return p.RuntimeHandler
+}
+
+// GetRuntimeType returns the runtime type for this pod.
+func (p *pod) GetRuntimeType() string {
+	return p.RuntimeType
+}
+
+// GetRuntimeClass returns the runtime controller for this pod.
+func (p *pod) GetRuntimeClass() string {
+	return p.RuntimeClass
 }

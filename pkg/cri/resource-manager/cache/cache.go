@@ -40,6 +40,8 @@ import (
 const (
 	// CRI marks changes that can be applied by the CRI controller.
 	CRI = "cri"
+	// Kata marks changes that can be applied by the kata controller.
+	Kata = "kata"
 	// RDT marks changes that can be applied by the RDT controller.
 	RDT = "rdt"
 	// BlockIO marks changes that can be applied by the BlockIO controller.
@@ -69,8 +71,18 @@ const (
 	TopologyHintsKey = "topologyhints" + "." + kubernetes.ResmgrKeyNamespace
 )
 
-// allControllers is a slice of all controller domains.
-var allControllers = []string{CRI, RDT, BlockIO, Memory}
+var (
+	// allControllers lists all controller domains sans non-default runtime classes
+	allControllers = []string{CRI, RDT, BlockIO, Memory}
+	// runtimeClasses lists all non-default runtime classes
+	runtimeClasses = []string{Kata}
+	// runtimeTypes maps runtime types(' prefixes) to controllers
+	runtimeTypes = map[string]string{
+		"":                               CRI,
+		"io.containerd.runtime.v1.linux": CRI,
+		"io.containerd.kata.":            Kata,
+	}
+)
 
 // PodState is the pod state in the runtime.
 type PodState int32
@@ -159,6 +171,20 @@ type Pod interface {
 	GetContainerAffinity(string) []*Affinity
 	// ScopeExpression returns an affinity expression for defining this pod as the scope.
 	ScopeExpression() *resmgr.Expression
+	// GetRuntimeHandler returns the runtime handler for this pod.
+	GetRuntimeHandler() string
+	// GetRuntimeType returns the runtime type for this pod.
+	GetRuntimeType() string
+	// GetRuntimeClass returns the runtime controller for this pod.
+	GetRuntimeClass() string
+}
+
+// PodInfo is extra pod information extracted from the runtime.
+type PodInfo struct {
+	// RuntimeHandler is runtimeHandler from the runtime pod inspection info.
+	RuntimeHandler string
+	// RuntimeType is the runtimeType from the runtime pod inspection info.
+	RuntimeType string
 }
 
 // A cached pod.
@@ -177,6 +203,10 @@ type pod struct {
 
 	Resources *PodResourceRequirements // annotated resource requirements
 	Affinity  *podContainerAffinity    // annotated container affinity
+
+	RuntimeHandler string // runtime handler for this pod (from run request)
+	RuntimeType    string // runtime type for this pod (from status response)
+	RuntimeClass   string // runtime controller name
 }
 
 // ContainerState is the container state in the runtime.
@@ -338,6 +368,13 @@ type Container interface {
 	// GetAffinity returns the annotated affinity expressions for this container.
 	GetAffinity() []*Affinity
 
+	// GetRuntimeHandler returns the runtime handler for this container.
+	GetRuntimeHandler() string
+	// GetRuntimeType returns the runtime type for this container.
+	GetRuntimeType() string
+	// GetRuntimeClass returns the runtime controller for this pod.
+	GetRuntimeClass() string
+
 	// SetRDTClass assigns this container to the given RDT class.
 	SetRDTClass(string)
 	// GetRDTClass returns the RDT class for this container.
@@ -412,6 +449,7 @@ type container struct {
 	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
 	req       *interface{}                 // pending CRI request
 
+	RuntimeClass string       // runtime controller name
 	RDTClass     string       // RDT class this container is assigned to.
 	BlockIOClass string       // Block I/O class this container is assigned to.
 	ToptierLimit int64        // Top tier memory limit.
@@ -497,7 +535,7 @@ type Cachable interface {
 // itself upon startup.
 type Cache interface {
 	// InsertPod inserts a pod into the cache, using a runtime request or reply.
-	InsertPod(id string, msg interface{}) Pod
+	InsertPod(id string, msg interface{}, info *PodInfo) Pod
 	// DeletePod deletes a pod from the cache.
 	DeletePod(id string) Pod
 	// LookupPod looks up a pod in the cache.
@@ -761,6 +799,7 @@ func (cch *cache) SetAdjustment(external *config.Adjustment) (bool, map[string]e
 		}
 
 		c.markPending(allControllers...)
+		c.markPending(c.RuntimeClass)
 	}
 
 	if err := cch.Save(); err != nil {
@@ -807,9 +846,8 @@ func (cch *cache) setEffectiveAdjustment(effective map[*container]string) {
 		}
 
 		// we forcibly mark the container as updated in all controller domains
-		for _, ctrl := range allControllers {
-			c.markPending(ctrl)
-		}
+		c.markPending(allControllers...)
+		c.markPending(c.RuntimeClass)
 	}
 }
 
@@ -830,16 +868,16 @@ func (cch *cache) createCacheID(c *container) string {
 }
 
 // Insert a pod into the cache.
-func (cch *cache) InsertPod(id string, msg interface{}) Pod {
+func (cch *cache) InsertPod(id string, msg interface{}, info *PodInfo) Pod {
 	var err error
 
 	p := &pod{cache: cch, ID: id}
 
 	switch msg.(type) {
 	case *cri.RunPodSandboxRequest:
-		err = p.fromRunRequest(msg.(*cri.RunPodSandboxRequest))
+		err = p.fromRunRequest(msg.(*cri.RunPodSandboxRequest), nil)
 	case *cri.PodSandbox:
-		err = p.fromListResponse(msg.(*cri.PodSandbox))
+		err = p.fromListResponse(msg.(*cri.PodSandbox), nil)
 	default:
 		err = fmt.Errorf("cannot create pod from message %T", msg)
 	}
@@ -1023,7 +1061,7 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse) ([]Pod, []Pod, []
 		valid[item.Id] = struct{}{}
 		if _, ok := cch.Pods[item.Id]; !ok {
 			cch.Debug("inserting discovered pod %s...", item.Id)
-			pod := cch.InsertPod(item.Id, item)
+			pod := cch.InsertPod(item.Id, item, nil)
 			add = append(add, pod)
 		}
 	}
