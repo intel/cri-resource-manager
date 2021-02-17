@@ -26,6 +26,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/cri/server"
+
+	"github.com/intel/cri-resource-manager/pkg/dump"
 )
 
 // setupRequestProcessing prepares the resource manager for CRI request processing.
@@ -165,21 +167,20 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 	m.Info("synchronizing cache state with CRI runtime...")
 
 	add, del := []cache.Container{}, []cache.Container{}
+	info := map[string]*cache.PodInfo{}
 
 	pods, err := m.relay.Client().ListPodSandbox(ctx, &criapi.ListPodSandboxRequest{})
 	if err != nil {
-		return nil, nil, resmgrError("cache synchronization container query failed: %v", err)
+		return nil, nil, resmgrError("cache synchronization pod query failed: %v", err)
 	}
-	_, _, added, deleted := m.cache.Refresh(pods)
-	for _, c := range added {
-		if c.GetState() != cache.ContainerStateRunning {
-			m.Info("ignoring discovered container %s (in state %v)...",
-				c.GetID(), c.GetState())
-			continue
+	for _, pod := range pods.Items {
+		i, err := m.queryPodInfo(ctx, pod.Id)
+		if err != nil {
+			m.Error("%v", err)
 		}
-		m.Info("discovered out-of-sync running container %s...", c.GetID())
-		add = append(add, c)
+		info[pod.Id] = i
 	}
+	_, _, deleted := m.cache.RefreshPods(pods, info)
 	for _, c := range deleted {
 		m.Info("discovered stale container %s...", c.GetID())
 		del = append(del, c)
@@ -189,7 +190,7 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 	if err != nil {
 		return nil, nil, resmgrError("cache synchronization container query failed: %v", err)
 	}
-	_, _, added, deleted = m.cache.Refresh(containers)
+	added, deleted := m.cache.RefreshContainers(containers)
 	for _, c := range added {
 		if c.GetState() != cache.ContainerStateRunning {
 			m.Info("ignoring discovered container %s (in state %v)...",
@@ -207,9 +208,25 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 	return add, del, nil
 }
 
+// queryPodInfo queries a pod's runtime-specific info using a PodSandboxStatus request.
+func (m *resmgr) queryPodInfo(ctx context.Context, ID string) (*cache.PodInfo, error) {
+	status, err := m.relay.Client().PodSandboxStatus(ctx, &criapi.PodSandboxStatusRequest{
+		PodSandboxId: ID,
+		Verbose:      true,
+	})
+	if err != nil {
+		return nil, resmgrError("failed to query status of pod %s: %v", ID, err)
+	}
+
+	dump.ReplyMessage("unsolicited", "PodSandboxStatus", "query-response", status, 0, false)
+
+	return cache.ExtractPodInfo(status)
+}
+
 // RunPod intercepts CRI requests for Pod creation.
 func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 	handler server.Handler) (interface{}, error) {
+	var info *cache.PodInfo
 
 	reply, rqerr := handler(ctx, request)
 	if rqerr != nil {
@@ -217,11 +234,15 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 		return reply, rqerr
 	}
 
+	podID := reply.(*criapi.RunPodSandboxResponse).PodSandboxId
+	if request.(*criapi.RunPodSandboxRequest).RuntimeHandler != "" {
+		info, _ = m.queryPodInfo(ctx, podID)
+	}
+
 	m.Lock()
 	defer m.Unlock()
 
-	podID := reply.(*criapi.RunPodSandboxResponse).PodSandboxId
-	pod := m.cache.InsertPod(podID, request, nil)
+	pod := m.cache.InsertPod(podID, request, info)
 	m.updateIntrospection()
 
 	// search for any lingering old version and clean up if found
