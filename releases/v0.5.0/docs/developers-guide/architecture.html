@@ -1,0 +1,560 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Architecture &mdash; CRI Resource Manager 0.5.0 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Policy Writer’s Guide" href="policy-writers-guide.html" />
+    <link rel="prev" title="Developer’s Guide" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> CRI Resource Manager
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                v0.5.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../policy/index.html">Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Developer’s Guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#components">Components</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#node-agent">Node Agent</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#resource-manager">Resource Manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cache">Cache</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#generic-policy-layer">Generic Policy Layer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#generic-resource-controller-layer">Generic Resource Controller Layer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#metrics-collector">Metrics Collector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#policy-implementations">Policy Implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#resource-controller-implementations">Resource Controller Implementations</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="policy-writers-guide.html">Policy Writer’s Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testing.html">Testing</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Developer’s Guide</a> &raquo;</li>
+        
+      <li>Architecture</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../../_sources/docs/developers-guide/architecture.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="architecture">
+<h1>Architecture<a class="headerlink" href="#architecture" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>CRI Resource Manager (CRI-RM) is a pluggable add-on for controlling how much
+and which resources are assigned to containers in a Kubernetes cluster. It’s
+an add-on because you install it in addition to the normal selection of your
+components. It’s pluggable since you inject it on the signaling path between
+two existing components with the rest of the cluster unaware of its presence.</p>
+<p>CRI-RM plugs in between kubelet and CRI, the Kubernetes node agent and the
+container runtime implementation. It intercepts CRI protocol requests from
+the kubelet acting as a non-transparent proxy towards the runtime. Proxying
+by CRI-RM is non-transparent in nature because it usually alters intercepted
+protocol messages before forwarding them.</p>
+<p>CRI-RM keeps track of the states of all containers running on a Kubernetes
+node. Whenever it intercepts a CRI request which results in changes to the
+resource allocation of any container (container creation, deletion or
+resource assignment update request), CRI-RM runs one of its built-in policy
+algorithms. This policy makes a decision about how the assignment of resources
+should be updated and, eventually, the intercepted request gets modified
+according to this decision. The policy can make changes to any container in
+the system, not just the one associated with the intercepted CRI request.
+Therefore it does not operate directly on CRI requests. Instead CRI-RM’s
+internal state tracking cache provides an abstraction for modifying containers
+and the policy uses this abstraction for recording its decisions.</p>
+<p>In addition to policies, CRI-RM has a number of built-in resource controllers.
+These are used to put policy decisions, in practice pending changes made to
+containers by a policy, into effect. A special in-band CRI controller is used
+to control all resources which are controllable via the CRI runtime. This
+controller handles the practical details of updating the intercepted CRI
+request and generating any additional unsolicited update requests for other
+existing containers updated by the policy decision. Additional out-of-band
+controllers exist to exercise control over resources which the current CRI
+runtimes are unable to handle.</p>
+<p>To tell which containers need to be handed off to various controllers for
+updating, CRI-RM uses the internal state tracking cache’s ability to tell
+which containers have pending unenforced changes and to which controllers’
+domain these changes belong to. The CRI controller currently handles CPU and
+memory resources, including huge pages. The level of control covers per
+container CPU sets, CFS parametrization, memory limits, OOM score adjustment
+and pinning to memory controllers. The two existing out-of-band controllers,
+RDT and Block I/O, handle last level cache and memory bandwidth allocation,
+and the arbitration of Block I/O bandwidth respectively.</p>
+<p>Many of the details of how CRI-RM operates is configurable. These include, for
+instance, which policy is active within CRI-RM, configuration of the resource
+assignment algorithm for the active policy, and configuration for the various
+resource controllers. Alhough CRI-RM can be configured using a configuration
+file present on the node running CRI-RM, the preferred way for configuring all
+CRI-RM instances in a cluster is to use Kubernetes ConfigMaps and the CRI-RM
+Node Agent.</p>
+<p align="center">
+<!-- # It's a pity the markdown ![]()-syntax does not support aligning... -->
+<img src="figures/arch-overview.svg" title="Architecture Overview">
+</p></div>
+<div class="section" id="components">
+<h2>Components<a class="headerlink" href="#components" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="node-agent">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/agent/">Node Agent</a><a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h3>
+<p>The node agent is a component external to CRI-RM itself. All interactions
+by CRI-RM with the Kubernetes Control Plane go through the node agent with
+the node agent performing any direct interactions on behalf of CRI-RM.</p>
+<p>The node agent communicates with CRI-RM using two gRPC interfaces. The
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/config/api/v1/">config interface</a> is used to</p>
+<ul class="simple">
+<li><p>push updated external configuration data to CRI-RM</p></li>
+<li><p>push adjustments to container resource assignments to CRI-RM</p></li>
+</ul>
+<p>The <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/agent/api/v1/">cluster interface</a> implements the necessary
+low-level plumbing for the agent interface CRI-RM internally exposes
+for its policies and other components. This interface in turn implements</p>
+<ul class="simple">
+<li><p>updating resource capacity of the node</p></li>
+<li><p>getting, setting or removing labels on the node</p></li>
+<li><p>getting, setting or removing annotations on the node</p></li>
+<li><p>getting, setting or removing taints on the node</p></li>
+</ul>
+<p>The config interface is defined and has its gRPC server running in
+CRI-RM. The agent acts as a gRPC client for this interface. The low-level
+cluster interface is defined and has its gRPC server running in the agent,
+with the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/agent">convenience layer</a> defined in
+CRI-RM. CRI-RM acts as a gRPC client for the low-level plumbing interface.</p>
+<p>Additionally, the stock node agent that comes with CRI-RM implements schemes
+for</p>
+<ul class="simple">
+<li><p>configuration management for all CRI-RM instances</p></li>
+<li><p>management of dynamic adjustments to container resource assignments</p></li>
+</ul>
+<p align="center">
+<!-- # It's a pity the markdown ![]()-syntax does not support aligning... -->
+<img src="figures/cri-resmgr.png" title="Architecture Overview" width="50%">
+</p></div>
+<div class="section" id="resource-manager">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/">Resource Manager</a><a class="headerlink" href="#resource-manager" title="Permalink to this headline">¶</a></h3>
+<p>CRI-RM implements a request processing and an event processing pipeline.
+The request processing pipeline takes care of proxying CRI requests and
+responses between CRI clients and the CRI runtime. The event processing
+pipeline processes a set of other events which are not directly related
+to or the result of CRI requests. These events are typically internally
+generated within CRI-RM. They can be the result of changes in the state
+of some containers or the utilisation of a shared system resource, which
+potentially could warrant an attempt to rebalance the distribution of
+resources among containers to bring the system closer to an optimal state.
+Some events can also be generated by policies.</p>
+<p>The Resource Manager component of CRI-RM implements the basic control
+flow of both of these processing pipelines. It passes control to all the
+necessary sub-components of CRI-RM at the various phases of processing a
+request or an event. Additionally it serializes the processing of these,
+making sure there is at most one (intercepted) request or event being
+processed at any point in time.</p>
+<p>The high-level control flow of the request processing pipeline is the
+following:</p>
+<p>A. If the request does not need policying, let it bypass the processing
+pipeline: hand it off for logging, then relay it to the server and the
+corresponding response back to the client.</p>
+<p>B. If the request needs to be intercepted for policying</p>
+<ol class="simple">
+<li><p>take processing pipeline serialization lock</p></li>
+<li><p>look up/create cache objects (pod/container) for the request</p></li>
+<li><p>if the request has no resource allocation consequences, do proxying (step 6)</p></li>
+<li><p>otherwise invoke the policy layer for resource allocation:</p></li>
+</ol>
+<ul class="simple">
+<li><p>pass it on to the configured active policy, which will</p></li>
+<li><p>allocate resources for the container</p></li>
+<li><p>update the assignments for the container in the cache</p></li>
+<li><p>update any other containers affected by the allocation in the cache</p></li>
+</ul>
+<ol class="simple">
+<li><p>invoke the controller layer for post-policy processing, which will</p></li>
+</ol>
+<ul class="simple">
+<li><p>collect controllers with pending changes in their domain of control</p></li>
+<li><p>for each invoke the post-policy processing function corresponding to the request</p></li>
+<li><p>clear pending markers for the controllers</p></li>
+</ul>
+<ol class="simple">
+<li><p>proxy the request</p></li>
+</ol>
+<ul class="simple">
+<li><p>relay the request to the server</p></li>
+<li><p>send update requests for any additional affected containers</p></li>
+<li><p>update the cache if/as necessary based on the response</p></li>
+<li><p>relay the response back to the client</p></li>
+</ul>
+<ol class="simple">
+<li><p>release processing pipeline serialization lock</p></li>
+</ol>
+<p>The high-level control flow of the event processing pipeline is one of the
+following, based on the event type:</p>
+<ul class="simple">
+<li><p>for policy-specific events:</p>
+<ol class="simple">
+<li><p>take processing pipeline lock</p></li>
+<li><p>call policy event handler</p></li>
+<li><p>invoke the controller layer for post-policy processing (same as step 5 for requests)</p></li>
+<li><p>release pipeline lock</p></li>
+</ol>
+</li>
+<li><p>for metrics events:</p>
+<ol class="simple">
+<li><p>perform collection/processing/correlation</p></li>
+<li><p>take processing pipeline lock</p></li>
+<li><p>update cache objects as/if necessary</p></li>
+<li><p>request rebalancing as/if necessary</p></li>
+<li><p>release pipeline lock</p></li>
+</ol>
+</li>
+<li><p>for rebalance events:</p>
+<ol class="simple">
+<li><p>take processing pipeline lock</p></li>
+<li><p>invoke policy layer for rebalancing</p></li>
+<li><p>invoke the controller layer for post-policy processing (same as step 5 for requests)</p></li>
+<li><p>release pipeline lock</p></li>
+</ol>
+</li>
+</ul>
+</div>
+<div class="section" id="cache">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/cache/">Cache</a><a class="headerlink" href="#cache" title="Permalink to this headline">¶</a></h3>
+<p>The cache is a shared internal storage within CRI-RM. It tracks the runtime
+state of pods and containers known to CRI-RM, as well as the state of CRI-RM
+itself, including the active configuration and the state of the active policy.
+The cache is saved to permanent storage in the filesystem and used to restore
+the runtime state of CRI-RM across restarts.</p>
+<p>The cache provides functions for querying and updating the state of pods and
+containers. This is the mechanism used by the active policy to make resource
+assignment decisions. The policy simply updates the state of the affected
+containers in the cache according to the decisions.</p>
+<p>The cache’s ability to associate and track changes to containers with resource
+domains is used to enforce policy decisions. The generic controller layer first
+queries which containers have pending changes, then invokes each controller for
+each container. The controllers use the querying functions provided by the
+cache to decide if anything in their resource/control domain needs to be changed
+and then act accordingly.</p>
+<p>Access to the cache needs to be serialized. However, this serialization is not
+provided by the cache itself. Instead, it assumes callers to make sure proper
+protection is in place against concurrent read-write access. The request and
+event processing pipelines in the resource manager use a lock to serialize
+request and event processing and consequently access to the cache.</p>
+<p>If a policy needs to do processing unsolicited by the resource manager, IOW
+processing other than handling the internal policy backend API calls from the
+resource manager, then it should inject a policy event into the resource
+managers event loop. This will cause a callback from the resource manager to
+the policy’s event handler with the injected event as an argument and with the
+cache properly locked.</p>
+</div>
+<div class="section" id="generic-policy-layer">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/policy/policy.go">Generic Policy Layer</a><a class="headerlink" href="#generic-policy-layer" title="Permalink to this headline">¶</a></h3>
+<p>The generic policy layer defines the abstract interface the rest of CRI-RM
+uses to interact with policy implementations and takes care of the details
+of activating and dispatching calls through to the configured active policy.</p>
+</div>
+<div class="section" id="generic-resource-controller-layer">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/control/control.go">Generic Resource Controller Layer</a><a class="headerlink" href="#generic-resource-controller-layer" title="Permalink to this headline">¶</a></h3>
+<p>The generic resource controller layer defines the abstract interface the rest
+of CRI-RM uses to interact with resource controller implementations and takes
+care of the details of dispatching calls to the controller implementations for
+post-policy enforcment of decisions.</p>
+</div>
+<div class="section" id="metrics-collector">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/metrics/">Metrics Collector</a><a class="headerlink" href="#metrics-collector" title="Permalink to this headline">¶</a></h3>
+<p>The metrics collector gathers a set of runtime metrics about the containers
+running on the node. CRI-RM can be configured to periodically evaluate this
+collected data to determine how optimal the current assignment of container
+resources is, and to attempt a rebalancing/reallocation if it is deemed
+both possible and necessary.</p>
+</div>
+<div class="section" id="policy-implementations">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/policy/builtin/">Policy Implementations</a><a class="headerlink" href="#policy-implementations" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="none">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/policy/builtin/none/">None</a><a class="headerlink" href="#none" title="Permalink to this headline">¶</a></h4>
+<p>An empty policy which does no policy decisions. It is included merely for
+the sake of completeness, analoguous to the none policy of the CPU Manager
+in kubelet.</p>
+</div>
+<div class="section" id="static-pools">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/policy/builtin/static-pools/">Static Pools</a><a class="headerlink" href="#static-pools" title="Permalink to this headline">¶</a></h4>
+<p>A backward-compatible reimplementation of <a class="reference external" href="https://github.com/intel/CPU-Manager-for-Kubernetes">CMK</a>
+for CRI-RM with a few extra features.</p>
+</div>
+<div class="section" id="static">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/policy/builtin/static/">Static</a><a class="headerlink" href="#static" title="Permalink to this headline">¶</a></h4>
+<p>Part of the code from the static policy of CPU Manager in kubelet, brutally
+hacked to work within CRI-RM. Serves merely as a proof-of-concept that the
+current policies of kubelet can be implemented in CRI-RM.</p>
+</div>
+<div class="section" id="static-plus">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/policy/builtin/static-plus/">Static Plus</a><a class="headerlink" href="#static-plus" title="Permalink to this headline">¶</a></h4>
+<p>A fairly simplistic policy similar in spirit to the static policy of
+CPU Manager in kubelet, with a few extra features.</p>
+</div>
+<div class="section" id="topology-aware">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/policy/builtin/topology-aware/">Topology Aware</a><a class="headerlink" href="#topology-aware" title="Permalink to this headline">¶</a></h4>
+<p>A topology-aware policy capable of handling multiple tiers/types of memory,
+typically a DRAM/PMEM combination configured in 2-layer memory mode.</p>
+</div>
+</div>
+<div class="section" id="resource-controller-implementations">
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/control/">Resource Controller Implementations</a><a class="headerlink" href="#resource-controller-implementations" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="rdt">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/control/rdt/">RDT</a><a class="headerlink" href="#rdt" title="Permalink to this headline">¶</a></h4>
+<p>A resource controller implementation responsible for the practical details of
+associating a container with RDT classes. This class effectively determines
+how much last level cache and memory bandwidth will be available for the
+container. This controller uses the resctrl pseudo filesystem of the Linux
+kernel for control.</p>
+</div>
+<div class="section" id="block-i-o">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/control/blockio/">Block I/O</a><a class="headerlink" href="#block-i-o" title="Permalink to this headline">¶</a></h4>
+<p>A resource controller implementation responsible for the practical details of
+associating a container with a Block I/O class. This class effectively
+determines how much Block I/O bandwidth will be available for the container.
+This controller uses the blkio cgroup controller and the cgroupfs pseudo-
+filesystem of the Linux kernel for control.</p>
+</div>
+<div class="section" id="cri">
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/pkg/cri/resource-manager/control/cri/">CRI</a><a class="headerlink" href="#cri" title="Permalink to this headline">¶</a></h4>
+<p>A resource controller responsible for modifying intercepted CRI container
+creation requests and creating CRI container resource update requests,
+according to the changes the active policy makes to containers.</p>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="policy-writers-guide.html" class="btn btn-neutral float-right" title="Policy Writer’s Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Developer’s Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2020, various.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+  
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.5
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>

@@ -1,0 +1,313 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Webhook &mdash; CRI Resource Manager 0.5.0 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Developer’s Guide" href="developers-guide/index.html" />
+    <link rel="prev" title="Node Agent" href="node-agent.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> CRI Resource Manager
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                v0.5.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="setup.html">Setup and Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="policy/index.html">Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="node-agent.html">Node Agent</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">CRI Resource Manager</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Webhook</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/docs/webhook.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="webhook">
+<h1>Webhook<a class="headerlink" href="#webhook" title="Permalink to this headline">¶</a></h1>
+<p>By default CRI Resource Manager does not see the original container <em>resource
+requirements</em> specified in the <em>Pod Spec</em>. It tries to calculate these for <code class="docutils literal notranslate"><span class="pre">cpu</span></code>
+and <code class="docutils literal notranslate"><span class="pre">memory</span></code> <em>compute resource</em>s using the related parameters present in the
+CRI container creation request. The resulting estimates are normally accurate
+for <code class="docutils literal notranslate"><span class="pre">cpu</span></code>, and also for <code class="docutils literal notranslate"><span class="pre">memory</span></code> <code class="docutils literal notranslate"><span class="pre">limits</span></code>. However, it is not possible to use
+these parameters to estimate <code class="docutils literal notranslate"><span class="pre">memory</span></code> <code class="docutils literal notranslate"><span class="pre">request</span></code>s or any <em>extended resource</em>s.</p>
+<p>If you want to make sure that CRI Resource Manager uses the origin <em>Pod Spec</em>
+<em>resource requirement</em>s, you need to duplicate these as <em>annotations</em> on the Pod.
+This is necessary if you plan using or writing a policy which needs <em>extended
+resource</em>s.</p>
+<p>This process can be fully automated using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/64fe33f7f3fb1050ac78a9782d393cc9decfb619/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating
+Webhook</a>. Once you built the docker image for it using
+the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/64fe33f7f3fb1050ac78a9782d393cc9decfb619/cmd/cri-resmgr-webhook/Dockerfile">provided Dockerfile</a> and published it,
+you can set up the webhook as follows:</p>
+<ul>
+<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">IMAGE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/64fe33f7f3fb1050ac78a9782d393cc9decfb619/cmd/cri-resmgr-webhook/webhook-deployment.yaml">webhook-deployment.yaml</a> to match the image.</p></li>
+<li><p>Create a <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook-secret</span></code> that carries a key and a certificate to <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook</span></code>. You can create a key, a self-signed certificate and the secret that holds them with commands:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SVC</span><span class="o">=</span>cri-resmgr-webhook <span class="nv">NS</span><span class="o">=</span>cri-resmgr
+openssl req -x509 -newkey rsa:2048 -sha256 -days <span class="m">365</span> -nodes <span class="se">\</span>
+  -keyout cmd/cri-resmgr-webhook/server-key.pem <span class="se">\</span>
+  -out cmd/cri-resmgr-webhook/server-crt.pem <span class="se">\</span>
+  -subj <span class="s2">&quot;/CN=</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span> <span class="se">\</span>
+  -addext <span class="s2">&quot;subjectAltName=DNS:</span><span class="nv">$SVC</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span>
+cat &gt;cmd/cri-resmgr-webhook/webhook-secret.yaml <span class="s">&lt;&lt;EOF</span>
+<span class="s">apiVersion: v1</span>
+<span class="s">kind: Secret</span>
+<span class="s">metadata:</span>
+<span class="s">  name: cri-resmgr-webhook-secret</span>
+<span class="s">  namespace: $NS</span>
+<span class="s">data:</span>
+<span class="s">  svc.crt: $(base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem)</span>
+<span class="s">  svc.key: $(base64 -w0 &lt; cmd/cri-resmgr-webhook/server-key.pem)</span>
+<span class="s">type: Opaque</span>
+<span class="s">EOF</span>
+kubectl create namespace <span class="nv">$NS</span>
+kubectl create -f cmd/cri-resmgr-webhook/webhook-secret.yaml
+</pre></div>
+</div>
+</li>
+<li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">CA_BUNDLE_PLACEHOLDER</span></code> in <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/64fe33f7f3fb1050ac78a9782d393cc9decfb619/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml">mutating-webhook-config.yaml</a>.
+If you created the key and the certificate with the commands above,
+you can do this with command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sed -e <span class="s2">&quot;s/CA_BUNDLE_PLACEHOLDER/</span><span class="k">$(</span>base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem<span class="k">)</span><span class="s2">/&quot;</span> <span class="se">\</span>
+    -i cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
+</pre></div>
+</div>
+</li>
+<li><p>Finally set up the webhook with these commands:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl apply -f cmd/cri-resmgr-webhook/webhook-deployment.yaml
+kubectl <span class="nb">wait</span> --for<span class="o">=</span><span class="nv">condition</span><span class="o">=</span>Available -n cri-resmgr deployments/cri-resmgr-webhook
+kubectl apply -f cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="developers-guide/index.html" class="btn btn-neutral float-right" title="Developer’s Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="node-agent.html" class="btn btn-neutral float-left" title="Node Agent" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2020, various.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+  
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.5
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>
