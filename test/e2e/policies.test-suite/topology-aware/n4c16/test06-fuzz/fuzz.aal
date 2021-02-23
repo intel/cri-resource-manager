@@ -1,0 +1,138 @@
+language python {
+    max_mem=7500  # maximum memory on VM in MB
+    max_cpu=15000 # maximum CPUs on node in mCPU
+    max_reserved_cpu=1000 # maximum reserved CPUs on node in mCPU
+    class Vars:
+        # namespace for variables in input names
+        def __repr__(self):
+            return "{" + ",".join("%s:%s" % (a, getattr(self, a)) for a in sorted(self.__dict__.keys()) if not a.startswith("_")) + "}\n"
+    def inputvars(input_name):
+        # parse VAR=VALUE's from input_name
+        v = Vars()
+        for word in input_name.split():
+            keyvalue = word.split("=")
+            if len(keyvalue) == 2:
+                if (keyvalue[1].endswith("m") or keyvalue[1].endswith("M")) and len(keyvalue[1]) > 1 and keyvalue[1][-2] in '0123456789':
+                    keyvalue[1] = keyvalue[1][:-1]
+                try:
+                    setattr(v, keyvalue[0], int(keyvalue[1]))
+                except:
+                    setattr(v, keyvalue[0], keyvalue[1])
+        return v
+}
+
+variables {
+    mem, cpu, reserved_cpu, pods
+}
+
+initial_state {
+    mem=0
+    cpu=0
+    reserved_cpu=0
+    pods={}
+}
+
+# Create non-reserved CPU pods
+# On this topology, there is
+# - 2G mem/numanode, 4G mem/package, 8G mem in total
+# -  4 CPU/numanode,  8 CPU/package, 16 CPU in total
+input
+    "NAME=gu0 CONTCOUNT=1 CPU=200m MEM=1500M create guaranteed",
+    "NAME=gu1 CONTCOUNT=2 CPU=1000m MEM=500M create guaranteed",
+    "NAME=gu2 CONTCOUNT=2 CPU=1200m MEM=4500M create guaranteed",
+    "NAME=gu3 CONTCOUNT=3 CPU=2000m MEM=500M create guaranteed",
+    "NAME=gu4 CONTCOUNT=1 CPU=4200m MEM=100M create guaranteed",
+    "NAME=bu0 CONTCOUNT=1 CPU=1200m MEM=50M CPUREQ=900m MEMREQ=49M CPULIM=1200m MEMLIM=50M create burstable",
+    "NAME=bu1 CONTCOUNT=2 CPU=1900m MEM=300M CPUREQ=1800m MEMREQ=299M CPULIM=1900m MEMLIM=300M create burstable",
+    "NAME=be0 CONTCOUNT=1 CPU=0 MEM=0 create besteffort",
+    "NAME=be1 CONTCOUNT=3 CPU=0 MEM=0 create besteffort"
+{
+    guard {
+        v = inputvars(input_name)
+        return (v.NAME not in pods
+                and (mem + v.MEM * v.CONTCOUNT < max_mem)
+                and (cpu + v.CPU * v.CONTCOUNT < max_cpu))
+    }
+    body {
+        v = inputvars(input_name)
+        v.namespace = getattr(v, "namespace", "default")
+        mem += v.MEM * v.CONTCOUNT
+        cpu += v.CPU * v.CONTCOUNT
+        pods[v.NAME] = v
+    }
+}
+
+# Create pods to the kube-system namespace
+input
+    "NAME=rgu0 CONTCOUNT=2 CPU=100m MEM=1000M namespace=kube-system create guaranteed",
+    "NAME=rbu0 CONTCOUNT=1 CPU=100m MEM=100M CPUREQ=99m MEMREQ=99M CPULIM=100m MEMLIM=100M namespace=kube-system create burstable",
+    "NAME=rbe0 CONTCOUNT=2 CPU=0 MEM=0 namespace=kube-system create besteffort"
+{
+    guard {
+        v = inputvars(input_name)
+        return (v.NAME not in pods
+                and (mem + v.MEM * v.CONTCOUNT < max_mem)
+                and (reserved_cpu + v.CPU * v.CONTCOUNT < max_reserved_cpu))
+
+    }
+    body {
+        v = inputvars(input_name)
+        mem += v.MEM * v.CONTCOUNT
+        reserved_cpu += v.CPU * v.CONTCOUNT
+        pods[v.NAME] = v
+    }
+}
+
+# Kill a process in a container
+# - "echo gu0c1" matches and kills process only in container gu0c1 in pod gu0
+# - "echo gu0" matches and kills processes in all containers of pod gu0
+input
+    "NAME=gu0 container-exit0 gu0c0",
+    "NAME=gu1 container-exit0 gu1c0",
+    "NAME=gu2 container-exit0 gu2c0",
+    "NAME=gu3 container-exit0 gu3",
+    "NAME=gu4 container-exit0 gu4c",
+    "NAME=bu0 container-exit0 bu0c0",
+    "NAME=bu1 container-exit0 bu1c0",
+    "NAME=be0 container-exit0 be0c0",
+    "NAME=be1 container-exit0 be0c0",
+    "NAME=rgu0 container-exit0 rgu0c0",
+    "NAME=rbu0 container-exit0 rbu0c0",
+    "NAME=rbe0 container-exit0 rbe0c0"
+{
+    guard {
+        v = inputvars(input_name)
+        return v.NAME in pods
+    }
+}
+
+# Delete single pod
+input
+    "NAME=gu0 kubectl delete pod gu0 --now",
+    "NAME=gu1 kubectl delete pod gu1 --now",
+    "NAME=gu2 kubectl delete pod gu2 --now",
+    "NAME=gu3 kubectl delete pod gu3 --now",
+    "NAME=gu4 kubectl delete pod gu4 --now",
+    "NAME=bu0 kubectl delete pod bu0 --now",
+    "NAME=bu1 kubectl delete pod bu1 --now",
+    "NAME=be0 kubectl delete pod be0 --now",
+    "NAME=be1 kubectl delete pod be1 --now",
+    "NAME=rgu0 kubectl delete pod rgu0 -n kube-system --now",
+    "NAME=rbu0 kubectl delete pod rbu0 -n kube-system --now",
+    "NAME=rbe0 kubectl delete pod rbe0 -n kube-system --now"
+{
+    guard {
+        v = inputvars(input_name)
+        return v.NAME in pods
+    }
+    body {
+        v = inputvars(input_name)
+        p = pods[v.NAME]
+        mem -= p.MEM * p.CONTCOUNT
+        if getattr(p, "namespace", "") == "kube-system":
+            reserved_cpu -= p.CPU * p.CONTCOUNT
+        else:
+            cpu -= p.CPU * p.CONTCOUNT
+        del pods[v.NAME]
+    }
+}
