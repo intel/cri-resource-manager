@@ -257,7 +257,7 @@ func resourcesToQOS(podResources *PodResourceRequirements) corev1.PodQOSClass {
 }
 
 // findContainerDir brute-force searches for a container cgroup dir.
-func findContainerDir(podCgroupDir, podID, ID string) string {
+func findContainerDir(podCgroupDir, podID, ID, runtimeClass string) string {
 	var dirs []string
 
 	if podCgroupDir == "" {
@@ -266,15 +266,30 @@ func findContainerDir(podCgroupDir, podID, ID string) string {
 
 	cpusetDir := cgroups.Cpuset.Path()
 
-	dirs = []string{
-		// containerd, systemd
-		path.Join(cpusetDir, podCgroupDir, "cri-containerd-"+ID+".scope"),
-		// containerd, cgroupfs
-		path.Join(cpusetDir, podCgroupDir, "cri-containerd-"+ID),
-		// crio, systemd
-		path.Join(cpusetDir, podCgroupDir, "crio-"+ID+".scope"),
-		// crio, cgroupfs
-		path.Join(cpusetDir, podCgroupDir, "crio-"+ID),
+	if runtimeClass == "kata" {
+		base := path.Base(podCgroupDir)
+		dirs = []string{
+			// kata v2, containerd
+			path.Join(cpusetDir, "vc", "kata_"+base+":cri-containerd:"+podID),
+			// kata v1, containerd
+			path.Join(cpusetDir, "vc", "kata_"+podID),
+			// kata v1, crio
+			path.Join(cpusetDir, podCgroupDir, "crio-"+podID+".scope"),
+			path.Join(cpusetDir, podCgroupDir, "crio-"+podID),
+			path.Join(cpusetDir, podCgroupDir, "kata_crio-"+podID+".scope"),
+			path.Join(cpusetDir, podCgroupDir, "kata_crio-"+podID),
+		}
+	} else {
+		dirs = []string{
+			// containerd, systemd
+			path.Join(cpusetDir, podCgroupDir, "cri-containerd-"+ID+".scope"),
+			// containerd, cgroupfs
+			path.Join(cpusetDir, podCgroupDir, "cri-containerd-"+ID),
+			// crio, systemd
+			path.Join(cpusetDir, podCgroupDir, "crio-"+ID+".scope"),
+			// crio, cgroupfs
+			path.Join(cpusetDir, podCgroupDir, "crio-"+ID),
+		}
 	}
 
 	for _, dir := range dirs {

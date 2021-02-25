@@ -134,6 +134,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 
 	c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, getKubeletHint(c.GetCpusetCpus(), c.GetCpusetMems()))
 
+	c.RuntimeClass = pod.RuntimeClass
 	if err := c.setDefaults(); err != nil {
 		return err
 	}
@@ -176,6 +177,7 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 		c.Resources = estimateComputeResources(c.LinuxReq, pod.CgroupParent)
 	}
 
+	c.RuntimeClass = pod.RuntimeClass
 	if err := c.setDefaults(); err != nil {
 		return err
 	}
@@ -642,7 +644,7 @@ func (c *container) GetCpusetMems() string {
 
 func (c *container) SetLinuxResources(req *cri.LinuxContainerResources) {
 	c.LinuxReq = req
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func (c *container) SetCPUPeriod(value int64) {
@@ -650,7 +652,7 @@ func (c *container) SetCPUPeriod(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuPeriod = value
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func (c *container) SetCPUQuota(value int64) {
@@ -658,7 +660,7 @@ func (c *container) SetCPUQuota(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuQuota = value
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func (c *container) SetCPUShares(value int64) {
@@ -666,7 +668,7 @@ func (c *container) SetCPUShares(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuShares = value
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func (c *container) SetMemoryLimit(value int64) {
@@ -674,7 +676,7 @@ func (c *container) SetMemoryLimit(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.MemoryLimitInBytes = value
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func (c *container) SetOomScoreAdj(value int64) {
@@ -682,7 +684,7 @@ func (c *container) SetOomScoreAdj(value int64) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.OomScoreAdj = value
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func (c *container) SetCpusetCpus(value string) {
@@ -690,7 +692,7 @@ func (c *container) SetCpusetCpus(value string) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetCpus = value
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func (c *container) SetCpusetMems(value string) {
@@ -698,7 +700,7 @@ func (c *container) SetCpusetMems(value string) {
 		c.LinuxReq = &cri.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetMems = value
-	c.markPending(CRI)
+	c.markPending(CRI, c.RuntimeClass)
 }
 
 func getTopologyHints(hostPath, containerPath string, readOnly bool) topology.Hints {
@@ -772,10 +774,28 @@ func (c *container) GetCgroupDir() string {
 	}
 	if pod, ok := c.GetPod(); ok {
 		parent, podID := pod.GetCgroupParentDir(), pod.GetID()
-		ID := c.GetID()
-		c.CgroupDir = findContainerDir(parent, podID, ID)
+		ID, class := c.GetID(), c.GetRuntimeClass()
+		c.CgroupDir = findContainerDir(parent, podID, ID, class)
 	}
 	return c.CgroupDir
+}
+
+func (c *container) GetRuntimeHandler() string {
+	if pod, ok := c.GetPod(); ok {
+		return pod.GetRuntimeHandler()
+	}
+	return ""
+}
+
+func (c *container) GetRuntimeType() string {
+	if pod, ok := c.GetPod(); ok {
+		return pod.GetRuntimeType()
+	}
+	return ""
+}
+
+func (c *container) GetRuntimeClass() string {
+	return c.RuntimeClass
 }
 
 func (c *container) SetRDTClass(class string) {
