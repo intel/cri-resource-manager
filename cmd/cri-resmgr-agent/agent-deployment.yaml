@@ -11,9 +11,11 @@ metadata:
 rules:
 - apiGroups:
   - ""
+  - criresmgr.intel.com
   resources:
   - nodes
   - configmaps
+  - adjustments
   - labels
   - annotations
   verbs:
