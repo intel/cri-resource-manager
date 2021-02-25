@@ -40,6 +40,8 @@ import (
 const (
 	// CRI marks changes that can be applied by the CRI controller.
 	CRI = "cri"
+	// Kata marks changes that can be applied by the kata controller.
+	Kata = "kata"
 	// RDT marks changes that can be applied by the RDT controller.
 	RDT = "rdt"
 	// BlockIO marks changes that can be applied by the BlockIO controller.
@@ -69,8 +71,10 @@ const (
 	TopologyHintsKey = "topologyhints" + "." + kubernetes.ResmgrKeyNamespace
 )
 
-// allControllers is a slice of all controller domains.
-var allControllers = []string{CRI, RDT, BlockIO, Memory}
+var (
+	// allControllers lists all controller domains sans non-default runtime classes
+	allControllers = []string{CRI, RDT, BlockIO, Memory}
+)
 
 // PodState is the pod state in the runtime.
 type PodState int32
@@ -94,7 +98,8 @@ type PodResourceRequirements struct {
 
 // PodStatus wraps a PodSandboxStatus response for data extraction.
 type PodStatus struct {
-	CgroupParent string // extracted CgroupParent
+	CgroupParent   string // extracted CgroupParent
+	RuntimeHandler string // extracted RuntimeHandler
 }
 
 // Pod is the exposed interface from a cached pod.
@@ -164,6 +169,12 @@ type Pod interface {
 	GetContainerAffinity(string) []*Affinity
 	// ScopeExpression returns an affinity expression for defining this pod as the scope.
 	ScopeExpression() *resmgr.Expression
+	// GetRuntimeHandler returns the runtime handler for this pod.
+	GetRuntimeHandler() string
+	// GetRuntimeType returns the runtime type for this pod.
+	GetRuntimeType() string
+	// GetRuntimeClass returns the runtime controller for this pod.
+	GetRuntimeClass() string
 
 	// GetProcesses returns the pids of all processes in the pod either excluding
 	// container processes, if called with false, or including those if called with true.
@@ -189,6 +200,10 @@ type pod struct {
 
 	Resources *PodResourceRequirements // annotated resource requirements
 	Affinity  *podContainerAffinity    // annotated container affinity
+
+	RuntimeHandler string // runtime handler for this pod (from run request)
+	RuntimeType    string // runtime type for this pod (from status response)
+	RuntimeClass   string // runtime controller name
 }
 
 // ContainerState is the container state in the runtime.
@@ -353,6 +368,13 @@ type Container interface {
 	// GetCgroupDir returns the relative path of the cgroup directory for the container.
 	GetCgroupDir() string
 
+	// GetRuntimeHandler returns the runtime handler for this container.
+	GetRuntimeHandler() string
+	// GetRuntimeType returns the runtime type for this container.
+	GetRuntimeType() string
+	// GetRuntimeClass returns the runtime controller for this pod.
+	GetRuntimeClass() string
+
 	// SetRDTClass assigns this container to the given RDT class.
 	SetRDTClass(string)
 	// GetRDTClass returns the RDT class for this container.
@@ -433,6 +455,7 @@ type container struct {
 	req       *interface{}                 // pending CRI request
 
 	CgroupDir    string       // cgroup directory relative to a(ny) controller.
+	RuntimeClass string       // runtime controller name
 	RDTClass     string       // RDT class this container is assigned to.
 	BlockIOClass string       // Block I/O class this container is assigned to.
 	ToptierLimit int64        // Top tier memory limit.
@@ -784,6 +807,7 @@ func (cch *cache) SetAdjustment(external *config.Adjustment) (bool, map[string]e
 		}
 
 		c.markPending(allControllers...)
+		c.markPending(c.RuntimeClass)
 	}
 
 	if err := cch.Save(); err != nil {
@@ -830,9 +854,8 @@ func (cch *cache) setEffectiveAdjustment(effective map[*container]string) {
 		}
 
 		// we forcibly mark the container as updated in all controller domains
-		for _, ctrl := range allControllers {
-			c.markPending(ctrl)
-		}
+		c.markPending(allControllers...)
+		c.markPending(c.RuntimeClass)
 	}
 }
 

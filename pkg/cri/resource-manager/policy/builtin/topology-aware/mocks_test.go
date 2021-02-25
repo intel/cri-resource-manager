@@ -533,6 +533,15 @@ func (m *mockContainer) String() string {
 func (m *mockContainer) Eval(string) interface{} {
 	panic("unimplemented")
 }
+func (m *mockContainer) GetRuntimeHandler() string {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetRuntimeType() string {
+	panic("unimplemented")
+}
+func (m *mockContainer) GetRuntimeClass() string {
+	panic("unimplemented")
+}
 func (m *mockContainer) GetProcesses() ([]string, error) {
 	panic("unimplemented")
 }
@@ -639,6 +648,15 @@ func (m *mockPod) String() string {
 	return "mockPod"
 }
 func (m *mockPod) Eval(string) interface{} {
+	panic("unimplemented")
+}
+func (m *mockPod) GetRuntimeHandler() string {
+	panic("unimplemented")
+}
+func (m *mockPod) GetRuntimeType() string {
+	panic("unimplemented")
+}
+func (m *mockPod) GetRuntimeClass() string {
 	panic("unimplemented")
 }
 func (m *mockPod) GetProcesses(bool) ([]string, error) {
