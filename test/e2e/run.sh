@@ -50,6 +50,9 @@ usage() {
     echo "    reinstall_cri_resmgr: If 1, stop running cri-resmgr, reinstall,"
     echo "             and restart it on the VM before starting test run."
     echo "             The default is 0."
+    echo "    reinstall_cri_resmgr_agent: If 1, stop running cri-resmgr-agent, reinstall,"
+    echo "             and restart it on the VM before starting test run."
+    echo "             The default is 0."
     echo "    omit_agent: if 1, omit installing/starting/cleaning up cri-resmgr-agent."
     echo "    outdir:  Save output under given directory."
     echo "             The default is \"${SCRIPT_DIR}/output\"."
@@ -395,6 +398,9 @@ install() { # script API
         "cri-resmgr")
             vm-install-cri-resmgr
             ;;
+        "cri-resmgr-agent")
+            vm-install-cri-resmgr-agent
+            ;;
         "cri-resmgr-webhook")
             vm-install-cri-resmgr-webhook
             ;;
@@ -416,6 +422,10 @@ uninstall() { # script API
             terminate cri-resmgr
             terminate cri-resmgr-agent
             distro-remove-pkg cri-resource-manager
+            vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/cri-resmgr /etc/cri-resmgr"
+            ;;
+        "cri-resmgr-agent")
+            terminate cri-resmgr-agent
             vm-command "rm -rf /usr/local/bin/cri-resmgr /usr/bin/cri-resmgr /usr/local/bin/cri-resmgr-agent /usr/bin/cri-resmgr-agent /var/lib/cri-resmgr /etc/cri-resmgr"
             ;;
         "cri-resmgr-webhook")
@@ -952,6 +962,7 @@ cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
 cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
 cleanup=${cleanup:-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr:-0}
+reinstall_cri_resmgr_agent=${reinstall_cri_resmgr_agent:-0}
 omit_agent=${omit_agent:-0}
 py_consts="${py_consts:-''}"
 topology=${topology:-'[
@@ -1086,8 +1097,16 @@ if [ "$reinstall_cri_resmgr" == "1" ]; then
     uninstall cri-resmgr
 fi
 
+if [ "$reinstall_cri_resmgr_agent" == "1" ]; then
+    uninstall cri-resmgr-agent
+fi
+
 if ! vm-command-q "type -p cri-resmgr >/dev/null"; then
     install cri-resmgr
+fi
+
+if ! vm-command-q "type -p cri-resmgr-agent >/dev/null"; then
+    install cri-resmgr-agent
 fi
 
 # Start cri-resmgr if not already running
