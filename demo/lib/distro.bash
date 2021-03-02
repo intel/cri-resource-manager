@@ -293,7 +293,7 @@ centos-install-golang() {
 }
 
 fedora-image-url() {
-    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/32/Cloud/x86_64/images/Fedora-Cloud-Base-32-1.6.x86_64.qcow2"
+    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
 }
 
 fedora-ssh-user() {
