@@ -1,7 +1,7 @@
 # Quick-start
 
 The following describes the minimum number of steps to get started with CRI
-Resource mManager.
+Resource Manager.
 
 ## Pre-requisites
 
