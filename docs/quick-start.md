@@ -83,7 +83,7 @@ kubeadm join --cri-socket /var/run/cri-resmgr/cri-resmgr.sock \
 
 Congratulations, you now have cri-resource-manager running on your system and
 policying container resource allocations. Next, you could see:
-- [Installation](installation.md) for more installation options and 
+- [Installation](installation.md) for more installation options and
   detailed installation instructions
 - [Setup](setup.md) for details on setup and usage
 - [Node Agent](node-agent.md) for seting up cri-resmgr-agent for dynamic

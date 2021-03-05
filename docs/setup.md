@@ -81,7 +81,7 @@ also disables the config interface for receiving configuration updates.
 
 ### Using CRI Resource Manager Agent and a ConfigMap
 
-This setup requires an extra component, the 
+This setup requires an extra component, the
 [CRI Resource Manager Node Agent][agent],
 to monitor and fetch configuration from the ConfigMap and pass it on to CRI
 Resource Manager. By default, CRI Resource Manager automatically tries to
@@ -307,7 +307,7 @@ environment:
    have the runtimes enabled in their configuration files.
   * Kubernetes must be made aware of the CRI-O/containerd runtimes via a
    "RuntimeClass"
-   [resource](https://kubernetes.io/docs/concepts/containers/runtime-class/) 
+   [resource](https://kubernetes.io/docs/concepts/containers/runtime-class/)
 
 After these prerequisites are satisfied, the configuration file for the
 target  Kata Container, must have the flag "SandboxCgroupOnly" set to true.
@@ -324,7 +324,7 @@ Kubernetes cgroup naming conventions.
    # See: https://godoc.org/github.com/kata-containers/runtime/virtcontainers#ContainerType
    sandbox_cgroup_only=true
    ...
-   ``` 
+   ```
 
 ### Reference
 

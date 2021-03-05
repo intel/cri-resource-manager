@@ -29,7 +29,7 @@ You can assign a node to a configuration group by setting the
 the configuration group. You can remove a node from its group by deleting
 the node group label.
 
-There is a 
+There is a
 [sample ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
 that contains a node-specific, a group-specific, and a default ConfigMap
 example. See [any available policy-specific documentation](policy/index.rst)
