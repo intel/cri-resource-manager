@@ -16,6 +16,8 @@ package cache
 
 import (
 	"io/ioutil"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -24,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
+
+	"github.com/intel/cri-resource-manager/pkg/cgroups"
 )
 
 var memoryCapacity int64
@@ -252,80 +256,37 @@ func resourcesToQOS(podResources *PodResourceRequirements) corev1.PodQOSClass {
 	return corev1.PodQOSBurstable
 }
 
-/*
-// ContainerQOS tries to map Pod container resources (from annotation) to QOS class.
-func resourceRequirementsToQOS(resources *corev1.ResourceRequirements) corev1.PodQOSClass {
-	var qos corev1.PodQOSClass
+// findContainerDir brute-force searches for a container cgroup dir.
+func findContainerDir(podCgroupDir, podID, ID string) string {
+	var dirs []string
 
-	if resources == nil {
-		return qos
+	if podCgroupDir == "" {
+		return ""
 	}
 
-	if podResources == nil {
-		return qos
+	cpusetDir := cgroups.Cpuset.Path()
+
+	dirs = []string{
+		// containerd, systemd
+		path.Join(cpusetDir, podCgroupDir, "cri-containerd-"+ID+".scope"),
+		// containerd, cgroupfs
+		path.Join(cpusetDir, podCgroupDir, "cri-containerd-"+ID),
+		// crio, systemd
+		path.Join(cpusetDir, podCgroupDir, "crio-"+ID+".scope"),
+		// crio, cgroupfs
+		path.Join(cpusetDir, podCgroupDir, "crio-"+ID),
 	}
 
-	requests := corev1.ResourceList{}
-	limits := corev1.ResourceList{}
-	zeroQuantity := resapi.MustParse("0")
-	isGuaranteed := true
-	for _, resources := range podResources.Containers {
-		// process requests
-		for name, quantity := range resources.Requests {
-			if !isSupportedQoSComputeResource(name) {
-				continue
-			}
-			if quantity.Cmp(zeroQuantity) == 1 {
-				delta := quantity.Copy()
-				if _, exists := requests[name]; !exists {
-					requests[name] = *delta
-				} else {
-					delta.Add(requests[name])
-					requests[name] = *delta
-				}
-			}
-		}
-		// process limits
-		qosLimitsFound := sets.NewString()
-		for name, quantity := range resources.Limits {
-			if !isSupportedQoSComputeResource(name) {
-				continue
-			}
-			if quantity.Cmp(zeroQuantity) == 1 {
-				qosLimitsFound.Insert(string(name))
-				delta := quantity.Copy()
-				if _, exists := limits[name]; !exists {
-					limits[name] = *delta
-				} else {
-					delta.Add(limits[name])
-					limits[name] = *delta
-				}
-			}
-		}
-
-		if !qosLimitsFound.HasAll(string(corev1.ResourceMemory), string(corev1.ResourceCPU)) {
-			isGuaranteed = false
-		}
-	}
-	if len(requests) == 0 && len(limits) == 0 {
-		return corev1.PodQOSBestEffort
-	}
-	// Check is requests match limits for all resources.
-	if isGuaranteed {
-		for name, req := range requests {
-			if lim, exists := limits[name]; !exists || lim.Cmp(req) != 0 {
-				isGuaranteed = false
-				break
+	for _, dir := range dirs {
+		if info, err := os.Stat(dir); err == nil {
+			if info.Mode().IsDir() {
+				return strings.TrimPrefix(dir, cpusetDir)
 			}
 		}
 	}
-	if isGuaranteed &&
-		len(requests) == len(limits) {
-		return corev1.PodQOSGuaranteed
-	}
-	return corev1.PodQOSBurstable
+
+	return ""
 }
-*/
 
 func isSupportedQoSComputeResource(name corev1.ResourceName) bool {
 	return name == corev1.ResourceCPU || name == corev1.ResourceMemory

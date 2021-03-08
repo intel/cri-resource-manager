@@ -70,10 +70,6 @@ func removeTmpCache(dir string) {
 }
 
 func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
-	if string(fp.qos) == "" {
-		fp.qos = v1.PodQOSBurstable
-	}
-
 	if fp.labels == nil {
 		fp.labels = make(map[string]string)
 	}
@@ -82,7 +78,18 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 	fp.labels[kubetypes.KubernetesPodUIDLabel] = fp.uid
 	nextFakePodID++
 
-	qos := strings.ToLower(string(fp.qos))
+	if string(fp.qos) == "" {
+		fp.qos = v1.PodQOSBurstable
+	}
+
+	cgroupPath := ""
+	if fp.qos != v1.PodQOSGuaranteed {
+		pathClass := "kubepods-" + strings.ToLower(string(fp.qos))
+		cgroupPath = "/kubepods.slice/" + pathClass + ".slice/" + pathClass + "-pod" + fp.uid
+	} else {
+		cgroupPath = "/kubepods.slice/kubepods-pod" + strings.ReplaceAll(fp.uid, "-", "_")
+	}
+
 	req := &cri.RunPodSandboxRequest{
 		Config: &cri.PodSandboxConfig{
 			Metadata: &cri.PodSandboxMetadata{
@@ -93,15 +100,14 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 			Labels:      fp.labels,
 			Annotations: fp.annotations,
 			Linux: &cri.LinuxPodSandboxConfig{
-				CgroupParent: "/kubepods.slice/kubepods-" + qos + ".slice/" +
-					"kubepods-" + string(fp.qos) + "-pod-" + fp.id + ".slice",
+				CgroupParent: cgroupPath,
 			},
 		},
 	}
 	fp.podCfg = req.Config
 
 	cch.(*cache).Debug("*** => creating Pod: %+v\n", *req)
-	p := cch.InsertPod(fp.id, req)
+	p := cch.InsertPod(fp.id, req, nil)
 	cch.(*cache).Debug("*** <= created Pod: %+v\n", *p.(*pod))
 	return p, nil
 }
