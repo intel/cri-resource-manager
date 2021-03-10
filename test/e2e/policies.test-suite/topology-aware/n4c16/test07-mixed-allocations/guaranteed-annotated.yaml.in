@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  $(if [ -n "${ANNOTATIONS[0]}" ]; then echo "
+  annotations:
+    $(for annotation in "${ANNOTATIONS[@]}"; do echo "
+    $annotation
+    "; done)
+  "; fi)
+  labels:
+    app: ${NAME}
+spec:
+  containers:
+  $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
+  - name: ${NAME}c$(( contnum - 1 ))
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+      - -c
+      - echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
+    resources:
+      requests:
+        cpu: ${CPU}
+        memory: '${MEM}'
+      limits:
+        cpu: ${CPU}
+        memory: '${MEM}'
+  "; done )
+  terminationGracePeriodSeconds: 1
