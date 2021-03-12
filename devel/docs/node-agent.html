@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Node Agent &mdash; CRI Resource Manager 0.5.0-18-g006807d documentation</title>
+  <title>Node Agent &mdash; CRI Resource Manager 0.5.0-20-g600e7b1 documentation</title>
   
 
   
@@ -175,8 +175,8 @@
 <h1>Node Agent<a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h1>
 <p>CRI Resource Manager can be configured dynamically using the CRI Resource
 Manager Node Agent and Kubernetes ConfigMaps. The agent can be build using
-the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/006807d8947e338032ca1b0cd18973cb7706e2a3/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be deployed
-as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/006807d8947e338032ca1b0cd18973cb7706e2a3/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
+the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/600e7b1602186b0715a8a9dbe906288041da70db/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be deployed
+as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/600e7b1602186b0715a8a9dbe906288041da70db/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
 <p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment variable
 <code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running on. If necessary
 pass it the credentials for accessing the cluster using the the <code class="docutils literal notranslate"><span class="pre">-kubeconfig</span> <span class="pre">&lt;file&gt;</span></code>
@@ -195,7 +195,7 @@ the others.</p>
 <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/group</span></code> label on the node to the name of
 the configuration group. You can remove a node from its group by deleting the node
 group label.</p>
-<p>There is a <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/006807d8947e338032ca1b0cd18973cb7706e2a3/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
+<p>There is a <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/600e7b1602186b0715a8a9dbe906288041da70db/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
 that contains anode-specific, a group-specific, and a default ConfigMap examples.
 See <a class="reference internal" href="policy/index.html">any available policy-specific documentation</a> for more information on the
 policy configurations.</p>
