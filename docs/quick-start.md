@@ -1,7 +1,7 @@
 # Quick-start
 
-The following describes the Minimal steps to get started with CRI Resource
-Manager.
+The following describes the minimum number of steps to get started with CRI
+Resource Manager.
 
 ## Pre-requisites
 
@@ -12,9 +12,9 @@ Manager.
 
 First, install and setup cri-resource-manager.
 
-### Install Package
+### Install package
 
-#### CentOS, Fedora and SUSE
+#### CentOS\*, Fedora\*, and SUSE\*
 
 ```
 CRIRM_VERSION=`curl -s "https://api.github.com/repos/intel/cri-resource-manager/releases/latest" | \
@@ -23,7 +23,7 @@ source /etc/os-release
 sudo rpm -Uvh https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/cri-resource-manager-${CRIRM_VERSION}-0.x86_64.${ID}-${VERSION_ID}.rpm
 ```
 
-#### Ubuntu and Debian
+#### Ubuntu\* and Debian\*
 ```
 CRIRM_VERSION=`curl -s "https://api.github.com/repos/intel/cri-resource-manager/releases/latest" | \
                jq .tag_name | tr -d '"v'`
@@ -32,7 +32,7 @@ pkg=cri-resource-manager_${CRIRM_VERSION}_amd64.${ID}-${VERSION_ID}.deb; curl -L
 ```
 
 
-### Setup and Verify
+### Setup and verify
 
 Create configuration and start cri-resource-manager
 ```
@@ -50,13 +50,13 @@ systemctl status cri-resource-manager
 Next, you need to configure kubelet to user cri-resource-manager as it's
 container runtime endpoint.
 
-### Existing Cluster
+### Existing cluster
 
 When integrating into an existing cluster you need to change kubelet to use
 cri-resmgr instead of the existing container runtime (expecting containerd
 here).
 
-#### CentOS, Fedora and SUSE
+#### CentOS, Fedora, and SUSE
 ```
 sudo sed '/KUBELET_EXTRA_ARGS/ s!$! --container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock!' -i /etc/sysconfig/kubelet
 sudo systemctl restart kubelet
@@ -70,8 +70,9 @@ sudo systemctl restart kubelet
 
 ### New Cluster
 
-When in the process of setting up a new cluster you simply point kubelet to use
-the cri-resmgr cri sockets on cluster node setup time. E.g. with kubeadm:
+When in the process of setting up a new cluster you simply point the kubelet
+to use the cri-resmgr cri sockets on cluster node setup time. Here's an
+example with kubeadm:
 ```
 kubeadm join --cri-socket /var/run/cri-resmgr/cri-resmgr.sock \
 ...
@@ -82,8 +83,11 @@ kubeadm join --cri-socket /var/run/cri-resmgr/cri-resmgr.sock \
 
 Congratulations, you now have cri-resource-manager running on your system and
 policying container resource allocations. Next, you could see:
-- [Installation](installation.md) for more installation options and detailed installation instructions
+- [Installation](installation.md) for more installation options and
+  detailed installation instructions
 - [Setup](setup.md) for details on setup and usage
-- [Node Agent](node-agent.md) for seting up cri-resmgr-agent for dynamic configuration and more
+- [Node Agent](node-agent.md) for setting up cri-resmgr-agent for dynamic
+  configuration and more
 - [Webhook](webhook.md) for setting up our resource-annotating webhook
-- [Kata support](setup.md#kata-containers) for setting up CRI-RM with Kata containers
+- [Support for Kata Containers\*](setup.md#kata-containers) for setting up
+  CRI-RM with Kata Containers
