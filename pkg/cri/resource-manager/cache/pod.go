@@ -25,6 +25,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/runtimes"
 )
 
 const (
@@ -51,12 +52,14 @@ func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
 	p.Labels = cfg.Labels
 	p.Annotations = cfg.Annotations
 	p.CgroupParent = cfg.GetLinux().GetCgroupParent()
+	p.RuntimeClass = runtimes.MatchHandler(req.RuntimeHandler)
 
 	if err := p.discoverQOSClass(); err != nil {
 		p.cache.Error("%v", err)
 	}
 
 	p.parseResourceAnnotations()
+	p.setDefaults()
 
 	return nil
 }
@@ -76,14 +79,35 @@ func (p *pod) fromListResponse(pod *cri.PodSandbox, status *PodStatus) error {
 	p.Labels = pod.Labels
 	p.Annotations = pod.Annotations
 	p.CgroupParent = status.CgroupParent
+	if p.RuntimeHandler == "" {
+		p.RuntimeHandler = status.RuntimeHandler
+	}
+	p.RuntimeClass = runtimes.MatchHandler(p.RuntimeHandler)
 
 	if err := p.discoverQOSClass(); err != nil {
 		p.cache.Error("%v", err)
 	}
 
 	p.parseResourceAnnotations()
+	p.setDefaults()
 
 	return nil
+}
+
+// setDefaults sets up pod-level defaults.
+func (p *pod) setDefaults() {
+	qosClass := string(p.GetQOSClass())
+	class, ok := p.GetPodAnnotation(RDTClassKey)
+	if !ok {
+		class = qosClass
+	}
+	p.RDTClass = class
+
+	class, ok = p.GetPodAnnotation(BlockIOClassKey)
+	if !ok {
+		class = qosClass
+	}
+	p.BlockIOClass = class
 }
 
 // Get the init containers of a pod.
@@ -291,6 +315,11 @@ func (p *pod) GetEffectiveAnnotation(key, container string) (string, bool) {
 	if v, ok := p.Annotations[key+"/container."+container]; ok {
 		return v, true
 	}
+	return p.GetPodAnnotation(key)
+}
+
+// Get the effective pod-level annotation for the given key.
+func (p *pod) GetPodAnnotation(key string) (string, bool) {
 	if v, ok := p.Annotations[key+"/pod"]; ok {
 		return v, true
 	}
@@ -446,6 +475,31 @@ func (p *pod) Eval(key string) interface{} {
 	}
 }
 
+// GetRuntimeHandler returns the runtime handler for this pod.
+func (p *pod) GetRuntimeHandler() string {
+	return p.RuntimeHandler
+}
+
+// GetRuntimeType returns the runtime type for this pod.
+func (p *pod) GetRuntimeType() string {
+	return p.RuntimeType
+}
+
+// GetRuntimeClass returns the runtime controller for this pod.
+func (p *pod) GetRuntimeClass() string {
+	return p.RuntimeClass
+}
+
+// GetRDTClass returns the pod-level RDT class.
+func (p *pod) GetRDTClass() string {
+	return p.RDTClass
+}
+
+// GetBlockIOClass returns the pod-level BlockIO class.
+func (p *pod) GetBlockIOClass() string {
+	return p.BlockIOClass
+}
+
 // GetProcesses returns the pids of processes in a pod.
 func (p *pod) GetProcesses(recursive bool) ([]string, error) {
 	return p.getTasks(recursive, true)
@@ -512,8 +566,9 @@ func ParsePodStatus(response *cri.PodSandboxStatusResponse) (*PodStatus, error) 
 		} `json:"linux"`
 	}
 	type statusInfo struct {
-		RuntimeSpec *infoRuntimeSpec `json:"runtimeSpec"`
-		Config      *infoConfig      `json:"config"`
+		RuntimeHandler string           `json:"runtimeHandler"`
+		RuntimeSpec    *infoRuntimeSpec `json:"runtimeSpec"`
+		Config         *infoConfig      `json:"config"`
 	}
 
 	if response.Status.Metadata != nil {
@@ -535,14 +590,25 @@ func ParsePodStatus(response *cri.PodSandboxStatusResponse) (*PodStatus, error) 
 	ps := &PodStatus{}
 
 	if info.Config != nil { // containerd
-		// CgroupParent: Info["config"]["linux"]["cgroup_parent"]
+		// CgroupParent:   Info["config"]["linux"]["cgroup_parent"]
+		// runtimeHandler: Status.RuntimeHandler
+		// runtimeHandler: Info["runtimeHandler"]
+
+		if response.Status.RuntimeHandler != "" {
+			ps.RuntimeHandler = response.Status.RuntimeHandler
+		} else {
+			ps.RuntimeHandler = info.RuntimeHandler
+		}
 		ps.CgroupParent = info.Config.Linux.CgroupParent
 	} else if info.RuntimeSpec != nil { // cri-o
-		// CgroupParent: Info["info"]["runtimeSpec"]["annotations"][crioCgroupParent]
+		// CgroupParent:   Info["info"]["runtimeSpec"]["annotations"][crioCgroupParent]
+		// runtimeHandler: Info["info"]["runtimeSpec"]["annotations"][crioRuntimeHandler]
 		const (
-			crioCgroupParent = "io.kubernetes.cri-o.CgroupParent"
+			crioRuntimeHandler = "io.kubernetes.cri-o.RuntimeHandler"
+			crioCgroupParent   = "io.kubernetes.cri-o.CgroupParent"
 		)
 
+		ps.RuntimeHandler = info.RuntimeSpec.Annotations[crioRuntimeHandler]
 		ps.CgroupParent = info.RuntimeSpec.Annotations[crioCgroupParent]
 	}
 
