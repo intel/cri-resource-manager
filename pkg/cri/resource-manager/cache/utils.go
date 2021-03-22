@@ -267,6 +267,7 @@ func findContainerDir(podCgroupDir, podID, ID string) string {
 	cpusetDir := cgroups.Cpuset.Path()
 
 	dirs = []string{
+		path.Join(cpusetDir, podCgroupDir, ID),
 		// containerd, systemd
 		path.Join(cpusetDir, podCgroupDir, "cri-containerd-"+ID+".scope"),
 		// containerd, cgroupfs
