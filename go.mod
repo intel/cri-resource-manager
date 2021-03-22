@@ -34,6 +34,7 @@ require (
 
 replace (
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0 => ./pkg/topology
+	github.com/intel/goresctrl => github.com/askervin/goresctrl v0.0.0-20210322083802-963cce2085b2
 	google.golang.org/grpc => google.golang.org/grpc v1.26.0
 
 	k8s.io/api v0.0.0 => k8s.io/api v0.0.0-20201113170447-7ec4e34ebfa0
