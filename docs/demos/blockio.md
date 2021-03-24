@@ -1,10 +1,10 @@
 # Block I/O Demo
 
-This demo creates a virtual machine for a single-node Kubernetes
+This demo creates a virtual machine for a single-node Kubernetes\*
 cluster where container runtime features are extended by `cri-resmgr`.
 
-In this setup `cri-resmgr` is configured with block I/O parameters
-that throttles I/O bandwith of a container that constantly scans
+In this setup, `cri-resmgr` is configured with block I/O parameters
+that throttle I/O bandwith of a container that constantly scans
 system file checksums.
 
 ## Prerequisites
