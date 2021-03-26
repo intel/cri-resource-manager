@@ -195,7 +195,7 @@ if ! vm-command-q "dpkg -l | grep -q kubelet"; then
     screen-install-k8s
 fi
 
-if ! vm-command-q "[ -f /usr/bin/cri-resmgr ]"; then
+if ! vm-command-q "[ -f /usr/bin/cri-resmgr ] || [ -f /usr/local/bin/cri-resmgr ]"; then
     screen-install-cri-resmgr
 fi
 
