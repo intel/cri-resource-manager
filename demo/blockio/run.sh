@@ -105,6 +105,7 @@ screen-launch-cri-resmgr-agent() {
 screen-measure-io-speed() {
     process=$1
     measuretime=2
+    vm-command "echo 3 > /proc/sys/vm/drop_caches"
     out "### Measuring $process read speed -- twice."
     cmd="pid=\$(ps -A | awk \"/$process/{print \\\$1}\"); [ -n \"\$pid\" ] && { echo \$(grep read_bytes /proc/\$pid/io; sleep $measuretime; grep read_bytes /proc/\$pid/io) | awk \"{print \\\"$process read speed: \\\"(\\\$4-\\\$2)/$measuretime/1024\\\" kBps\\\"}\"; }"
     speed=360 outcolor=10 vm-command "$cmd"
