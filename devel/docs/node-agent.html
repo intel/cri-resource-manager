@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Node Agent &mdash; CRI Resource Manager 0.5.0-22-g18fe17b documentation</title>
+  <title>Node Agent &mdash; CRI Resource Manager 0.5.0-26-gd8f75d5e documentation</title>
   
 
   
@@ -174,31 +174,35 @@
   <div class="section" id="node-agent">
 <h1>Node Agent<a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h1>
 <p>CRI Resource Manager can be configured dynamically using the CRI Resource
-Manager Node Agent and Kubernetes ConfigMaps. The agent can be build using
-the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/18fe17bda335ba44591fa7a93a552f3609eb7386/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be deployed
-as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/18fe17bda335ba44591fa7a93a552f3609eb7386/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
-<p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment variable
-<code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running on. If necessary
-pass it the credentials for accessing the cluster using the the <code class="docutils literal notranslate"><span class="pre">-kubeconfig</span> <span class="pre">&lt;file&gt;</span></code>
-command line option.</p>
-<p>The agent monitors two ConfigMaps for the node, a primary node-specific one, and
-a secondary group-specific or default one, depending on whether the node belongs
-to a configuration group. The node-specific ConfigMap always takes precedence over
-the others.</p>
+Manager Node Agent and Kubernetes* ConfigMaps. The agent can be build using
+the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/d8f75d5eda4c265827a9da31b8cf83d72b780978/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be
+deployed as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/d8f75d5eda4c265827a9da31b8cf83d72b780978/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
+<p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment
+variable <code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running
+on. If necessary pass it the credentials for accessing the cluster using
+the <code class="docutils literal notranslate"><span class="pre">-kubeconfig</span> <span class="pre">&lt;file&gt;</span></code> command line option.</p>
+<p>The agent monitors two ConfigMaps for the node, a primary node-specific one
+and a secondary group-specific or default one, depending on whether the node
+belongs to a configuration group. The node-specific ConfigMap always takes
+precedence over the others.</p>
 <p>The names of these ConfigMaps are</p>
 <ol class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.node.$NODE_NAME</span></code>: primary, node-specific configuration</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.group.$GROUP_NAME</span></code>: secondary group-specific node configuration</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.default</span></code>: secondary: secondary default node configuration</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.group.$GROUP_NAME</span></code>: secondary group-specific node
+configuration</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.default</span></code>: secondary: secondary default node
+configuration</p></li>
 </ol>
 <p>You can assign a node to a configuration group by setting the
 <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/group</span></code> label on the node to the name of
-the configuration group. You can remove a node from its group by deleting the node
-group label.</p>
-<p>There is a <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/18fe17bda335ba44591fa7a93a552f3609eb7386/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
-that contains anode-specific, a group-specific, and a default ConfigMap examples.
-See <a class="reference internal" href="policy/index.html">any available policy-specific documentation</a> for more information on the
-policy configurations.</p>
+the configuration group. You can remove a node from its group by deleting
+the node group label.</p>
+<p>There is a
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/d8f75d5eda4c265827a9da31b8cf83d72b780978/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
+that contains a node-specific, a group-specific, and a default ConfigMap
+example. See <a class="reference internal" href="policy/index.html">any available policy-specific documentation</a>
+for more information on the policy configurations.</p>
 </div>
 
 

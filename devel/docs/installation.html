@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Installation &mdash; CRI Resource Manager 0.5.0-22-g18fe17b documentation</title>
+  <title>Installation &mdash; CRI Resource Manager 0.5.0-26-gd8f75d5e documentation</title>
   
 
   
@@ -94,11 +94,11 @@
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#installing-from-packages">Installing From Packages</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#installing-from-sources">Installing From Sources</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#building-packages-for-the-distro-of-your-host">Building Packages for the Distro of Your Host</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#building-packages-for-another-distro">Building Packages for Another Distro</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#post-install-configuration">Post-Install Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-from-packages">Installing from packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-from-sources">Installing from sources</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-packages-for-the-distro-of-your-host">Building packages for the distro of your host</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-packages-for-another-distro">Building packages for another distro</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#post-install-configuration">Post-install configuration</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="setup.html">Setup and Usage</a></li>
@@ -181,11 +181,12 @@
   <div class="section" id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="installing-from-packages">
-<h2>Installing From Packages<a class="headerlink" href="#installing-from-packages" title="Permalink to this headline">¶</a></h2>
+<h2>Installing from packages<a class="headerlink" href="#installing-from-packages" title="Permalink to this headline">¶</a></h2>
 <p>You can install CRI Resource Manager from <code class="docutils literal notranslate"><span class="pre">deb</span></code> or <code class="docutils literal notranslate"><span class="pre">rpm</span></code> packages
 for supported distros.</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://github.com/intel/cri-resource-manager/releases/latest">download</a> packages</p></li>
+<li><p><a class="reference external" href="https://github.com/intel/cri-resource-manager/releases/latest">download</a>
+packages</p></li>
 <li><p>install them:</p>
 <ul>
 <li><p>for rpm packages: <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">rpm</span> <span class="pre">-Uvh</span> <span class="pre">&lt;packages&gt;</span></code></p></li>
@@ -195,7 +196,7 @@ for supported distros.</p>
 </ul>
 </div>
 <div class="section" id="installing-from-sources">
-<h2>Installing From Sources<a class="headerlink" href="#installing-from-sources" title="Permalink to this headline">¶</a></h2>
+<h2>Installing from sources<a class="headerlink" href="#installing-from-sources" title="Permalink to this headline">¶</a></h2>
 <p>Although not recommended, you can install CRI Resource Manager from sources:</p>
 <ul class="simple">
 <li><p>get the sources: <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">clone</span> <span class="pre">https://github.com/intel/cri-resource-manager</span></code></p></li>
@@ -206,7 +207,7 @@ for supported distros.</p>
 from sources.</p>
 </div>
 <div class="section" id="building-packages-for-the-distro-of-your-host">
-<h2>Building Packages for the Distro of Your Host<a class="headerlink" href="#building-packages-for-the-distro-of-your-host" title="Permalink to this headline">¶</a></h2>
+<h2>Building packages for the distro of your host<a class="headerlink" href="#building-packages-for-the-distro-of-your-host" title="Permalink to this headline">¶</a></h2>
 <p>You can build packages for the <code class="docutils literal notranslate"><span class="pre">$distro</span></code> of your host by executing the
 following command:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">make</span> <span class="n">packages</span>
@@ -215,7 +216,7 @@ following command:</p>
 <p>If the <code class="docutils literal notranslate"><span class="pre">$version</span></code> of your <code class="docutils literal notranslate"><span class="pre">$distro</span></code> is supported, this will leave the
 resulting packages in <code class="docutils literal notranslate"><span class="pre">packages/$distro-$version</span></code>. Building packages
 this way requires <code class="docutils literal notranslate"><span class="pre">docker</span></code>, but it does not require you to install
-the full set of build dependecies of CRI Resource Manager to your host.</p>
+the full set of build dependencies of CRI Resource Manager to your host.</p>
 <p>If you want to build packages without docker, you can use either
 <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">rpm</span></code> or <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">deb</span></code>, depending on which supported distro you are
 running. Building this way requires all the build dependencies to be
@@ -228,29 +229,29 @@ installed on your host.</p>
 distro is supported.</p>
 </div>
 <div class="section" id="building-packages-for-another-distro">
-<h2>Building Packages for Another Distro<a class="headerlink" href="#building-packages-for-another-distro" title="Permalink to this headline">¶</a></h2>
+<h2>Building packages for another distro<a class="headerlink" href="#building-packages-for-another-distro" title="Permalink to this headline">¶</a></h2>
 <p>You can cross-build packages of the native <code class="docutils literal notranslate"><span class="pre">$type</span></code> for a particular
-<code class="docutils literal notranslate"><span class="pre">$version</span></code> of a <code class="docutils literal notranslate"><span class="pre">$distro</span></code> by running the follwing command:</p>
+<code class="docutils literal notranslate"><span class="pre">$version</span></code> of a <code class="docutils literal notranslate"><span class="pre">$distro</span></code> by running the following command:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>make cross-$type.$distro-$version
 </pre></div>
 </div>
-<p>Similarly to <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">packages</span></code> this will build packages using a <code class="docutils literal notranslate"><span class="pre">docker</span></code>
+<p>Similarly to <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">packages</span></code>, this will build packages using a <code class="docutils literal notranslate"><span class="pre">Docker\*</span></code>
 container. However, instead of building for your host, it will build them
 for the specified distro. For instance <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">cross-deb.ubuntu-18.04</span></code> will
-build <code class="docutils literal notranslate"><span class="pre">deb</span></code> packages for <code class="docutils literal notranslate"><span class="pre">Ubuntu</span> <span class="pre">18.04</span></code>, and <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">cross-rpm.centos-8</span></code> will
-build <code class="docutils literal notranslate"><span class="pre">rpm</span></code> packages for <code class="docutils literal notranslate"><span class="pre">CentOS</span> <span class="pre">8</span></code></p>
+build <code class="docutils literal notranslate"><span class="pre">deb</span></code> packages for <code class="docutils literal notranslate"><span class="pre">Ubuntu\*</span> <span class="pre">18.04</span></code> and <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">cross-rpm.centos-8</span></code> will
+build <code class="docutils literal notranslate"><span class="pre">rpm</span></code> packages for <code class="docutils literal notranslate"><span class="pre">CentOS\*</span> <span class="pre">8</span></code></p>
 </div>
 <div class="section" id="post-install-configuration">
-<h2>Post-Install Configuration<a class="headerlink" href="#post-install-configuration" title="Permalink to this headline">¶</a></h2>
-<p>The provided packages install <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service files and sample configuration.
-The easiest way to get up and running is to rename the sample configuration and
-start CRI Resource Manager using systemd. You can do this using the following
-commands:</p>
+<h2>Post-install configuration<a class="headerlink" href="#post-install-configuration" title="Permalink to this headline">¶</a></h2>
+<p>The provided packages install <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service files and a sample
+configuration. The easiest way to get up and running is to rename the sample
+configuration and start CRI Resource Manager using systemd. You can do this
+using the following commands:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mv</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">fallback</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">sample</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">fallback</span><span class="o">.</span><span class="n">cfg</span>
 <span class="n">systemctl</span> <span class="n">start</span> <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span>
 </pre></div>
 </div>
-<p>If you want, you can set up automatic starting of CRI Resource Manager
+<p>If you want, you can set CRI Resource Manager to automatically start
 when your system boots with this command:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">systemctl</span> <span class="n">enable</span> <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span>
 </pre></div>
@@ -258,7 +259,7 @@ when your system boots with this command:</p>
 <p>The provided packages also install a file for managing the default options
 passed to CRI Resource Manager upon startup. You can change these by editing
 this file and then restarting CRI Resource Manager, like this:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># On debian-based systems edit the defaults like this:
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># On Debian\*-based systems edit the defaults like this:
 ${EDITOR:-vi} /etc/default/cri-resource-manager
 # On rpm-based systems edit the defaults like this:
 ${EDITOR:-vi} /etc/sysconfig/cri-resource-manager
