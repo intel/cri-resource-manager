@@ -2,4 +2,4 @@ sphinx==3.2.1
 sphinx_rtd_theme
 recommonmark==0.7.1
 sphinx-markdown-tables
-Pygments==2.6.1
+Pygments==2.7.4
