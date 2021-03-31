@@ -147,8 +147,12 @@ screen-install-cri-resmgr-debugging() {
         command-error "installing delve failed"
     }
     host-command "cd \"$HOST_PROJECT_DIR/..\" && rsync -av --exclude .git $(basename "$HOST_PROJECT_DIR") $VM_SSH_USER@$VM_IP:"
+    host-command "cd \"$HOST_GORESCTRL_DIR/..\" && rsync -av --exclude .git $(basename "$HOST_GORESCTRL_DIR") $VM_SSH_USER@$VM_IP:"
     vm-command "mkdir -p \"\$HOME/.config/dlv\""
-    vm-command "( echo 'substitute-path:'; echo ' - {from: $HOST_PROJECT_DIR, to: /home/$VM_SSH_USER/$(basename "$HOST_PROJECT_DIR")}' ) > \"\$HOME/.config/dlv/config.yml\""
+    vm-command "( echo 'substitute-path:'
+                  echo ' - {from: $HOST_PROJECT_DIR, to: /home/$VM_SSH_USER/$(basename "$HOST_PROJECT_DIR")}'
+                  echo ' - {from: $HOST_GORESCTRL_DIR, to: /home/$VM_SSH_USER/$(basename "$HOST_GORESCTRL_DIR")}'
+                ) > \"\$HOME/.config/dlv/config.yml\""
 }
 
 screen-launch-cri-resmgr() {

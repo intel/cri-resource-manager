@@ -5,6 +5,9 @@ HOST_LIB_DIR="$(dirname "${BASH_SOURCE[0]}")"
 HOST_PROJECT_DIR="$(dirname "$(dirname "$(realpath "$HOST_LIB_DIR")")")"
 HOST_VM_IMAGE_DIR=~/vms/images
 HOST_VM_DATA_DIR_TEMPLATE="~/vms/data/\${VM_NAME}"
+if [ -z "$HOST_GORESCTRL_DIR" ]; then
+    HOST_GORESCTRL_DIR="$(realpath "$HOST_PROJECT_DIR/../goresctrl")"
+fi
 GOVM=${GOVM-govm}
 
 host-command() {
