@@ -82,6 +82,9 @@ type Logger interface {
 	// DebugEnabled checks if debug messages are enabled for this Logger.
 	DebugEnabled() bool
 
+	// Prefix returns the output prefix for this logger.
+	Prefix() string
+
 	// Source returns the source name of this Logger.
 	Source() string
 }
@@ -311,6 +314,15 @@ func (l logger) DebugEnabled() bool {
 	defer log.RUnlock()
 	_, enabled := log.debug[l]
 	return enabled || log.forced
+}
+
+func (l logger) Prefix() string {
+	log.RLock()
+	defer log.RUnlock()
+	if log.prefix {
+		return log.sources[l]
+	}
+	return ""
 }
 
 func (l logger) Source() string {

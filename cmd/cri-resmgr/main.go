@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/intel/goresctrl/pkg/blockio"
 	"github.com/intel/goresctrl/pkg/rdt"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
@@ -40,6 +41,7 @@ func main() {
 	logger.SetGrpcLogger("grpc", &rate)
 	logger.SetStdLogger("stdlog")
 	rdt.SetLogger(logger.Get("rdt"))
+	blockio.SetLogger(logger.Get("blockio"))
 
 	printConfig := flag.Bool("print-config", false, "Print configuration and exit.")
 	listPolicies := flag.Bool("list-policies", false, "List available policies.")
