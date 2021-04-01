@@ -225,6 +225,11 @@ func (p *pod) GetAnnotation(key string) (string, bool) {
 	return value, ok
 }
 
+// Get pod annotations.
+func (p *pod) GetAnnotations() map[string]string {
+	return p.Annotations
+}
+
 // Get and decode/unmarshal pod annotation for the given key.
 func (p *pod) GetAnnotationObject(key string, objPtr interface{},
 	decode func([]byte, interface{}) error) (bool, error) {

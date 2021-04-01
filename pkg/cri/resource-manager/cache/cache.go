@@ -133,6 +133,8 @@ type Pod interface {
 	GetAnnotationKeys() []string
 	// GetAnnotation returns the value of the given annotation and whether it was found.
 	GetAnnotation(key string) (string, bool)
+	// GetAnnotations returns raw pod annotations map.
+	GetAnnotations() map[string]string
 	// GetAnnotationObject decodes the value of the given annotation with the given function.
 	GetAnnotationObject(key string, objPtr interface{},
 		decode func([]byte, interface{}) error) (bool, error)
