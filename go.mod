@@ -8,10 +8,10 @@ require (
 	github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.4.0
+	github.com/google/go-cmp v0.5.2
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
-	github.com/intel/goresctrl v0.0.0-20210216084728-8e0ae5411bf4
+	github.com/intel/goresctrl v0.0.0-20210503070253-b143acc88245
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.8.0
 	github.com/prometheus/client_model v0.2.0
@@ -19,8 +19,8 @@ require (
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd
 	go.opencensus.io v0.22.2
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
-	golang.org/x/sys v0.0.0-20201015000850-e3ed0017c211
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/grpc v1.27.0
 	k8s.io/api v0.19.4
@@ -34,7 +34,6 @@ require (
 
 replace (
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0 => ./pkg/topology
-	github.com/intel/goresctrl => github.com/askervin/goresctrl v0.0.0-20210322083802-963cce2085b2
 	google.golang.org/grpc => google.golang.org/grpc v1.26.0
 
 	k8s.io/api v0.0.0 => k8s.io/api v0.0.0-20201113170447-7ec4e34ebfa0
