@@ -386,10 +386,7 @@ func (p *policy) Introspect() *introspect.State {
 	for _, rdtClass := range rdt.GetClasses() {
 		rdtClassNames = append(rdtClassNames, rdtClass.Name())
 	}
-	blkioClassNames := []string{}
-	for _, blkioClass := range blockio.GetClasses() {
-		blkioClassNames = append(blkioClassNames, blkioClass.Name)
-	}
+	p.inspsys.BlockIOClasses = blockio.GetClasses()
 	p.inspsys.RDTClasses = rdtClassNames
 	p.inspsys.Policy = opt.Policy
 
