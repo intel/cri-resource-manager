@@ -5,6 +5,25 @@ metadata:
   labels:
     app: ${NAME}
 spec:
+  $(if [ -n "$ICONTCOUNT" ]; then echo "
+  initContainers:
+  $(for contnum in $(seq 1 ${ICONTCOUNT}); do echo "
+  - name: ${NAME}c$(( contnum - 1 ))i
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+      - -c
+      - echo ${NAME}c$(( contnum - 1 ))i \$(sleep ${ICONTSLEEP:-5})
+    resources:
+      requests:
+        cpu: ${CPU}
+        memory: '${MEM}'
+      limits:
+        cpu: ${CPU}
+        memory: '${MEM}'
+  "; done )
+  "; fi )
   containers:
   $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
   - name: ${NAME}c$(( contnum - 1 ))

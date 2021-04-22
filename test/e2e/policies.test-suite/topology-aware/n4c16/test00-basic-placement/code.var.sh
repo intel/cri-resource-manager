@@ -36,3 +36,17 @@ verify \
     'disjoint_sets(nodes["pod2c0"], nodes["pod2c1"], nodes["pod2c2"], nodes["pod2c3"])'
 
 kubectl delete pods --all --now
+
+# pod3: Test that initContainer resources are freed before launching
+# containers: instantiate 5 init containers, each requiring 5 CPUs. If
+# the resources of an init container weren't freed before next init
+# container is launched, not all of them could be launched, and not
+# real containers could fit on the node.
+ICONTCOUNT=5 ICONTSLEEP=1 CONTCOUNT=2 CPU=5 MEM=100M create guaranteed
+report allowed
+verify \
+    'disjoint_sets(cpus["pod3c0"], cpus["pod3c1"])' \
+    'disjoint_sets(nodes["pod3c0"], nodes["pod3c1"])' \
+    'disjoint_sets(packages["pod3c0"], packages["pod3c1"])'
+
+kubectl delete pods --all --now
