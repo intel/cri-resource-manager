@@ -35,11 +35,11 @@ type tracing struct {
 // start starts our Jaeger exporter.
 func (t *tracing) start(agent, collector string, sampling Sampling) error {
 	if agent == "" && collector == "" {
-		log.Info("%s is disabled", jaegerExporter)
+		log.Infof("%s is disabled", jaegerExporter)
 		return nil
 	}
 
-	log.Info("creating %s...", jaegerExporter)
+	log.Infof("creating %s...", jaegerExporter)
 
 	cfg := jaeger.Options{
 		ServiceName:       ServiceName,
@@ -47,7 +47,7 @@ func (t *tracing) start(agent, collector string, sampling Sampling) error {
 		AgentEndpoint:     agent,
 
 		Process: jaeger.Process{ServiceName: ServiceName},
-		OnError: func(err error) { log.Error("jaeger error: %v", err) },
+		OnError: func(err error) { log.Errorf("jaeger error: %v", err) },
 	}
 
 	exp, err := jaeger.NewExporter(cfg)
@@ -72,7 +72,7 @@ func (t *tracing) stop() {
 		return
 	}
 
-	log.Info("stopping Jaeger trace exporter...")
+	log.Infof("stopping Jaeger trace exporter...")
 
 	trace.UnregisterExporter(t.exporter)
 	*t = tracing{}
@@ -80,7 +80,7 @@ func (t *tracing) stop() {
 
 // reconfigure reconfigures our Jaeger exporter.
 func (t *tracing) reconfigure(agent, collector string, sampling Sampling) error {
-	log.Info("reconfiguring %s...", jaegerExporter)
+	log.Infof("reconfiguring %s...", jaegerExporter)
 
 	if agent == "" && collector == "" {
 		t.stop()

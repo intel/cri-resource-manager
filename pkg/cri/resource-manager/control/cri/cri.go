@@ -65,11 +65,11 @@ func (ctl *crictl) Stop() {
 // PreCreateHook is the CRI controller pre-create hook.
 func (ctl *crictl) PreCreateHook(c cache.Container) error {
 	if !c.HasPending(CRIController) {
-		log.Debug("pre-create hook: no pending changes for %s", c.PrettyName())
+		log.Debugf("pre-create hook: no pending changes for %s", c.PrettyName())
 		return nil
 	}
 
-	log.Debug("pre-create hook: updating %s", c.PrettyName())
+	log.Debugf("pre-create hook: updating %s", c.PrettyName())
 
 	request, ok := c.GetCRIRequest()
 	if !ok {
@@ -112,11 +112,11 @@ func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 	var update *criapi.UpdateContainerResourcesRequest
 
 	if !c.HasPending(CRIController) {
-		log.Debug("post-update hook: no changes for %s", c.PrettyName())
+		log.Debugf("post-update hook: no changes for %s", c.PrettyName())
 		return nil
 	}
 
-	log.Debug("post-update hook: updating %s", c.PrettyName())
+	log.Debugf("post-update hook: updating %s", c.PrettyName())
 
 	resources := c.GetLinuxResources()
 	if resources == nil {

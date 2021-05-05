@@ -23,6 +23,6 @@ import (
 func init() {
 	err := metrics.RegisterCollector("avx", NewCollector)
 	if err != nil {
-		log.Error("Failed to register AVX collector: %v", err)
+		log.Errorf("Failed to register AVX collector: %v", err)
 	}
 }

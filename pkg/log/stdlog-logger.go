@@ -40,6 +40,6 @@ func SetStdLogger(source string) {
 
 // Write implements io.Writer for stdlogger.
 func (s *stdlogger) Write(p []byte) (int, error) {
-	s.l.Debug("%s", string(p))
+	s.l.Debugf("%s", string(p))
 	return len(p), nil
 }

@@ -55,18 +55,18 @@ var levelTag = map[Level]string{
 
 // Logger is the interface for producing log messages for/from a particular source.
 type Logger interface {
-	// Debug formats and emits a debug message.
-	Debug(format string, args ...interface{})
-	// Info formats and emits an informational message.
-	Info(format string, args ...interface{})
-	// Warn formats and emits a warning message.
-	Warn(format string, args ...interface{})
-	// Error formats and emits an error message.
-	Error(format string, args ...interface{})
-	// Panic formats and emits an error message then panics with the same.
-	Panic(format string, args ...interface{})
-	// Fatal formats and emits an error message and os.Exit()'s with status 1.
-	Fatal(format string, args ...interface{})
+	// Debugf formats and emits a debug message.
+	Debugf(format string, args ...interface{})
+	// Infof formats and emits an informational message.
+	Infof(format string, args ...interface{})
+	// Warnf formats and emits a warning message.
+	Warnf(format string, args ...interface{})
+	// Errorf formats and emits an error message.
+	Errorf(format string, args ...interface{})
+	// Panicf formats and emits an error message then panics with the same.
+	Panicf(format string, args ...interface{})
+	// Fatalf formats and emits an error message and os.Exit()'s with status 1.
+	Fatalf(format string, args ...interface{})
 
 	// DebugBlock formats and emits a multiline debug message.
 	DebugBlock(prefix string, format string, args ...interface{})
@@ -331,7 +331,7 @@ func (l logger) Source() string {
 	return log.sources[l]
 }
 
-func (l logger) Debug(format string, args ...interface{}) {
+func (l logger) Debugf(format string, args ...interface{}) {
 	log.RLock()
 	defer log.RUnlock()
 
@@ -350,7 +350,7 @@ func (l logger) Debug(format string, args ...interface{}) {
 	}
 }
 
-func (l logger) Info(format string, args ...interface{}) {
+func (l logger) Infof(format string, args ...interface{}) {
 	log.RLock()
 	defer log.RUnlock()
 
@@ -363,7 +363,7 @@ func (l logger) Info(format string, args ...interface{}) {
 	}
 }
 
-func (l logger) Warn(format string, args ...interface{}) {
+func (l logger) Warnf(format string, args ...interface{}) {
 	log.RLock()
 	defer log.RUnlock()
 
@@ -376,7 +376,7 @@ func (l logger) Warn(format string, args ...interface{}) {
 	}
 }
 
-func (l logger) Error(format string, args ...interface{}) {
+func (l logger) Errorf(format string, args ...interface{}) {
 	log.RLock()
 	defer log.RUnlock()
 
@@ -388,7 +388,7 @@ func (l logger) Error(format string, args ...interface{}) {
 	}
 }
 
-func (l logger) Fatal(format string, args ...interface{}) {
+func (l logger) Fatalf(format string, args ...interface{}) {
 	log.RLock()
 	defer log.RUnlock()
 
@@ -400,7 +400,7 @@ func (l logger) Fatal(format string, args ...interface{}) {
 	}
 }
 
-func (l logger) Panic(format string, args ...interface{}) {
+func (l logger) Panicf(format string, args ...interface{}) {
 	log.RLock()
 	defer log.RUnlock()
 

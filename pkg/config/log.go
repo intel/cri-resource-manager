@@ -30,12 +30,12 @@ import (
 // Logger is our set of logging functions.
 type Logger struct {
 	DebugEnabled func() bool
-	Debug        func(string, ...interface{})
-	Info         func(string, ...interface{})
-	Warning      func(string, ...interface{})
-	Error        func(string, ...interface{})
-	Fatal        func(string, ...interface{})
-	Panic        func(string, ...interface{})
+	Debugf       func(string, ...interface{})
+	Infof        func(string, ...interface{})
+	Warningf     func(string, ...interface{})
+	Errorf       func(string, ...interface{})
+	Fatalf       func(string, ...interface{})
+	Panicf       func(string, ...interface{})
 }
 
 // log is our Logger.
@@ -46,35 +46,35 @@ func SetLogger(logger Logger) {
 	if logger.DebugEnabled != nil {
 		log.DebugEnabled = logger.DebugEnabled
 	}
-	if logger.Debug != nil {
-		log.Debug = logger.Debug
+	if logger.Debugf != nil {
+		log.Debugf = logger.Debugf
 	}
-	if logger.Info != nil {
-		log.Info = logger.Info
+	if logger.Infof != nil {
+		log.Infof = logger.Infof
 	}
-	if logger.Warning != nil {
-		log.Warning = logger.Warning
+	if logger.Warningf != nil {
+		log.Warningf = logger.Warningf
 	}
-	if logger.Error != nil {
-		log.Error = logger.Error
+	if logger.Errorf != nil {
+		log.Errorf = logger.Errorf
 	}
-	if logger.Panic != nil {
-		log.Panic = logger.Panic
+	if logger.Panicf != nil {
+		log.Panicf = logger.Panicf
 	}
-	if logger.Fatal != nil {
-		log.Fatal = logger.Fatal
+	if logger.Fatalf != nil {
+		log.Fatalf = logger.Fatalf
 	}
 }
 
 func defaultLogger() Logger {
 	return Logger{
 		DebugEnabled: debugEnabled,
-		Debug:        debugmsg,
-		Info:         infomsg,
-		Warning:      warningmsg,
-		Error:        errormsg,
-		Fatal:        fatalmsg,
-		Panic:        panicmsg,
+		Debugf:       debugmsg,
+		Infof:        infomsg,
+		Warningf:     warningmsg,
+		Errorf:       errormsg,
+		Fatalf:       fatalmsg,
+		Panicf:       panicmsg,
 	}
 }
 

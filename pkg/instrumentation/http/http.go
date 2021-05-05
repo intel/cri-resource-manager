@@ -52,10 +52,10 @@ func (mux *ServeMux) Handle(pattern string, handler http.Handler) {
 	mux.Lock()
 	defer mux.Unlock()
 
-	log.Debug("registering handler for %q...", pattern)
+	log.Debugf("registering handler for %q...", pattern)
 
 	if _, ok := mux.handlers[pattern]; ok {
-		log.Error("can't register duplicate HTTP handler for %q", pattern)
+		log.Errorf("can't register duplicate HTTP handler for %q", pattern)
 		return
 	}
 
@@ -68,10 +68,10 @@ func (mux *ServeMux) HandleFunc(pattern string, fn func(http.ResponseWriter, *ht
 	mux.Lock()
 	defer mux.Unlock()
 
-	log.Debug("registering handler function for %q...", pattern)
+	log.Debugf("registering handler function for %q...", pattern)
 
 	if _, ok := mux.handlers[pattern]; ok {
-		log.Error("can't register duplicate HTTP handler function for '%s'", pattern)
+		log.Errorf("can't register duplicate HTTP handler function for '%s'", pattern)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (mux *ServeMux) Unregister(pattern string) (http.Handler, bool) {
 		return nil, false
 	}
 
-	log.Debug("unregistering handler for %q...", pattern)
+	log.Debugf("unregistering handler for %q...", pattern)
 
 	delete(mux.handlers, pattern)
 	mux.mux = http.NewServeMux()
@@ -106,7 +106,7 @@ func (mux *ServeMux) Unregister(pattern string) (http.Handler, bool) {
 func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux.RLock()
 	defer mux.RUnlock()
-	log.Debug("serving %s...", r.URL)
+	log.Debugf("serving %s...", r.URL)
 	mux.mux.ServeHTTP(w, r)
 }
 
@@ -140,11 +140,11 @@ func (s *Server) GetAddress() string {
 // Start sets up the server to listen and serve on the given address.
 func (s *Server) Start(addr string) error {
 	if addr == "" {
-		log.Info("%s is disabled", httpServer)
+		log.Infof("%s is disabled", httpServer)
 		return nil
 	}
 
-	log.Info("starting %s...", httpServer)
+	log.Infof("starting %s...", httpServer)
 
 	s.Lock()
 	defer s.Unlock()
@@ -168,7 +168,7 @@ func (s *Server) Start(addr string) error {
 
 // Stop Close()'s the server immediately.
 func (s *Server) Stop() {
-	log.Info("stopping %s...", httpServer)
+	log.Infof("stopping %s...", httpServer)
 
 	s.Lock()
 	defer s.Unlock()
@@ -185,7 +185,7 @@ func (s *Server) Stop() {
 func (s *Server) Shutdown(wait bool) {
 	var sync chan struct{}
 
-	log.Info("shutting down %s...", httpServer)
+	log.Infof("shutting down %s...", httpServer)
 
 	s.Lock()
 	defer s.Unlock()
@@ -208,7 +208,7 @@ func (s *Server) Shutdown(wait bool) {
 
 // Reconfigure reconfigures the server.
 func (s *Server) Reconfigure(addr string) error {
-	log.Info("reconfiguring %s...", httpServer)
+	log.Infof("reconfiguring %s...", httpServer)
 
 	if s.GetAddress() != addr {
 		return s.Restart(addr)
@@ -218,7 +218,7 @@ func (s *Server) Reconfigure(addr string) error {
 
 // Restart restarts it on the given address.
 func (s *Server) Restart(addr string) error {
-	log.Info("restarting %s...", httpServer)
+	log.Infof("restarting %s...", httpServer)
 
 	s.Stop()
 	return s.Start(addr)

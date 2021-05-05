@@ -51,7 +51,7 @@ func Register(name string, dir http.FileSystem) {
 
 // Setup sets up the given multiplexer to serve visualization implementations.
 func Setup(mux *xhttp.ServeMux) error {
-	log.Info("activating visualization interface...")
+	log.Infof("activating visualization interface...")
 
 	mux.Handle("/", http.RedirectHandler("/ui/index.html", http.StatusFound))
 	mux.Handle("/ui", http.RedirectHandler("/ui/index.html", http.StatusFound))
@@ -64,14 +64,14 @@ func Setup(mux *xhttp.ServeMux) error {
 
 // Open is the http.Dir implementation for our visualizers.
 func (v *visualizer) Open(path string) (http.File, error) {
-	log.Debug("HTTP request %q", path)
+	log.Debugf("HTTP request %q", path)
 
 	relative, err := filepath.Rel(visualizerPrefix+"/", path)
 	if err != nil {
 		return nil, visualizerError("failed to resolve path %q: %v", err)
 	}
 
-	log.Debug("%s => %s", path, relative)
+	log.Debugf("%s => %s", path, relative)
 
 	split := strings.Split(relative, "/")
 	if len(split) < 2 {
@@ -153,11 +153,11 @@ func (v *visualizer) generateIndexHTML(w http.ResponseWriter, req *http.Request)
 // register registers a builtin visualizer implementation.
 func (v *visualizer) register(name string, dir http.FileSystem) {
 	if _, ok := v.builtin[name]; ok {
-		log.Error("builtin visualizer '%s' already registered", name)
+		log.Errorf("builtin visualizer '%s' already registered", name)
 		return
 	}
 	v.builtin[name] = dir
-	log.Info("registered %s builtin visualizer...", name)
+	log.Infof("registered %s builtin visualizer...", name)
 }
 
 // discoverExternalUIs returns a map of external visualizer implementations.
@@ -171,14 +171,14 @@ func (v *visualizer) discoverExternalUIs() map[string]string {
 
 			dir, err := filepath.Abs(filepath.Dir(path))
 			if err != nil {
-				log.Error("failed to determine absolute directory for '%s': %v", path, err)
+				log.Errorf("failed to determine absolute directory for '%s': %v", path, err)
 				return nil
 			}
 
 			name := v.uniqueExternalUIName(dir, external)
 			external[name] = dir
 
-			log.Debug("found external visualizer '%s' (%s)", name, dir)
+			log.Debugf("found external visualizer '%s' (%s)", name, dir)
 
 			return nil
 		})

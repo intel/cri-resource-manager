@@ -108,11 +108,11 @@ func newDemoter(m *migration) *demoter {
 
 func (d *demoter) start() {
 	if d.pageScanInterval > 0 && d.pageMoveInterval > 0 && d.maxPageMoveCount > 0 {
-		log.Info("scanning pages every %s, moving max. %d pages every %s",
+		log.Infof("scanning pages every %s, moving max. %d pages every %s",
 			d.pageScanInterval.String(), d.maxPageMoveCount, d.pageMoveInterval.String())
 		d.startDirtyBitResetTimer()
 	} else {
-		log.Info("scanning pages is disabled")
+		log.Infof("scanning pages is disabled")
 	}
 }
 
@@ -174,7 +174,7 @@ func (d *demoter) updateDemoter(cid string, p pagePool, targetNodes system.IDSet
 				case _ = <-moveTimerChan:
 					err := d.movePages(pagePool, count, nodes)
 					if err != nil {
-						log.Error("Error demoting pages: %s", err)
+						log.Errorf("Error demoting pages: %s", err)
 					}
 				}
 			}
@@ -259,7 +259,7 @@ func (d *demoter) resetDirtyBit(c *container) error {
 	for _, pid := range pids {
 		err = resetDirtyBit(pid)
 		if err != nil {
-			log.Error("%s: failed to reset dirty but for process %s: %v",
+			log.Errorf("%s: failed to reset dirty but for process %s: %v",
 				c.prettyName, pid, err)
 			return err
 		}
@@ -286,7 +286,7 @@ func (d *demoter) scanPages() {
 		// Gather the known pages which need to be moved.
 		pagePool, err := d.getPagesForContainer(container, dramNodes)
 		if err != nil {
-			log.Error("failed to get pages for container %v", container.prettyName)
+			log.Errorf("failed to get pages for container %v", container.prettyName)
 			continue
 		}
 
@@ -294,7 +294,7 @@ func (d *demoter) scanPages() {
 		for _, pages := range pagePool.pages {
 			count += len(pages)
 		}
-		log.Debug("%d pages for (maybe) demoting for %v", count, container.prettyName)
+		log.Debugf("%d pages for (maybe) demoting for %v", count, container.prettyName)
 
 		// Reset the dirty bit from all pages.
 		d.resetDirtyBit(container)
@@ -322,7 +322,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 		addressRanges := make([]addrRange, 0)
 		pidNumber64, err := strconv.ParseInt(pid, 10, 32)
 		if err != nil {
-			log.Error("Failed to parse addr to int: %v", err)
+			log.Errorf("Failed to parse addr to int: %v", err)
 			continue
 		}
 		pidNumber := int(pidNumber64)
@@ -330,13 +330,13 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 		numaMapsPath := "/proc/" + pid + "/numa_maps"
 		numaMapsBytes, err := ioutil.ReadFile(numaMapsPath)
 		if err != nil {
-			log.Error("Could not read numa_maps: %v", err)
+			log.Errorf("Could not read numa_maps: %v", err)
 			continue
 		}
 		mapsPath := "/proc/" + pid + "/maps"
 		mapsBytes, err := ioutil.ReadFile(mapsPath)
 		if err != nil {
-			log.Error("Could not read maps: %v\n", err)
+			log.Errorf("Could not read maps: %v\n", err)
 			os.Exit(1)
 		}
 		mapsLines := strings.Split(string(mapsBytes), "\n")
@@ -378,17 +378,17 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 						endAddrStr := mapLine[len(tokens[0]+"-"):spaceIndex]
 						startAddr, err := strconv.ParseInt(tokens[0], 16, 64)
 						if err != nil {
-							log.Error("Failed to parse addr to int: %v\n", err)
+							log.Errorf("Failed to parse addr to int: %v\n", err)
 							break
 						}
 						endAddr, err := strconv.ParseInt(endAddrStr, 16, 64)
 						if err != nil {
-							log.Error("Failed to parse addr to int: %v\n", err)
+							log.Errorf("Failed to parse addr to int: %v\n", err)
 							break
 						}
 						rangeLength := endAddr - startAddr
 						addressRanges = append(addressRanges, addrRange{uint64(startAddr), uint64(rangeLength / int64(os.Getpagesize()))})
-						// log.Debug("found interesting page range for pid %s: %v", pid, addressRanges[len(addressRanges)-1])
+						// log.Debugf("found interesting page range for pid %s: %v", pid, addressRanges[len(addressRanges)-1])
 						break
 					}
 				}
@@ -400,7 +400,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 		// them as candidates to be moved by adding them to pagePool.
 
 		if len(addressRanges) > 0 {
-			// log.Debug("Getting pages for PID %s for ranges %v", pid, addressRanges)
+			// log.Debugf("Getting pages for PID %s for ranges %v", pid, addressRanges)
 			pages := make([]page, 0)
 			path := "/proc/" + pid + "/pagemap"
 			pageMap, err := os.OpenFile(path, os.O_RDONLY, 0)
@@ -414,7 +414,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 				offset, err := pageMap.Seek(idx, io.SeekStart)
 				if err != nil {
 					// Maybe there was a race condition and the maps changed?
-					log.Error("Failed to seek: %v\n", err)
+					log.Errorf("Failed to seek: %v\n", err)
 					continue
 				}
 				for i := uint64(0); i < addressRange.length; i++ {
@@ -423,7 +423,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 					_, err = io.ReadAtLeast(pageMap, bytes, 8)
 					if err != nil {
 						// Possibly the maps changed.
-						log.Error("Could not read data from pagemaps(%v)(page size: %d, seek offset: %d): %v\n", idx, os.Getpagesize(), offset, err)
+						log.Errorf("Could not read data from pagemaps(%v)(page size: %d, seek offset: %d): %v\n", idx, os.Getpagesize(), offset, err)
 						break
 					}
 					data := binary.LittleEndian.Uint64(bytes)
@@ -444,7 +444,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 					softDirty := (data&softDirtyBit == softDirtyBit)
 
 					if present && exclusive && !softDirty {
-						// log.Debug("page a candidate for moving: 0x%08x", addressRange.addr+i*uint64(os.Getpagesize()))
+						// log.Debugf("page a candidate for moving: 0x%08x", addressRange.addr+i*uint64(os.Getpagesize()))
 						pages = append(pages, page{addr: addressRange.addr + i*uint64(os.Getpagesize()), pid: pidNumber})
 					}
 				}
@@ -494,7 +494,7 @@ func (d *demoter) movePagesForPid(p []page, count uint, pid int, targetNodes sys
 	// Call move_pages() first with nil nodes array to find out the current controllers.
 	_, currentStatus, err := d.pageMover.MovePagesSyscall(pid, nPages, pages, nil, flags)
 	if err != nil {
-		log.Error("Failed to find out the current status of the pages: %v.", err)
+		log.Errorf("Failed to find out the current status of the pages: %v.", err)
 		return 0, err
 	}
 
@@ -506,7 +506,7 @@ func (d *demoter) movePagesForPid(p []page, count uint, pid int, targetNodes sys
 			// There was an error regarding this page.
 			continue
 		}
-		// log.Debug("page 0x%08X: old status %d", pages[i], pageStatus)
+		// log.Debugf("page 0x%08X: old status %d", pages[i], pageStatus)
 		if !targetNodes.Has(system.ID(pageStatus)) {
 			// In case of many PMEM controllers choose the one that is the closest.
 			dramPages = append(dramPages, pages[i])
@@ -554,10 +554,10 @@ func (d *demoter) movePages(p pagePool, count uint, targetNodes system.IDSet) er
 			count -= nPagesForPid
 		}
 
-		log.Debug("moving %d pages for pid %d", nMovePages, mostPagesPid)
+		log.Debugf("moving %d pages for pid %d", nMovePages, mostPagesPid)
 		nPages, err := d.movePagesForPid(p.pages[mostPagesPid], nMovePages, mostPagesPid, targetNodes)
 		if err != nil {
-			log.Error("Failed to move pages: %v", err)
+			log.Errorf("Failed to move pages: %v", err)
 			return err
 		}
 		// Remove processed pages from the pagemap.

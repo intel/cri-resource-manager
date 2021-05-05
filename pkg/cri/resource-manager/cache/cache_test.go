@@ -106,9 +106,9 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 	}
 	fp.podCfg = req.Config
 
-	cch.(*cache).Debug("*** => creating Pod: %+v\n", *req)
+	cch.(*cache).Debugf("*** => creating Pod: %+v\n", *req)
 	p := cch.InsertPod(fp.id, req, nil)
-	cch.(*cache).Debug("*** <= created Pod: %+v\n", *p.(*pod))
+	cch.(*cache).Debugf("*** <= created Pod: %+v\n", *p.(*pod))
 	return p, nil
 }
 
@@ -134,12 +134,12 @@ func createFakeContainer(cch Cache, fc *fakeContainer) (Container, error) {
 		SandboxConfig: fc.fakePod.podCfg,
 	}
 
-	cch.(*cache).Debug("*** => creating Container: %+v\n", *req)
+	cch.(*cache).Debugf("*** => creating Container: %+v\n", *req)
 	c, err := cch.InsertContainer(req)
 	if err != nil {
 		return nil, err
 	}
-	cch.(*cache).Debug("*** <= created Container: %+v\n", *c.(*container))
+	cch.(*cache).Debugf("*** <= created Container: %+v\n", *c.(*container))
 	update := &cri.CreateContainerResponse{ContainerId: fc.id}
 	if _, err := cch.UpdateContainerID(c.GetCacheID(), update); err != nil {
 		return nil, err
@@ -194,25 +194,25 @@ func TestLookupContainerByCgroup(t *testing.T) {
 		podCgroupDir := p.GetCgroupParentDir()
 		path := podCgroupDir + "/container-" + c.GetID() + ".scope"
 
-		cch.(*cache).Info("=> %s: testing lookup by cgroup path %s...", c.PrettyName(), path)
+		cch.(*cache).Infof("=> %s: testing lookup by cgroup path %s...", c.PrettyName(), path)
 		chk, ok := cch.LookupContainerByCgroup(path)
 		if !ok {
 			t.Errorf("failed to look up container %s by cgroup path %s (pod parent cgroup: %s)",
 				c.PrettyName(), path, podCgroupDir)
 		}
-		cch.(*cache).Info("<= %s", chk.PrettyName())
+		cch.(*cache).Infof("<= %s", chk.PrettyName())
 
 		if strings.HasPrefix(c.GetName(), "err-") {
 			path := podCgroupDir + "-another/container-" + c.GetID() + ".scope"
 
-			cch.(*cache).Info("=> %s: testing lookup failure by cgroup path %s...",
+			cch.(*cache).Infof("=> %s: testing lookup failure by cgroup path %s...",
 				c.PrettyName(), path)
 			chk, ok := cch.LookupContainerByCgroup(path)
 			if ok {
 				t.Errorf("look up of container %s by path %s should have failed, but gave %s",
 					c.PrettyName(), path, chk.PrettyName())
 			}
-			cch.(*cache).Info("<= OK (not found as expected)")
+			cch.(*cache).Infof("<= OK (not found as expected)")
 		}
 
 		if chk.GetID() != c.GetID() {

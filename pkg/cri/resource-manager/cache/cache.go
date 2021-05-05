@@ -688,7 +688,7 @@ func (cch *cache) SetActivePolicy(policy string) error {
 
 // ResetActivePolicy clears the active policy any any policy-specific data from the cache.
 func (cch *cache) ResetActivePolicy() error {
-	cch.Warn("clearing all data for active policy (%q) from cache...",
+	cch.Warnf("clearing all data for active policy (%q) from cache...",
 		cch.PolicyName)
 
 	cch.PolicyName = ""
@@ -781,7 +781,7 @@ func (cch *cache) SetAdjustment(external *config.Adjustment) (bool, map[string]e
 		effective[c] = previous
 
 		if previous != uptodate {
-			cch.Info("%s effective external adjustment changed from %q to %q",
+			cch.Infof("%s effective external adjustment changed from %q to %q",
 				c.PrettyName(), previous, uptodate)
 		}
 
@@ -827,7 +827,7 @@ func (cch *cache) setEffectiveAdjustment(effective map[*container]string) {
 		previous := c.setEffectiveAdjustment(uptodate)
 
 		if previous != uptodate {
-			cch.Info("%s effective external adjustment changed from %q to %q",
+			cch.Infof("%s effective external adjustment changed from %q to %q",
 				c.PrettyName(), previous, uptodate)
 		}
 
@@ -847,7 +847,7 @@ func (cch *cache) createCacheID(c *container) string {
 		}
 	}
 
-	cch.Warn("can't find unique id for pod %s, assigning local cache id", c.PodID)
+	cch.Warnf("can't find unique id for pod %s, assigning local cache id", c.PodID)
 	id := "cache:" + strconv.FormatUint(cch.NextID, 16)
 	cch.NextID++
 
@@ -870,7 +870,7 @@ func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) Pod {
 	}
 
 	if err != nil {
-		cch.Error("failed to insert pod %s: %v", id, err)
+		cch.Errorf("failed to insert pod %s: %v", id, err)
 		return nil
 	}
 
@@ -888,7 +888,7 @@ func (cch *cache) DeletePod(id string) Pod {
 		return nil
 	}
 
-	cch.Debug("removing pod %s (%s)", p.Name, p.ID)
+	cch.Debugf("removing pod %s (%s)", p.Name, p.ID)
 	delete(cch.Pods, id)
 
 	cch.Save()
@@ -935,7 +935,7 @@ func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
 	adjustments := cch.getApplicableAdjustments(cch.External, c)
 	switch {
 	case len(adjustments) > 1:
-		cch.Error("conflicting adjustments for %s: %s",
+		cch.Errorf("conflicting adjustments for %s: %s",
 			c.PrettyName(), strings.Join(adjustments, ","))
 	case len(adjustments) == 1:
 		c.setEffectiveAdjustment(adjustments[0])
@@ -975,7 +975,7 @@ func (cch *cache) DeleteContainer(id string) Container {
 		return nil
 	}
 
-	cch.Debug("removing container %s", c.PrettyName())
+	cch.Debugf("removing container %s", c.PrettyName())
 	cch.removeContainerDirectory(c.CacheID)
 	delete(cch.Containers, c.ID)
 	delete(cch.Containers, c.CacheID)
@@ -993,7 +993,7 @@ func (cch *cache) LookupContainer(id string) (Container, bool) {
 
 // LookupContainerByCgroup looks up the container for the given cgroup path.
 func (cch *cache) LookupContainerByCgroup(path string) (Container, bool) {
-	cch.Debug("resolving %s to a container...", path)
+	cch.Debugf("resolving %s to a container...", path)
 
 	for id, c := range cch.Containers {
 		if id != c.CacheID {
@@ -1031,7 +1031,7 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string
 	for _, item := range msg.Items {
 		valid[item.Id] = struct{}{}
 		if _, ok := cch.Pods[item.Id]; !ok {
-			cch.Debug("inserting discovered pod %s...", item.Id)
+			cch.Debugf("inserting discovered pod %s...", item.Id)
 			pod := cch.InsertPod(item.Id, item, status[item.Id])
 			add = append(add, pod)
 		}
@@ -1039,7 +1039,7 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string
 
 	for _, pod := range cch.Pods {
 		if _, ok := valid[pod.ID]; !ok {
-			cch.Debug("purging stale pod %s...", pod.ID)
+			cch.Debugf("purging stale pod %s...", pod.ID)
 			pod.State = PodStateStale
 			del = append(del, cch.DeletePod(pod.ID))
 		}
@@ -1047,7 +1047,7 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string
 
 	for id, c := range cch.Containers {
 		if _, ok := valid[c.PodID]; !ok {
-			cch.Debug("purging container %s of stale pod %s...", c.CacheID, c.PodID)
+			cch.Debugf("purging container %s of stale pod %s...", c.CacheID, c.PodID)
 			cch.DeleteContainer(c.CacheID)
 			c.State = ContainerStateStale
 			if id == c.CacheID {
@@ -1073,10 +1073,10 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 
 		valid[c.Id] = struct{}{}
 		if _, ok := cch.Containers[c.Id]; !ok {
-			cch.Debug("inserting discovered container %s...", c.Id)
+			cch.Debugf("inserting discovered container %s...", c.Id)
 			inserted, err := cch.InsertContainer(c)
 			if err != nil {
-				cch.Error("failed to insert discovered container %s to cache: %v",
+				cch.Errorf("failed to insert discovered container %s to cache: %v",
 					c.Id, err)
 			} else {
 				add = append(add, inserted)
@@ -1086,7 +1086,7 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 
 	for id, c := range cch.Containers {
 		if _, ok := valid[c.ID]; !ok {
-			cch.Debug("purging stale container %s (state: %v)...", c.CacheID, c.GetState())
+			cch.Debugf("purging stale container %s (state: %v)...", c.CacheID, c.GetState())
 			cch.DeleteContainer(c.CacheID)
 			c.State = ContainerStateStale
 			if id == c.CacheID {
@@ -1182,9 +1182,9 @@ func (cch *cache) SetPolicyEntry(key string, obj interface{}) {
 
 	if cch.DebugEnabled() {
 		if data, err := marshalEntry(obj); err != nil {
-			cch.Error("marshalling of policy entry '%s' failed: %v", key, err)
+			cch.Errorf("marshalling of policy entry '%s' failed: %v", key, err)
 		} else {
-			cch.Debug("policy entry '%s' set to '%s'", key, string(data))
+			cch.Debugf("policy entry '%s' set to '%s'", key, string(data))
 		}
 	}
 }
@@ -1212,18 +1212,18 @@ func (cch *cache) GetPolicyEntry(key string, ptr interface{}) bool {
 
 		// first access to key since startup
 		if err := unmarshalEntry([]byte(entry), ptr); err != nil {
-			cch.Fatal("failed to unmarshal '%s' policy entry for key '%s' (%T): %v",
+			cch.Fatalf("failed to unmarshal '%s' policy entry for key '%s' (%T): %v",
 				cch.PolicyName, key, ptr, err)
 		}
 
 		if err := cch.cacheEntry(key, ptr); err != nil {
-			cch.Fatal("failed to cache '%s' policy entry for key '%s': %v",
+			cch.Fatalf("failed to cache '%s' policy entry for key '%s': %v",
 				cch.PolicyName, key, err)
 		}
 	} else {
 		// subsequent accesses to key
 		if err := cch.setEntry(key, ptr, obj); err != nil {
-			cch.Fatal("failed use cached entry for key '%s' of policy '%s': %v",
+			cch.Fatalf("failed use cached entry for key '%s' of policy '%s': %v",
 				key, cch.PolicyName, err)
 		}
 	}
@@ -1394,7 +1394,7 @@ func (cch *cache) checkPerm(what, path string, isDir bool, p *permissions) (bool
 	expected := p.prefer
 	rejected := p.reject
 	if ((expected | rejected) &^ os.ModePerm) != 0 {
-		cch.Panic("internal error: current permissions check only handles permission bits (rwx)")
+		cch.Panicf("internal error: current permissions check only handles permission bits (rwx)")
 	}
 
 	// check that we don't have any of the rejectable permission bits set
@@ -1405,7 +1405,7 @@ func (cch *cache) checkPerm(what, path string, isDir bool, p *permissions) (bool
 
 	// warn if permissions are less strict than the preferred defaults
 	if (existing | expected) != expected {
-		cch.Warn("existing %s %q has less strict permissions %v than expected %v",
+		cch.Warnf("existing %s %q has less strict permissions %v than expected %v",
 			what, path, existing, expected)
 	}
 
@@ -1521,7 +1521,7 @@ func (cch *cache) Restore(data []byte) error {
 
 // Save the state of the cache.
 func (cch *cache) Save() error {
-	cch.Debug("saving cache to file '%s'...", cch.filePath)
+	cch.Debugf("saving cache to file '%s'...", cch.filePath)
 
 	data, err := cch.Snapshot()
 	if err != nil {
@@ -1542,16 +1542,16 @@ func (cch *cache) Save() error {
 
 // Load loads the last saved state of the cache.
 func (cch *cache) Load() error {
-	cch.Debug("loading cache from file '%s'...", cch.filePath)
+	cch.Debugf("loading cache from file '%s'...", cch.filePath)
 
 	data, err := ioutil.ReadFile(cch.filePath)
 
 	switch {
 	case os.IsNotExist(err):
-		cch.Debug("no cache file '%s', nothing to restore", cch.filePath)
+		cch.Debugf("no cache file '%s', nothing to restore", cch.filePath)
 		return nil
 	case len(data) == 0:
-		cch.Debug("empty cache file '%s', nothing to restore", cch.filePath)
+		cch.Debugf("empty cache file '%s', nothing to restore", cch.filePath)
 		return nil
 	case err != nil:
 		return cacheError("failed to load cache from file '%s': %v", cch.filePath, err)

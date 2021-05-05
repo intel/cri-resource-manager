@@ -75,7 +75,7 @@ func newConfigUpdater(socket string) (configUpdater, error) {
 }
 
 func (u *updater) Start() error {
-	u.Info("Starting config-updater")
+	u.Infof("Starting config-updater")
 	go func() {
 		var pendingConfig *resmgrConfig
 		var pendingAdjustment *resmgrAdjustment
@@ -85,12 +85,12 @@ func (u *updater) Start() error {
 		for {
 			select {
 			case cfg := <-u.newConfig:
-				u.Info("scheduling update after %v rate-limiting timeout...", rateLimitTimeout)
+				u.Infof("scheduling update after %v rate-limiting timeout...", rateLimitTimeout)
 				pendingConfig = cfg
 				ratelimit = time.After(rateLimitTimeout)
 
 			case adjust := <-u.newAdjustment:
-				u.Info("scheduling update after %v rate-limiting timeout...", rateLimitTimeout)
+				u.Infof("scheduling update after %v rate-limiting timeout...", rateLimitTimeout)
 				pendingAdjustment = adjust
 				ratelimit = time.After(rateLimitTimeout)
 
@@ -98,11 +98,11 @@ func (u *updater) Start() error {
 				if pendingConfig != nil {
 					mgrErr, err := u.setConfig(pendingConfig)
 					if err != nil {
-						u.Error("failed to send configuration update: %v", err)
+						u.Errorf("failed to send configuration update: %v", err)
 						ratelimit = time.After(retryTimeout)
 					} else {
 						if mgrErr != nil {
-							u.Error("cri-resmgr configuration error: %v", mgrErr)
+							u.Errorf("cri-resmgr configuration error: %v", mgrErr)
 						}
 						pendingConfig = nil
 						ratelimit = nil
@@ -112,10 +112,10 @@ func (u *updater) Start() error {
 					errors, err := u.setAdjustment(pendingAdjustment)
 
 					if err != nil {
-						u.Error("failed to update adjustments: %+v", err)
+						u.Errorf("failed to update adjustments: %+v", err)
 					}
 					if len(errors) > 0 {
-						u.Error("some adjustment updates failed: %+v", errors)
+						u.Errorf("some adjustment updates failed: %+v", errors)
 					}
 
 					u.newStatus <- &resmgrStatus{
@@ -153,7 +153,7 @@ func (u *updater) setConfig(cfg *resmgrConfig) (error, error) {
 	defer cancel()
 
 	req := &resmgr_v1.SetConfigRequest{NodeName: nodeName, Config: *cfg}
-	u.Debug("sending SetConfig request to cri-resmgr")
+	u.Debugf("sending SetConfig request to cri-resmgr")
 
 	reply, err := u.resmgrCli.SetConfig(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
 
@@ -186,7 +186,7 @@ func (u *updater) setAdjustment(adjust *resmgrAdjustment) (map[string]string, er
 	}
 
 	req := &resmgr_v1.SetAdjustmentRequest{NodeName: nodeName, Adjustment: string(encoded)}
-	u.Debug("sending SetAdjustment request to cri-resmgr")
+	u.Debugf("sending SetAdjustment request to cri-resmgr")
 
 	reply, err := u.resmgrCli.SetAdjustment(ctx, req, []grpc.CallOption{grpc.FailFast(false)}...)
 

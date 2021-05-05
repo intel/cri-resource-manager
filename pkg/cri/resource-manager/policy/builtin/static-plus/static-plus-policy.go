@@ -82,10 +82,10 @@ func CreateStaticPlusPolicy(opts *policy.BackendOptions) policy.Backend {
 		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
 	}
 
-	p.Info("creating policy...")
+	p.Infof("creating policy...")
 
 	if err := p.setupPools(opts.Available, opts.Reserved); err != nil {
-		p.Fatal("failed to set up cpu pools: %v", err)
+		p.Fatalf("failed to set up cpu pools: %v", err)
 	}
 
 	p.dumpPools()
@@ -118,7 +118,7 @@ func (p *staticplus) Start(add []cache.Container, del []cache.Container) error {
 
 // Sync synchronizes the state ofd this policy.
 func (p *staticplus) Sync(add []cache.Container, del []cache.Container) error {
-	p.Debug("synchronizing state...")
+	p.Debugf("synchronizing state...")
 	for _, c := range del {
 		p.ReleaseResources(c)
 	}
@@ -135,7 +135,7 @@ func (p *staticplus) AllocateResources(c cache.Container) error {
 
 	id := c.GetCacheID()
 
-	p.Debug("allocating container %s...", id)
+	p.Debugf("allocating container %s...", id)
 
 	if _, ok := p.allocations[id]; ok {
 		return nil
@@ -153,7 +153,7 @@ func (p *staticplus) AllocateResources(c cache.Container) error {
 func (p *staticplus) ReleaseResources(c cache.Container) error {
 	id := c.GetCacheID()
 
-	p.Debug("releasing container %s...", id)
+	p.Debugf("releasing container %s...", id)
 
 	a, ok := p.allocations[id]
 	if !ok {
@@ -165,19 +165,19 @@ func (p *staticplus) ReleaseResources(c cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (p *staticplus) UpdateResources(c cache.Container) error {
-	p.Debug("(not) updating container %s...", c.PrettyName())
+	p.Debugf("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 
 // Rebalance tries to find an optimal allocation of resources for the current containers.
 func (p *staticplus) Rebalance() (bool, error) {
-	p.Debug("(not) rebalancing containers...")
+	p.Debugf("(not) rebalancing containers...")
 	return false, nil
 }
 
 // HandleEvent handles policy-specific events.
 func (p *staticplus) HandleEvent(*events.Policy) (bool, error) {
-	p.Debug("(not) handling event...")
+	p.Debugf("(not) handling event...")
 	return false, nil
 }
 
@@ -186,7 +186,7 @@ func (p *staticplus) ExportResourceData(c cache.Container) map[string]string {
 	a, ok := p.allocations[c.GetCacheID()]
 	if !ok {
 		// Hmm...
-		p.Warn("can't find allocation for container %s", c.PrettyName())
+		p.Warnf("can't find allocation for container %s", c.PrettyName())
 		return nil
 	}
 
@@ -294,7 +294,7 @@ func (p *staticplus) setupPools(available, reserved policy.ConstraintSet) error 
 // Restore saved policy state from the cache.
 func (p *staticplus) restoreCache() error {
 	if !p.cache.GetPolicyEntry(keySharedPool, &p.shared) {
-		p.Warn("initializing empty policy state...")
+		p.Warnf("initializing empty policy state...")
 
 		p.shared = p.available
 		p.allocations = make(Allocations)
@@ -302,7 +302,7 @@ func (p *staticplus) restoreCache() error {
 		p.cache.SetPolicyEntry(keyAllocations,
 			cache.Cachable(&cachedAllocations{a: p.allocations}))
 	} else {
-		p.Info("restoring cached policy state...")
+		p.Infof("restoring cached policy state...")
 
 		ca := cachedAllocations{}
 		if !p.cache.GetPolicyEntry(keyAllocations, &ca) {
@@ -335,22 +335,22 @@ func (p *staticplus) optOutFromIsolation(c cache.Container) bool {
 	preferIsolated := true
 
 	if pod, found := c.GetPod(); !found {
-		p.Warn("can't find pod for container %s", c.PrettyName())
+		p.Warnf("can't find pod for container %s", c.PrettyName())
 	} else {
 		if value, ok := pod.GetResmgrAnnotation(keyPreferIsolated); ok {
 			if isolated, err := strconv.ParseBool(value); !isolated {
 				if err != nil {
-					p.Error("invalid annotation '%s' on container %s, expecting boolean: %v",
+					p.Errorf("invalid annotation '%s' on container %s, expecting boolean: %v",
 						keyPreferIsolated, c.PrettyName(), err)
 				} else {
-					p.Info("container %s is opted-out from isolation", c.PrettyName())
+					p.Infof("container %s is opted-out from isolation", c.PrettyName())
 				}
 				preferIsolated = false
 			} else {
-				p.Info("container %s explicitly opted-in for isolation", c.PrettyName())
+				p.Infof("container %s explicitly opted-in for isolation", c.PrettyName())
 			}
 		} else {
-			p.Info("container %s goes with default isolation", c.PrettyName())
+			p.Infof("container %s goes with default isolation", c.PrettyName())
 		}
 	}
 
@@ -404,7 +404,7 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		c.SetCpusetCpus(p.reserved.String())
 		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
-		p.Info("system container %s allocated (%d mCPU) to reserved pool %s",
+		p.Infof("system container %s allocated (%d mCPU) to reserved pool %s",
 			c.PrettyName(), a.shared, p.reserved.String())
 
 		// for shared-only assignments, it's enough to update the container
@@ -412,7 +412,7 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		c.SetCpusetCpus(p.shared.String())
 		c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
 
-		p.Info("container %s allocated (%d mCPU) to shared pool %s",
+		p.Infof("container %s allocated (%d mCPU) to shared pool %s",
 			c.PrettyName(), a.shared, p.shared.String())
 
 		// isolated, sliced-off exclusive, or mixed allocation
@@ -427,12 +427,12 @@ func (p *staticplus) addAssignment(c cache.Container, a *Assignment) error {
 		if a.shared != 0 {
 			c.SetCpusetCpus(a.exclusive.Union(p.shared).String())
 			c.SetCPUShares(int64(MilliCPUToShares(a.shared)))
-			p.Info("container %s allocated to %s (%s) and shared (%d mCPU) pool %s",
+			p.Infof("container %s allocated to %s (%s) and shared (%d mCPU) pool %s",
 				c.PrettyName(), kind, a.exclusive.String(), a.shared, p.shared.String())
 		} else {
 			c.SetCpusetCpus(a.exclusive.String())
 			c.SetCPUShares(int64(MilliCPUToShares(1000 * a.exclusive.Size())))
-			p.Info("container %s allocated to %s CPUs %s", c.PrettyName(),
+			p.Infof("container %s allocated to %s CPUs %s", c.PrettyName(),
 				kind, a.exclusive.String())
 		}
 
@@ -460,21 +460,21 @@ func (p *staticplus) delAssignment(a *Assignment, id string) error {
 	switch {
 	// for shared-only allocations there is not much to do...
 	case a.exclusive.IsEmpty():
-		p.Info("freed shared-only (%d mCPU) allocations of container %s",
+		p.Infof("freed shared-only (%d mCPU) allocations of container %s",
 			a.shared, id)
 
 		// for isolated exclusive cpus, return them to the pool
 	case !a.exclusive.Intersection(p.sys.Isolated()).IsEmpty():
 		p.isolated = p.isolated.Union(a.exclusive)
 
-		p.Info("freed isolated allocations (%s) of container %s",
+		p.Infof("freed isolated allocations (%s) of container %s",
 			a.exclusive.String(), id)
 
 		// for cpus sliced off the shared pool, return then and update others
 	default:
 		p.shared = p.shared.Union(a.exclusive)
 
-		p.Info("freed exclusive allocations (%s) of container %s",
+		p.Infof("freed exclusive allocations (%s) of container %s",
 			a.exclusive.String(), id)
 
 		if err := p.updateSharedAllocations(); err != nil {
@@ -496,7 +496,7 @@ func (p *staticplus) updateSharedAllocations() error {
 	for id, ca := range p.allocations {
 		cac, ok := p.cache.LookupContainer(id)
 		if !ok {
-			p.Warn("can't find allocated container %s", id)
+			p.Warnf("can't find allocated container %s", id)
 			// remove and recalculate shared CPUs
 			p.delAssignment(ca, id)
 			return p.updateSharedAllocations()
@@ -510,14 +510,14 @@ func (p *staticplus) updateSharedAllocations() error {
 
 		if avail <= 0 {
 			cset = cset.Union(p.reserved)
-			p.Warn("out of free shared (%s) capacity, using reserved pool (%s) as well",
+			p.Warnf("out of free shared (%s) capacity, using reserved pool (%s) as well",
 				p.shared.String(), p.reserved.String())
 		}
 
 		if cac.GetCpusetCpus() != cset.String() {
 			cac.SetCpusetCpus(cset.String())
 
-			p.Info("container %s reallocated to exclusive (%s) and shared (%d mCPU) pool %s",
+			p.Infof("container %s reallocated to exclusive (%s) and shared (%d mCPU) pool %s",
 				cac.PrettyName(), ca.exclusive.String(), ca.shared, cset.String())
 		}
 
@@ -525,10 +525,10 @@ func (p *staticplus) updateSharedAllocations() error {
 	}
 
 	if avail < 0 {
-		p.Warn("not enough free capacity in shared pool (%s): lacking %d mCPU",
+		p.Warnf("not enough free capacity in shared pool (%s): lacking %d mCPU",
 			p.shared.String(), -avail)
 	} else {
-		p.Info("free shared (%s) capacity left: %d mCPU", p.shared.String(), avail)
+		p.Infof("free shared (%s) capacity left: %d mCPU", p.shared.String(), avail)
 	}
 
 	return nil
@@ -566,7 +566,7 @@ func (p *staticplus) updatePools() error {
 
 // dumpPools dumps the current state of pools.
 func (p *staticplus) dumpPools() {
-	p.Info("current CPU pools:")
+	p.Infof("current CPU pools:")
 	offline := p.offline.String()
 	if offline == "" {
 		offline = "<none>"
@@ -576,28 +576,28 @@ func (p *staticplus) dumpPools() {
 		isolated = "<none>"
 	}
 
-	p.Info("  offline:  %s", offline)
-	p.Info("  reserved: %s", p.reserved.String())
-	p.Info("  shared:   %s", p.shared.String())
-	p.Info("  isolated: %s", isolated)
+	p.Infof("  offline:  %s", offline)
+	p.Infof("  reserved: %s", p.reserved.String())
+	p.Infof("  shared:   %s", p.shared.String())
+	p.Infof("  isolated: %s", isolated)
 
 }
 
 // dumpAllocations dumps the current allocations.
 func (p *staticplus) dumpAllocations() {
-	p.Info("container CPU allocations:")
+	p.Infof("container CPU allocations:")
 	switch {
 	case p.allocations == nil:
-		p.Info("  <nil>")
+		p.Infof("  <nil>")
 	case len(p.allocations) == 0:
-		p.Info("  <none>")
+		p.Infof("  <none>")
 	default:
 		for id, ca := range p.allocations {
 			e := ca.exclusive.String()
 			if e == "" {
 				e = "<none>"
 			}
-			p.Info("  %s: exclusive: %s, shared: %d milli-cpu", id, e, ca.shared)
+			p.Infof("  %s: exclusive: %s, shared: %d milli-cpu", id, e, ca.shared)
 		}
 	}
 }

@@ -66,7 +66,7 @@ func main() {
 				config.Describe(args[1:]...)
 				os.Exit(0)
 			default:
-				log.Error("unknown command line arguments: %s", strings.Join(flag.Args(), ","))
+				log.Errorf("unknown command line arguments: %s", strings.Join(flag.Args(), ","))
 				flag.Usage()
 				os.Exit(1)
 			}
@@ -75,20 +75,20 @@ func main() {
 
 	logger.Flush()
 	logger.SetupDebugToggleSignal(syscall.SIGUSR1)
-	log.Info("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
+	log.Infof("cri-resmgr (version %s, build %s) starting...", version.Version, version.Build)
 
 	if err := instrumentation.Start(); err != nil {
-		log.Fatal("failed to set up instrumentation: %v", err)
+		log.Fatalf("failed to set up instrumentation: %v", err)
 	}
 	defer instrumentation.Stop()
 
 	m, err := resmgr.NewResourceManager()
 	if err != nil {
-		log.Fatal("failed to create resource manager instance: %v", err)
+		log.Fatalf("failed to create resource manager instance: %v", err)
 	}
 
 	if err := m.Start(); err != nil {
-		log.Fatal("failed to start resource manager: %v", err)
+		log.Fatalf("failed to start resource manager: %v", err)
 	}
 
 	for {

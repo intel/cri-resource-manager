@@ -279,7 +279,7 @@ func readFromFileInDir(baseDir string, filenames []string) (string, error) {
 
 // SetBlkioParameters writes OCI BlockIO parameters to files in cgroups blkio contoller directory.
 func SetBlkioParameters(cgroupsDir string, blockIO OciBlockIOParameters) error {
-	log.Debug("configuring cgroups blkio controller in directory %#v with parameters %+v", cgroupsDir, blockIO)
+	log.Debugf("configuring cgroups blkio controller in directory %#v with parameters %+v", cgroupsDir, blockIO)
 	var errors *multierror.Error
 	if blockIO.Weight >= 0 {
 		errors = multierror.Append(errors, writeToFileInDir(cgroupsDir, blkioWeightFiles, strconv.FormatInt(blockIO.Weight, 10)))

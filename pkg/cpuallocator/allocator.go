@@ -138,7 +138,7 @@ func newAllocatorHelper(sys sysfs.System, topo topologyCache) *allocatorHelper {
 
 // Allocate full idle CPU packages.
 func (a *allocatorHelper) takeIdlePackages() {
-	a.Debug("* takeIdlePackages()...")
+	a.Debugf("* takeIdlePackages()...")
 
 	offline := a.sys.Offlined()
 
@@ -158,14 +158,14 @@ func (a *allocatorHelper) takeIdlePackages() {
 			return pkgs[i] < pkgs[j]
 		})
 
-	a.Debug(" => idle packages sorted by preference: %v", pkgs)
+	a.Debugf(" => idle packages sorted by preference: %v", pkgs)
 
 	// take as many idle packages as we need/can
 	for _, id := range pkgs {
 		cset := a.topology.pkg[id].Difference(offline)
-		a.Debug(" => considering package %v (#%s)...", id, cset)
+		a.Debugf(" => considering package %v (#%s)...", id, cset)
 		if a.cnt >= cset.Size() {
-			a.Debug(" => taking package %v...", id)
+			a.Debugf(" => taking package %v...", id)
 			a.result = a.result.Union(cset)
 			a.from = a.from.Difference(cset)
 			a.cnt -= cset.Size()
@@ -179,7 +179,7 @@ func (a *allocatorHelper) takeIdlePackages() {
 
 // Allocate full idle CPU cores.
 func (a *allocatorHelper) takeIdleCores() {
-	a.Debug("* takeIdleCores()...")
+	a.Debugf("* takeIdleCores()...")
 
 	offline := a.sys.Offlined()
 
@@ -202,14 +202,14 @@ func (a *allocatorHelper) takeIdleCores() {
 			return cores[i] < cores[j]
 		})
 
-	a.Debug(" => idle cores sorted by preference: %v", cores)
+	a.Debugf(" => idle cores sorted by preference: %v", cores)
 
 	// take as many idle cores as we can
 	for _, id := range cores {
 		cset := a.topology.core[id].Difference(offline)
-		a.Debug(" => considering core %v (#%s)...", id, cset)
+		a.Debugf(" => considering core %v (#%s)...", id, cset)
 		if a.cnt >= cset.Size() {
-			a.Debug(" => taking core %v...", id)
+			a.Debugf(" => taking core %v...", id)
 			a.result = a.result.Union(cset)
 			a.from = a.from.Difference(cset)
 			a.cnt -= cset.Size()
@@ -231,7 +231,7 @@ func (a *allocatorHelper) takeIdleThreads() {
 			return a.from.Difference(offline).Contains(int(id))
 		})
 
-	a.Debug(" => idle threads unsorted: %v", cores)
+	a.Debugf(" => idle threads unsorted: %v", cores)
 
 	// sorted for preference by id, mimicking cpus_assignment.go for now:
 	//   IOW, prefer CPUs
@@ -290,12 +290,12 @@ func (a *allocatorHelper) takeIdleThreads() {
 			return iCore < jCore
 		})
 
-	a.Debug(" => idle threads sorted: %v", cores)
+	a.Debugf(" => idle threads sorted: %v", cores)
 
 	// take as many idle cores as we can
 	for _, id := range cores {
 		cset := a.topology.core[id].Difference(offline)
-		a.Debug(" => considering thread %v (#%s)...", id, cset)
+		a.Debugf(" => considering thread %v (#%s)...", id, cset)
 		cset = cpuset.NewCPUSet(int(id))
 		a.result = a.result.Union(cset)
 		a.from = a.from.Difference(cset)
@@ -309,7 +309,7 @@ func (a *allocatorHelper) takeIdleThreads() {
 
 // takeAny is a dummy allocator not dependent on sysfs topology information
 func (a *allocatorHelper) takeAny() {
-	a.Debug("* takeAnyCores()...")
+	a.Debugf("* takeAnyCores()...")
 
 	cpus := a.from.ToSlice()
 
@@ -360,7 +360,7 @@ func (ca *cpuAllocator) allocateCpus(from *cpuset.CPUSet, cnt int, prefer CPUPri
 
 		result, err, *from = a.allocate(), nil, a.from.Clone()
 
-		a.Debug("%d cpus from #%v (preferring #%v) => #%v", cnt, from.Union(result), a.prefer, result)
+		a.Debugf("%d cpus from #%v (preferring #%v) => #%v", cnt, from.Union(result), a.prefer, result)
 	}
 
 	return result, err
@@ -378,7 +378,7 @@ func (ca *cpuAllocator) ReleaseCpus(from *cpuset.CPUSet, cnt int, prefer CPUPrio
 
 	result, err := ca.allocateCpus(from, from.Size()-cnt, prefer)
 
-	ca.Debug("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset, cnt, from, result)
+	ca.Debugf("ReleaseCpus(#%s, %d) => kept: #%s, released: #%s", oset, cnt, from, result)
 
 	return result, err
 }
@@ -422,7 +422,7 @@ func (c *topologyCache) discoverCPUPriorities(sys sysfs.System) {
 		for p, cpus := range cpuPriorities {
 			source := map[bool]string{true: "sst", false: "cpufreq"}[sstActive]
 			cset := sysfs.NewIDSet(cpus...).CPUSet()
-			log.Debug("package #%d (%s): %d %s priority cpus (%v)", id, source, len(cpus), CPUPriority(p), cset)
+			log.Debugf("package #%d (%s): %d %s priority cpus (%v)", id, source, len(cpus), CPUPriority(p), cset)
 			prio[p] = prio[p].Union(cset)
 		}
 	}
@@ -445,7 +445,7 @@ func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID sysfs.ID)
 	// 3. SST-BF is meaningful if neither SST-TF nor SST-CP is enabled
 	switch {
 	case sst.TFEnabled:
-		log.Debug("package #%d: using SST-TF based CPU prioritization", pkgID)
+		log.Debugf("package #%d: using SST-TF based CPU prioritization", pkgID)
 		// We only look at the CLOS id as SST-TF (seems to) follows ordered CLOS priority
 		for _, i := range cpuIDs {
 			id := sysfs.ID(i)
@@ -459,7 +459,7 @@ func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID sysfs.ID)
 		active = true
 	case sst.CPEnabled:
 		closPrio := c.sstClosPriority(sys, pkgID)
-		log.Debug("package #%d: using SST-CP based CPU prioritization with CLOS mapping %v", pkgID, closPrio)
+		log.Debugf("package #%d: using SST-CP based CPU prioritization with CLOS mapping %v", pkgID, closPrio)
 
 		active = false
 		for _, i := range cpuIDs {
@@ -474,7 +474,7 @@ func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID sysfs.ID)
 	}
 
 	if !active && sst.BFEnabled {
-		log.Debug("package #%d: using SST-BF based CPU prioritization", pkgID)
+		log.Debugf("package #%d: using SST-BF based CPU prioritization", pkgID)
 		for _, i := range cpuIDs {
 			id := sysfs.ID(i)
 			p := PriorityLow
@@ -522,7 +522,7 @@ func (c *topologyCache) sstClosPriority(sys sysfs.System, pkgID sysfs.ID) map[in
 	if sst.CPPriority == sysfs.Ordered {
 		// In ordered mode the priority is simply the CLOS id
 		closSorted = sortedKeys(closIds)
-		log.Debug("package #%d, ordered SST-CP priority with CLOS ids %v", pkgID, closSorted)
+		log.Debugf("package #%d, ordered SST-CP priority with CLOS ids %v", pkgID, closSorted)
 	} else {
 		// In proportional mode we sort by the proportional priority parameter
 		closPpSorted := sortedKeys(closPps)
@@ -530,7 +530,7 @@ func (c *topologyCache) sstClosPriority(sys sysfs.System, pkgID sysfs.ID) map[in
 		for _, pp := range closPpSorted {
 			closSorted = append(closSorted, closPps[pp])
 		}
-		log.Debug("package #%d, proportional SST-CP priority with PP-to-CLOS parity %v", pkgID, closPps)
+		log.Debugf("package #%d, proportional SST-CP priority with PP-to-CLOS parity %v", pkgID, closPps)
 	}
 
 	// Map from CLOS id to cpuallocator CPU priority

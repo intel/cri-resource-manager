@@ -109,7 +109,7 @@ func (c *client) Connect(options ConnectOptions) error {
 	}
 
 	if c.icc != nil {
-		c.Debug("starting %s client on socket %s...", kind, socket)
+		c.Debugf("starting %s client on socket %s...", kind, socket)
 		c.ImageServiceClient = api.NewImageServiceClient(c.icc)
 	}
 
@@ -124,7 +124,7 @@ func (c *client) Connect(options ConnectOptions) error {
 	}
 
 	if c.rcc != nil {
-		c.Debug("starting %s client on socket %s...", kind, socket)
+		c.Debugf("starting %s client on socket %s...", kind, socket)
 		c.RuntimeServiceClient = api.NewRuntimeServiceClient(c.rcc)
 	}
 
@@ -134,12 +134,12 @@ func (c *client) Connect(options ConnectOptions) error {
 // Close any open service connection.
 func (c *client) Close() {
 	if c.icc != nil {
-		c.Debug("closing image service connection...")
+		c.Debugf("closing image service connection...")
 		c.icc.Close()
 	}
 
 	if c.rcc != nil {
-		c.Debug("closing runtime service connection...")
+		c.Debugf("closing runtime service connection...")
 		if c.rcc != c.icc {
 			c.rcc.Close()
 		}
@@ -159,7 +159,7 @@ func (c *client) CheckConnection(options ConnectOptions) error {
 	c.Close()
 
 	if options.Reconnect {
-		c.Warn("client connections are down")
+		c.Warnf("client connections are down")
 		if err := c.Connect(ConnectOptions{Wait: false}); err == nil {
 			return nil
 		}
@@ -201,7 +201,7 @@ func (c *client) connect(kind, socket string, options ConnectOptions) (*grpc.Cli
 		}))
 
 	if options.Wait {
-		c.Info("waiting for %s on socket %s...", kind, socket)
+		c.Infof("waiting for %s on socket %s...", kind, socket)
 		if err = utils.WaitForServer(socket, -1, dialOpts, &cc); err != nil {
 			return nil, clientError("failed to connect to %s: %v", kind, err)
 		}

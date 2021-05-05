@@ -154,10 +154,10 @@ func parseEnv(name, defval string, parsefn func(string) error) {
 		if err == nil {
 			return
 		}
-		log.Error("invalid environment %s=%q: %v, using default %q", name, envval, err, defval)
+		log.Errorf("invalid environment %s=%q: %v, using default %q", name, envval, err, defval)
 	}
 	if err := parsefn(defval); err != nil {
-		log.Error("invalid default %s=%q: %v", name, defval, err)
+		log.Errorf("invalid default %s=%q: %v", name, defval, err)
 	}
 }
 
@@ -220,11 +220,11 @@ func defaultOptions() interface{} {
 
 // configNotify is our configuration udpate notification handler.
 func configNotify(event config.Event, source config.Source) error {
-	log.Info("instrumentation configuration is now %v", opt)
+	log.Infof("instrumentation configuration is now %v", opt)
 
-	log.Info("reconfiguring...")
+	log.Infof("reconfiguring...")
 	if err := svc.reconfigure(); err != nil {
-		log.Error("failed to restart instrumentation: %v", err)
+		log.Errorf("failed to restart instrumentation: %v", err)
 	}
 
 	return nil

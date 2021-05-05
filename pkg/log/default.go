@@ -27,34 +27,34 @@ func Default() Logger {
 	return deflog
 }
 
-// Info formats and emits an informational message.
-func Info(format string, args ...interface{}) {
-	deflog.Info(format, args...)
+// Infof formats and emits an informational message.
+func Infof(format string, args ...interface{}) {
+	deflog.Infof(format, args...)
 }
 
-// Warn formats and emits a warning message.
-func Warn(format string, args ...interface{}) {
-	deflog.Warn(format, args...)
+// Warnf formats and emits a warning message.
+func Warnf(format string, args ...interface{}) {
+	deflog.Warnf(format, args...)
 }
 
-// Error formats and emits an error message.
-func Error(format string, args ...interface{}) {
-	deflog.Error(format, args...)
+// Errorf formats and emits an error message.
+func Errorf(format string, args ...interface{}) {
+	deflog.Errorf(format, args...)
 }
 
-// Fatal formats and emits an error message and os.Exit()'s with status 1.
-func Fatal(format string, args ...interface{}) {
-	deflog.Fatal(format, args...)
+// Fatalf formats and emits an error message and os.Exit()'s with status 1.
+func Fatalf(format string, args ...interface{}) {
+	deflog.Fatalf(format, args...)
 }
 
-// Panic formats and emits an error messages, and panics with the same.
-func Panic(format string, args ...interface{}) {
-	deflog.Panic(format, args...)
+// Panicf formats and emits an error messages, and panics with the same.
+func Panicf(format string, args ...interface{}) {
+	deflog.Panicf(format, args...)
 }
 
-// Debug formats and emits a debug message.
-func Debug(format string, args ...interface{}) {
-	deflog.Debug(format, args...)
+// Debugf formats and emits a debug message.
+func Debugf(format string, args ...interface{}) {
+	deflog.Debugf(format, args...)
 }
 
 // InfoBlock formats and emits a multiline information message.

@@ -56,7 +56,7 @@ func (o *options) ControllerMode(name string) mode {
 
 // configNotify is our configuration update notification callback.
 func (o *options) configNotify(event config.Event, source config.Source) error {
-	log.Info("configuration updated")
+	log.Infof("configuration updated")
 	for name, controller := range controllers {
 		controller.mode = o.ControllerMode(name)
 	}

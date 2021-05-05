@@ -26,7 +26,7 @@ import (
 func cpuHintScore(hint topology.Hint, CPUs cpuset.CPUSet) float64 {
 	hCPUs, err := cpuset.Parse(hint.CPUs)
 	if err != nil {
-		log.Warn("invalid hint CPUs '%s' from %s", hint.CPUs, hint.Provider)
+		log.Warnf("invalid hint CPUs '%s' from %s", hint.CPUs, hint.Provider)
 		return 0.0
 	}
 	common := hCPUs.Intersection(CPUs)
@@ -38,7 +38,7 @@ func numaHintScore(hint topology.Hint, sysIDs ...system.ID) float64 {
 	for _, idstr := range strings.Split(hint.NUMAs, ",") {
 		hID, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
-			log.Warn("invalid hint NUMA node %s from %s", idstr, hint.Provider)
+			log.Warnf("invalid hint NUMA node %s from %s", idstr, hint.Provider)
 			return 0.0
 		}
 
@@ -59,7 +59,7 @@ func dieHintScore(hint topology.Hint, sysID system.ID, socket system.CPUPackage)
 	for _, idstr := range strings.Split(hint.NUMAs, ",") {
 		hID, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
-			log.Warn("invalid hint NUMA node %s from %s", idstr, hint.Provider)
+			log.Warnf("invalid hint NUMA node %s from %s", idstr, hint.Provider)
 			return 0.0
 		}
 
@@ -76,7 +76,7 @@ func socketHintScore(hint topology.Hint, sysID system.ID) float64 {
 	for _, idstr := range strings.Split(hint.Sockets, ",") {
 		id, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
-			log.Warn("invalid hint socket '%s' from %s", idstr, hint.Provider)
+			log.Warnf("invalid hint socket '%s' from %s", idstr, hint.Provider)
 			return 0.0
 		}
 		if id == int64(sysID) {

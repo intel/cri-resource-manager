@@ -86,12 +86,12 @@ func (s *server) Start(socket string) error {
 	}
 	v1.RegisterAgentServer(s.server, gs)
 
-	s.Info("starting gRPC server at socket %s", socket)
+	s.Infof("starting gRPC server at socket %s", socket)
 	go func() {
 		defer lis.Close()
 		err := s.server.Serve(lis)
 		if err != nil {
-			s.Fatal("grpc server died: %v", err)
+			s.Fatalf("grpc server died: %v", err)
 		}
 	}()
 	return nil
@@ -111,7 +111,7 @@ type grpcServer struct {
 
 // GetNode gets K8s node object.
 func (g *grpcServer) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.GetNodeReply, error) {
-	g.Debug("received GetNodeRequest: %v", req)
+	g.Debugf("received GetNodeRequest: %v", req)
 	rpl := &v1.GetNodeReply{}
 
 	node, err := getNodeObject(g.cli)
@@ -129,7 +129,7 @@ func (g *grpcServer) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.G
 
 // PatchNode patches the K8s node object.
 func (g *grpcServer) PatchNode(ctx context.Context, req *v1.PatchNodeRequest) (*v1.PatchNodeReply, error) {
-	g.Debug("received PatchNodeRequest: %v", req)
+	g.Debugf("received PatchNodeRequest: %v", req)
 	rpl := &v1.PatchNodeReply{}
 
 	// Apply patches
@@ -145,7 +145,7 @@ func (g *grpcServer) PatchNode(ctx context.Context, req *v1.PatchNodeRequest) (*
 
 // UpdateNodeCapacity updates capacity in Node status
 func (g *grpcServer) UpdateNodeCapacity(ctx context.Context, req *v1.UpdateNodeCapacityRequest) (*v1.UpdateNodeCapacityReply, error) {
-	g.Debug("received UpdateNodeCapacityRequest: %v", req)
+	g.Debugf("received UpdateNodeCapacityRequest: %v", req)
 
 	rpl := &v1.UpdateNodeCapacityReply{}
 
@@ -172,7 +172,7 @@ func (g *grpcServer) UpdateNodeCapacity(ctx context.Context, req *v1.UpdateNodeC
 
 // HealthCheck checks if the agent is in healthy state
 func (g *grpcServer) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) (*v1.HealthCheckReply, error) {
-	g.Debug("received HealthCheckRequest: %v", req)
+	g.Debugf("received HealthCheckRequest: %v", req)
 	return &v1.HealthCheckReply{}, nil
 }
 
@@ -189,7 +189,7 @@ func isNativeResource(name string) bool {
 
 // GetConfig gets the cri-resmgr configuration
 func (g *grpcServer) GetConfig(ctx context.Context, req *v1.GetConfigRequest) (*v1.GetConfigReply, error) {
-	g.Debug("received GetConfigRequest: %v", req)
+	g.Debugf("received GetConfigRequest: %v", req)
 	rpl := &v1.GetConfigReply{
 		NodeName: nodeName,
 		Config:   resmgrConfig{},
@@ -198,7 +198,7 @@ func (g *grpcServer) GetConfig(ctx context.Context, req *v1.GetConfigRequest) (*
 	if g.getConfig != nil {
 		rpl.Config = g.getConfig()
 	} else {
-		g.Warn("no getter method configured, returning empty config!")
+		g.Warnf("no getter method configured, returning empty config!")
 	}
 	return rpl, nil
 }

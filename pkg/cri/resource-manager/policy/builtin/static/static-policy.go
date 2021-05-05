@@ -76,12 +76,12 @@ func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
 	}
 
-	s.Info("creating policy...")
+	s.Infof("creating policy...")
 
 	s.numHT = s.sys.CPU(sysfs.ID(0)).ThreadCPUSet().Size()
 
 	if err := s.checkConstraints(); err != nil {
-		s.Fatal("cannot start with given constraints: %v", err)
+		s.Fatalf("cannot start with given constraints: %v", err)
 	}
 
 	config.GetModule(PolicyPath).AddNotify(s.configNotify)
@@ -101,14 +101,14 @@ func (s *static) Description() string {
 
 // Start prepares this policy for accepting allocation/release requests.
 func (s *static) Start(add []cache.Container, del []cache.Container) error {
-	s.Debug("starting up...")
+	s.Debugf("starting up...")
 
 	if err := s.allocateReserved(); err != nil {
 		return policyError("failed allocate reserved CPUs: %v", err)
 	}
 
-	s.Info("using reserved CPUs: %s", s.reservedCpus.String())
-	s.Info("using available CPUs: %s", s.availableCpus.String())
+	s.Infof("using reserved CPUs: %s", s.reservedCpus.String())
+	s.Infof("using available CPUs: %s", s.availableCpus.String())
 
 	if err := s.validateState(s.state); err != nil {
 		return policyError("failed to start with given cache/state: %v", err)
@@ -121,7 +121,7 @@ func (s *static) Start(add []cache.Container, del []cache.Container) error {
 
 // Sync synchronizes the active policy state.
 func (s *static) Sync(add []cache.Container, del []cache.Container) error {
-	s.Debug("synchronizing state...")
+	s.Debugf("synchronizing state...")
 	for _, c := range del {
 		s.ReleaseResources(c)
 	}
@@ -134,7 +134,7 @@ func (s *static) Sync(add []cache.Container, del []cache.Container) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (s *static) AllocateResources(c cache.Container) error {
-	s.Info("allocating resource for container %s...", c.PrettyName())
+	s.Infof("allocating resource for container %s...", c.PrettyName())
 
 	container := c
 	containerID := c.GetCacheID()
@@ -150,7 +150,7 @@ func (s *static) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (s *static) ReleaseResources(c cache.Container) error {
-	s.Info("releasing resources of container %s...", c.PrettyName())
+	s.Infof("releasing resources of container %s...", c.PrettyName())
 
 	containerID := c.GetCacheID()
 	err := s.RemoveContainer(containerID)
@@ -160,19 +160,19 @@ func (s *static) ReleaseResources(c cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (s *static) UpdateResources(c cache.Container) error {
-	s.Debug("(not) updating container %s...", c.PrettyName())
+	s.Debugf("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 
 // Rebalance tries to find an optimal allocation of resources for the current containers.
 func (s *static) Rebalance() (bool, error) {
-	s.Debug("(not) rebalancing containers...")
+	s.Debugf("(not) rebalancing containers...")
 	return false, nil
 }
 
 // HandleEvent handles policy-specific events.
 func (s *static) HandleEvent(*events.Policy) (bool, error) {
-	s.Debug("(not) handling event...")
+	s.Debugf("(not) handling event...")
 	return false, nil
 }
 
@@ -203,16 +203,16 @@ func (s *static) Introspect(*introspect.State) {
 }
 
 func (s *static) configNotify(event config.Event, source config.Source) error {
-	s.Info("configuration %s", event)
+	s.Infof("configuration %s", event)
 
 	if opt.RelaxedIsolation {
-		s.Info("isolated exclusive CPUs: globally preferred (all pods)")
+		s.Infof("isolated exclusive CPUs: globally preferred (all pods)")
 	} else {
-		s.Info("isolated exclusive CPUs: per-pod (by annotation '%s')",
+		s.Infof("isolated exclusive CPUs: per-pod (by annotation '%s')",
 			kubernetes.ResmgrKey(keyPreferIsolated))
 	}
 
-	s.Info("rdt support set to %v", opt.Rdt)
+	s.Infof("rdt support set to %v", opt.Rdt)
 
 	return nil
 }
@@ -222,7 +222,7 @@ func (s *static) assignableCPUs(numCPUs int) cpuset.CPUSet {
 	cset := s.GetDefaultCPUSet().Difference(s.reservedCpus)
 
 	if cset.Size() < numCPUs && s.isolatedCpus.Size() > 0 {
-		s.Warn("not enough non-isolated CPUs (%d) left for request (%d)",
+		s.Warnf("not enough non-isolated CPUs (%d) left for request (%d)",
 			cset.Size(), numCPUs)
 		cset = cset.Union(s.isolatedCpus)
 	}
@@ -233,20 +233,20 @@ func (s *static) assignableCPUs(numCPUs int) cpuset.CPUSet {
 // AddContainer is the CPU Manager static policy AddContainer function.
 func (s *static) AddContainer(pod cache.Pod, container cache.Container, containerID string) error {
 	if numCPUs := s.guaranteedCPUs(pod, container); numCPUs != 0 {
-		s.Info("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.GetName(), container.GetName(), containerID)
+		s.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.GetName(), container.GetName(), containerID)
 		// container belongs in an exclusively allocated pool
 
 		if _, ok := s.GetCPUSet(containerID); ok {
-			s.Info("[cpumanager] static policy: container already present in state, skipping (container: %s, container id: %s)", container.GetName(), containerID)
+			s.Infof("[cpumanager] static policy: container already present in state, skipping (container: %s, container id: %s)", container.GetName(), containerID)
 			return nil
 		}
 
 		cpuset, err := s.allocateCPUs(numCPUs, containerID)
 		if err != nil {
-			s.Error("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)
+			s.Errorf("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)
 			return err
 		}
-		s.Debug("setting cpuset of %s to allocated %s", containerID, cpuset)
+		s.Debugf("setting cpuset of %s to allocated %s", containerID, cpuset)
 		s.SetCPUSet(containerID, cpuset)
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
@@ -255,7 +255,7 @@ func (s *static) AddContainer(pod cache.Pod, container cache.Container, containe
 
 // RemoveContainer is the CPU Manager static policy RemoveContainer function.
 func (s *static) RemoveContainer(containerID string) error {
-	s.Info("[cpumanager] static policy: RemoveContainer (container id: %s)", containerID)
+	s.Infof("[cpumanager] static policy: RemoveContainer (container id: %s)", containerID)
 	if toRelease, ok := s.GetCPUSet(containerID); ok {
 		s.Delete(containerID)
 		isolated := toRelease.Intersection(s.sys.Isolated())
@@ -287,7 +287,7 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 		if c, ok := s.state.LookupContainer(containerID); ok {
 			p, found := c.GetPod()
 			if !found {
-				s.Warn("can't find pod for container %s", c.GetID())
+				s.Warnf("can't find pod for container %s", c.GetID())
 				return false, false
 			}
 
@@ -296,7 +296,7 @@ func (s *static) cpuPreference(containerID string, numCPUs int) (bool, bool) {
 					prefer = true
 				} else {
 					if err != nil {
-						s.Error("invalid annotation '%s' on container %s, expecting boolean: %v",
+						s.Errorf("invalid annotation '%s' on container %s, expecting boolean: %v",
 							keyPreferIsolated, c.PrettyName(), err)
 					}
 				}
@@ -321,7 +321,7 @@ func (s *static) allocateOrdinaryCPUs(numCPUs int) (cpuset.CPUSet, error) {
 		return cpuset.NewCPUSet(), err
 	}
 
-	s.Info("allocated %d ordinary CPUs: %s", numCPUs, result.String())
+	s.Infof("allocated %d ordinary CPUs: %s", numCPUs, result.String())
 
 	return result, nil
 }
@@ -332,13 +332,13 @@ func (s *static) allocateIsolatedCPUs(numCPUs int, prefer bool) (cpuset.CPUSet, 
 
 	switch {
 	case err != nil:
-		s.Info("falling back to %d ordinary CPUs", numCPUs)
+		s.Infof("falling back to %d ordinary CPUs", numCPUs)
 		return s.allocateOrdinaryCPUs(numCPUs)
 	case numCPUs == 1 || prefer:
-		s.Info("allocated %d isolated CPUs: %s", numCPUs, result.String())
+		s.Infof("allocated %d isolated CPUs: %s", numCPUs, result.String())
 		return result, nil
 	default:
-		s.Info("falling back to %d ordinary CPUs", numCPUs)
+		s.Infof("falling back to %d ordinary CPUs", numCPUs)
 		return s.allocateOrdinaryCPUs(numCPUs)
 	}
 }
@@ -348,7 +348,7 @@ func (s *static) allocateCPUs(numCPUs int, containerID string) (cpuset.CPUSet, e
 	var result cpuset.CPUSet
 	var err error
 
-	s.Info("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
+	s.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
 
 	if try, prefer := s.cpuPreference(containerID, numCPUs); !try {
 		result, err = s.allocateOrdinaryCPUs(numCPUs)
@@ -364,14 +364,14 @@ func (s *static) allocateCPUs(numCPUs int, containerID string) (cpuset.CPUSet, e
 	s.SetDefaultCPUSet(s.GetDefaultCPUSet().Difference(result))
 	s.isolatedCpus = s.isolatedCpus.Difference(result)
 
-	s.Info("[cpumanager] allocateCPUs: returning \"%v\"", result)
+	s.Infof("[cpumanager] allocateCPUs: returning \"%v\"", result)
 	return result, nil
 }
 
 func (s *static) guaranteedCPUs(pod cache.Pod, container cache.Container) int {
 	qos := pod.GetQOSClass()
 
-	s.Debug("* QoS class for pod %s (%s) is %s", pod.GetID(), pod.GetName(), qos)
+	s.Debugf("* QoS class for pod %s (%s) is %s", pod.GetID(), pod.GetName(), qos)
 
 	if qos != corev1.PodQOSGuaranteed {
 		return 0
@@ -405,7 +405,7 @@ func (s *static) checkConstraints() error {
 	}
 
 	s.isolatedCpus = isolated
-	s.Info("system isolated CPUs: %s", s.isolatedCpus)
+	s.Infof("system isolated CPUs: %s", s.isolatedCpus)
 
 	return nil
 }
@@ -483,7 +483,7 @@ func (s *static) validateState(state cache.Cache) error {
 		s.isolatedCpus = s.isolatedCpus.Difference(cset)
 	}
 
-	s.Info("available (unallocated) isolated CPUs: %s", s.isolatedCpus)
+	s.Infof("available (unallocated) isolated CPUs: %s", s.isolatedCpus)
 
 	// 3. It's possible that the set of available CPUs has changed since
 	// the state was written. This can be due to for example
@@ -527,7 +527,7 @@ func (s *static) validateAssignments() {
 	ca := s.GetCPUAssignments()
 	for id, cset := range ca {
 		if _, ok := s.state.LookupContainer(id); !ok {
-			s.Info("Removing stale assignment of container %s (cpus %s)",
+			s.Infof("Removing stale assignment of container %s (cpus %s)",
 				id, cset.String())
 			s.RemoveContainer(id)
 		}
@@ -566,7 +566,7 @@ func (s *static) GetCPUAssignments() ContainerCPUAssignments {
 	var ca map[string]cpuset.CPUSet
 
 	if !s.state.GetPolicyEntry(keyAssignments, &ca) {
-		s.Error("no cached CPU assignments")
+		s.Errorf("no cached CPU assignments")
 	}
 
 	if ca == nil {
@@ -587,7 +587,7 @@ func (s *static) GetDefaultCPUSet() cpuset.CPUSet {
 	var cset cpuset.CPUSet
 
 	if !s.state.GetPolicyEntry(keyDefaultCPUs, &cset) {
-		s.Error("no cached default CPU set")
+		s.Errorf("no cached default CPU set")
 	}
 
 	return cset
@@ -625,7 +625,7 @@ func (s *static) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 
 // Delete deletes the given container from our state.
 func (s *static) Delete(containerID string) {
-	s.Debug("deleting container %s from assignments", containerID)
+	s.Debugf("deleting container %s from assignments", containerID)
 
 	ca := s.GetCPUAssignments()
 	delete(ca, containerID)
@@ -641,7 +641,7 @@ func (s *static) SetCpusetCpus(id, value string) error {
 	}
 
 	c.SetCpusetCpus(value)
-	s.Info("container %s: CpusetCpus set to %s", c.PrettyName(), value)
+	s.Infof("container %s: CpusetCpus set to %s", c.PrettyName(), value)
 
 	return nil
 }

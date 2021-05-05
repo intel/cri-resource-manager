@@ -135,7 +135,7 @@ func NewResourceManager() (ResourceManager, error) {
 
 // Start starts the resource manager.
 func (m *resmgr) Start() error {
-	m.Info("starting...")
+	m.Infof("starting...")
 
 	m.Lock()
 	defer m.Unlock()
@@ -173,14 +173,14 @@ func (m *resmgr) Start() error {
 		}
 	}
 
-	m.Info("up and running")
+	m.Infof("up and running")
 
 	return nil
 }
 
 // Stop stops the resource manager.
 func (m *resmgr) Stop() {
-	m.Info("shutting down...")
+	m.Infof("shutting down...")
 
 	m.Lock()
 	defer m.Unlock()
@@ -198,13 +198,13 @@ func (m *resmgr) Stop() {
 
 // SetConfig pushes new configuration to the resource manager.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
-	m.Info("applying new configuration from agent...")
+	m.Infof("applying new configuration from agent...")
 	return m.setConfig(conf)
 }
 
 // SetAdjustment pushes new external adjustments to the resource manager.
 func (m *resmgr) SetAdjustment(adjustment *config.Adjustment) map[string]error {
-	m.Info("applying new adjustments from agent...")
+	m.Infof("applying new adjustments from agent...")
 
 	m.Lock()
 	defer m.Unlock()
@@ -213,13 +213,13 @@ func (m *resmgr) SetAdjustment(adjustment *config.Adjustment) map[string]error {
 
 // setConfigFromFile pushes new configuration to the resource manager from a file.
 func (m *resmgr) setConfigFromFile(path string) error {
-	m.Info("applying new configuration from file %s...", path)
+	m.Infof("applying new configuration from file %s...", path)
 	return m.setConfig(path)
 }
 
 // setAdjustments pushes new external policies to the resource manager.
 func (m *resmgr) setAdjustment(adjustments *config.Adjustment) map[string]error {
-	m.Info("applying new external adjustments from agent...")
+	m.Infof("applying new external adjustments from agent...")
 
 	rebalance, errors := m.cache.SetAdjustment(adjustments)
 	if rebalance {
@@ -231,17 +231,17 @@ func (m *resmgr) setAdjustment(adjustments *config.Adjustment) map[string]error 
 
 // resetCachedPolicy resets the cached active policy and all of its data.
 func (m *resmgr) resetCachedPolicy() int {
-	m.Info("resetting active policy stored in cache...")
+	m.Infof("resetting active policy stored in cache...")
 	defer logger.Flush()
 
 	if utils.ServerActiveAt(opt.RelaySocket) {
-		m.Error("refusing to reset, looks like an instance of %q is active at socket %q...",
+		m.Errorf("refusing to reset, looks like an instance of %q is active at socket %q...",
 			filepath.Base(os.Args[0]), opt.RelaySocket)
 		return 1
 	}
 
 	if err := m.cache.ResetActivePolicy(); err != nil {
-		m.Error("failed to reset active policy: %v", err)
+		m.Errorf("failed to reset active policy: %v", err)
 		return 1
 	}
 	return 0
@@ -249,17 +249,17 @@ func (m *resmgr) resetCachedPolicy() int {
 
 // resetCachedConfig resets any cached configuration.
 func (m *resmgr) resetCachedConfig() int {
-	m.Info("resetting cached configuration...")
+	m.Infof("resetting cached configuration...")
 	defer logger.Flush()
 
 	if utils.ServerActiveAt(opt.RelaySocket) {
-		m.Error("refusing to reset, looks like an instance of %q is active at socket %q...",
+		m.Errorf("refusing to reset, looks like an instance of %q is active at socket %q...",
 			filepath.Base(os.Args[0]), opt.RelaySocket)
 		return 1
 	}
 
 	if err := m.cache.ResetConfig(); err != nil {
-		m.Error("failed to reset cached configuration: %v", err)
+		m.Errorf("failed to reset cached configuration: %v", err)
 		return 1
 	}
 	return 0
@@ -331,7 +331,7 @@ func (m *resmgr) loadConfig() error {
 	//
 
 	if opt.ForceConfig != "" {
-		m.Info("using forced configuration %s...", opt.ForceConfig)
+		m.Infof("using forced configuration %s...", opt.ForceConfig)
 		if err := pkgcfg.SetConfigFromFile(opt.ForceConfig); err != nil {
 			return resmgrError("failed to load forced configuration %s: %v",
 				opt.ForceConfig, err)
@@ -339,26 +339,26 @@ func (m *resmgr) loadConfig() error {
 		return m.setupConfigSignal(opt.ForceConfigSignal)
 	}
 
-	m.Info("trying configuration from agent...")
+	m.Infof("trying configuration from agent...")
 	if conf, err := m.agent.GetConfig(1 * time.Second); err == nil {
 		if err = pkgcfg.SetConfig(conf.Data); err == nil {
 			m.conf = conf // schedule storing in cache if we ever manage to start up
 			return nil
 		}
-		m.Error("configuration from agent failed to apply: %v", err)
+		m.Errorf("configuration from agent failed to apply: %v", err)
 	}
 
-	m.Info("trying last cached configuration...")
+	m.Infof("trying last cached configuration...")
 	if conf := m.cache.GetConfig(); conf != nil {
 		err := pkgcfg.SetConfig(conf.Data)
 		if err == nil {
 			return nil
 		}
-		m.Error("failed to activate cached configuration: %v", err)
+		m.Errorf("failed to activate cached configuration: %v", err)
 	}
 
 	if opt.FallbackConfig != "" {
-		m.Info("using fallback configuration %s...", opt.FallbackConfig)
+		m.Infof("using fallback configuration %s...", opt.FallbackConfig)
 		if err := pkgcfg.SetConfigFromFile(opt.FallbackConfig); err != nil {
 			return resmgrError("failed to load fallback configuration %s: %v",
 				opt.FallbackConfig, err)
@@ -366,7 +366,7 @@ func (m *resmgr) loadConfig() error {
 		return nil
 	}
 
-	m.Warn("no initial configuration found")
+	m.Warnf("no initial configuration found")
 	return nil
 }
 
@@ -376,7 +376,7 @@ func (m *resmgr) setupConfigSignal(signame string) error {
 		return nil
 	}
 
-	m.Info("setting up signal %s to reload forced configuration", signame)
+	m.Infof("setting up signal %s to reload forced configuration", signame)
 
 	sig := unix.SignalNum(signame)
 	if int(sig) == 0 {
@@ -395,10 +395,10 @@ func (m *resmgr) setupConfigSignal(signame string) error {
 				}
 			}
 
-			m.Info("reloading forced configuration %s...", opt.ForceConfig)
+			m.Infof("reloading forced configuration %s...", opt.ForceConfig)
 
 			if err := m.setConfigFromFile(opt.ForceConfig); err != nil {
-				m.Error("failed to reload forced configuration %s: %v",
+				m.Errorf("failed to reload forced configuration %s: %v",
 					opt.ForceConfig, err)
 			}
 		}
@@ -417,7 +417,7 @@ func (m *resmgr) setupPolicy() error {
 	if active != cached {
 		if cached != "" {
 			if opt.DisablePolicySwitch {
-				m.Error("can't switch policy from %q to %q: policy switching disabled",
+				m.Errorf("can't switch policy from %q to %q: policy switching disabled",
 					cached, active)
 				return resmgrError("cannot load cache with policy %s for active policy %s",
 					cached, active)
@@ -491,10 +491,10 @@ func (m *resmgr) setupIntrospection() error {
 
 	if !opt.DisableUI {
 		if err := visualizer.Setup(mux); err != nil {
-			m.Error("failed to set up UI for visualization: %v", err)
+			m.Errorf("failed to set up UI for visualization: %v", err)
 		}
 	} else {
-		m.Warn("built-in visualization UIs are disabled")
+		m.Warnf("built-in visualization UIs are disabled")
 	}
 
 	return nil

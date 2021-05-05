@@ -39,7 +39,7 @@ func newService() *service {
 
 // Start starts instrumentation services.
 func (s *service) Start() error {
-	log.Info("starting instrumentation services...")
+	log.Infof("starting instrumentation services...")
 
 	s.Lock()
 	defer s.Unlock()

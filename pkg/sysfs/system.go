@@ -284,7 +284,7 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 	if (sys.flags & DiscoverSst) != 0 {
 		if err := sys.discoverSst(); err != nil {
 			// Just consider SST unsupported if our detection fails for some reason
-			sys.Warn("%v", err)
+			sys.Warnf("%v", err)
 		}
 	}
 
@@ -317,45 +317,45 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 
 	if sys.DebugEnabled() {
 		for id, pkg := range sys.packages {
-			sys.Info("package #%d:", id)
-			sys.Debug("   cpus: %s", pkg.cpus)
-			sys.Debug("  nodes: %s", pkg.nodes)
-			sys.Debug("   dies: %s", pkg.dies)
+			sys.Infof("package #%d:", id)
+			sys.Debugf("   cpus: %s", pkg.cpus)
+			sys.Debugf("  nodes: %s", pkg.nodes)
+			sys.Debugf("   dies: %s", pkg.dies)
 			for die := range pkg.dies {
-				sys.Debug("    die #%v nodes: %v", die, pkg.DieNodeIDs(die))
-				sys.Debug("    die #%v cpus: %s", die, pkg.DieCPUSet(die).String())
+				sys.Debugf("    die #%v nodes: %v", die, pkg.DieNodeIDs(die))
+				sys.Debugf("    die #%v cpus: %s", die, pkg.DieCPUSet(die).String())
 			}
 		}
 
 		for id, node := range sys.nodes {
-			sys.Debug("node #%d:", id)
-			sys.Debug("      cpus: %s", node.cpus)
-			sys.Debug("  distance: %v", node.distance)
-			sys.Debug("   package: #%d", node.pkg)
-			sys.Debug("       die: #%d", node.die)
+			sys.Debugf("node #%d:", id)
+			sys.Debugf("      cpus: %s", node.cpus)
+			sys.Debugf("  distance: %v", node.distance)
+			sys.Debugf("   package: #%d", node.pkg)
+			sys.Debugf("       die: #%d", node.die)
 		}
 
 		for id, cpu := range sys.cpus {
-			sys.Debug("CPU #%d:", id)
-			sys.Debug("        pkg: %d", cpu.pkg)
-			sys.Debug("        die: %d", cpu.die)
-			sys.Debug("       node: %d", cpu.node)
-			sys.Debug("       core: %d", cpu.core)
-			sys.Debug("    threads: %s", cpu.threads)
-			sys.Debug("  base freq: %d", cpu.baseFreq)
-			sys.Debug("       freq: %d - %d", cpu.freq.min, cpu.freq.max)
-			sys.Debug("        epp: %d", cpu.epp)
+			sys.Debugf("CPU #%d:", id)
+			sys.Debugf("        pkg: %d", cpu.pkg)
+			sys.Debugf("        die: %d", cpu.die)
+			sys.Debugf("       node: %d", cpu.node)
+			sys.Debugf("       core: %d", cpu.core)
+			sys.Debugf("    threads: %s", cpu.threads)
+			sys.Debugf("  base freq: %d", cpu.baseFreq)
+			sys.Debugf("       freq: %d - %d", cpu.freq.min, cpu.freq.max)
+			sys.Debugf("        epp: %d", cpu.epp)
 		}
 
-		sys.Debug("offline CPUs: %s", sys.offline)
-		sys.Debug("isolated CPUs: %s", sys.isolated)
+		sys.Debugf("offline CPUs: %s", sys.offline)
+		sys.Debugf("isolated CPUs: %s", sys.isolated)
 
 		for id, cch := range sys.cache {
-			sys.Debug("cache #%d:", id)
-			sys.Debug("   type: %v", cch.kind)
-			sys.Debug("   size: %d", cch.size)
-			sys.Debug("  level: %d", cch.level)
-			sys.Debug("   CPUs: %s", cch.cpus)
+			sys.Debugf("cache #%d:", id)
+			sys.Debugf("   type: %v", cch.kind)
+			sys.Debugf("   size: %d", cch.size)
+			sys.Debugf("  level: %d", cch.level)
+			sys.Debugf("   CPUs: %s", cch.cpus)
 		}
 	}
 
@@ -546,7 +546,7 @@ func (sys *system) discoverCPUs() error {
 
 	_, err := readSysfsEntry(sys.path, filepath.Join(sysfsCPUPath, "isolated"), &sys.isolated, ",")
 	if err != nil {
-		sys.Error("failed to get set of isolated cpus: %v", err)
+		sys.Errorf("failed to get set of isolated cpus: %v", err)
 	}
 
 	entries, _ := filepath.Glob(filepath.Join(sys.path, sysfsCPUPath, "cpu[0-9]*"))
@@ -771,9 +771,9 @@ func (sys *system) discoverNodes() error {
 	}
 	cpuNodes := cpuNodesBuilder.Result()
 
-	sys.Logger.Info("NUMA nodes with CPUs: %s", cpuNodes.String())
-	sys.Logger.Info("NUMA nodes with (any) memory: %s", memoryNodes.String())
-	sys.Logger.Info("NUMA nodes with normal memory: %s", normalMemNodes.String())
+	sys.Logger.Infof("NUMA nodes with CPUs: %s", cpuNodes.String())
+	sys.Logger.Infof("NUMA nodes with (any) memory: %s", memoryNodes.String())
+	sys.Logger.Infof("NUMA nodes with normal memory: %s", normalMemNodes.String())
 
 	dramNodes := memoryNodes.Intersection(cpuNodes)
 	pmemOrHbmNodes := memoryNodes.Difference(dramNodes)
@@ -814,14 +814,14 @@ func (sys *system) discoverNodes() error {
 				return fmt.Errorf("not able to determine system special memory types")
 			}
 			if mem.MemTotal < dramAvg {
-				sys.Logger.Info("node %d has HBM memory", node.id)
+				sys.Logger.Infof("node %d has HBM memory", node.id)
 				node.memoryType = MemoryTypeHBM
 			} else {
-				sys.Logger.Info("node %d has PMEM memory", node.id)
+				sys.Logger.Infof("node %d has PMEM memory", node.id)
 				node.memoryType = MemoryTypePMEM
 			}
 		} else if _, ok := dramNodeIds[node.id]; ok {
-			sys.Logger.Info("node %d has DRAM memory", node.id)
+			sys.Logger.Infof("node %d has DRAM memory", node.id)
 			node.memoryType = MemoryTypeDRAM
 		} else {
 			return fmt.Errorf("Unknown memory type for node %v (pmem nodes: %s, dram nodes: %s)", node, pmemOrHbmNodes, dramNodes)
@@ -963,7 +963,7 @@ func (sys *system) discoverPackages() error {
 
 func (sys *system) discoverSst() error {
 	if !SstSupported() {
-		sys.Info("Speed Select Technology (SST) support not detected")
+		sys.Infof("Speed Select Technology (SST) support not detected")
 		return nil
 	}
 

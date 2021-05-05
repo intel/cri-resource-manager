@@ -53,7 +53,7 @@ func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
 	p.CgroupParent = cfg.GetLinux().GetCgroupParent()
 
 	if err := p.discoverQOSClass(); err != nil {
-		p.cache.Error("%v", err)
+		p.cache.Errorf("%v", err)
 	}
 
 	p.parseResourceAnnotations()
@@ -78,7 +78,7 @@ func (p *pod) fromListResponse(pod *cri.PodSandbox, status *PodStatus) error {
 	p.CgroupParent = status.CgroupParent
 
 	if err := p.discoverQOSClass(); err != nil {
-		p.cache.Error("%v", err)
+		p.cache.Errorf("%v", err)
 	}
 
 	p.parseResourceAnnotations()
@@ -269,7 +269,7 @@ func (p *pod) GetAnnotationObject(key string, objPtr interface{},
 	}
 
 	if err != nil {
-		p.cache.Error("failed to decode annotation %s (%s): %v", key, value, err)
+		p.cache.Errorf("failed to decode annotation %s (%s): %v", key, value, err)
 	}
 
 	return true, err
@@ -389,7 +389,7 @@ func (p *pod) GetContainerAffinity(name string) []*Affinity {
 		weight := DefaultWeight
 		if !p.Affinity.parseSimple(p, value, weight) {
 			if err := p.Affinity.parseFull(p, value, weight); err != nil {
-				p.cache.Error("%v", err)
+				p.cache.Errorf("%v", err)
 			}
 		}
 	}
@@ -398,17 +398,17 @@ func (p *pod) GetContainerAffinity(name string) []*Affinity {
 		weight := -DefaultWeight
 		if !p.Affinity.parseSimple(p, value, weight) {
 			if err := p.Affinity.parseFull(p, value, weight); err != nil {
-				p.cache.Error("%v", err)
+				p.cache.Errorf("%v", err)
 			}
 		}
 	}
 
 	if p.cache.DebugEnabled() {
-		p.cache.Debug("Pod container affinity for %s:", p.GetName())
+		p.cache.Debugf("Pod container affinity for %s:", p.GetName())
 		for id, ca := range *p.Affinity {
-			p.cache.Debug("  - container %s:", id)
+			p.cache.Debugf("  - container %s:", id)
 			for _, a := range ca {
-				p.cache.Debug("    * %s", a.String())
+				p.cache.Debugf("    * %s", a.String())
 			}
 		}
 	}
@@ -496,7 +496,7 @@ func (p *pod) getTasks(recursive, processes bool) ([]string, error) {
 				continue
 			}
 
-			p.cache.Error("%s: failed to read pids of %s: %v", p.Name,
+			p.cache.Errorf("%s: failed to read pids of %s: %v", p.Name,
 				c.PrettyName(), err)
 		}
 	}

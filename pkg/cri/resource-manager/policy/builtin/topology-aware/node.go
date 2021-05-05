@@ -295,35 +295,35 @@ func (n *node) Dump(prefix string, level ...int) {
 	idt := indent(prefix, lvl)
 
 	n.self.node.dump(prefix, lvl)
-	log.Debug("%s  - %s", idt, n.noderes.DumpCapacity())
-	log.Debug("%s  - %s", idt, n.freeres.DumpAllocatable())
+	log.Debugf("%s  - %s", idt, n.noderes.DumpCapacity())
+	log.Debugf("%s  - %s", idt, n.freeres.DumpAllocatable())
 	n.freeres.DumpMemoryState(idt + "  ")
 	if n.mem.Size() > 0 {
-		log.Debug("%s  - normal memory: %v", idt, n.mem)
+		log.Debugf("%s  - normal memory: %v", idt, n.mem)
 	}
 	if n.hbm.Size() > 0 {
-		log.Debug("%s  - HBM memory: %v", idt, n.hbm)
+		log.Debugf("%s  - HBM memory: %v", idt, n.hbm)
 	}
 	if n.pMem.Size() > 0 {
-		log.Debug("%s  - PMEM memory: %v", idt, n.pMem)
+		log.Debugf("%s  - PMEM memory: %v", idt, n.pMem)
 	}
 	for _, grant := range n.policy.allocations.grants {
 		cpuNodeID := grant.GetCPUNode().NodeID()
 		memNodeID := grant.GetMemoryNode().NodeID()
 		switch {
 		case cpuNodeID == n.id && memNodeID == n.id:
-			log.Debug("%s    + cpu+mem %s", idt, grant)
+			log.Debugf("%s    + cpu+mem %s", idt, grant)
 		case cpuNodeID == n.id:
-			log.Debug("%s    + cpuonly %s", idt, grant)
+			log.Debugf("%s    + cpuonly %s", idt, grant)
 		case memNodeID == n.id:
-			log.Debug("%s    + memonly %s", idt, grant)
+			log.Debugf("%s    + memonly %s", idt, grant)
 		}
 	}
 	if !n.Parent().IsNil() {
-		log.Debug("%s  - parent: <%s>", idt, n.Parent().Name())
+		log.Debugf("%s  - parent: <%s>", idt, n.Parent().Name())
 	}
 	if len(n.children) > 0 {
-		log.Debug("%s  - children:", idt)
+		log.Debugf("%s  - children:", idt)
 		for _, c := range n.children {
 			c.Dump(prefix, lvl+1)
 		}
@@ -388,10 +388,10 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 	}
 
 	if !n.IsLeafNode() {
-		log.Debug("%s: cumulating child resources...", n.Name())
+		log.Debugf("%s: cumulating child resources...", n.Name())
 
 		if len(assignedNUMANodes) > 0 {
-			log.Fatal("invalid pool setup: trying to attach NUMA nodes to non-leaf node %s",
+			log.Fatalf("invalid pool setup: trying to attach NUMA nodes to non-leaf node %s",
 				n.Name())
 		}
 
@@ -402,11 +402,11 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 			n.mem.Add(c.GetMemset(memoryDRAM).Members()...)
 			n.hbm.Add(c.GetMemset(memoryHBM).Members()...)
 			n.pMem.Add(c.GetMemset(memoryPMEM).Members()...)
-			log.Debug("  + %s", supply.DumpCapacity())
+			log.Debugf("  + %s", supply.DumpCapacity())
 		}
-		log.Debug("  = %s", n.noderes.DumpCapacity())
+		log.Debugf("  = %s", n.noderes.DumpCapacity())
 	} else {
-		log.Debug("%s: discovering attached/assigned resources...", n.Name())
+		log.Debugf("%s: discovering attached/assigned resources...", n.Name())
 
 		mmap := createMemoryMap(0, 0, 0)
 		cpus := cpuset.NewCPUSet()
@@ -417,7 +417,7 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 
 			meminfo, err := node.MemoryInfo()
 			if err != nil {
-				log.Fatal("%s: failed to get memory info for NUMA node #%d", n.Name(), nodeID)
+				log.Fatalf("%s: failed to get memory info for NUMA node #%d", n.Name(), nodeID)
 			}
 
 			switch node.GetMemoryType() {
@@ -425,20 +425,20 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 				n.mem.Add(nodeID)
 				mmap.AddDRAM(meminfo.MemTotal)
 				shortCPUs := kubernetes.ShortCPUSet(nodeCPUs)
-				log.Debug("  + assigned DRAM NUMA node #%d (cpuset: %s, DRAM %.2fM)",
+				log.Debugf("  + assigned DRAM NUMA node #%d (cpuset: %s, DRAM %.2fM)",
 					nodeID, shortCPUs, float64(meminfo.MemTotal)/float64(1024*1024))
 			case system.MemoryTypePMEM:
 				n.pMem.Add(nodeID)
 				mmap.AddPMEM(meminfo.MemTotal)
-				log.Debug("  + assigned PMEM NUMA node #%d (DRAM %.2fM)", nodeID,
+				log.Debugf("  + assigned PMEM NUMA node #%d (DRAM %.2fM)", nodeID,
 					float64(meminfo.MemTotal)/float64(1024*1024))
 			case system.MemoryTypeHBM:
 				n.hbm.Add(nodeID)
 				mmap.AddHBM(meminfo.MemTotal)
-				log.Debug("  + assigned HBMEM NUMA node #%d (DRAM %.2fM)",
+				log.Debugf("  + assigned HBMEM NUMA node #%d (DRAM %.2fM)",
 					nodeID, float64(meminfo.MemTotal)/float64(1024*1024))
 			default:
-				log.Fatal("NUMA node #%d with unknown memory type %v", node.GetMemoryType())
+				log.Fatalf("NUMA node #%d with unknown memory type %v", node.GetMemoryType())
 			}
 
 			allowed := nodeCPUs.Intersection(n.policy.allowed)
@@ -447,13 +447,13 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 			sharable := allowed.Difference(isolated).Difference(reserved)
 
 			if !reserved.IsEmpty() {
-				log.Debug("    allowed reserved CPUs: %s", kubernetes.ShortCPUSet(reserved))
+				log.Debugf("    allowed reserved CPUs: %s", kubernetes.ShortCPUSet(reserved))
 			}
 			if !sharable.IsEmpty() {
-				log.Debug("    allowed sharable CPUs: %s", kubernetes.ShortCPUSet(sharable))
+				log.Debugf("    allowed sharable CPUs: %s", kubernetes.ShortCPUSet(sharable))
 			}
 			if !isolated.IsEmpty() {
-				log.Debug("    allowed isolated CPUs: %s", kubernetes.ShortCPUSet(isolated))
+				log.Debugf("    allowed isolated CPUs: %s", kubernetes.ShortCPUSet(isolated))
 			}
 
 			cpus = cpus.Union(allowed)
@@ -463,7 +463,7 @@ func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
 		reserved := cpus.Intersection(n.policy.reserved).Difference(isolated)
 		sharable := cpus.Difference(isolated).Difference(reserved)
 		n.noderes = newSupply(n, isolated, reserved, sharable, 0, 0, mmap, nil)
-		log.Debug("  = %s", n.noderes.DumpCapacity())
+		log.Debugf("  = %s", n.noderes.DumpCapacity())
 	}
 
 	n.freeres = n.noderes.Clone()
@@ -494,14 +494,14 @@ func (n *node) assignNUMANodes(ids []system.ID) {
 
 	for _, numaNodeID := range ids {
 		if n.mem.Has(numaNodeID) || n.pMem.Has(numaNodeID) || n.hbm.Has(numaNodeID) {
-			log.Warn("*** NUMA node #%d already discovered by or assigned to %s",
+			log.Warnf("*** NUMA node #%d already discovered by or assigned to %s",
 				numaNodeID, n.Name())
 			continue
 		}
 		numaNode := n.policy.sys.Node(numaNodeID)
 		memTotal := uint64(0)
 		if meminfo, err := numaNode.MemoryInfo(); err != nil {
-			log.Error("%s: failed to get memory info for NUMA node #%d",
+			log.Errorf("%s: failed to get memory info for NUMA node #%d",
 				n.Name(), numaNodeID)
 		} else {
 			memTotal = meminfo.MemTotal
@@ -510,20 +510,20 @@ func (n *node) assignNUMANodes(ids []system.ID) {
 		case system.MemoryTypeDRAM:
 			mem.Add(memTotal, 0, 0)
 			n.mem.Add(numaNodeID)
-			log.Info("*** DRAM NUMA node #%d assigned to pool node %q",
+			log.Infof("*** DRAM NUMA node #%d assigned to pool node %q",
 				numaNodeID, n.Name())
 		case system.MemoryTypePMEM:
 			n.pMem.Add(numaNodeID)
 			mem.Add(0, memTotal, 0)
-			log.Info("*** PMEM NUMA node #%d assigned to pool node %q",
+			log.Infof("*** PMEM NUMA node #%d assigned to pool node %q",
 				numaNodeID, n.Name())
 		case system.MemoryTypeHBM:
 			n.hbm.Add(numaNodeID)
 			mem.Add(0, 0, memTotal)
-			log.Info("*** HBM NUMA node #%d assigned to pool node %q",
+			log.Infof("*** HBM NUMA node #%d assigned to pool node %q",
 				numaNodeID, n.Name())
 		default:
-			log.Fatal("can't assign NUMA node #%d of type %v to pool node %q",
+			log.Fatalf("can't assign NUMA node #%d of type %v to pool node %q",
 				numaNodeID, numaNode.GetMemoryType())
 		}
 	}
@@ -598,7 +598,7 @@ func (p *policy) NewNumaNode(id system.ID, parent Node) Node {
 
 // Dump (the NUMA-specific parts of) this node.
 func (n *numanode) dump(prefix string, level ...int) {
-	log.Debug("%s<NUMA node #%v>", indent(prefix, level...), n.id)
+	log.Debugf("%s<NUMA node #%v>", indent(prefix, level...), n.id)
 }
 
 // Get CPU supply available at this node.
@@ -673,7 +673,7 @@ func (p *policy) NewDieNode(id system.ID, parent Node) Node {
 
 // Dump (the die-specific parts of) this node.
 func (n *dienode) dump(prefix string, level ...int) {
-	log.Debug("%s<die #%v/%v>", indent(prefix, level...), n.syspkg.ID(), n.id)
+	log.Debugf("%s<die #%v/%v>", indent(prefix, level...), n.syspkg.ID(), n.id)
 }
 
 // Get CPU supply available at this node.
@@ -752,7 +752,7 @@ func (p *policy) NewSocketNode(id system.ID, parent Node) Node {
 
 // Dump (the socket-specific parts of) this node.
 func (n *socketnode) dump(prefix string, level ...int) {
-	log.Debug("%s<socket #%v>", indent(prefix, level...), n.id)
+	log.Debugf("%s<socket #%v>", indent(prefix, level...), n.id)
 }
 
 // Get CPU supply available at this node.
@@ -824,7 +824,7 @@ func (p *policy) NewVirtualNode(name string, parent Node) Node {
 
 // Dump (the virtual-node specific parts of) this node.
 func (n *virtualnode) dump(prefix string, level ...int) {
-	log.Debug("%s<virtual %s>", indent(prefix, level...), n.name)
+	log.Debugf("%s<virtual %s>", indent(prefix, level...), n.name)
 }
 
 // Get CPU supply available at this node.
@@ -856,7 +856,7 @@ func (n *virtualnode) GetMemset(mtype memoryType) system.IDSet {
 
 // AssignNUMANodes assigns the given NUMA nodes to this one.
 func (n *virtualnode) AssignNUMANodes(ids []system.ID) {
-	log.Panic("cannot assign NUMA nodes #%s to %s",
+	log.Panicf("cannot assign NUMA nodes #%s to %s",
 		system.NewIDSet(ids...).String(), n.Name())
 }
 

@@ -48,7 +48,7 @@ func (a *agent) getK8sClient(kubeconfig string) (*k8sclient.Clientset, *resmgr.C
 	var err error
 
 	if kubeconfig == "" {
-		a.Info("using in-cluster kubeconfig")
+		a.Infof("using in-cluster kubeconfig")
 		config, err = rest.InClusterConfig()
 	} else {
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -262,9 +262,9 @@ func (w *watch) Start(name string) {
 
 		for {
 			if events == nil {
-				w.parent.Info("creating %s watch", w.Name())
+				w.parent.Infof("creating %s watch", w.Name())
 				if k8w, err = w.openfn(w.ns, w.name); err != nil {
-					w.parent.Warn("failed to create %s watch: %v", w.Name(), err)
+					w.parent.Warnf("failed to create %s watch: %v", w.Name(), err)
 					ratelimit = time.After(1 * time.Second)
 				} else {
 					events = k8w.ResultChan()
@@ -282,7 +282,7 @@ func (w *watch) Start(name string) {
 				if ok {
 					w.events <- e
 				} else {
-					w.parent.Warn("failed to get event from watch %s", w.Name())
+					w.parent.Warnf("failed to get event from watch %s", w.Name())
 					k8w.Stop()
 					events = nil
 				}

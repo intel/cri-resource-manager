@@ -90,13 +90,13 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 
 	if err := ctl.configure(); err != nil {
 		// Just print an error. A config update later on may be valid.
-		log.Error("failed apply initial configuration: %v", err)
+		log.Errorf("failed apply initial configuration: %v", err)
 	}
 
 	rdt.RegisterCustomPrometheusLabels("pod_name", "container_name")
 	err := metrics.RegisterCollector("rdt", rdt.NewCollector)
 	if err != nil {
-		log.Error("failed register rdt collector: %v", err)
+		log.Errorf("failed register rdt collector: %v", err)
 	}
 
 	pkgcfg.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
@@ -176,7 +176,7 @@ func (ctl *rdtctl) assign(c cache.Container) error {
 
 	err := ctl.assignClass(c, class)
 	if err != nil && class != rdt.RootClassName {
-		log.Warn("%v; falling back to system root class", err)
+		log.Warnf("%v; falling back to system root class", err)
 		return ctl.assignClass(c, rdt.RootClassName)
 	}
 	return err
@@ -220,7 +220,7 @@ func (ctl *rdtctl) assignClass(c cache.Container, class string) error {
 			return err
 		}
 	}
-	log.Info("%q: assigned to class %q", pretty, class)
+	log.Infof("%q: assigned to class %q", pretty, class)
 
 	return nil
 }
@@ -233,13 +233,13 @@ func (ctl *rdtctl) monitor(cls rdt.CtrlGroup, pod, name, id, pretty string, pids
 
 	annotations := map[string]string{"pod_name": pod, "container_name": name}
 	if mg, err := cls.CreateMonGroup(id, annotations); err != nil {
-		log.Warn("%q: failed to create monitoring group: %v", pretty, err)
+		log.Warnf("%q: failed to create monitoring group: %v", pretty, err)
 	} else {
 		if err := mg.AddPids(pids...); err != nil {
 			return rdtError("%q: failed to assign to monitoring group %q: %v",
 				pretty, cls.Name()+"/"+mg.Name(), err)
 		}
-		log.Info("%q: assigned to monitoring group %q", pretty, cls.Name()+"/"+mg.Name())
+		log.Infof("%q: assigned to monitoring group %q", pretty, cls.Name()+"/"+mg.Name())
 	}
 	return nil
 }
@@ -252,7 +252,7 @@ func (ctl *rdtctl) stopMonitor(c cache.Container) error {
 			if err := cls.DeleteMonGroup(name); err != nil {
 				return err
 			}
-			log.Info("%q: removed monitoring group %q",
+			log.Infof("%q: removed monitoring group %q",
 				c.PrettyName(), cls.Name()+"/"+mg.Name())
 		}
 	}
@@ -279,7 +279,7 @@ func (ctl *rdtctl) assignAll(forceClass string) {
 			err = ctl.assign(c)
 		}
 		if err != nil {
-			log.Warn("failed to assign rdt class of %q: %v", c.PrettyName(), err)
+			log.Warnf("failed to assign rdt class of %q: %v", c.PrettyName(), err)
 		}
 	}
 
@@ -345,10 +345,10 @@ func (ctl *rdtctl) configure() error {
 		return rdtError("invalid mode %q", ctl.opt.Options.Mode)
 	}
 
-	log.Debug("rdt controller operating mode set to %q", ctl.mode)
+	log.Debugf("rdt controller operating mode set to %q", ctl.mode)
 
 	if ctl.opt.Options.Mode != OperatingModeDisabled {
-		log.Debug("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.monitoringDisabled()])
+		log.Debugf("rdt monitoring %s", map[bool]string{true: "disabled", false: "enabled"}[ctl.monitoringDisabled()])
 	}
 
 	return nil
@@ -356,7 +356,7 @@ func (ctl *rdtctl) configure() error {
 
 // configNotify is our runtime configuration notification callback.
 func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
-	log.Info("configuration update, applying new config")
+	log.Infof("configuration update, applying new config")
 	return ctl.configure()
 }
 

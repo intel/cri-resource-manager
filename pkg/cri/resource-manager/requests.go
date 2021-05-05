@@ -150,7 +150,7 @@ func (m *resmgr) startRequestProcessing() error {
 	}
 
 	if err := m.runPostReleaseHooks(ctx, "startup", del...); err != nil {
-		m.Error("startup: failed to run post-release hooks: %v", err)
+		m.Errorf("startup: failed to run post-release hooks: %v", err)
 	}
 
 	return m.cache.Save()
@@ -162,7 +162,7 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 		return nil, nil, nil
 	}
 
-	m.Info("synchronizing cache state with CRI runtime...")
+	m.Infof("synchronizing cache state with CRI runtime...")
 
 	add, del := []cache.Container{}, []cache.Container{}
 	pods, err := m.relay.Client().ListPodSandbox(ctx, &criapi.ListPodSandboxRequest{})
@@ -173,14 +173,14 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 	status := map[string]*cache.PodStatus{}
 	for _, pod := range pods.Items {
 		if s, err := m.queryPodStatus(ctx, pod.Id); err != nil {
-			m.Error("%s: failed to query pod status: %v", pod.Id, err)
+			m.Errorf("%s: failed to query pod status: %v", pod.Id, err)
 		} else {
 			status[pod.Id] = s
 		}
 	}
 	_, _, deleted := m.cache.RefreshPods(pods, status)
 	for _, c := range deleted {
-		m.Info("discovered stale container %s...", c.GetID())
+		m.Infof("discovered stale container %s...", c.GetID())
 		del = append(del, c)
 	}
 
@@ -191,15 +191,15 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 	added, deleted := m.cache.RefreshContainers(containers)
 	for _, c := range added {
 		if c.GetState() != cache.ContainerStateRunning {
-			m.Info("ignoring discovered container %s (in state %v)...",
+			m.Infof("ignoring discovered container %s (in state %v)...",
 				c.GetID(), c.GetState())
 			continue
 		}
-		m.Info("discovered out-of-sync running container %s...", c.GetID())
+		m.Infof("discovered out-of-sync running container %s...", c.GetID())
 		add = append(add, c)
 	}
 	for _, c := range deleted {
-		m.Info("discovered stale container %s...", c.GetID())
+		m.Infof("discovered stale container %s...", c.GetID())
 		del = append(del, c)
 	}
 
@@ -225,7 +225,7 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 
 	reply, rqerr := handler(ctx, request)
 	if rqerr != nil {
-		m.Error("%s: failed to create pod: %v", method, rqerr)
+		m.Errorf("%s: failed to create pod: %v", method, rqerr)
 		return reply, rqerr
 	}
 
@@ -244,16 +244,16 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 		if p.GetUID() != pod.GetUID() || p == pod {
 			continue
 		}
-		m.Warn("re-creation of pod %s, releasing old one", p.GetName())
+		m.Warnf("re-creation of pod %s, releasing old one", p.GetName())
 		for _, c := range pod.GetInitContainers() {
-			m.Info("%s: removing stale init-container %s...", method, c.PrettyName())
+			m.Infof("%s: removing stale init-container %s...", method, c.PrettyName())
 			m.policy.ReleaseResources(c)
 			c.UpdateState(cache.ContainerStateStale)
 			released = true
 			del = append(del, c)
 		}
 		for _, c := range pod.GetContainers() {
-			m.Info("%s: removing stale container %s...", method, c.PrettyName())
+			m.Infof("%s: removing stale container %s...", method, c.PrettyName())
 			m.policy.ReleaseResources(c)
 			c.UpdateState(cache.ContainerStateStale)
 			released = true
@@ -263,12 +263,12 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 	}
 	if released {
 		if err := m.runPostReleaseHooks(ctx, method, del...); err != nil {
-			m.Error("%s: failed to run post-release hooks for lingering pod %s: %v",
+			m.Errorf("%s: failed to run post-release hooks for lingering pod %s: %v",
 				method, pod.GetName(), err)
 		}
 	}
 
-	m.Info("created pod %s (%s)", pod.GetName(), podID)
+	m.Infof("created pod %s (%s)", pod.GetName(), podID)
 
 	return reply, nil
 }
@@ -286,37 +286,37 @@ func (m *resmgr) StopPod(ctx context.Context, method string, request interface{}
 	pod, ok := m.cache.LookupPod(podID)
 
 	if !ok {
-		m.Warn("%s: failed to look up pod %s, just passing request through", method, podID)
+		m.Warnf("%s: failed to look up pod %s, just passing request through", method, podID)
 		return reply, rqerr
 	}
 
 	if rqerr != nil {
-		m.Error("%s: failed to stop pod %s: %v", method, podID, rqerr)
+		m.Errorf("%s: failed to stop pod %s: %v", method, podID, rqerr)
 		return reply, rqerr
 	}
 
-	m.Info("%s: stopped pod %s (%s)...", method, pod.GetName(), podID)
+	m.Infof("%s: stopped pod %s (%s)...", method, pod.GetName(), podID)
 
 	released := []cache.Container{}
 	for _, c := range pod.GetInitContainers() {
-		m.Info("%s: releasing resources for %s...", method, c.PrettyName())
+		m.Infof("%s: releasing resources for %s...", method, c.PrettyName())
 		if err := m.policy.ReleaseResources(c); err != nil {
-			m.Warn("%s: failed to release init-container %s: %v", method, c.PrettyName(), err)
+			m.Warnf("%s: failed to release init-container %s: %v", method, c.PrettyName(), err)
 		}
 		c.UpdateState(cache.ContainerStateExited)
 		released = append(released, c)
 	}
 	for _, c := range pod.GetContainers() {
-		m.Info("%s: releasing resources for container %s...", method, c.PrettyName())
+		m.Infof("%s: releasing resources for container %s...", method, c.PrettyName())
 		if err := m.policy.ReleaseResources(c); err != nil {
-			m.Warn("%s: failed to release container %s: %v", method, c.PrettyName(), err)
+			m.Warnf("%s: failed to release container %s: %v", method, c.PrettyName(), err)
 		}
 		c.UpdateState(cache.ContainerStateExited)
 		released = append(released, c)
 	}
 
 	if err := m.runPostReleaseHooks(ctx, method, released...); err != nil {
-		m.Error("%s: failed to run post-release hooks for pod %s: %v",
+		m.Errorf("%s: failed to run post-release hooks for pod %s: %v",
 			method, pod.GetName(), err)
 	}
 
@@ -338,36 +338,36 @@ func (m *resmgr) RemovePod(ctx context.Context, method string, request interface
 	pod, ok := m.cache.LookupPod(podID)
 
 	if !ok {
-		m.Warn("%s: failed to look up pod %s, just passing request through", method, podID)
+		m.Warnf("%s: failed to look up pod %s, just passing request through", method, podID)
 		return reply, rqerr
 	}
 
 	if rqerr != nil {
-		m.Error("%s: failed to remove pod %s: %v", method, podID, rqerr)
+		m.Errorf("%s: failed to remove pod %s: %v", method, podID, rqerr)
 	} else {
-		m.Info("%s: removed pod %s (%s)...", method, pod.GetName(), podID)
+		m.Infof("%s: removed pod %s (%s)...", method, pod.GetName(), podID)
 	}
 
 	released := []cache.Container{}
 	for _, c := range pod.GetInitContainers() {
-		m.Info("%s: removing stale init-container %s...", method, c.PrettyName())
+		m.Infof("%s: removing stale init-container %s...", method, c.PrettyName())
 		if err := m.policy.ReleaseResources(c); err != nil {
-			m.Warn("%s: failed to release init-container %s: %v", method, c.PrettyName(), err)
+			m.Warnf("%s: failed to release init-container %s: %v", method, c.PrettyName(), err)
 		}
 		c.UpdateState(cache.ContainerStateStale)
 		released = append(released, c)
 	}
 	for _, c := range pod.GetContainers() {
-		m.Info("%s: removing stale container %s...", method, c.PrettyName())
+		m.Infof("%s: removing stale container %s...", method, c.PrettyName())
 		if err := m.policy.ReleaseResources(c); err != nil {
-			m.Warn("%s: failed to release container %s: %v", method, c.PrettyName(), err)
+			m.Warnf("%s: failed to release container %s: %v", method, c.PrettyName(), err)
 		}
 		c.UpdateState(cache.ContainerStateStale)
 		released = append(released, c)
 	}
 
 	if err := m.runPostReleaseHooks(ctx, method, released...); err != nil {
-		m.Error("%s: failed to run post-release hooks for pod %s: %v",
+		m.Errorf("%s: failed to run post-release hooks for pod %s: %v",
 			method, pod.GetName(), err)
 	}
 
@@ -389,7 +389,7 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 		if pod, ok := m.cache.LookupPod(msg.PodSandboxId); ok {
 			if msg.Config != nil && msg.Config.Metadata != nil {
 				if c, ok := pod.GetContainer(msg.Config.Metadata.Name); ok {
-					m.Warn("re-creation of container %s, releasing old one", c.PrettyName())
+					m.Warnf("re-creation of container %s, releasing old one", c.PrettyName())
 					m.policy.ReleaseResources(c)
 				}
 			}
@@ -398,16 +398,16 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 
 	container, err := m.cache.InsertContainer(request)
 	if err != nil {
-		m.Error("%s: failed to insert new container to cache: %v", method, err)
+		m.Errorf("%s: failed to insert new container to cache: %v", method, err)
 		return nil, resmgrError("%s: failed to insert new container to cache: %v", method, err)
 	}
 
 	container.SetCRIRequest(request)
 
-	m.Info("%s: creating container %s...", method, container.PrettyName())
+	m.Infof("%s: creating container %s...", method, container.PrettyName())
 
 	if err := m.policy.AllocateResources(container); err != nil {
-		m.Error("%s: failed to allocate resources for container %s: %v",
+		m.Errorf("%s: failed to allocate resources for container %s: %v",
 			method, container.PrettyName(), err)
 		m.cache.DeleteContainer(container.GetCacheID())
 		return nil, resmgrError("failed to allocate container resources: %v", err)
@@ -421,7 +421,7 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 	})
 
 	if err := m.runPostAllocateHooks(ctx, method); err != nil {
-		m.Error("%s: failed to run post-allocate hooks for %s: %v",
+		m.Errorf("%s: failed to run post-allocate hooks for %s: %v",
 			method, container.PrettyName(), err)
 		m.policy.ReleaseResources(container)
 		m.runPostReleaseHooks(ctx, method, container)
@@ -433,7 +433,7 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 	reply, rqerr := handler(ctx, request)
 
 	if rqerr != nil {
-		m.Error("%s: failed to create container %s: %v", method, container.PrettyName(), rqerr)
+		m.Errorf("%s: failed to create container %s: %v", method, container.PrettyName(), rqerr)
 		m.policy.ReleaseResources(container)
 		m.runPostReleaseHooks(ctx, method, container)
 		m.cache.DeleteContainer(container.GetCacheID())
@@ -458,15 +458,15 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
-		m.Warn("%s: failed to look up container %s, just passing request through",
+		m.Warnf("%s: failed to look up container %s, just passing request through",
 			method, containerID)
 		return handler(ctx, request)
 	}
 
-	m.Info("%s: starting container %s...", method, container.PrettyName())
+	m.Infof("%s: starting container %s...", method, container.PrettyName())
 
 	if container.GetState() != cache.ContainerStateCreated {
-		m.Error("%s: refusing to start container %s in unexpected state %v",
+		m.Errorf("%s: refusing to start container %s in unexpected state %v",
 			method, container.PrettyName(), container.GetState())
 		return nil, resmgrError("refusing to start container %s in unexpexted state %v",
 			container.PrettyName(), container.GetState())
@@ -475,7 +475,7 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 	reply, rqerr := handler(ctx, request)
 
 	if rqerr != nil {
-		m.Error("%s: failed to start container %s: %v", method, container.PrettyName(), rqerr)
+		m.Errorf("%s: failed to start container %s: %v", method, container.PrettyName(), rqerr)
 		return nil, rqerr
 	}
 
@@ -487,11 +487,11 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 		Data:   container,
 	}
 	if _, err := m.policy.HandleEvent(e); err != nil {
-		m.Error("%s: policy failed to handle event %s: %v", method, e.Type, err)
+		m.Errorf("%s: policy failed to handle event %s: %v", method, e.Type, err)
 	}
 
 	if err := m.runPostStartHooks(ctx, method, container); err != nil {
-		m.Error("%s: failed to run post-start hooks for %s: %v",
+		m.Errorf("%s: failed to run post-start hooks for %s: %v",
 			method, container.PrettyName(), err)
 	}
 
@@ -513,31 +513,31 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
-		m.Warn("%s: failed to look up container %s, just passing request through",
+		m.Warnf("%s: failed to look up container %s, just passing request through",
 			method, containerID)
 		return reply, rqerr
 	}
 
 	if rqerr != nil {
-		m.Error("%s: failed to stop container %s: %v", method, container.PrettyName(), rqerr)
+		m.Errorf("%s: failed to stop container %s: %v", method, container.PrettyName(), rqerr)
 		return reply, rqerr
 	}
 
-	m.Info("%s: stopped container %s...", method, container.PrettyName())
+	m.Infof("%s: stopped container %s...", method, container.PrettyName())
 
 	// Notes:
 	//   For now, we assume any error replies from CRI are about the container not
 	//   being found, in which case we still go ahead and finish locally stopping it...
 
 	if err := m.policy.ReleaseResources(container); err != nil {
-		m.Error("%s: failed to release resources for container %s: %v",
+		m.Errorf("%s: failed to release resources for container %s: %v",
 			method, container.PrettyName(), err)
 	}
 
 	container.UpdateState(cache.ContainerStateExited)
 
 	if err := m.runPostReleaseHooks(ctx, method, container); err != nil {
-		m.Error("%s: failed to run post-release hooks for %s: %v",
+		m.Errorf("%s: failed to run post-release hooks for %s: %v",
 			method, container.PrettyName(), err)
 	}
 
@@ -559,26 +559,26 @@ func (m *resmgr) RemoveContainer(ctx context.Context, method string, request int
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
-		m.Warn("%s: failed to look up container %s, just passing request through",
+		m.Warnf("%s: failed to look up container %s, just passing request through",
 			method, containerID)
 		return reply, rqerr
 	}
 
 	if rqerr != nil {
-		m.Error("%s: failed to remove container %s: %v", method, container.PrettyName(), rqerr)
+		m.Errorf("%s: failed to remove container %s: %v", method, container.PrettyName(), rqerr)
 	} else {
-		m.Info("%s: removed container %s...", method, container.PrettyName())
+		m.Infof("%s: removed container %s...", method, container.PrettyName())
 	}
 
 	if err := m.policy.ReleaseResources(container); err != nil {
-		m.Error("%s: failed to release resources for container %s: %v",
+		m.Errorf("%s: failed to release resources for container %s: %v",
 			method, container.PrettyName(), err)
 	}
 
 	container.UpdateState(cache.ContainerStateStale)
 
 	if err := m.runPostReleaseHooks(ctx, method, container); err != nil {
-		m.Error("%s: failed to run post-release hooks for %s: %v",
+		m.Errorf("%s: failed to run post-release hooks for %s: %v",
 			method, container.PrettyName(), err)
 	}
 
@@ -616,9 +616,9 @@ func (m *resmgr) ListContainers(ctx context.Context, method string, request inte
 		if c, ok := m.cache.LookupContainer(listed.Id); ok {
 			state := c.GetState()
 			if state == cache.ContainerStateRunning || state == cache.ContainerStateCreated {
-				m.Info("%s: exited, releasing its resources...", c.PrettyName())
+				m.Infof("%s: exited, releasing its resources...", c.PrettyName())
 				if err := m.policy.ReleaseResources(c); err != nil {
-					m.Error("%s: failed to release resources for container %s: %v",
+					m.Errorf("%s: failed to release resources for container %s: %v",
 						method, c.PrettyName(), err)
 				}
 				c.UpdateState(cache.ContainerStateExited)
@@ -630,9 +630,9 @@ func (m *resmgr) ListContainers(ctx context.Context, method string, request inte
 	for _, c := range m.cache.GetContainers() {
 		if c.GetState() == cache.ContainerStateRunning {
 			if _, ok := clistmap[c.GetID()]; !ok {
-				m.Info("%s: absent from runtime, releasing its resources...", c.PrettyName())
+				m.Infof("%s: absent from runtime, releasing its resources...", c.PrettyName())
 				if err := m.policy.ReleaseResources(c); err != nil {
-					m.Error("%s: failed to release resources for container %s: %v",
+					m.Errorf("%s: failed to release resources for container %s: %v",
 						method, c.PrettyName(), err)
 				}
 				c.UpdateState(cache.ContainerStateStale)
@@ -643,7 +643,7 @@ func (m *resmgr) ListContainers(ctx context.Context, method string, request inte
 
 	if len(released) > 0 {
 		if err := m.runPostReleaseHooks(ctx, method, released...); err != nil {
-			m.Error("%s: failed to run post-release hooks: %v",
+			m.Errorf("%s: failed to run post-release hooks: %v",
 				method, err)
 		}
 	}
@@ -663,12 +663,12 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
-		m.Warn("%s: silently dropping container update request for %s...",
+		m.Warnf("%s: silently dropping container update request for %s...",
 			method, containerID)
 	} else {
-		m.Warn("%s: silently dropping container update request for %s...",
+		m.Warnf("%s: silently dropping container update request for %s...",
 			method, container.PrettyName())
-		m.Warn("%s: XXX TODO: we probably should reallocate the container instead...",
+		m.Warnf("%s: XXX TODO: we probably should reallocate the container instead...",
 			method)
 	}
 
@@ -682,7 +682,7 @@ func (m *resmgr) RebalanceContainers() error {
 	m.Lock()
 	defer m.Unlock()
 
-	m.Info("rebalancing (reallocating) containers...")
+	m.Infof("rebalancing (reallocating) containers...")
 
 	return m.rebalance("Rebalance")
 }
@@ -696,12 +696,12 @@ func (m *resmgr) rebalance(method string) error {
 	changes, err := m.policy.Rebalance()
 
 	if err != nil {
-		m.Error("%s: rebalancing of containers failed: %v", method, err)
+		m.Errorf("%s: rebalancing of containers failed: %v", method, err)
 	}
 
 	if changes {
 		if err := m.runPostUpdateHooks(context.Background(), method); err != nil {
-			m.Error("%s: failed to run post-update hooks: %v", method, err)
+			m.Errorf("%s: failed to run post-update hooks: %v", method, err)
 			return resmgrError("%s: failed to run post-update hooks: %v", method, err)
 		}
 	}
@@ -718,19 +718,19 @@ func (m *resmgr) DeliverPolicyEvent(e *events.Policy) error {
 		e.Source = "unspecified"
 	}
 
-	m.Info("delivering policy event %s.%s...", e.Source, e.Type)
+	m.Infof("delivering policy event %s.%s...", e.Source, e.Type)
 
 	method := "DeliverPolicyEvent"
 	changes, err := m.policy.HandleEvent(e)
 
 	if err != nil {
-		m.Error("%s: handling event %s.%s failed: %v", method, e.Source, e.Type, err)
+		m.Errorf("%s: handling event %s.%s failed: %v", method, e.Source, e.Type, err)
 		return err
 	}
 
 	if changes {
 		if err = m.runPostUpdateHooks(context.Background(), method); err != nil {
-			m.Error("%s: failed to run post-update hooks: %v", method, err)
+			m.Errorf("%s: failed to run post-update hooks: %v", method, err)
 			return resmgrError("%s: failed to run post-update hooks: %v", method, err)
 		}
 	}
@@ -755,18 +755,18 @@ func (m *resmgr) setConfig(v interface{}) error {
 		err = fmt.Errorf("invalid configuration source/type %T", v)
 	}
 	if err != nil {
-		m.Error("configuration rejected: %v", err)
+		m.Errorf("configuration rejected: %v", err)
 		return resmgrError("configuration rejected: %v", err)
 	}
 
 	// synchronize state of controllers with new configuration
 	if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
-		m.Error("failed to synchronize controllers with new configuration: %v", err)
+		m.Errorf("failed to synchronize controllers with new configuration: %v", err)
 		return resmgrError("failed to synchronize controllers with new configuration: %v", err)
 	}
 
 	if err = m.runPostUpdateHooks(context.Background(), "setConfig"); err != nil {
-		m.Error("failed to run post-update hooks after reconfiguration: %v", err)
+		m.Errorf("failed to run post-update hooks after reconfiguration: %v", err)
 		return resmgrError("failed to run post-update hooks after reconfiguration: %v", err)
 	}
 
@@ -775,7 +775,7 @@ func (m *resmgr) setConfig(v interface{}) error {
 		m.cache.SetConfig(cfg)
 	}
 
-	m.Info("successfully switched to new configuration")
+	m.Infof("successfully switched to new configuration")
 
 	return nil
 }
@@ -786,24 +786,24 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 		switch c.GetState() {
 		case cache.ContainerStateRunning, cache.ContainerStateCreated:
 			if err := m.control.RunPostUpdateHooks(c); err != nil {
-				m.Warn("%s post-update hook failed for %s: %v",
+				m.Warnf("%s post-update hook failed for %s: %v",
 					method, c.PrettyName(), err)
 			}
 			if req, ok := c.ClearCRIRequest(); ok {
 				if _, err := m.sendCRIRequest(ctx, req); err != nil {
-					m.Warn("%s update of container %s failed: %v",
+					m.Warnf("%s update of container %s failed: %v",
 						method, c.PrettyName(), err)
 				}
 			}
 			m.policy.ExportResourceData(c)
 		case cache.ContainerStateCreating:
 			if err := m.control.RunPreCreateHooks(c); err != nil {
-				m.Warn("%s pre-create hook failed for %s: %v",
+				m.Warnf("%s pre-create hook failed for %s: %v",
 					method, c.PrettyName(), err)
 			}
 			m.policy.ExportResourceData(c)
 		default:
-			m.Warn("%s: skipping container %s (in state %v)", method,
+			m.Warnf("%s: skipping container %s (in state %v)", method,
 				c.PrettyName(), c.GetState())
 		}
 	}
@@ -813,7 +813,7 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 // runPostStartHooks runs the necessary hooks after having started a container.
 func (m *resmgr) runPostStartHooks(ctx context.Context, method string, c cache.Container) error {
 	if err := m.control.RunPostStartHooks(c); err != nil {
-		m.Error("%s: post-start hook failed for %s: %v", method, c.PrettyName(), err)
+		m.Errorf("%s: post-start hook failed for %s: %v", method, c.PrettyName(), err)
 	}
 	return nil
 }
@@ -822,7 +822,7 @@ func (m *resmgr) runPostStartHooks(ctx context.Context, method string, c cache.C
 func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string, released ...cache.Container) error {
 	for _, c := range released {
 		if err := m.control.RunPostStopHooks(c); err != nil {
-			m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
+			m.Warnf("post-stop hook failed for %s: %v", c.PrettyName(), err)
 		}
 		if c.GetState() == cache.ContainerStateStale {
 			m.cache.DeleteContainer(c.GetCacheID())
@@ -832,23 +832,23 @@ func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string, release
 		switch state := c.GetState(); state {
 		case cache.ContainerStateStale, cache.ContainerStateExited:
 			if err := m.control.RunPostStopHooks(c); err != nil {
-				m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
+				m.Warnf("post-stop hook failed for %s: %v", c.PrettyName(), err)
 			}
 			if state == cache.ContainerStateStale {
 				m.cache.DeleteContainer(c.GetCacheID())
 			}
 		case cache.ContainerStateRunning, cache.ContainerStateCreated:
 			if err := m.control.RunPostUpdateHooks(c); err != nil {
-				m.Warn("post-update hook failed for %s: %v", c.PrettyName(), err)
+				m.Warnf("post-update hook failed for %s: %v", c.PrettyName(), err)
 			}
 			if req, ok := c.ClearCRIRequest(); ok {
 				if _, err := m.sendCRIRequest(ctx, req); err != nil {
-					m.Warn("update of container %s failed: %v", c.PrettyName(), err)
+					m.Warnf("update of container %s failed: %v", c.PrettyName(), err)
 				}
 			}
 			m.policy.ExportResourceData(c)
 		default:
-			m.Warn("%s: skipping pending container %s (in state %v)",
+			m.Warnf("%s: skipping pending container %s (in state %v)",
 				method, c.PrettyName(), c.GetState())
 		}
 	}
@@ -865,7 +865,7 @@ func (m *resmgr) runPostUpdateHooks(ctx context.Context, method string) error {
 			}
 			if req, ok := c.GetCRIRequest(); ok {
 				if _, err := m.sendCRIRequest(ctx, req); err != nil {
-					m.Warn("%s update of container %s failed: %v",
+					m.Warnf("%s update of container %s failed: %v",
 						method, c.PrettyName(), err)
 				} else {
 					c.ClearCRIRequest()
@@ -873,7 +873,7 @@ func (m *resmgr) runPostUpdateHooks(ctx context.Context, method string) error {
 			}
 			m.policy.ExportResourceData(c)
 		default:
-			m.Warn("%s: skipping container %s (in state %v)", method,
+			m.Warnf("%s: skipping container %s (in state %v)", method,
 				c.PrettyName(), c.GetState())
 		}
 	}
@@ -886,7 +886,7 @@ func (m *resmgr) sendCRIRequest(ctx context.Context, request interface{}) (inter
 	switch request.(type) {
 	case *criapi.UpdateContainerResourcesRequest:
 		req := request.(*criapi.UpdateContainerResourcesRequest)
-		m.Debug("sending update request for container %s...", req.ContainerId)
+		m.Debugf("sending update request for container %s...", req.ContainerId)
 		return client.UpdateContainerResources(ctx, req)
 	default:
 		return nil, resmgrError("sendCRIRequest: unhandled request type %T", request)

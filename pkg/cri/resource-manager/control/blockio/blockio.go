@@ -119,7 +119,7 @@ func (ctl *blockioctl) isImplicitlyDisabled() bool {
 
 	idle := len(blockio.GetClasses()) == 0
 	if idle {
-		log.Warn("controller implictly disabled (no configured classes)")
+		log.Warnf("controller implictly disabled (no configured classes)")
 	}
 	ctl.idle = &idle
 
@@ -140,7 +140,7 @@ func (ctl *blockioctl) assign(c cache.Container) error {
 	if err := blockio.SetCgroupClass(c.GetCgroupDir(), class); err != nil {
 		return blockioError("%q: failed to assign to class %q: %w", c.PrettyName(), class, err)
 	}
-	log.Info("%q: assigned to class %q", c.PrettyName(), class)
+	log.Infof("%q: assigned to class %q", c.PrettyName(), class)
 	return nil
 }
 
@@ -169,7 +169,7 @@ func (ctl *blockioctl) reconfigureRunningContainers() error {
 	}
 	for _, c := range ctl.cache.GetContainers() {
 		class := c.GetBlockIOClass()
-		log.Debug("%q: configure blockio class %q", c.PrettyName(), class)
+		log.Debugf("%q: configure blockio class %q", c.PrettyName(), class)
 		err := blockio.SetCgroupClass(c.GetCgroupDir(), class)
 		if err != nil {
 			errors = multierror.Append(errors, err)

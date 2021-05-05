@@ -94,14 +94,14 @@ func (cch *cache) EvaluateAffinity(a *Affinity) map[string]int32 {
 
 // FilterScope returns the containers selected by the scope expression.
 func (cch *cache) FilterScope(scope *resmgr.Expression) []Container {
-	cch.Debug("calculating scope %s", scope.String())
+	cch.Debugf("calculating scope %s", scope.String())
 	result := []Container{}
 	for _, c := range cch.GetContainers() {
 		if scope.Evaluate(c) {
-			cch.Debug("  + container %s: IN scope", c.PrettyName())
+			cch.Debugf("  + container %s: IN scope", c.PrettyName())
 			result = append(result, c)
 		} else {
-			cch.Debug("  - container %s: NOT IN scope", c.PrettyName())
+			cch.Debugf("  - container %s: NOT IN scope", c.PrettyName())
 		}
 	}
 	return result

@@ -109,7 +109,7 @@ func (e *Expression) Validate() error {
 
 // Evaluate evaluates an expression against a container.
 func (e *Expression) Evaluate(subject Evaluable) bool {
-	log.Debug("evaluating %q @ %s...", *e, subject)
+	log.Debugf("evaluating %q @ %s...", *e, subject)
 
 	value, ok := e.KeyValue(subject)
 	result := false
@@ -159,14 +159,14 @@ func (e *Expression) Evaluate(subject Evaluable) bool {
 		result = true
 	}
 
-	log.Debug("%q @ %s => %v", *e, subject, result)
+	log.Debugf("%q @ %s => %v", *e, subject, result)
 
 	return result
 }
 
 // KeyValue extracts the value of the expresssion key from a container.
 func (e *Expression) KeyValue(subject Evaluable) (string, bool) {
-	log.Debug("looking up %q @ %s...", e.Key, subject)
+	log.Debugf("looking up %q @ %s...", e.Key, subject)
 
 	value := ""
 	ok := false
@@ -184,7 +184,7 @@ func (e *Expression) KeyValue(subject Evaluable) (string, bool) {
 		value = strings.Join(vals, vsep)
 	}
 
-	log.Debug("%q @ %s => %q, %v", e.Key, subject, value, ok)
+	log.Debugf("%q @ %s => %q, %v", e.Key, subject, value, ok)
 
 	return value, ok
 }
@@ -230,7 +230,7 @@ func validSeparator(b byte) bool {
 func ResolveRef(subject Evaluable, spec string) (string, bool, error) {
 	var obj interface{}
 
-	log.Debug("resolving %q @ %s...", spec, subject)
+	log.Debugf("resolving %q @ %s...", spec, subject)
 
 	spec = path.Clean(spec)
 	ref := strings.Split(spec, "/")
@@ -244,7 +244,7 @@ func ResolveRef(subject Evaluable, spec string) (string, bool, error) {
 	for len(ref) > 0 {
 		key := ref[0]
 
-		log.Debug("resolve walking %q @ %s...", key, obj)
+		log.Debugf("resolve walking %q @ %s...", key, obj)
 		switch v := obj.(type) {
 		case string:
 			obj = v
@@ -274,7 +274,7 @@ func ResolveRef(subject Evaluable, spec string) (string, bool, error) {
 			subject, spec, obj)
 	}
 
-	log.Debug("resolved %q @ %s => %s", spec, subject, str)
+	log.Debugf("resolved %q @ %s => %s", spec, subject, str)
 
 	return str, true, nil
 }

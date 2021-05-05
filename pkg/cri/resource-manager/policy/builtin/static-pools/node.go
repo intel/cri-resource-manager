@@ -46,7 +46,7 @@ func newNodeUpdater(agent agent.Interface) *nodeUpdater {
 }
 
 func (u *nodeUpdater) start() error {
-	u.Info("starting node updater")
+	u.Infof("starting node updater")
 
 	if u.agent == nil {
 		return stpError("cri-resmgr-agent connection required")
@@ -65,15 +65,15 @@ func (u *nodeUpdater) start() error {
 				if pending != nil {
 					err := u.updateNode(pending, -1)
 					if err != nil {
-						u.Info("node update failed: %v", err)
+						u.Infof("node update failed: %v", err)
 						retry = time.After(5 * time.Second)
 					} else {
-						u.Info("node successfully updated")
+						u.Infof("node successfully updated")
 						pending = nil
 						retry = nil
 					}
 				} else {
-					u.Panic("BUG: node update with nil config requested")
+					u.Panicf("BUG: node update with nil config requested")
 				}
 			}
 		}
@@ -104,20 +104,20 @@ func (u *nodeUpdater) updateNode(conf *config, opTimeout time.Duration) error {
 	// Update extended resources
 	resources := map[string]string{
 		exclusiveCoreResourceName: strconv.Itoa(numExclusiveCPULists)}
-	u.Info("updating node capacity (extended resources)")
+	u.Infof("updating node capacity (extended resources)")
 	if err := u.agent.UpdateNodeCapacity(resources, opTimeout); err != nil {
 		return err
 	}
 
 	// Manage legacy node label
 	if conf.LabelNode {
-		u.Info("creating CMK node label")
+		u.Infof("creating CMK node label")
 		err := u.agent.SetLabels(map[string]string{cmkLegacyNodeLabelName: "true"}, opTimeout)
 		if err != nil {
 			return stpError("failed to update legacy node label: %v", err)
 		}
 	} else {
-		u.Info("removing CMK node label")
+		u.Infof("removing CMK node label")
 		err := u.agent.RemoveLabels([]string{cmkLegacyNodeLabelName}, opTimeout)
 		if err != nil {
 			return stpError("failed to update legacy node label: %v", err)
@@ -139,13 +139,13 @@ func (u *nodeUpdater) updateNode(conf *config, opTimeout time.Duration) error {
 	_, tainted := u.agent.FindTaintIndex(nodeTaints, &legacyTaint)
 
 	if !tainted && conf.TaintNode {
-		u.Info("creating CMK node taint")
+		u.Infof("creating CMK node taint")
 		if err := u.agent.SetTaints(cmkTaints, opTimeout); err != nil {
 			return stpError("failed to set legacy node taint: %v", err)
 		}
 	}
 	if tainted && !conf.TaintNode {
-		u.Debug("removing CMK node taint")
+		u.Debugf("removing CMK node taint")
 		if err := u.agent.RemoveTaints(cmkTaints, opTimeout); err != nil {
 			return stpError("failed to clear legacy node taint: %v", err)
 		}

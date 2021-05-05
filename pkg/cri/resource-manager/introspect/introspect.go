@@ -131,19 +131,19 @@ func (s *Server) Set(state *State) error {
 
 // Start enables serving HTTP requests.
 func (s *Server) Start() {
-	log.Info("starting introspection server...")
+	log.Infof("starting introspection server...")
 	s.ready = true
 }
 
 // Stop stops serving further HTTP requests.
 func (s *Server) Stop() {
-	log.Info("stopping introspection server...")
+	log.Infof("stopping introspection server...")
 	s.ready = false
 }
 
 // set sets the given state and encodes it as a JSON string.
 func (s *Server) set(state *State) error {
-	log.Debug("updating introspection data...")
+	log.Debugf("updating introspection data...")
 	s.state = state
 	data, err := json.Marshal(s.state)
 	if err != nil {
@@ -161,7 +161,7 @@ func (s *Server) serve(w http.ResponseWriter, req *http.Request) {
 	if !s.ready {
 		return
 	}
-	log.Debug("serving introspection data...")
+	log.Debugf("serving introspection data...")
 	s.RLock()
 	fmt.Fprintf(w, "%s\r\n", s.data)
 	s.RUnlock()

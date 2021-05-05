@@ -103,7 +103,7 @@ func (m *Metrics) Start() error {
 			pollTimer = time.NewTicker(m.opts.PollInterval)
 			pollChan = pollTimer.C
 		} else {
-			log.Info("periodic collection of metrics is disabled")
+			log.Infof("periodic collection of metrics is disabled")
 		}
 
 		for {
@@ -115,12 +115,12 @@ func (m *Metrics) Start() error {
 				return
 			case _ = <-pollChan:
 				if err := m.poll(); err != nil {
-					log.Error("failed to poll raw metrics: %v", err)
+					log.Errorf("failed to poll raw metrics: %v", err)
 					continue
 				}
 
 				if err := m.process(); err != nil {
-					log.Error("failed to deliver metrics event: %v", err)
+					log.Errorf("failed to deliver metrics event: %v", err)
 				}
 			}
 		}

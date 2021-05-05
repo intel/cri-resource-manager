@@ -85,7 +85,7 @@ func NewResourceManagerAgent() (ResourceManagerAgent, error) {
 
 // Start starts the resource manager.
 func (a *agent) Run() error {
-	a.Info("starting CRI Resource Manager Agent")
+	a.Infof("starting CRI Resource Manager Agent")
 
 	if err := a.server.Start(opts.agentSocket); err != nil {
 		return agentError("failed to start gRPC server: %v", err)
@@ -111,9 +111,9 @@ func (a *agent) Run() error {
 			}
 		case status, ok := <-a.updater.StatusChan():
 			if ok {
-				a.Info("got status %v", status)
+				a.Infof("got status %v", status)
 				if err := a.watcher.UpdateStatus(status); err != nil {
-					a.Error("failed to update adjustment node status: %v", err)
+					a.Errorf("failed to update adjustment node status: %v", err)
 				}
 			}
 		}

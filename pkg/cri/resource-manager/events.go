@@ -62,7 +62,7 @@ func (m *resmgr) startEventProcessing() error {
 			rebalanceTimer = time.NewTicker(opt.RebalanceTimer)
 			rebalanceChan = rebalanceTimer.C
 		} else {
-			m.Info("periodic rebalancing is disabled")
+			m.Infof("periodic rebalancing is disabled")
 		}
 		for {
 			select {
@@ -75,7 +75,7 @@ func (m *resmgr) startEventProcessing() error {
 				m.processEvent(event)
 			case _ = <-rebalanceChan:
 				if err := m.RebalanceContainers(); err != nil {
-					evtlog.Error("rebalancing failed: %v", err)
+					evtlog.Errorf("rebalancing failed: %v", err)
 				}
 			}
 			logger.Flush()
@@ -109,17 +109,17 @@ func (m *resmgr) SendEvent(event interface{}) error {
 
 // processEvent processes the given event.
 func (m *resmgr) processEvent(e interface{}) {
-	evtlog.Debug("received event of type %T...", e)
+	evtlog.Debugf("received event of type %T...", e)
 
 	switch event := e.(type) {
 	case string:
-		evtlog.Debug("'%s'...", event)
+		evtlog.Debugf("'%s'...", event)
 	case *events.Metrics:
 		m.processAvx(event.Avx)
 	case *events.Policy:
 		m.DeliverPolicyEvent(event)
 	default:
-		evtlog.Warn("event of unexpected type %T...", e)
+		evtlog.Warnf("event of unexpected type %T...", e)
 	}
 }
 
@@ -142,11 +142,11 @@ func (m *resmgr) processAvx(e *events.Avx) bool {
 		//     through a low-pass filter.
 		if active {
 			if _, wasTagged := c.SetTag(cache.TagAVX512, "true"); !wasTagged {
-				evtlog.Info("container %s STARTED using AVX512 instructions", c.PrettyName())
+				evtlog.Infof("container %s STARTED using AVX512 instructions", c.PrettyName())
 			}
 		} else {
 			if _, wasTagged := c.DeleteTag(cache.TagAVX512); wasTagged {
-				evtlog.Info("container %s STOPPED using AVX512 instructions", c.PrettyName())
+				evtlog.Infof("container %s STOPPED using AVX512 instructions", c.PrettyName())
 			}
 		}
 	}

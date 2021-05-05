@@ -33,10 +33,10 @@ func main() {
 
 	a, err := agent.NewResourceManagerAgent()
 	if err != nil {
-		log.Fatal("failed to create resource manager agent instance: %v", err)
+		log.Fatalf("failed to create resource manager agent instance: %v", err)
 	}
 
 	if err := a.Run(); err != nil {
-		log.Fatal("%v", err)
+		log.Fatalf("%v", err)
 	}
 }

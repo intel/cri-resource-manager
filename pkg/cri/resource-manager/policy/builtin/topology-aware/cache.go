@@ -47,7 +47,7 @@ func (p *policy) restoreAllocations(allocations *allocations) error {
 	//
 
 	if err := p.reinstateGrants(allocations.grants); err != nil {
-		log.Error("failed to reinstate grants verbatim: %v", err)
+		log.Errorf("failed to reinstate grants verbatim: %v", err)
 		containers, poolHints := allocations.getContainerPoolHints()
 		if err := p.reallocateResources(containers, poolHints); err != nil {
 			p.allocations = savedAllocations
@@ -72,7 +72,7 @@ func (p *policy) reinstateGrants(grants map[string]Grant) error {
 				pool.Name(), c.PrettyName(), err)
 		}
 
-		log.Info("updated pool %q with reinstated CPU grant of %q",
+		log.Infof("updated pool %q with reinstated CPU grant of %q",
 			pool.Name(), c.PrettyName())
 
 		pool = grant.GetMemoryNode()
@@ -82,7 +82,7 @@ func (p *policy) reinstateGrants(grants map[string]Grant) error {
 				pool.Name(), c.PrettyName(), err)
 		}
 
-		log.Info("updated pool %q with reinstanted memory reservation of %q",
+		log.Infof("updated pool %q with reinstanted memory reservation of %q",
 			pool.Name(), c.PrettyName())
 
 		p.allocations.grants[id] = grant
@@ -167,7 +167,7 @@ func (ccg *cachedGrant) ToGrant(policy *policy) (Grant, error) {
 	)
 
 	if g.Memset().String() != ccg.Memset.String() {
-		log.Error("cache error: mismatch in stored/recalculated memset: %s != %s",
+		log.Errorf("cache error: mismatch in stored/recalculated memset: %s != %s",
 			ccg.Memset, g.Memset())
 	}
 
@@ -211,10 +211,10 @@ func (a *allocations) UnmarshalJSON(data []byte) error {
 	for id, ccg := range cgrants {
 		a.grants[id], err = ccg.ToGrant(a.policy)
 		if err != nil {
-			log.Error("removing unresolvable cached grant %v: %v", *ccg, err)
+			log.Errorf("removing unresolvable cached grant %v: %v", *ccg, err)
 			delete(a.grants, id)
 		} else {
-			log.Debug("resolved cache grant: %v", a.grants[id].String())
+			log.Debugf("resolved cache grant: %v", a.grants[id].String())
 		}
 	}
 

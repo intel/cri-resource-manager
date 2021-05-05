@@ -54,7 +54,7 @@ func (p *policy) buildPoolsByTopology() error {
 	//   of omitted DRAM NUMA nodes need to get assigned to, and also
 	//   where PMEM NUMA node resources need to get assigned to.
 
-	log.Debug("building topology pool tree...")
+	log.Debugf("building topology pool tree...")
 
 	p.nodes = make(map[string]Node)
 
@@ -62,9 +62,9 @@ func (p *policy) buildPoolsByTopology() error {
 	if p.sys.SocketCount() > 1 {
 		p.root = p.NewVirtualNode("root", nilnode)
 		p.nodes[p.root.Name()] = p.root
-		log.Debug("  + created pool (root) %q", p.root.Name())
+		log.Debugf("  + created pool (root) %q", p.root.Name())
 	} else {
-		log.Debug("  - omitted pool virtual root (single-socket system)")
+		log.Debugf("  - omitted pool virtual root (single-socket system)")
 	}
 
 	// create socket nodes, for a single-socket system set the only socket as the root
@@ -74,11 +74,11 @@ func (p *policy) buildPoolsByTopology() error {
 
 		if p.root != nil {
 			socket = p.NewSocketNode(socketID, p.root)
-			log.Debug("    + created pool %q", socket.Parent().Name()+"/"+socket.Name())
+			log.Debugf("    + created pool %q", socket.Parent().Name()+"/"+socket.Name())
 		} else {
 			socket = p.NewSocketNode(socketID, nilnode)
 			p.root = socket
-			log.Debug("    + created pool %q (as root)", socket.Name())
+			log.Debugf("    + created pool %q (as root)", socket.Name())
 		}
 
 		p.nodes[socket.Name()] = socket
@@ -90,7 +90,7 @@ func (p *policy) buildPoolsByTopology() error {
 	for socketID, socket := range sockets {
 		dieIDs := p.sys.Package(socketID).DieIDs()
 		if len(dieIDs) < 2 {
-			log.Debug("      - omitted pool %q (die count: %d)", socket.Name()+"/die #0",
+			log.Debugf("      - omitted pool %q (die count: %d)", socket.Name()+"/die #0",
 				len(dieIDs))
 			continue
 		}
@@ -100,7 +100,7 @@ func (p *policy) buildPoolsByTopology() error {
 			for _, numaNodeID := range p.sys.Package(socketID).DieNodeIDs(dieID) {
 				numaDies[numaNodeID] = die
 			}
-			log.Debug("      + created pool %q", die.Parent().Name()+"/"+die.Name())
+			log.Debugf("      + created pool %q", die.Parent().Name()+"/"+die.Name())
 		}
 	}
 
@@ -117,10 +117,10 @@ func (p *policy) buildPoolsByTopology() error {
 			dramNodes[numaNodeID] = numaSysNode
 		case system.MemoryTypePMEM:
 			pmemNodes[numaNodeID] = numaSysNode
-			log.Debug("        - omitted pool \"NUMA node #%d\": PMEM node", numaNodeID)
+			log.Debugf("        - omitted pool \"NUMA node #%d\": PMEM node", numaNodeID)
 			continue // don't create pool, will assign to a closest DRAM node
 		default:
-			log.Warn("        - ignored pool \"NUMA node #%d\": unhandled memory type %v",
+			log.Warnf("        - ignored pool \"NUMA node #%d\": unhandled memory type %v",
 				numaNodeID, numaSysNode.GetMemoryType())
 			continue
 		}
@@ -136,7 +136,7 @@ func (p *policy) buildPoolsByTopology() error {
 		if die, ok := numaDies[numaNodeID]; ok {
 			if p.parentNumaNodeCountWithCPUs(numaSysNode) < 2 {
 				numaSurrogates[numaNodeID] = die
-				log.Debug("        - omitted pool \"NUMA node #%d\": using surrogate %q",
+				log.Debugf("        - omitted pool \"NUMA node #%d\": using surrogate %q",
 					numaNodeID, numaSurrogates[numaNodeID].Name())
 				continue
 			}
@@ -145,7 +145,7 @@ func (p *policy) buildPoolsByTopology() error {
 			socket := sockets[p.sys.Node(numaNodeID).PackageID()]
 			if p.parentNumaNodeCountWithCPUs(numaSysNode) < 2 {
 				numaSurrogates[numaNodeID] = socket
-				log.Debug("        - omitted pool \"NUMA node #%d\": using surrogate %q",
+				log.Debugf("        - omitted pool \"NUMA node #%d\": using surrogate %q",
 					numaNodeID, numaSurrogates[numaNodeID].Name())
 				continue
 			}
@@ -154,14 +154,14 @@ func (p *policy) buildPoolsByTopology() error {
 
 		p.nodes[numaNode.Name()] = numaNode
 		numaSurrogates[numaNodeID] = numaNode
-		log.Debug("        + created pool %q", numaNode.Parent().Name()+"/"+numaNode.Name())
+		log.Debugf("        + created pool %q", numaNode.Parent().Name()+"/"+numaNode.Name())
 	}
 
 	// set up assignment of PMEM and DRAM node resources to pool nodes and surrogates
 	assigned := p.assignNUMANodes(numaSurrogates, pmemNodes, dramNodes)
-	log.Debug("NUMA node to pool assignment:")
+	log.Debugf("NUMA node to pool assignment:")
 	for n, numaNodeIDs := range assigned {
-		log.Debug("  pool %q: NUMA nodes #%s", n.Name(), system.NewIDSet(numaNodeIDs...))
+		log.Debugf("  pool %q: NUMA nodes #%s", n.Name(), system.NewIDSet(numaNodeIDs...))
 	}
 
 	// enumerate pools, calculate depth, discover resource capacity, assign NUMA nodes
@@ -184,10 +184,10 @@ func (p *policy) buildPoolsByTopology() error {
 	// make sure all PMEM nodes got assigned
 	if len(assigned) > 0 {
 		for node, pmem := range assigned {
-			log.Error("failed to assign PMEM NUMA nodes #%s (to NUMA node/surrogate %s %v)",
+			log.Errorf("failed to assign PMEM NUMA nodes #%s (to NUMA node/surrogate %s %v)",
 				system.NewIDSet(pmem...), node.Name(), node)
 		}
-		log.Fatal("internal error: unassigned PMEM NUMA nodes remaining")
+		log.Fatalf("internal error: unassigned PMEM NUMA nodes remaining")
 	}
 
 	p.root.Dump("<pool-setup>")
@@ -252,11 +252,11 @@ func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[s
 			}
 		}
 		if taker == nil {
-			log.Panic("failed to assign CPU-less PMEM node #%d to any surrogate", pmemID)
+			log.Panicf("failed to assign CPU-less PMEM node #%d to any surrogate", pmemID)
 		}
 
 		assigned[taker] = append(assigned[taker], pmemID)
-		log.Debug("        + PMEM node #%d assigned to %s with distance %v", pmemID, taker.Name(),
+		log.Debugf("        + PMEM node #%d assigned to %s with distance %v", pmemID, taker.Name(),
 			p.sys.NodeDistance(pmemID, takerID))
 	}
 
@@ -264,7 +264,7 @@ func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[s
 	for dramID := range dram {
 		taker := surrogates[dramID]
 		assigned[taker] = append([]system.ID{dramID}, assigned[taker]...)
-		log.Debug("        + DRAM node #%d assigned to %s", dramID, taker.Name())
+		log.Debugf("        + DRAM node #%d assigned to %s", dramID, taker.Name())
 	}
 
 	return assigned
@@ -284,7 +284,7 @@ func (p *policy) checkHWTopology() error {
 				continue
 			}
 			if shared := nodes1.Intersection(nodes2); !shared.IsEmpty() {
-				log.Error("can't handle HW topology: sockets #%v, #%v share NUMA node(s) #%s",
+				log.Errorf("can't handle HW topology: sockets #%v, #%v share NUMA node(s) #%s",
 					id1, id2, shared.String())
 				return policyError("unhandled HW topology: sockets #%v, #%v share NUMA node(s) #%s",
 					id1, id2, shared.String())
@@ -303,7 +303,7 @@ func (p *policy) checkHWTopology() error {
 				}
 				nodes2 := system.NewIDSet(pkg.DieNodeIDs(id2)...)
 				if shared := nodes1.CPUSet().Intersection(nodes2.CPUSet()); !shared.IsEmpty() {
-					log.Error("can't handle HW topology: "+
+					log.Errorf("can't handle HW topology: "+
 						"socket #%v, dies #%v,%v share NUMA node(s) #%s",
 						socketID, id1, id2, shared.String())
 					return policyError("unhandled HW topology: "+
@@ -320,7 +320,7 @@ func (p *policy) checkHWTopology() error {
 			d1 := p.sys.NodeDistance(from, to)
 			d2 := p.sys.NodeDistance(to, from)
 			if d1 != d2 {
-				log.Error("asymmetric NUMA distance (#%d, #%d): %d != %d",
+				log.Errorf("asymmetric NUMA distance (#%d, #%d): %d != %d",
 					from, to, d1, d2)
 				return policyError("asymmetric NUMA distance (#%d, #%d): %d != %d",
 					from, to, d1, d2)
@@ -354,9 +354,9 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 		scores, pools := p.sortPoolsByScore(request, affinity)
 
 		if log.DebugEnabled() {
-			log.Debug("* node fitting for %s", request)
+			log.Debugf("* node fitting for %s", request)
 			for idx, n := range pools {
-				log.Debug("    - #%d: node %s, score %s, affinity: %d",
+				log.Debugf("    - #%d: node %s, score %s, affinity: %d",
 					idx, n.Name(), scores[n.NodeID()], affinity[n.NodeID()])
 			}
 		}
@@ -369,13 +369,13 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 		if poolHint != "" {
 			for idx, p := range pools {
 				if p.Name() == poolHint {
-					log.Debug("* using hinted pool %q (#%d best fit)", poolHint, idx+1)
+					log.Debugf("* using hinted pool %q (#%d best fit)", poolHint, idx+1)
 					pool = p
 					break
 				}
 			}
 			if pool == nil {
-				log.Debug("* cannot use hinted pool %q", poolHint)
+				log.Debugf("* cannot use hinted pool %q", poolHint)
 			}
 		}
 
@@ -391,7 +391,7 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 			request, supply.DumpAllocatable(), err)
 	}
 
-	log.Debug("allocated req '%s' to memory node '%s' (memset %s,%s,%s)",
+	log.Debugf("allocated req '%s' to memory node '%s' (memset %s,%s,%s)",
 		container.PrettyName(), grant.GetMemoryNode().Name(),
 		grant.GetMemoryNode().GetMemset(memoryDRAM),
 		grant.GetMemoryNode().GetMemset(memoryPMEM),
@@ -567,7 +567,7 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 					return nil, err
 				}
 				if changed {
-					log.Debug("* moved container %s upward to node %s to guarantee memory",
+					log.Debugf("* moved container %s upward to node %s to guarantee memory",
 						oldGrant.GetContainer().PrettyName(), oldGrant.GetMemoryNode().Name())
 					break
 				}
@@ -584,7 +584,7 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 
 // Apply the result of allocation to the requesting container.
 func (p *policy) applyGrant(grant Grant) {
-	log.Debug("* applying grant %s", grant)
+	log.Debugf("* applying grant %s", grant)
 
 	container := grant.GetContainer()
 	cpuType := grant.CPUType()
@@ -613,7 +613,7 @@ func (p *policy) applyGrant(grant Grant) {
 		cpus = reserved.String()
 		cpuPortion = grant.ReservedPortion()
 	} else {
-		log.Debug("unsupported granted cpuType %s", cpuType)
+		log.Debugf("unsupported granted cpuType %s", cpuType)
 		return
 	}
 
@@ -624,9 +624,9 @@ func (p *policy) applyGrant(grant Grant) {
 
 	if opt.PinCPU {
 		if cpus != "" {
-			log.Debug("  => pinning to (%s) cpuset %s", kind, cpus)
+			log.Debugf("  => pinning to (%s) cpuset %s", kind, cpus)
 		} else {
-			log.Debug("  => not pinning CPUs, allocated cpuset is empty...")
+			log.Debugf("  => not pinning CPUs, allocated cpuset is empty...")
 		}
 		container.SetCpusetCpus(cpus)
 		if exclusive.IsEmpty() {
@@ -649,25 +649,25 @@ func (p *policy) applyGrant(grant Grant) {
 	}
 
 	if mems != "" {
-		log.Debug("  => pinning to memory %s", mems)
+		log.Debugf("  => pinning to memory %s", mems)
 		container.SetCpusetMems(mems)
 		p.setDemotionPreferences(container, grant)
 	} else {
-		log.Debug("  => not pinning memory, memory set is empty...")
+		log.Debugf("  => not pinning memory, memory set is empty...")
 	}
 }
 
 // Release resources allocated by this grant.
 func (p *policy) releasePool(container cache.Container) (Grant, bool) {
-	log.Debug("* releasing resources allocated to %s", container.PrettyName())
+	log.Debugf("* releasing resources allocated to %s", container.PrettyName())
 
 	grant, ok := p.allocations.grants[container.GetCacheID()]
 	if !ok {
-		log.Debug("  => no grant found, nothing to do...")
+		log.Debugf("  => no grant found, nothing to do...")
 		return nil, false
 	}
 
-	log.Debug("  => releasing grant %s...", grant)
+	log.Debugf("  => releasing grant %s...", grant)
 
 	// Remove the grant from all supplys it uses.
 	grant.Release()
@@ -681,13 +681,13 @@ func (p *policy) releasePool(container cache.Container) (Grant, bool) {
 // Update shared allocations effected by agrant.
 func (p *policy) updateSharedAllocations(grant *Grant) {
 	if grant != nil {
-		log.Debug("* updating shared allocations affected by %s", (*grant).String())
+		log.Debugf("* updating shared allocations affected by %s", (*grant).String())
 		if (*grant).CPUType() == cpuReserved {
-			log.Debug("  this grant uses reserved CPUs, does not affect shared allocations")
+			log.Debugf("  this grant uses reserved CPUs, does not affect shared allocations")
 			return
 		}
 	} else {
-		log.Debug("* updating shared allocations")
+		log.Debugf("* updating shared allocations")
 	}
 
 	for _, other := range p.allocations.grants {
@@ -698,12 +698,12 @@ func (p *policy) updateSharedAllocations(grant *Grant) {
 		}
 
 		if other.CPUType() == cpuReserved {
-			log.Debug("  => %s not affected (only reserved CPUs)...", other)
+			log.Debugf("  => %s not affected (only reserved CPUs)...", other)
 			continue
 		}
 
 		if other.SharedPortion() == 0 && !other.ExclusiveCPUs().IsEmpty() {
-			log.Debug("  => %s not affected (only exclusive CPUs)...", other)
+			log.Debugf("  => %s not affected (only exclusive CPUs)...", other)
 			continue
 		}
 
@@ -711,11 +711,11 @@ func (p *policy) updateSharedAllocations(grant *Grant) {
 			shared := other.GetCPUNode().FreeSupply().SharableCPUs()
 			exclusive := other.ExclusiveCPUs()
 			if exclusive.IsEmpty() {
-				log.Debug("  => updating %s with shared CPUs of %s: %s...",
+				log.Debugf("  => updating %s with shared CPUs of %s: %s...",
 					other, other.GetCPUNode().Name(), shared.String())
 				other.GetContainer().SetCpusetCpus(shared.String())
 			} else {
-				log.Debug("  => updating %s with exclusive+shared CPUs of %s: %s+%s...",
+				log.Debugf("  => updating %s with exclusive+shared CPUs of %s: %s+%s...",
 					other, other.GetCPUNode().Name(), exclusive.String(), shared.String())
 				other.GetContainer().SetCpusetCpus(exclusive.Union(shared).String())
 			}
@@ -725,7 +725,7 @@ func (p *policy) updateSharedAllocations(grant *Grant) {
 
 // setDemotionPreferences sets the dynamic demotion preferences a container.
 func (p *policy) setDemotionPreferences(c cache.Container, g Grant) {
-	log.Debug("%s: setting demotion preferences...", c.PrettyName())
+	log.Debugf("%s: setting demotion preferences...", c.PrettyName())
 
 	// System containers should not be demoted.
 	if c.GetNamespace() == kubernetes.NamespaceSystem {
@@ -742,7 +742,7 @@ func (p *policy) setDemotionPreferences(c cache.Container, g Grant) {
 	dram := g.GetMemoryNode().GetMemset(memoryDRAM)
 	pmem := g.GetMemoryNode().GetMemset(memoryPMEM)
 
-	log.Debug("%s: eligible for demotion from %s to %s NUMA node(s)",
+	log.Debugf("%s: eligible for demotion from %s to %s NUMA node(s)",
 		c.PrettyName(), dram, pmem)
 
 	c.SetPageMigration(&cache.PageMigrate{
@@ -773,7 +773,7 @@ func (p *policy) addImplicitAffinities() error {
 
 // Calculate pool affinities for the given container.
 func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int32 {
-	log.Debug("=> calculating pool affinities...")
+	log.Debugf("=> calculating pool affinities...")
 
 	result := make(map[int]int32, len(p.nodes))
 	for id, w := range p.calculateContainerAffinity(container) {
@@ -792,7 +792,7 @@ func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int3
 
 // Calculate affinity of this container (against all other containers).
 func (p *policy) calculateContainerAffinity(container cache.Container) map[string]int32 {
-	log.Debug("* calculating affinity for container %s...", container.PrettyName())
+	log.Debugf("* calculating affinity for container %s...", container.PrettyName())
 
 	ca := container.GetAffinity()
 
@@ -806,7 +806,7 @@ func (p *policy) calculateContainerAffinity(container cache.Container) map[strin
 	// self-affinity does not make sense, so remove any
 	delete(result, container.GetCacheID())
 
-	log.Debug("  => affinity: %v", result)
+	log.Debugf("  => affinity: %v", result)
 
 	return result
 }
@@ -854,7 +854,7 @@ func (p *policy) filterInsufficientResources(req Request, originals []Node) []No
 			}
 		}
 		if required > 0 {
-			log.Debug("%s: filtered out %s with insufficient memory", req.GetContainer().PrettyName(), node.Name())
+			log.Debugf("%s: filtered out %s with insufficient memory", req.GetContainer().PrettyName(), node.Name())
 		}
 	}
 	return sufficient
@@ -893,9 +893,9 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	a1 := affinityScore(affinity, node1)
 	a2 := affinityScore(affinity, node2)
 
-	log.Debug("comparing scores for %s and %s", node1.Name(), node2.Name())
-	log.Debug("  %s: %s, affinity score %f", node1.Name(), score1.String(), a1)
-	log.Debug("  %s: %s, affinity score %f", node2.Name(), score2.String(), a2)
+	log.Debugf("comparing scores for %s and %s", node1.Name(), node2.Name())
+	log.Debugf("  %s: %s, affinity score %f", node1.Name(), score1.String(), a1)
+	log.Debugf("  %s: %s, affinity score %f", node2.Name(), score2.String(), a2)
 
 	//
 	// Notes:
@@ -928,45 +928,45 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 	// 1) a node with insufficient isolated or shared capacity loses
 	switch {
 	case cpuType == cpuNormal && ((isolated2 < 0 && isolated1 >= 0) || (shared2 <= 0 && shared1 > 0)):
-		log.Debug("  => %s loses, insufficent isolated or shared", node2.Name())
+		log.Debugf("  => %s loses, insufficent isolated or shared", node2.Name())
 		return true
 	case cpuType == cpuNormal && ((isolated1 < 0 && isolated2 >= 0) || (shared1 <= 0 && shared2 > 0)):
-		log.Debug("  => %s loses, insufficent isolated or shared", node1.Name())
+		log.Debugf("  => %s loses, insufficent isolated or shared", node1.Name())
 		return false
 	case cpuType == cpuReserved && reserved2 < 0 && reserved1 >= 0:
-		log.Debug("  => %s loses, insufficent reserved", node2.Name())
+		log.Debugf("  => %s loses, insufficent reserved", node2.Name())
 		return true
 	case cpuType == cpuReserved && reserved1 < 0 && reserved2 >= 0:
-		log.Debug("  => %s loses, insufficent reserved", node1.Name())
+		log.Debugf("  => %s loses, insufficent reserved", node1.Name())
 		return false
 	}
 
-	log.Debug("  - isolated/reserved/shared insufficiency is a TIE")
+	log.Debugf("  - isolated/reserved/shared insufficiency is a TIE")
 
 	// 2) higher affinity score wins
 	if a1 > a2 {
-		log.Debug("  => %s loses on affinity", node2.Name())
+		log.Debugf("  => %s loses on affinity", node2.Name())
 		return true
 	}
 	if a2 > a1 {
-		log.Debug("  => %s loses on affinity", node1.Name())
+		log.Debugf("  => %s loses on affinity", node1.Name())
 		return false
 	}
 
-	log.Debug("  - affinity is a TIE")
+	log.Debugf("  - affinity is a TIE")
 
 	// 3) matching memory type wins
 	if reqType := request.MemoryType(); reqType != memoryUnspec {
 		if node1.HasMemoryType(reqType) && !node2.HasMemoryType(reqType) {
-			log.Debug("  => %s WINS on memory type", node1.Name())
+			log.Debugf("  => %s WINS on memory type", node1.Name())
 			return true
 		}
 		if !node1.HasMemoryType(reqType) && node2.HasMemoryType(reqType) {
-			log.Debug("  => %s WINS on memory type", node2.Name())
+			log.Debugf("  => %s WINS on memory type", node2.Name())
 			return false
 		}
 
-		log.Debug("  - memory type is a TIE")
+		log.Debugf("  - memory type is a TIE")
 	}
 
 	// 4) better topology hint score wins
@@ -977,41 +977,41 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 		hs2, nz2 := combineHintScores(hScores2)
 
 		if hs1 > hs2 {
-			log.Debug("  => %s WINS on hints", node1.Name())
+			log.Debugf("  => %s WINS on hints", node1.Name())
 			return true
 		}
 		if hs2 > hs1 {
-			log.Debug("  => %s WINS on hints", node2.Name())
+			log.Debugf("  => %s WINS on hints", node2.Name())
 			return false
 		}
 
-		log.Debug("  - hints are a TIE")
+		log.Debugf("  - hints are a TIE")
 
 		if hs1 == 0 {
 			if nz1 > nz2 {
-				log.Debug("  => %s WINS on non-zero hints", node1.Name())
+				log.Debugf("  => %s WINS on non-zero hints", node1.Name())
 				return true
 			}
 			if nz2 > nz1 {
-				log.Debug("  => %s WINS on non-zero hints", node2.Name())
+				log.Debugf("  => %s WINS on non-zero hints", node2.Name())
 				return false
 			}
 
-			log.Debug("  - non-zero hints are a TIE")
+			log.Debugf("  - non-zero hints are a TIE")
 		}
 
 		// for a tie, prefer lower nodes and smaller ids
 		if hs1 == hs2 && nz1 == nz2 && (hs1 != 0 || nz1 != 0) {
 			if depth1 > depth2 {
-				log.Debug("  => %s WINS as it is lower", node1.Name())
+				log.Debugf("  => %s WINS as it is lower", node1.Name())
 				return true
 			}
 			if depth1 < depth2 {
-				log.Debug("  => %s WINS as it is lower", node2.Name())
+				log.Debugf("  => %s WINS as it is lower", node2.Name())
 				return false
 			}
 
-			log.Debug("  => %s WINS based on equal hint socres, lower id",
+			log.Debugf("  => %s WINS based on equal hint socres, lower id",
 				map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
 			return id1 < id2
@@ -1020,15 +1020,15 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 
 	// 5) a lower node wins
 	if depth1 > depth2 {
-		log.Debug("  => %s WINS on depth", node1.Name())
+		log.Debugf("  => %s WINS on depth", node1.Name())
 		return true
 	}
 	if depth1 < depth2 {
-		log.Debug("  => %s WINS on depth", node2.Name())
+		log.Debugf("  => %s WINS on depth", node2.Name())
 		return false
 	}
 
-	log.Debug("  - depth is a TIE")
+	log.Debugf("  - depth is a TIE")
 
 	if request.CPUType() == cpuReserved {
 		// 6) if requesting reserved CPUs, more reserved
@@ -1042,7 +1042,7 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 		if reserved2/(score2.Colocated()+1) > reserved1/(score1.Colocated()+1) {
 			return false
 		}
-		log.Debug("  - reserved capacity is a TIE")
+		log.Debugf("  - reserved capacity is a TIE")
 	} else if request.CPUType() == cpuNormal {
 		// 7) more isolated capacity wins
 		if request.Isolate() && (isolated1 > 0 || isolated2 > 0) {
@@ -1053,7 +1053,7 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 				return false
 			}
 
-			log.Debug("  => %s WINS based on equal isolated capacity, lower id",
+			log.Debugf("  => %s WINS based on equal isolated capacity, lower id",
 				map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
 			return id1 < id2
@@ -1062,15 +1062,15 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 		// 8) more slicable shared capacity wins
 		if request.FullCPUs() > 0 && (shared1 > 0 || shared2 > 0) {
 			if shared1 > shared2 {
-				log.Debug("  => %s WINS on more slicable capacity", node1.Name())
+				log.Debugf("  => %s WINS on more slicable capacity", node1.Name())
 				return true
 			}
 			if shared2 > shared1 {
-				log.Debug("  => %s WINS on more slicable capacity", node2.Name())
+				log.Debugf("  => %s WINS on more slicable capacity", node2.Name())
 				return false
 			}
 
-			log.Debug("  => %s WINS based on equal slicable capacity, lower id",
+			log.Debugf("  => %s WINS based on equal slicable capacity, lower id",
 				map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
 			return id1 < id2
@@ -1078,29 +1078,29 @@ func (p *policy) compareScores(request Request, pools []Node, scores map[int]Sco
 
 		// 9) fewer colocated containers win
 		if score1.Colocated() < score2.Colocated() {
-			log.Debug("  => %s WINS on colocation score", node1.Name())
+			log.Debugf("  => %s WINS on colocation score", node1.Name())
 			return true
 		}
 		if score2.Colocated() < score1.Colocated() {
-			log.Debug("  => %s WINS on colocation score", node2.Name())
+			log.Debugf("  => %s WINS on colocation score", node2.Name())
 			return false
 		}
 
-		log.Debug("  - colocation score is a TIE")
+		log.Debugf("  - colocation score is a TIE")
 
 		// more shared capacity wins
 		if shared1 > shared2 {
-			log.Debug("  => %s WINS on more shared capacity", node1.Name())
+			log.Debugf("  => %s WINS on more shared capacity", node1.Name())
 			return true
 		}
 		if shared2 > shared1 {
-			log.Debug("  => %s WINS on more shared capacity", node2.Name())
+			log.Debugf("  => %s WINS on more shared capacity", node2.Name())
 			return false
 		}
 	}
 
 	// 10) lower id wins
-	log.Debug("  => %s WINS based on lower id",
+	log.Debugf("  => %s WINS based on lower id",
 		map[bool]string{true: node1.Name(), false: node2.Name()}[id1 < id2])
 
 	return id1 < id2

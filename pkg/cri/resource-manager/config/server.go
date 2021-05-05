@@ -87,12 +87,12 @@ func (s *server) Start(socket string) error {
 	s.server = grpc.NewServer(serverOpts...)
 	v1.RegisterConfigServer(s.server, s)
 
-	s.Info("starting config-server at socket %s...", socket)
+	s.Infof("starting config-server at socket %s...", socket)
 	go func() {
 		defer lis.Close()
 		err := s.server.Serve(lis)
 		if err != nil {
-			s.Fatal("config-server died: %v", err)
+			s.Fatalf("config-server died: %v", err)
 		}
 	}()
 	return nil
@@ -112,7 +112,7 @@ func (s *server) SetConfig(ctx context.Context, req *v1.SetConfigRequest) (*v1.S
 	s.Lock()
 	defer s.Unlock()
 
-	s.Debug("SetConfig request: %+v", req)
+	s.Debugf("SetConfig request: %+v", req)
 
 	reply := &v1.SetConfigReply{}
 	err := s.setConfigCb(&RawConfig{NodeName: req.NodeName, Data: req.Config})
@@ -128,7 +128,7 @@ func (s *server) SetAdjustment(ctx context.Context, req *v1.SetAdjustmentRequest
 	s.Lock()
 	defer s.Unlock()
 
-	s.Debug("SetAdjustment request: %+v", req)
+	s.Debugf("SetAdjustment request: %+v", req)
 
 	errors := map[string]error{}
 	specs := map[string]*extapi.AdjustmentSpec{}

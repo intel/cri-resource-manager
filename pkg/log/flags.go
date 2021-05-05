@@ -173,9 +173,9 @@ func (m srcmap) clone() srcmap {
 
 // configNotify is the configuration change notification callback for options.
 func (o *options) configNotify(event pkgcfg.Event, src pkgcfg.Source) error {
-	deflog.Info("logger configuration %v", event)
-	deflog.Info(" * debugging: %s", o.Debug.String())
-	deflog.Info(" * log source: %v", o.LogSource)
+	deflog.Infof("logger configuration %v", event)
+	deflog.Infof(" * debugging: %s", o.Debug.String())
+	deflog.Infof(" * log source: %v", o.LogSource)
 	deflog.InfoBlock(" * klog: ", "%s", o.Klog.String())
 
 	// On the first configuration update event, we record the current values
@@ -245,22 +245,22 @@ func init() {
 	cfglog := log.get("config")
 	pkgcfg.SetLogger(pkgcfg.Logger{
 		DebugEnabled: cfglog.DebugEnabled,
-		Debug:        cfglog.Debug,
-		Info:         cfglog.Info,
-		Warning:      cfglog.Warn,
-		Error:        cfglog.Error,
-		Fatal:        cfglog.Fatal,
-		Panic:        cfglog.Panic,
+		Debugf:       cfglog.Debugf,
+		Infof:        cfglog.Infof,
+		Warningf:     cfglog.Warnf,
+		Errorf:       cfglog.Errorf,
+		Fatalf:       cfglog.Fatalf,
+		Panicf:       cfglog.Panicf,
 	})
 
 	defaultDebugFlags = make(srcmap)
 	if value, ok := os.LookupEnv(debugEnvVar); ok {
 		if err := defaultDebugFlags.parse(value); err != nil {
-			Default().Error("failed to parse %s %q: %v", debugEnvVar,
+			Default().Errorf("failed to parse %s %q: %v", debugEnvVar,
 				value, err)
 		} else {
 			log.setDbgMap(defaultDebugFlags)
-			Default().Info("seeded debug flags ($%s): %s", debugEnvVar,
+			Default().Infof("seeded debug flags ($%s): %s", debugEnvVar,
 				defaultDebugFlags.String())
 		}
 	}
