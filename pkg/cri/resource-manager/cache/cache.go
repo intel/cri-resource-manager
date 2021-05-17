@@ -25,8 +25,10 @@ import (
 	"strings"
 	"sync"
 
+	nri "github.com/containerd/nri/pkg/api"
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
@@ -583,9 +585,9 @@ type Cache interface {
 	Save() error
 
 	// RefreshPods purges/inserts stale/new pods/containers using a pod sandbox list response.
-	RefreshPods(*cri.ListPodSandboxResponse, map[string]*PodStatus) ([]Pod, []Pod, []Container)
+	RefreshPods(interface{}, map[string]*PodStatus) ([]Pod, []Pod, []Container)
 	// RefreshContainers purges/inserts stale/new containers using a container list response.
-	RefreshContainers(*cri.ListContainersResponse) ([]Container, []Container)
+	RefreshContainers(interface{}) ([]Container, []Container)
 
 	// Get the container (data) directory for a container.
 	ContainerDirectory(string) string
@@ -865,6 +867,8 @@ func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) (Pod,
 		err = p.fromRunRequest(msg.(*cri.RunPodSandboxRequest))
 	case *cri.PodSandbox:
 		err = p.fromListResponse(msg.(*cri.PodSandbox), status)
+	case *nri.PodSandbox:
+		err = p.fromNRI(msg.(*nri.PodSandbox))
 	default:
 		err = fmt.Errorf("cannot create pod from message %T", msg)
 	}
@@ -915,6 +919,8 @@ func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
 		err = c.fromCreateRequest(msg.(*cri.CreateContainerRequest))
 	case *cri.Container:
 		err = c.fromListResponse(msg.(*cri.Container))
+	case *nri.Container:
+		err = c.fromNRI(msg.(*nri.Container))
 	default:
 		err = fmt.Errorf("cannot create container from message %T", msg)
 	}
@@ -1021,42 +1027,75 @@ func (cch *cache) LookupContainerByCgroup(path string) (Container, bool) {
 }
 
 // RefreshPods purges/inserts stale/new pods/containers using a pod sandbox list response.
-func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string]*PodStatus) ([]Pod, []Pod, []Container) {
+func (cch *cache) RefreshPods(msg interface{}, status map[string]*PodStatus) ([]Pod, []Pod, []Container) {
 	valid := make(map[string]struct{})
 
 	add := []Pod{}
 	del := []Pod{}
 	containers := []Container{}
 
-	for _, item := range msg.Items {
-		valid[item.Id] = struct{}{}
-		if _, ok := cch.Pods[item.Id]; !ok {
-			cch.Debug("inserting discovered pod %s...", item.Id)
-			pod, err := cch.InsertPod(item.Id, item, status[item.Id])
-			if err != nil {
-				cch.Error("failed to insert discovered pod %s to cache: %v",
-					item.Id, err)
-			} else {
-				add = append(add, pod)
+	switch pods := msg.(type) {
+	case *cri.ListPodSandboxResponse:
+		for _, item := range pods.Items {
+			valid[item.Id] = struct{}{}
+			if _, ok := cch.Pods[item.Id]; !ok {
+				cch.Debug("inserting discovered pod %s...", item.Id)
+				pod, err := cch.InsertPod(item.Id, item, status[item.Id])
+				if err != nil {
+					cch.Error("failed to insert discovered pod %s to cache: %v",
+						item.Id, err)
+				} else {
+					add = append(add, pod)
+				}
 			}
 		}
-	}
-
-	for _, pod := range cch.Pods {
-		if _, ok := valid[pod.ID]; !ok {
-			cch.Debug("purging stale pod %s...", pod.ID)
-			pod.State = PodStateStale
-			del = append(del, cch.DeletePod(pod.ID))
+		for _, pod := range cch.Pods {
+			if _, ok := valid[pod.ID]; !ok {
+				cch.Debug("purging stale pod %s...", pod.ID)
+				pod.State = PodStateStale
+				del = append(del, cch.DeletePod(pod.ID))
+			}
 		}
-	}
+		for id, c := range cch.Containers {
+			if _, ok := valid[c.PodID]; !ok {
+				cch.Debug("purging container %s of stale pod %s...", c.CacheID, c.PodID)
+				cch.DeleteContainer(c.CacheID)
+				c.State = ContainerStateStale
+				if id == c.CacheID {
+					containers = append(containers, c)
+				}
+			}
+		}
 
-	for id, c := range cch.Containers {
-		if _, ok := valid[c.PodID]; !ok {
-			cch.Debug("purging container %s of stale pod %s...", c.CacheID, c.PodID)
-			cch.DeleteContainer(c.CacheID)
-			c.State = ContainerStateStale
-			if id == c.CacheID {
-				containers = append(containers, c)
+	case []*nri.PodSandbox:
+		for _, item := range pods {
+			valid[item.Id] = struct{}{}
+			if _, ok := cch.Pods[item.Id]; !ok {
+				cch.Debug("inserting discovered pod %s...", item.Id)
+				pod, err := cch.InsertPod(item.Id, item, status[item.Id])
+				if err != nil {
+					cch.Error("failed to insert discovered pod %s to cache: %v",
+						item.Id, err)
+				} else {
+					add = append(add, pod)
+				}
+			}
+		}
+		for _, pod := range cch.Pods {
+			if _, ok := valid[pod.ID]; !ok {
+				cch.Debug("purging stale pod %s...", pod.ID)
+				pod.State = PodStateStale
+				del = append(del, cch.DeletePod(pod.ID))
+			}
+		}
+		for id, c := range cch.Containers {
+			if _, ok := valid[c.PodID]; !ok {
+				cch.Debug("purging container %s of stale pod %s...", c.CacheID, c.PodID)
+				cch.DeleteContainer(c.CacheID)
+				c.State = ContainerStateStale
+				if id == c.CacheID {
+					containers = append(containers, c)
+				}
 			}
 		}
 	}
@@ -1065,26 +1104,43 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string
 }
 
 // RefreshContainers purges/inserts stale/new containers using a container list response.
-func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Container, []Container) {
+func (cch *cache) RefreshContainers(msg interface{}) ([]Container, []Container) {
 	valid := make(map[string]struct{})
 
 	add := []Container{}
 	del := []Container{}
 
-	for _, c := range msg.Containers {
-		if ContainerState(c.State) == ContainerStateExited {
-			continue
+	switch containers := msg.(type) {
+	case *cri.ListContainersResponse:
+		for _, c := range containers.Containers {
+			if ContainerState(c.State) == ContainerStateExited {
+				continue
+			}
+			valid[c.Id] = struct{}{}
+			if _, ok := cch.Containers[c.Id]; !ok {
+				cch.Debug("inserting discovered container %s...", c.Id)
+				inserted, err := cch.InsertContainer(c)
+				if err != nil {
+					cch.Error("failed to insert discovered container %s to cache: %v",
+						c.Id, err)
+				} else {
+					add = append(add, inserted)
+				}
+			}
 		}
 
-		valid[c.Id] = struct{}{}
-		if _, ok := cch.Containers[c.Id]; !ok {
-			cch.Debug("inserting discovered container %s...", c.Id)
-			inserted, err := cch.InsertContainer(c)
-			if err != nil {
-				cch.Error("failed to insert discovered container %s to cache: %v",
-					c.Id, err)
-			} else {
-				add = append(add, inserted)
+	case []*nri.Container:
+		for _, c := range containers {
+			valid[c.Id] = struct{}{}
+			if _, ok := cch.Containers[c.Id]; !ok {
+				cch.Debug("inserting discovered container %s...", c.Id)
+				inserted, err := cch.InsertContainer(c)
+				if err != nil {
+					cch.Error("failed to insert discovered container %s to cache: %v",
+						c.Id, err)
+				} else {
+					add = append(add, inserted)
+				}
 			}
 		}
 	}
