@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	nri "github.com/containerd/nri/v2alpha1/pkg/api"
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -76,6 +77,26 @@ func (p *pod) fromListResponse(pod *cri.PodSandbox, status *PodStatus) error {
 	p.Labels = pod.Labels
 	p.Annotations = pod.Annotations
 	p.CgroupParent = status.CgroupParent
+
+	if err := p.discoverQOSClass(); err != nil {
+		p.cache.Error("%v", err)
+	}
+
+	p.parseResourceAnnotations()
+
+	return nil
+}
+
+// Create a pod from an NRI request.
+func (p *pod) fromNRI(pod *nri.PodSandbox) error {
+	p.containers = make(map[string]string)
+	p.UID = pod.Uid
+	p.Name = pod.Name
+	p.Namespace = pod.Namespace
+	p.State = PodState(int32(cri.PodSandboxState_SANDBOX_READY))
+	p.Labels = pod.Labels
+	p.Annotations = pod.Annotations
+	p.CgroupParent = pod.CgroupParent
 
 	if err := p.discoverQOSClass(); err != nil {
 		p.cache.Error("%v", err)

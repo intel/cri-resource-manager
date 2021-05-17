@@ -41,6 +41,8 @@ type options struct {
 	MetricsTimer        time.Duration
 	RebalanceTimer      time.Duration
 	DisableUI           bool
+
+	UseNRIPlugin bool
 }
 
 // Relay command line options.
@@ -83,4 +85,7 @@ func init() {
 
 	flag.BoolVar(&opt.DisableUI, "disable-ui", false,
 		"Disable serving container placement visualization UIs.")
+
+	flag.BoolVar(&opt.UseNRIPlugin, "use-nri-plugin", false,
+		"Use the NRI plugin interface instead of becoming a CRI proxy.")
 }
