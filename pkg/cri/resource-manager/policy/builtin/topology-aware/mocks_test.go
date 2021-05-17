@@ -735,10 +735,10 @@ func (m *mockCache) SetAdjustment(*config.Adjustment) (bool, map[string]error) {
 func (m *mockCache) Save() error {
 	return nil
 }
-func (m *mockCache) RefreshPods(*criv1.ListPodSandboxResponse, map[string]*cache.PodStatus) ([]cache.Pod, []cache.Pod, []cache.Container) {
+func (m *mockCache) RefreshPods(interface{}, map[string]*cache.PodStatus) ([]cache.Pod, []cache.Pod, []cache.Container) {
 	panic("unimplemented")
 }
-func (m *mockCache) RefreshContainers(*criv1.ListContainersResponse) ([]cache.Container, []cache.Container) {
+func (m *mockCache) RefreshContainers(interface{}) ([]cache.Container, []cache.Container) {
 	panic("unimplemented")
 }
 func (m *mockCache) ContainerDirectory(string) string {

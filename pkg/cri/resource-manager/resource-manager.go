@@ -78,6 +78,7 @@ type resmgr struct {
 	stop         chan interface{}   // channel for signalling shutdown to goroutines
 	signals      chan os.Signal     // signal channel
 	introspect   *introspect.Server // server for external introspection
+	nri          *nriPlugin         // NRI plugins, if we're running as such
 }
 
 // NewResourceManager creates a new ResourceManager instance.
@@ -90,6 +91,17 @@ func NewResourceManager() (ResourceManager, error) {
 
 	sysfs.SetSysRoot(opt.HostRoot)
 	topology.SetSysRoot(opt.HostRoot)
+
+	if opt.UseNRIPlugin {
+		m.Info("running as an NRI plugin...")
+		nrip, err := newNRIPlugin(m)
+		if err != nil {
+			return nil, err
+		}
+		m.nri = nrip
+	} else {
+		m.Info("running as a CRI proxy...")
+	}
 
 	switch {
 	case opt.ResetPolicy && opt.ResetConfig:
@@ -124,23 +136,25 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, err
 	}
 
-	if err := m.setupRelay(); err != nil {
-		pid, _ := pidfile.OwnerPid()
-		if pid > 0 {
-			m.Error("looks like we're already running as pid %d...", pid)
+	if !opt.UseNRIPlugin {
+		if err := m.setupRelay(); err != nil {
+			pid, _ := pidfile.OwnerPid()
+			if pid > 0 {
+				m.Error("looks like we're already running as pid %d...", pid)
+			}
+			return nil, err
 		}
-		return nil, err
-	}
 
-	if err := m.setupRequestProcessing(); err != nil {
-		return nil, err
+		if err := m.setupRequestProcessing(); err != nil {
+			return nil, err
+		}
+
+		if err := m.setupControllers(); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := m.setupEventProcessing(); err != nil {
-		return nil, err
-	}
-
-	if err := m.setupControllers(); err != nil {
 		return nil, err
 	}
 
@@ -158,26 +172,33 @@ func (m *resmgr) Start() error {
 	m.Lock()
 	defer m.Unlock()
 
-	if err := m.checkRuntime(context.Background()); err != nil {
-		return err
-	}
+	if !opt.UseNRIPlugin {
+		if err := m.checkRuntime(context.Background()); err != nil {
+			return err
+		}
 
-	if err := m.startControllers(); err != nil {
-		return err
-	}
+		if err := m.startControllers(); err != nil {
+			return err
+		}
 
-	if err := m.startRequestProcessing(); err != nil {
-		return err
-	}
+		if err := m.startRequestProcessing(); err != nil {
+			return err
+		}
 
-	if err := m.startEventProcessing(); err != nil {
-		return err
-	}
+		// XXX TODO: these we should start for NRI as well, but
+		// event processing now depends on CRI request processing
 
-	m.startIntrospection()
+		if err := m.startEventProcessing(); err != nil {
+			return err
+		}
 
-	if err := m.relay.Start(); err != nil {
-		return resmgrError("failed to start CRI relay: %v", err)
+		m.startIntrospection()
+
+		if err := m.relay.Start(); err != nil {
+			return resmgrError("failed to start CRI relay: %v", err)
+		}
+	} else {
+		m.nri.start()
 	}
 
 	if err := pidfile.Remove(); err != nil {
@@ -220,9 +241,14 @@ func (m *resmgr) Stop() {
 	}
 
 	m.configServer.Stop()
-	m.relay.Stop()
-	m.stopIntrospection()
-	m.stopEventProcessing()
+
+	if !opt.UseNRIPlugin {
+		m.relay.Stop()
+		m.stopIntrospection()
+		m.stopEventProcessing()
+	} else {
+		m.nri.stop()
+	}
 }
 
 // SetConfig pushes new configuration to the resource manager.

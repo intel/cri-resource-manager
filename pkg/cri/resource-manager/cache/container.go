@@ -16,6 +16,7 @@ package cache
 
 import (
 	"encoding/json"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -26,6 +27,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 
+	"github.com/containerd/nri/pkg/api"
+	nri "github.com/containerd/nri/pkg/api"
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -181,6 +184,158 @@ func (c *container) fromListResponse(lrc *criv1.Container) error {
 	}
 
 	return nil
+}
+
+// Create container from an NRI request.
+func (c *container) fromNRI(nric *nri.Container) error {
+	c.PodID = nric.PodSandboxId
+
+	pod, ok := c.cache.Pods[c.PodID]
+	if !ok {
+		return cacheError("can't find cached pod %s for listed container", c.PodID)
+	}
+
+	c.ID = nric.Id
+	c.Name = nric.Name
+	c.Namespace = pod.Namespace
+	c.State = ContainerState(int32(criv1.ContainerState_CONTAINER_RUNNING)) // XXX TODO
+	c.Image = "unknown"
+	c.Command = make([]string, len(nric.Args))
+	copy(c.Command, nric.Args)
+	c.Labels = nric.Labels
+	c.Annotations = nric.Annotations
+	c.Tags = make(map[string]string)
+
+	genHints := true
+	if hintSetting, ok := c.GetEffectiveAnnotation(TopologyHintsKey); ok {
+		preference, err := strconv.ParseBool(hintSetting)
+		if err != nil {
+			c.cache.Error("invalid annotation %q=%q: %v", TopologyHintsKey, hintSetting, err)
+		} else {
+			genHints = preference
+		}
+	}
+	c.cache.Info("automatic topology hint generation %s for %q",
+		map[bool]string{false: "disabled", true: "enabled"}[genHints], c.PrettyName())
+
+	c.Mounts = make(map[string]*Mount)
+	for _, m := range nric.Mounts {
+		var (
+			propagation MountType
+			readOnly    bool
+			relabel     bool
+		)
+		for _, o := range m.Options {
+			switch o {
+			case "ro":
+				readOnly = true
+			case "rprivate":
+				propagation = MountPrivate
+			case "rshared":
+				propagation = MountBidirectional
+			case "rslave":
+				propagation = MountHostToContainer
+			case api.SELinuxRelabel:
+				relabel = true
+			}
+		}
+
+		c.Mounts[m.Destination] = &Mount{
+			Container:   m.Destination,
+			Host:        m.Source,
+			Readonly:    readOnly,
+			Relabel:     relabel,
+			Propagation: propagation,
+		}
+
+		if genHints {
+			if hints := getTopologyHints(m.Destination, m.Source, readOnly); len(hints) > 0 {
+				c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+			}
+		}
+	}
+
+	// Notes:
+	//   This is a way off/a bit wierd... Currently, we don't allow/handle altering
+	//   devices. We only convert these for topology hint generation.
+	c.Devices = make(map[string]*Device)
+	for _, d := range nric.GetLinux().GetDevices() {
+		var permissions string
+
+		if perm := d.FileMode.Get(); perm != nil {
+			if *perm&os.FileMode(0444) != os.FileMode(0) {
+				permissions = "r"
+			}
+			if *perm&os.FileMode(0222) != os.FileMode(0) {
+				permissions += "w"
+			}
+			permissions += "m"
+		} else {
+			permissions = "r"
+		}
+
+		c.Devices[d.Path] = &Device{
+			Container:   d.Path,
+			Host:        d.Path,
+			Permissions: permissions,
+		}
+
+		if genHints {
+			if hints := getTopologyHints(d.Path, d.Path, strings.IndexAny(permissions, "wm") == -1); len(hints) > 0 {
+				c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+			}
+		}
+	}
+
+	if lcr := nric.GetLinux().GetResources(); lcr != nil {
+		c.LinuxReq = toCRILinuxResources(lcr, nric.GetLinux().GetOomScoreAdj().GetValue())
+	} else {
+		c.LinuxReq = &criv1.LinuxContainerResources{}
+	}
+
+	if pod.Resources != nil {
+		if r, ok := pod.Resources.InitContainers[c.Name]; ok {
+			c.Resources = r
+		} else if r, ok := pod.Resources.Containers[c.Name]; ok {
+			c.Resources = r
+		}
+	}
+
+	if len(c.Resources.Requests) == 0 && len(c.Resources.Limits) == 0 {
+		c.Resources = estimateComputeResources(c.LinuxReq, pod.CgroupParent)
+	}
+
+	if err := c.setDefaults(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// toCRILinuxResources returns resources for CRI.
+func toCRILinuxResources(r *api.LinuxResources, oomScoreAdj int64) *criv1.LinuxContainerResources {
+	if r == nil {
+		return nil
+	}
+	o := &criv1.LinuxContainerResources{}
+	if r.Memory != nil {
+		o.MemoryLimitInBytes = r.Memory.GetLimit().GetValue()
+		o.OomScoreAdj = oomScoreAdj
+	}
+	if r.Cpu != nil {
+		o.CpuShares = int64(r.Cpu.GetShares().GetValue())
+		o.CpuPeriod = int64(r.Cpu.GetPeriod().GetValue())
+		o.CpuQuota = r.Cpu.GetQuota().GetValue()
+		o.CpusetCpus = r.Cpu.Cpus
+		o.CpusetMems = r.Cpu.Mems
+	}
+	for _, l := range r.HugepageLimits {
+		o.HugepageLimits = append(o.HugepageLimits, &criv1.HugepageLimit{
+			PageSize: l.PageSize,
+			Limit:    l.Limit,
+		})
+	}
+	return o
 }
 
 func (c *container) setDefaults() error {
