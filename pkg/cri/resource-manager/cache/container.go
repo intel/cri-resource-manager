@@ -26,6 +26,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 
+	nri "github.com/containerd/nri/api/plugin/vproto"
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -163,6 +164,117 @@ func (c *container) fromListResponse(lrc *cri.Container) error {
 	c.Labels = lrc.Labels
 	c.Annotations = lrc.Annotations
 	c.Tags = make(map[string]string)
+
+	if pod.Resources != nil {
+		if r, ok := pod.Resources.InitContainers[c.Name]; ok {
+			c.Resources = r
+		} else if r, ok := pod.Resources.Containers[c.Name]; ok {
+			c.Resources = r
+		}
+	}
+
+	if len(c.Resources.Requests) == 0 && len(c.Resources.Limits) == 0 {
+		c.Resources = estimateComputeResources(c.LinuxReq, pod.CgroupParent)
+	}
+
+	if err := c.setDefaults(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Create container from an NRI request.
+func (c *container) fromNRI(nric *nri.Container) error {
+	c.PodID = nric.PodSandboxId
+
+	pod, ok := c.cache.Pods[c.PodID]
+	if !ok {
+		return cacheError("can't find cached pod %s for listed container", c.PodID)
+	}
+
+	c.ID = nric.Id
+	c.Name = nric.Name
+	c.Namespace = pod.Namespace
+	c.State = ContainerState(int32(cri.ContainerState_CONTAINER_RUNNING)) // XXX TODO
+	c.Image = "unknown"
+	c.Labels = nric.Labels
+	c.Annotations = nric.Annotations
+	c.Tags = make(map[string]string)
+
+	genHints := true
+	if hintSetting, ok := c.GetEffectiveAnnotation(TopologyHintsKey); ok {
+		preference, err := strconv.ParseBool(hintSetting)
+		if err != nil {
+			c.cache.Error("invalid annotation %q=%q: %v", TopologyHintsKey, hintSetting, err)
+		} else {
+			genHints = preference
+		}
+	}
+	c.cache.Info("automatic topology hint generation %s for %q",
+		map[bool]string{false: "disabled", true: "enabled"}[genHints], c.PrettyName())
+
+	c.Mounts = make(map[string]*Mount)
+	for _, m := range nric.Mounts {
+		var propagation MountType
+		switch m.Propagation {
+		case nri.MountPropagation_PROPAGATION_PRIVATE:
+			propagation = MountPrivate
+		case nri.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
+			propagation = MountHostToContainer
+		case nri.MountPropagation_PROPAGATION_BIDIRECTIONAL:
+			propagation = MountBidirectional
+		}
+
+		c.Mounts[m.ContainerPath] = &Mount{
+			Container:   m.ContainerPath,
+			Host:        m.HostPath,
+			Readonly:    m.Readonly,
+			Relabel:     m.SelinuxRelabel,
+			Propagation: propagation,
+		}
+
+		if genHints {
+			if hints := getTopologyHints(m.HostPath, m.ContainerPath, m.Readonly); len(hints) > 0 {
+				c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+			}
+		}
+	}
+
+	c.Devices = make(map[string]*Device)
+	for _, d := range nric.Devices {
+		c.Devices[d.ContainerPath] = &Device{
+			Container:   d.ContainerPath,
+			Host:        d.HostPath,
+			Permissions: d.Permissions,
+		}
+		if genHints {
+			if hints := getTopologyHints(d.HostPath, d.ContainerPath, strings.IndexAny(d.Permissions, "wm") == -1); len(hints) > 0 {
+				c.TopologyHints = topology.MergeTopologyHints(c.TopologyHints, hints)
+			}
+		}
+	}
+
+	if lcr := nric.GetLinuxResources(); lcr != nil {
+		c.LinuxReq = &cri.LinuxContainerResources{
+			CpuPeriod:          lcr.CpuPeriod,
+			CpuQuota:           lcr.CpuQuota,
+			CpuShares:          lcr.CpuShares,
+			MemoryLimitInBytes: lcr.MemoryLimitInBytes,
+			OomScoreAdj:        lcr.OomScoreAdj,
+			CpusetCpus:         lcr.CpusetCpus,
+			CpusetMems:         lcr.CpusetMems,
+			HugepageLimits:     []*cri.HugepageLimit{},
+		}
+		for _, hpl := range lcr.HugepageLimits {
+			c.LinuxReq.HugepageLimits = append(c.LinuxReq.HugepageLimits, &cri.HugepageLimit{
+				PageSize: hpl.PageSize,
+				Limit:    hpl.Limit,
+			})
+		}
+	} else {
+		c.LinuxReq = &cri.LinuxContainerResources{}
+	}
 
 	if pod.Resources != nil {
 		if r, ok := pod.Resources.InitContainers[c.Name]; ok {
