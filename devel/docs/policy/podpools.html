@@ -4,10 +4,11 @@
 <html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8" />
-  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Podpools Policy &mdash; CRI Resource Manager 0.5.0-32-g9b256305 documentation</title>
+  <title>Podpools Policy &mdash; CRI Resource Manager 0.5.0-35-g0706260b documentation</title>
   
 
   
@@ -89,7 +90,7 @@
               
             
             
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -194,23 +195,23 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="podpools-policy">
+  <section id="podpools-policy">
 <h1>Podpools Policy<a class="headerlink" href="#podpools-policy" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="overview">
+<section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p>The podpools policy implements pod-level workload placement. It
 assigns all containers of a pod to the same CPU/memory pool. The
 number of CPUs in a pool is configurable by user.</p>
-</div>
-<div class="section" id="deployment">
+</section>
+<section id="deployment">
 <h2>Deployment<a class="headerlink" href="#deployment" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="install-cri-resmgr">
+<section id="install-cri-resmgr">
 <h3>Install cri-resmgr<a class="headerlink" href="#install-cri-resmgr" title="Permalink to this headline">¶</a></h3>
 <p>Deploy cri-resmgr on each node as you would for any other policy. See
 <a class="reference internal" href="../installation.html"><span class="doc">installation</span></a> for more details.</p>
-</div>
-</div>
-<div class="section" id="configuration">
+</section>
+</section>
+<section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
 <p>The policy is configured using the yaml-based configuration system of CRI-RM.
 See <a class="reference external" href="../setup.html#setting-up-cri-resource-manager">setup and usage</a> for more
@@ -239,9 +240,9 @@ that are not <code class="docutils literal notranslate"><span class="pre">dualcp
 each pod assigned to the pool. To align with kube-scheduler resource
 accounting, requested CPUs of all containers in this kind of pods must
 sum up to CPU/MaxPods, that is 2000m CPU in this case.</p>
-<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9b25630584b5b723ea8f3a70e67b8a1ef49a7bb2/sample-configs/podpools-policy.cfg">sample configmap</a> for a
+<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/0706260b35045ff4550b2ccc12f26a5205dae042/sample-configs/podpools-policy.cfg">sample configmap</a> for a
 complete example.</p>
-<div class="section" id="debugging">
+<section id="debugging">
 <h3>Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h3>
 <p>In order to enable more verbose logging for the podpools policy enable
 policy debug from the CRI-RM global config:</p>
@@ -249,9 +250,9 @@ policy debug from the CRI-RM global config:</p>
   <span class="nt">Debug</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">policy</span>
 </pre></div>
 </div>
-</div>
-</div>
-<div class="section" id="running-pods-in-podpools">
+</section>
+</section>
+<section id="running-pods-in-podpools">
 <h2>Running Pods in Podpools<a class="headerlink" href="#running-pods-in-podpools" title="Permalink to this headline">¶</a></h2>
 <p>The podpools policy assigns a pod to a pod pool instance if the pod
 has annotation</p>
@@ -295,8 +296,8 @@ not a <code class="docutils literal notranslate"><span class="pre">kube-system</
 include left-over CPUs after creating user-defined pools. If all CPUs
 were allocated to other pools, reserved CPUs will be used as shared,
 too.</p>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>

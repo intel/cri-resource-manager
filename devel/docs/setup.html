@@ -4,10 +4,11 @@
 <html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8" />
-  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Setup and Usage &mdash; CRI Resource Manager 0.5.0-32-g9b256305 documentation</title>
+  <title>Setup and Usage &mdash; CRI Resource Manager 0.5.0-35-g0706260b documentation</title>
   
 
   
@@ -89,7 +90,7 @@
               
             
             
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
@@ -191,7 +192,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="setup-and-usage">
+  <section id="setup-and-usage">
 <h1>Setup and Usage<a class="headerlink" href="#setup-and-usage" title="Permalink to this headline">¶</a></h1>
 <p>If you want to give CRI Resource Manager a try, here is the list of things
 you need to do, assuming you already have a Kubernetes* cluster up and
@@ -217,13 +218,13 @@ socket path.</p>
 </div>
 <p>The choice of policy to use along with any potential parameters specific to
 that policy are taken from the configuration file. You can take a look at the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/9b25630584b5b723ea8f3a70e67b8a1ef49a7bb2/sample-configs">sample configurations</a> for some minimal/trivial examples.
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/0706260b35045ff4550b2ccc12f26a5205dae042/sample-configs">sample configurations</a> for some minimal/trivial examples.
 For instance, you can use
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9b25630584b5b723ea8f3a70e67b8a1ef49a7bb2/sample-configs/topology-aware-policy.cfg">sample-configs/topology-aware-policy.cfg</a>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/0706260b35045ff4550b2ccc12f26a5205dae042/sample-configs/topology-aware-policy.cfg">sample-configs/topology-aware-policy.cfg</a>
 as <code class="docutils literal notranslate"><span class="pre">&lt;config-file&gt;</span></code> to activate the topology aware policy with memory
 tiering support.</p>
 <p><strong>NOTE</strong>: Currently, the available policies are a work in progress.</p>
-<div class="section" id="setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime">
+<section id="setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime">
 <h2>Setting up kubelet to use CRI Resource Manager as the runtime<a class="headerlink" href="#setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime" title="Permalink to this headline">¶</a></h2>
 <p>To let CRI Resource Manager act as a proxy between kubelet and the CRI
 runtime, you need to configure kubelet to connect to CRI Resource Manager
@@ -233,8 +234,8 @@ kubelet as shown below:</p>
      <span class="o">--</span><span class="n">container</span><span class="o">-</span><span class="n">runtime</span><span class="o">-</span><span class="n">endpoint</span><span class="o">=</span><span class="n">unix</span><span class="p">:</span><span class="o">///</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">.</span><span class="n">sock</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="setting-up-cri-resource-manager">
+</section>
+<section id="setting-up-cri-resource-manager">
 <h2>Setting up CRI Resource Manager<a class="headerlink" href="#setting-up-cri-resource-manager" title="Permalink to this headline">¶</a></h2>
 <p>Setting up CRI Resource Manager involves pointing it to your runtime and
 providing it with a configuration. Pointing to the runtime is done using
@@ -251,7 +252,7 @@ latter is a bit more involved but it allows you to</p>
 <li><p>manage policy configuration for your cluster as a single source, and</p></li>
 <li><p>dynamically update that configuration</p></li>
 </ul>
-<div class="section" id="using-a-local-configuration-from-a-file">
+<section id="using-a-local-configuration-from-a-file">
 <h3>Using a local configuration from a file<a class="headerlink" href="#using-a-local-configuration-from-a-file" title="Permalink to this headline">¶</a></h3>
 <p>This is the easiest way to run CRI Resource Manager for development or
 testing. You can do it with the following command:</p>
@@ -261,8 +262,8 @@ testing. You can do it with the following command:</p>
 <p>When started this way, CRI Resource Manager reads its configuration from the
 given file. It does not fetch external configuration from the node agent and
 also disables the config interface for receiving configuration updates.</p>
-</div>
-<div class="section" id="using-cri-resource-manager-agent-and-a-configmap">
+</section>
+<section id="using-cri-resource-manager-agent-and-a-configmap">
 <h3>Using CRI Resource Manager Agent and a ConfigMap<a class="headerlink" href="#using-cri-resource-manager-agent-and-a-configmap" title="Permalink to this headline">¶</a></h3>
 <p>This setup requires an extra component, the
 <a class="reference internal" href="node-agent.html"><span class="doc">CRI Resource Manager Node Agent</span></a>,
@@ -281,8 +282,8 @@ Manager is restarted (unless that time the –force-config option is used).
 While CRI Resource Manager is shut down, any cached configuration can be
 cleared from the cache using the –reset-config command line option.</p>
 <p>See the <a class="reference internal" href="node-agent.html"><span class="doc">Node Agent</span></a> about how to set up and configure the agent.</p>
-</div>
-<div class="section" id="changing-the-active-policy">
+</section>
+<section id="changing-the-active-policy">
 <h3>Changing the active policy<a class="headerlink" href="#changing-the-active-policy" title="Permalink to this headline">¶</a></h3>
 <p>Currently, CRI Resource Manager disables changing the active policy using
 the <a class="reference internal" href="node-agent.html"><span class="doc">agent</span></a>. That is, once the active policy is recorded in the cache,
@@ -302,15 +303,15 @@ option <code class="docutils literal notranslate"><span class="pre">--reset-poli
 <li><p>change policy (<code class="docutils literal notranslate"><span class="pre">$EDITOR</span> <span class="pre">/etc/cri-resource-manager/fallback.cfg</span></code>)</p></li>
 <li><p>start cri-resmgr (<code class="docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">start</span> <span class="pre">cri-resource-manager</span></code>)</p></li>
 </ul>
-</div>
-<div class="section" id="container-adjustments">
+</section>
+<section id="container-adjustments">
 <h3>Container adjustments<a class="headerlink" href="#container-adjustments" title="Permalink to this headline">¶</a></h3>
 <p>When the <a class="reference internal" href="node-agent.html"><span class="doc">agent</span></a> is in use, it is also possible to <code class="docutils literal notranslate"><span class="pre">adjust</span></code> container
 <code class="docutils literal notranslate"><span class="pre">resource</span> <span class="pre">assignments</span></code> externally, using dedicated <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code>
 <code class="docutils literal notranslate"><span class="pre">Custom</span> <span class="pre">Resources</span></code> in the <code class="docutils literal notranslate"><span class="pre">adjustments.criresmgr.intel.com</span></code> group. You can
-use the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9b25630584b5b723ea8f3a70e67b8a1ef49a7bb2/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml">provided schema</a>
+use the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/0706260b35045ff4550b2ccc12f26a5205dae042/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml">provided schema</a>
 to define the <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code> resource. Then you can copy and modify the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9b25630584b5b723ea8f3a70e67b8a1ef49a7bb2/sample-configs/external-adjustment.yaml">sample adjustment CR</a> as a
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/0706260b35045ff4550b2ccc12f26a5205dae042/sample-configs/external-adjustment.yaml">sample adjustment CR</a> as a
 starting point to test some overrides.</p>
 <p>An <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code> consists of the following:</p>
 <ul class="simple">
@@ -342,7 +343,7 @@ adjustment applies to all containers in its scope. If an adjustment/update
 results in conflicts for some container, that is at least one container is
 in the scope of multiple adjustments, the adjustment is rejected and the
 whole update is ignored.</p>
-<div class="section" id="commands-for-declaring-creating-deleting-and-examining-adjustments">
+<section id="commands-for-declaring-creating-deleting-and-examining-adjustments">
 <h4>Commands for declaring, creating, deleting, and examining adjustments<a class="headerlink" href="#commands-for-declaring-creating-deleting-and-examining-adjustments" title="Permalink to this headline">¶</a></h4>
 <p>You can declare the custom resource for adjustments with this command:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">apply</span> <span class="o">-</span><span class="n">f</span> <span class="n">pkg</span><span class="o">/</span><span class="n">apis</span><span class="o">/</span><span class="n">resmgr</span><span class="o">/</span><span class="n">v1alpha1</span><span class="o">/</span><span class="n">adjustment</span><span class="o">-</span><span class="n">schema</span><span class="o">.</span><span class="n">yaml</span>
@@ -445,17 +446,17 @@ kli@r640-1:~&gt; kubectl get -n kube-system adjustments.criresmgr.intel.com -ojs
 }
 </pre></div>
 </div>
-</div>
-</div>
-</div>
-<div class="section" id="using-cri-resource-manager-as-a-message-dumper">
+</section>
+</section>
+</section>
+<section id="using-cri-resource-manager-as-a-message-dumper">
 <h2>Using CRI Resource Manager as a message dumper<a class="headerlink" href="#using-cri-resource-manager-as-a-message-dumper" title="Permalink to this headline">¶</a></h2>
 <p>You can use CRI Resource Manager to simply inspect all proxied CRI requests
 and responses without applying any policy. Run CRI Resource Manager with the
-provided <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/9b25630584b5b723ea8f3a70e67b8a1ef49a7bb2/sample-configs/cri-full-message-dump.cfg">sample configuration</a>
+provided <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/0706260b35045ff4550b2ccc12f26a5205dae042/sample-configs/cri-full-message-dump.cfg">sample configuration</a>
 for doing this.</p>
-</div>
-<div class="section" id="kata-containers">
+</section>
+<section id="kata-containers">
 <h2>Kata Containers<a class="headerlink" href="#kata-containers" title="Permalink to this headline">¶</a></h2>
 <p><a class="reference external" href="https://katacontainers.io/">Kata Containers</a> is an open source container
 runtime, building lightweight virtual machines that seamlessly plug into the
@@ -485,7 +486,7 @@ Kubernetes cgroup naming conventions.</p>
 <span class="p">...</span>
 </pre></div>
 </div>
-<div class="section" id="reference">
+<section id="reference">
 <h3>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h3>
 <p>If you have a pre-existing Kubernetes cluster, for an easy deployement
 follow this <a class="reference external" href="https://github.com/kata-containers/packaging/blob/master/kata-deploy/README.md#kubernetes-quick-start">document</a>.</p>
@@ -497,9 +498,9 @@ follow this <a class="reference external" href="https://github.com/kata-containe
 <li><p><a class="reference external" href="https://kubernetes.io/docs/concepts/containers/runtime-class/">Kubernetes Runtime Class</a></p></li>
 <li><p><a class="reference external" href="https://github.com/kata-containers/kata-containers/blob/stable-2.0.0/docs/design/host-cgroups.md">Cgroup and Kata containers</a></p></li>
 </ul>
-</div>
-</div>
-<div class="section" id="using-docker-as-the-runtime">
+</section>
+</section>
+<section id="using-docker-as-the-runtime">
 <h2>Using Docker* as the runtime<a class="headerlink" href="#using-docker-as-the-runtime" title="Permalink to this headline">¶</a></h2>
 <p>If you must use <code class="docutils literal notranslate"><span class="pre">docker</span></code> as the runtime then the proxying setup is slightly
 more complex. Docker does not natively support the CRI API. Normally kubelet
@@ -525,8 +526,8 @@ according to the configuration of the real kubelet instance:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">kubelet</span> <span class="o">--</span><span class="n">experimental</span><span class="o">-</span><span class="n">dockershim</span> <span class="o">--</span><span class="n">port</span> <span class="mi">11250</span> <span class="o">--</span><span class="n">cgroup</span><span class="o">-</span><span class="n">driver</span> <span class="p">{</span><span class="n">systemd</span><span class="o">|</span><span class="n">cgroupfs</span><span class="p">}</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="logging-and-debugging">
+</section>
+<section id="logging-and-debugging">
 <h2>Logging and debugging<a class="headerlink" href="#logging-and-debugging" title="Permalink to this headline">¶</a></h2>
 <p>You can control logging with the klog command line options or by setting the
 corresponding environment variables. You can get the name of the environment
@@ -549,8 +550,8 @@ again.</p>
 to any settings in the environment. That said, if you turn something on in
 the environment but off in the configuration, it will be turned off
 eventually.</p>
-<!-- Links --></div>
-</div>
+<!-- Links --></section>
+</section>
 
 
            </div>

@@ -4,10 +4,11 @@
 <html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8" />
-  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.5.0-32-g9b256305 documentation</title>
+  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.5.0-35-g0706260b documentation</title>
   
 
   
@@ -89,7 +90,7 @@
               
             
             
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -198,9 +199,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="topology-aware-policy">
+  <section id="topology-aware-policy">
 <h1>Topology-Aware Policy<a class="headerlink" href="#topology-aware-policy" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="background">
+<section id="background">
 <h2>Background<a class="headerlink" href="#background" title="Permalink to this headline">¶</a></h2>
 <p>On server-grade hardware the CPU cores, I/O devices and other peripherals
 form a rather complex network together with the memory controllers, the
@@ -223,8 +224,8 @@ Given the idiosyncrasies of hardware, allocating a properly aligned set
 of resources for optimal workload performance requires identifying and
 understanding the multiple dimensions of access latency locality present
 in hardware or, in other words, hardware topology awareness.</p>
-</div>
-<div class="section" id="overview">
+</section>
+<section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy automatically builds a tree of pools based on the
 detected hardware topology. Each pool has a set of CPUs and memory zones
@@ -275,8 +276,8 @@ implementation evolves, its basic principles are roughly</p>
 fewer workloads</p></li>
 <li><p>prefer pools with better overall device alignment</p></li>
 </ul>
-</div>
-<div class="section" id="features">
+</section>
+<section id="features">
 <h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy has the following features:</p>
 <ul class="simple">
@@ -305,7 +306,7 @@ fewer workloads</p></li>
 <li><p>assign both exclusive and shared CPU cores to workload</p></li>
 </ul>
 </li>
-<li><p>discovering and using kernel-isolated CPU cores (<a class="reference external" href="https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html#cpu-lists">‘isolcpus’</a>)</p>
+<li><p>discovering and using kernel-isolated CPU cores (<a class="reference external" href="https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html#cpu-lists">’isolcpus’</a>)</p>
 <ul>
 <li><p>use kernel-isolated CPU cores for exclusively assigned CPU cores</p></li>
 </ul>
@@ -342,8 +343,8 @@ typically found on some special-purpose computing systems</p></li>
 </ul>
 </li>
 </ul>
-</div>
-<div class="section" id="activating-the-policy">
+</section>
+<section id="activating-the-policy">
 <h2>Activating the Policy<a class="headerlink" href="#activating-the-policy" title="Permalink to this headline">¶</a></h2>
 <p>You can activate the <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy by using the following configuration
 fragment in the configuration for <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code>:</p>
@@ -353,8 +354,8 @@ fragment in the configuration for <code class="docutils literal notranslate"><sp
     <span class="nt">CPU</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">750m</span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="configuring-the-policy">
+</section>
+<section id="configuring-the-policy">
 <h2>Configuring the Policy<a class="headerlink" href="#configuring-the-policy" title="Permalink to this headline">¶</a></h2>
 <p>The policy has a number of configuration options which affect its default behavior.
 These options can be supplied as part of the
@@ -386,8 +387,8 @@ would be otherwise eligible for exclusive CPU allocation</p></li>
 </ul>
 </li>
 </ul>
-</div>
-<div class="section" id="policy-cpu-allocation-preferences">
+</section>
+<section id="policy-cpu-allocation-preferences">
 <h2>Policy CPU Allocation Preferences<a class="headerlink" href="#policy-cpu-allocation-preferences" title="Permalink to this headline">¶</a></h2>
 <p>There are a number of workload properties this policy actively checks to decide
 if the workload could potentially benefit from extra resource allocation
@@ -497,14 +498,14 @@ are only eligible for shared CPU core allocation in the mixed and multi-core
 groups, are all pinned to run on the shared subset of CPU cores in the
 container’s assigned pool. This shared subset can and usually does change
 dynamically as exclusive CPU cores are allocated and released in the pool.</p>
-</div>
-<div class="section" id="container-cpu-allocation-preference-annotations">
+</section>
+<section id="container-cpu-allocation-preference-annotations">
 <h2>Container CPU Allocation Preference Annotations<a class="headerlink" href="#container-cpu-allocation-preference-annotations" title="Permalink to this headline">¶</a></h2>
 <p>Containers can be annotated to diverge from the default CPU allocation
 preferences the policy would otherwise apply to them. These Pod annotations
 can be given both with per pod and per container resolution. If for any
 container both of these exist, the container-specific one takes precedence.</p>
-<div class="section" id="shared-exclusive-and-isolated-cpu-preference">
+<section id="shared-exclusive-and-isolated-cpu-preference">
 <h3>Shared, Exclusive, and Isolated CPU Preference<a class="headerlink" href="#shared-exclusive-and-isolated-cpu-preference" title="Permalink to this headline">¶</a></h3>
 <p>A container can opt in to or opt out from shared CPU allocation using the
 following Pod annotation.</p>
@@ -535,8 +536,8 @@ allocation using the following Pod annotation.</p>
 </div>
 <p>These Pod annotations have no effect on containers which are not eligible for
 exclusive allocation.</p>
-</div>
-<div class="section" id="implicit-hardware-topology-hints">
+</section>
+<section id="implicit-hardware-topology-hints">
 <h3>Implicit Hardware Topology Hints<a class="headerlink" href="#implicit-hardware-topology-hints" title="Permalink to this headline">¶</a></h3>
 <p><code class="docutils literal notranslate"><span class="pre">CRI</span> <span class="pre">Resource</span> <span class="pre">Manager</span></code> automatically generates HW <code class="docutils literal notranslate"><span class="pre">Topology</span> <span class="pre">Hints</span></code> for devices
 assigned to a container, prior to handing the container off to the active policy
@@ -562,9 +563,9 @@ pool selection using the following Pod annotations.</p>
 <p>Topology hint generation is globally enabled by default. Therefore, using the
 Pod annotation as opt in only has an effect when the whole pod is annotated to
 opt out from hint-aware pool selection.</p>
-</div>
-</div>
-<div class="section" id="cold-start">
+</section>
+</section>
+<section id="cold-start">
 <h2>Cold Start<a class="headerlink" href="#cold-start" title="Permalink to this headline">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy supports “cold start” functionality. When cold start
 is enabled and the workload is allocated to a topology node with both DRAM and
@@ -595,8 +596,8 @@ future release:</p>
 <p>In the above example, <code class="docutils literal notranslate"><span class="pre">container1</span></code> would be initially granted only PMEM
 memory controller, but after 60 seconds the DRAM controller would be
 added to the container memset.</p>
-</div>
-<div class="section" id="dynamic-page-demotion">
+</section>
+<section id="dynamic-page-demotion">
 <h2>Dynamic Page Demotion<a class="headerlink" href="#dynamic-page-demotion" title="Permalink to this headline">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy also supports dynamic page demotion. With dynamic
 demotion enabled, rarely-used pages are periodically moved from DRAM to PMEM
@@ -618,8 +619,8 @@ fulfilling the memory container requirements would have their page ranges
 scanned for non-accessed pages every ten seconds. The result of the scan
 would be fed to a page-moving loop, which would attempt to move 1000 pages
 every two seconds from DRAM to PMEM.</p>
-</div>
-<div class="section" id="container-memory-requests-and-limits">
+</section>
+<section id="container-memory-requests-and-limits">
 <h2>Container memory requests and limits<a class="headerlink" href="#container-memory-requests-and-limits" title="Permalink to this headline">¶</a></h2>
 <p>Due to inaccuracies in how <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> calculates memory requests for
 pods in QoS class <code class="docutils literal notranslate"><span class="pre">Burstable</span></code>, you should either use <code class="docutils literal notranslate"><span class="pre">Limit</span></code> for setting
@@ -627,8 +628,8 @@ the amount of memory for containers in <code class="docutils literal notranslate
 <a class="reference internal" href="../webhook.html"><span class="doc">resource-annotating webhook</span></a> to provide <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> with
 an exact copy of the resource requirements from the Pod Spec as an extra
 Pod annotation.</p>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
