@@ -21,6 +21,10 @@ host-require-govm() {
     command -v "$GOVM" >/dev/null || error "cannot run govm \"$GOVM\". Check PATH or set GOVM=/path/to/govm."
 }
 
+host-require-cmd() {
+    command -v "$1" >/dev/null || error "cannot run \"$1\". Check dependencies."
+}
+
 host-get-vm-config() {
     if [ -z "$1" ]; then
         error "can't get VM configuration, name not set"
