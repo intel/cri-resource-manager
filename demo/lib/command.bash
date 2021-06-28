@@ -10,6 +10,8 @@
 # command-start and command-end set environment variables:
 # COMMAND, COMMAND_STATUS, COMMAND_OUTPUT
 
+export LC_NUMERIC=C
+
 # These exports force ssh-* to fail instead of prompting for a passphrase.
 export DISPLAY=bogus-none
 export SSH_ASKPASS=/bin/false
