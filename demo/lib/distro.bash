@@ -197,7 +197,7 @@ debian-remove-pkg() {
 }
 
 debian-install-golang() {
-    debian-install-pkg golang
+    debian-install-pkg golang git-core
 }
 
 debian-10-install-containerd-pre() {
@@ -288,7 +288,7 @@ centos-7-k8s-cni() {
 }
 
 centos-install-golang() {
-    distro-install-pkg wget tar gzip
+    distro-install-pkg wget tar gzip git-core
     from-tarball-install-golang
 }
 
@@ -317,7 +317,7 @@ fedora-remove-pkg() {
 }
 
 fedora-install-golang() {
-    fedora-install-pkg wget tar gzip
+    fedora-install-pkg wget tar gzip git-core
     from-tarball-install-golang
 }
 
@@ -421,7 +421,7 @@ opensuse-remove-pkg() {
 }
 
 opensuse-install-golang() {
-    opensuse-install-pkg wget tar gzip
+    opensuse-install-pkg wget tar gzip git-core
     from-tarball-install-golang
 }
 
