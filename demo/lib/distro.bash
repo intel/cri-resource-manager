@@ -465,10 +465,39 @@ EOF
 }
 
 opensuse-install-k8s() {
-    opensuse-install-pkg "kubernetes1.18-kubeadm kubernetes1.18-kubelet kubernetes1.18-client"
-    # remove original options to use crio as runtime
-    vm-command "mv /etc/sysconfig/kubelet /etc/sysconfig/kubelet.orig && cat /etc/sysconfig/kubelet.orig | sed -E 's:--container-runtime=remote::g;s:--container-runtime-endpoint=[^ ]* ::g' > /etc/sysconfig/kubelet" ||
-        command-error "failed to update kubelet configuration"
+    vm-command "( lsmod | grep -q br_netfilter ) || { echo br_netfilter > /etc/modules-load.d/50-br_netfilter.conf; modprobe br_netfilter; }"
+    vm-command "echo 1 > /proc/sys/net/ipv4/ip_forward"
+    vm-command "zypper ls"
+    if ! grep -q snappy <<< "$COMMAND_OUTPUT"; then
+        opensuse-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.2 snappy"
+        opensuse-refresh-pkg-db
+        opensuse-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd"
+    fi
+    vm-install-containernetworking
+    vm-command "systemctl enable --now snapd"
+    vm-command "snap wait system seed.loaded"
+    for kubepart in kubelet kubectl kubeadm; do
+        vm-command "snap install $kubepart --classic"
+    done
+    # Manage kubelet with systemd rather than snap
+    vm-command "snap stop kubelet"
+cat <<EOF |
+[Unit]
+Description=kubelet: The Kubernetes Node Agent
+Documentation=https://kubernetes.io/docs/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/snap/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --container-runtime=remote --container-runtime-endpoint=${k8scri_sock} --pod-infra-container-image=k8s.gcr.io/pause:3.4.1
+Restart=always
+StartLimitInterval=0
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    vm-pipe-to-file /etc/systemd/system/kubelet.service
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
 }
