@@ -616,9 +616,9 @@ default-restart-containerd() {
 from-tarball-install-golang() {
     vm-command-q "go version | grep -q go$GOLANG_VERSION" || {
         vm-command "wget --progress=dot:giga $GOLANG_URL -O go.tgz" && \
-            vm-command "tar -C /usr/local -xvzf go.tgz && rm go.tgz" && \
-            vm-command "echo \"PATH=/usr/local/go/bin:\$PATH\" > /etc/profile.d/go.sh" && \
-            vm-command "* installed \$(go version)"
+            vm-command "tar -C /usr/local -xvzf go.tgz >/dev/null && rm go.tgz" && \
+            vm-command "echo 'PATH=/usr/local/go/bin:\$PATH' > /etc/profile.d/go.sh" && \
+            vm-command "echo \* installed \$(go version)"
     }
 }
 
