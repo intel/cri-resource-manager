@@ -430,8 +430,13 @@ opensuse-wait-for-zypper() {
 }
 
 opensuse-install-containerd() {
-    opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/openSUSE_Leap_15.2/Virtualization:containers.repo
-    opensuse-install-pkg containerd
+    vm-command "zypper ls"
+    if ! grep -q Virtualization_containers <<< "$COMMAND_OUTPUT"; then
+        opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/openSUSE_Leap_15.2/Virtualization:containers.repo
+        opensuse-refresh-pkg-db
+    fi
+    opensuse-install-pkg --from Virtualization_containers containerd containerd-ctr
+    vm-command "ln -sf /usr/sbin/containerd-ctr /usr/sbin/ctr"
 
 cat <<EOF |
 [Unit]
