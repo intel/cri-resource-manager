@@ -366,18 +366,19 @@ echo 'Defaults !requiretty' > /etc/sudoers.d/10-norequiretty
 setenforce 0
 sed -E -i 's/^SELINUX=.*$/SELINUX=permissive/' /etc/selinux/config
 
-echo PATH="\$PATH:/usr/local/bin:/usr/local/sbin" > /etc/profile.d/usr-local-path.sh
-
+echo PATH='\$PATH:/usr/local/bin:/usr/local/sbin' > /etc/profile.d/usr-local-path.sh
+EOF
+    if [[ "${cgroups:-}" != "v2" ]]; then
+        cat <<EOF
 if grep -q NAME=Fedora /etc/os-release; then
     if ! grep -q systemd.unified_cgroup_hierarchy=0 /proc/cmdline; then
         sudo grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0"
         shutdown -r now
     fi
 fi
-
 EOF
+    fi
 }
-
 
 ###########################################################################
 
