@@ -69,9 +69,17 @@ usage() {
     echo "             after verify/create/launch function"
     echo ""
     echo "  Test input VARs:"
-    echo "    topology: JSON to override NUMA node list used in tests."
-    echo "             Effective only if \"vm\" does not exist."
+    echo "    topology: HW topology JSON for VM creation."
+    echo "             Effective only if the VM does not already exist."
     echo "             See: python3 ${DEMO_LIB_DIR}/topology2qemuopts.py --help"
+    echo "    distro:  Linux distribution to be installed on VM creation."
+    echo "             Supported values:"
+    echo "               debian-10 debian-sid"
+    echo "               ubuntu-18.04 ubuntu-20.04 ubuntu-20.10"
+    echo "               centos-7 centos-8 fedora"
+    echo "    k8s:     Kubernetes version to be installed on VM creation"
+    echo "             The default is the latest available on selected distro."
+    echo "             Example: k8s=1.18.10"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
     echo "    cri_resmgr_extra_args: arguments to be added on cri-resmgr"
     echo "             command line when launched"
@@ -92,8 +100,8 @@ usage() {
     echo ""
     echo "Default test input VARs: ./run.sh help defaults"
     echo ""
-    echo "Development cycle example:"
-    echo "pushd ../..; make; popd; reinstall_cri_resmgr=1 speed=120 ./run.sh play"
+    echo "Create VM 'foo' that runs k8s 1.20.2 on Debian Sid:"
+    echo "vm=foo distro=debian-sid k8s=1.20.2 ./run.sh interactive"
 }
 
 error() {
@@ -957,6 +965,7 @@ INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
 distro=${distro:=$DEFAULT_DISTRO}
+k8s=${k8s:=}
 cri=${cri:=containerd}
 TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
 vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
@@ -1007,6 +1016,8 @@ if [ "$mode" == "help" ]; then
         echo "Test input defaults:"
         echo ""
         echo "topology=${topology}"
+        echo "distro=${distro}"
+        echo "k8s=${k8s}"
         echo ""
         echo "cri_resmgr_cfg=${cri_resmgr_cfg}"
         echo ""
