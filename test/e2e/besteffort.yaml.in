@@ -4,6 +4,15 @@ metadata:
   name: ${NAME}
   labels:
     app: ${NAME}
+    $(for lbl in ${!LABEL*}; do [[ "$lbl" == LABEL[0-9]* ]] && echo "
+    ${!lbl}
+    "; done)
+  $([ -n "${!ANN*}" ] && echo "
+  annotations:
+    $(for ann in ${!ANN*}; do [[ "$ann" == ANN[0-9]* ]] && echo "
+    ${!ann}
+    "; done)
+  ")
 spec:
   containers:
   $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
