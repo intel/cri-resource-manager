@@ -1048,6 +1048,9 @@ else
     exit 1
 fi
 
+host-require-cmd jq
+host-require-cmd pv
+
 if [ -n "$user_script_file" ]; then
     if [ ! -f "$user_script_file" ]; then
         error "cannot find test script file \"$user_script_file\""
