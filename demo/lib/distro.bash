@@ -215,6 +215,11 @@ debian-sid-install-containerd-post() {
     vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
 }
 
+debian-install-crio-pre() {
+    debian-refresh-pkg-db
+    debian-install-pkg libgpgme11 conmon runc containernetworking-plugins conntrack || true
+}
+
 debian-install-k8s() {
     debian-refresh-pkg-db
     debian-install-pkg apt-transport-https curl
@@ -326,6 +331,11 @@ fedora-install-golang() {
     from-tarball-install-golang
 }
 
+fedora-install-crio-pre() {
+    distro-install-pkg runc conmon
+    vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
+}
+
 fedora-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
 }
@@ -417,6 +427,7 @@ opensuse-refresh-pkg-db() {
 }
 
 opensuse-install-pkg() {
+    opensuse-wait-for-zypper
     vm-command "$ZYPPER install $*" ||
         command-error "failed to install $*"
 }
@@ -432,7 +443,13 @@ opensuse-install-golang() {
 }
 
 opensuse-wait-for-zypper() {
-    vm-command 'cnt=0; while ps axuw | grep zypper | grep -qv grep; do if [ $cnt -lt 5 ]; then echo "Waiting for zypper to exit..."; sleep 1; let cnt=$cnt+1; else echo "Killing running zypper..."; killall zypper; sleep 1; fi; done'
+    vm-run-until --timeout 5 '( ! pidof zypper >/dev/null ) || ( killall zypper; sleep 1; exit 1 )' ||
+        error "Failed to stop zypper running in the background"
+}
+
+opensuse-install-crio-pre() {
+    distro-install-pkg runc conmon
+    vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
 }
 
 opensuse-install-containerd() {
@@ -565,7 +582,7 @@ EOF
       append=""
     done
     # Setup proxies for systemd services that might be installed later
-    for file in /etc/systemd/system/{containerd,docker}.service.d/proxy.conf; do
+    for file in /etc/systemd/system/{containerd,docker,crio}.service.d/proxy.conf; do
         cat <<EOF |
 [Service]
 Environment=HTTP_PROXY=$http_proxy
@@ -611,6 +628,52 @@ default-config-containerd() {
 default-restart-containerd() {
     vm-command "systemctl daemon-reload && systemctl restart containerd" ||
         command-error "failed to restart containerd systemd service"
+}
+
+default-install-crio() {
+    [ -n "$crio_src" ] || error "crio install error: crio_src is not set"
+    [ -x "$crio_src/bin/crio" ] || error "crio install error: file not found $crio_src/bin/crio"
+    for f in crio crio-status pinns; do
+        vm-put-file "$crio_src/bin/$f" "/usr/bin/$f"
+    done
+    cat <<EOF |
+[Unit]
+Description=cri-o container runtime
+Documentation=https://cri-o.io
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/crio
+
+Delegate=yes
+KillMode=process
+Restart=always
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=1048576
+TasksMax=infinity
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    vm-pipe-to-file /etc/systemd/system/crio.service
+    vm-command "mkdir -p /etc/systemd/system/crio.service.d"
+    vm-command "(echo \"[Service]\"; echo \"Environment=PATH=/sbin:/usr/sbin:$PATH:/usr/libexec/podman\") > /etc/systemd/system/crio.service.d/path.conf; systemctl daemon-reload"
+}
+
+default-config-crio() {
+    vm-command "mkdir -p /etc/containers"
+    echo '{"default": [{"type":"insecureAcceptAnything"}]}' | vm-pipe-to-file /etc/containers/policy.json
+    cat <<EOF |
+[registries.search]
+registries = ['docker.io']
+EOF
+    vm-pipe-to-file /etc/containers/registries.conf
+}
+
+default-restart-crio() {
+    vm-command "systemctl daemon-reload && systemctl restart crio" ||
+        command-error "failed to restart crio systemd service"
 }
 
 ###########################################################################
