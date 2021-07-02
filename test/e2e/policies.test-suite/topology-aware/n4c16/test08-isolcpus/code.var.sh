@@ -6,7 +6,9 @@ vm-command "grep isolcpus=8,9 /proc/cmdline" || {
     }
     launch cri-resmgr
     vm-command "systemctl restart kubelet"
+    sleep 1
     vm-wait-process --timeout 120 kube-apiserver
+    vm-run-until --timeout 120 "kubectl get node"
 }
 
 CONTCOUNT=1
