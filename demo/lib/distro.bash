@@ -187,7 +187,12 @@ debian-refresh-pkg-db() {
 }
 
 debian-install-pkg() {
-    vm-command "apt-get install -y $*" ||
+    # dpkg configure may ask "The default action is to keep your
+    # current version", for instance when a test has added
+    # /etc/containerd/config.toml and then apt-get installs
+    # containerd. 'yes ""' will continue with the default answer (N:
+    # keep existing) in this case. Without 'yes' installation fails.
+    vm-command "yes \"\" | apt-get install -y $*" ||
         command-error "failed to install $*"
 }
 
