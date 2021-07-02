@@ -132,6 +132,23 @@ vm-check-binary-cri-resmgr() {
     return 0
 }
 
+
+vm-check-source-files-changed() {
+    local bin_change
+    local src_change
+    local src_dir="$1"
+    local bin_file="$2"
+    bin_change=$(stat --format "%Z" "$bin_file")
+    src_change=$(find "$src_dir" -name '*.go' -type f -print0 | xargs -0 stat --format "%Z" | sort -n | tail -n 1)
+    if [[ "$src_change" > "$bin_change" ]]; then
+        echo "WARNING:"
+        echo "WARNING: Source files changed, outdated binaries in"
+        echo "WARNING: $(dirname "$bin_file")/"
+        echo "WARNING:"
+        sleep "${warning_delay:-0}"
+    fi
+}
+
 vm-command() { # script API
     # Usage: vm-command COMMAND
     #
