@@ -9,7 +9,6 @@ binsrc=${binsrc-local}
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 DEMO_LIB_DIR=$(realpath "$SCRIPT_DIR/../../demo/lib")
-BIN_DIR=${bindir-$(realpath "$SCRIPT_DIR/../../bin")}
 OUTPUT_DIR=${outdir-"$SCRIPT_DIR"/output}
 COMMAND_OUTPUT_DIR="$OUTPUT_DIR"/commands
 
@@ -31,7 +30,8 @@ usage() {
     echo "  MODE:     \"play\" plays the test as a demo."
     echo "            \"record\" plays and records the demo."
     echo "            \"test\" runs fast, reports pass or fail."
-    echo "            \"debug\" enables cri-resmgr debugging."
+    echo "            \"debug\" enables k8scri pipe debugging and"
+    echo "                    copies sources of all *_src VARs (see below) to vm."
     echo "            \"interactive\" launches interactive shell"
     echo "            for running test script commands"
     echo "            (see ./run.sh help script [FUNCTION])."
@@ -40,38 +40,67 @@ usage() {
     echo "  VARs:"
     echo "    vm:      govm virtual machine name."
     echo "             The default is \"crirm-test-e2e\"."
-    echo "    speed:   Demo play speed."
-    echo "             The default is 10 (keypresses per second)."
-    echo "    binsrc:  Where to get cri-resmgr to the VM."
-    echo "             \"github\": go get from master and build inside VM."
-    echo "             \"local\": copy from source tree bin/ (the default)."
-    echo "                      (set bindir=/path/to/cri-resmgr* to override bin/)"
+    echo "    containerd_src:"
+    echo "             \"/host/path/to/go/project\": replace vm /usr/bin binaries"
+    echo "             from /host/path/to/go/project/bin directory."
+    echo "             The default is to use vm OS package manager containerd."
+    echo "    crio_src:"
+    echo "             \"/host/path/to/go/project\": replace vm /usr/bin binaries"
+    echo "             from /host/path/to/go/project/bin directory."
+    echo "             Must be set if crio is a part of \$k8scri."
+    echo "    crirm_src:"
+    echo "             \"/host/path/to/go/project\": replace vm /usr/local/bin binaries"
+    echo "             from /host/path/to/go/project/bin directory."
+    echo "             The default is to use the project of these e2e tests."
+    echo "    runc_src:"
+    echo "             \"/host/path/to/go/project\": replace vm /usr/bin binaries"
+    echo "             from /host/path/to/go/project/bin directory."
+    echo "    binsrc:  Where to get cri-resmgr to the vm."
+    echo "             \"github\": go get from master and build inside vm."
+    echo "             \"local\": copy from \${crirm_src}/bin (the default)."
     echo "             \"packages/<distro>\": use distro packages from this dir"
-    echo "    reinstall_cri_resmgr: If 1, stop running cri-resmgr, reinstall,"
-    echo "             and restart it on the VM before starting test run."
+    echo "    reinstall_<containerd|crio|cri_resmgr|cri_resmgr_agent|runc>:"
+    echo "             If 1, stop the daemon (if not runc),"
+    echo "             then reinstall and restart it before starting test run."
     echo "             The default is 0."
-    echo "    reinstall_cri_resmgr_agent: If 1, stop running cri-resmgr-agent, reinstall,"
-    echo "             and restart it on the VM before starting test run."
-    echo "             The default is 0."
-    echo "    omit_agent: if 1, omit installing/starting/cleaning up cri-resmgr-agent."
+    echo "             Set containerd_src/crio_src/runc_src to install a local build."
+    echo "    omit_cri_resmgr: if 1, omit checking/installing/starting cri-resmgr."
+    echo "    omit_agent: if 1, omit checking/installing/starting cri-resmgr-agent."
     echo "    outdir:  Save output under given directory."
     echo "             The default is \"${SCRIPT_DIR}/output\"."
+    echo "    speed:   Demo play speed."
+    echo "             The default is 10 (keypresses per second)."
     echo "    cleanup: Level of cleanup after a test run:"
-    echo "             0: leave VM running (the default)"
-    echo "             1: delete VM"
-    echo "             2: stop VM, but do not delete it."
+    echo "             0: leave vm running (the default)"
+    echo "             1: delete vm"
+    echo "             2: stop vm, but do not delete it."
     echo "  Hook VARs:"
-    echo "    on_vm_online: code to be executed when SSH connection to VM works"
+    echo "    on_vm_online: code to be executed when SSH connection to vm works."
+    echo "    on_k8s_online: code to be executed when Kubernetes is ready for use."
     echo "    on_verify_fail, on_create_fail: code to be executed in case"
     echo "             verify() or create() fails. Example: go to interactive"
     echo "             mode if a verification fails: on_verify_fail=interactive"
     echo "    on_verify, on_create, on_launch: code to be executed every time"
     echo "             after verify/create/launch function"
     echo ""
-    echo "  Test input VARs:"
+    echo "  VM configuration VARs: (effective when vm is not already configured)"
     echo "    topology: JSON to override NUMA node list used in tests."
-    echo "             Effective only if \"vm\" does not exist."
     echo "             See: python3 ${DEMO_LIB_DIR}/topology2qemuopts.py --help"
+    echo "    distro:  Linux distribution to be / already installed on vm."
+    echo "             Supported values: centos-7, centos-8, debian-10, debian-sid"
+    echo "                 fedora, opensuse, ubuntu-18.10, ubuntu-20.04"
+    echo "    cgroups: cgroups version in the VM, v1 or v2. The default is v1."
+    echo "             cgroups=v2 is supported only on distro=fedora"
+    echo "    k8scri:  The container runtime pipe where kubelet connects to."
+    echo "             Options are:"
+    echo "             \"cri-resmgr|containerd\" cri-resmgr is a proxy to containerd."
+    echo "             \"cri-resmgr|crio\"       cri-resmgr is a proxy to cri-o."
+    echo "             \"containerd&cri-resmgr\" containerd, cri-resmgr is an NRI plugin."
+    echo "             \"containerd\"            containerd, no cri-resmgr."
+    echo "             \"crio\"                  cri-o, no cri-resmgr."
+    echo "             The default is \"cri-resmgr|containerd\"."
+    echo ""
+    echo "  Test input VARs:"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
     echo "    cri_resmgr_extra_args: arguments to be added on cri-resmgr"
     echo "             command line when launched"
@@ -118,7 +147,7 @@ record() {
 }
 
 screen-create-vm() {
-    speed=60 out "### Running the test in VM \"$VM_NAME\"."
+    speed=60 out "### Running the test in vm=\"$VM_NAME\"."
     host-create-vm "$vm" "$topology"
     vm-networking
     if [ -z "$VM_IP" ]; then
@@ -138,23 +167,6 @@ screen-install-cri-resmgr() {
     vm-install-cri-resmgr
 }
 
-screen-install-cri-resmgr-debugging() {
-    speed=60 out "### Installing cri-resmgr debugging enablers"
-    vm-install-golang
-    vm-install-pkg git
-    vm-install-pkg rsync
-    vm-command "go get github.com/go-delve/delve/cmd/dlv" || {
-        command-error "installing delve failed"
-    }
-    host-command "cd \"$HOST_PROJECT_DIR/..\" && rsync -av --exclude .git $(basename "$HOST_PROJECT_DIR") $VM_SSH_USER@$VM_IP:"
-    host-command "cd \"$HOST_GORESCTRL_DIR/..\" && rsync -av --exclude .git $(basename "$HOST_GORESCTRL_DIR") $VM_SSH_USER@$VM_IP:"
-    vm-command "mkdir -p \"\$HOME/.config/dlv\""
-    vm-command "( echo 'substitute-path:'
-                  echo ' - {from: $HOST_PROJECT_DIR, to: /home/$VM_SSH_USER/$(basename "$HOST_PROJECT_DIR")}'
-                  echo ' - {from: $HOST_GORESCTRL_DIR, to: /home/$VM_SSH_USER/$(basename "$HOST_GORESCTRL_DIR")}'
-                ) > \"\$HOME/.config/dlv/config.yml\""
-}
-
 screen-launch-cri-resmgr() {
     speed=60 out "### Launching cri-resmgr with config $cri_resmgr_cfg."
     if [ "${binsrc#packages}" != "$binsrc" ]; then
@@ -166,7 +178,7 @@ screen-launch-cri-resmgr() {
 
 screen-create-singlenode-cluster() {
     speed=60 out "### Setting up single-node Kubernetes cluster."
-    speed=60 out "### CRI Resource Manager + containerd will act as the container runtime."
+    speed=60 out "### Container runtime parts: $k8scri"
     vm-create-singlenode-cluster
 }
 
@@ -450,6 +462,9 @@ launch() { # script API
     #                cri_resmgr_cfg: configuration filepath (on host)
     #                cri_resmgr_extra_args: extra arguments on command line
     #                cri_resmgr_config: "force" (default) or "fallback"
+    #                k8scri: if the CRI pipe starts with cri-resmgr
+    #                        this launches cri-resmgr as a proxy,
+    #                        otherwise as a dynamic NRI plugin.
     #
     #   cri-resmgr-systemd:
     #                launch cri-resmgr on VM using "systemctl start".
@@ -470,13 +485,21 @@ launch() { # script API
     local launch_cmd
     local adjustment_schema="$HOST_PROJECT_DIR/pkg/apis/resmgr/v1alpha1/adjustment-schema.yaml"
     local cri_resmgr_config_option="-${cri_resmgr_config:-force}-config"
+    local cri_resmgr_mode=""
     case $target in
         "cri-resmgr")
             host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
             }
             vm-command "cat $(basename "$cri_resmgr_cfg")"
-            launch_cmd="cri-resmgr -relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket /var/run/containerd/containerd.sock $cri_resmgr_config_option $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
+            if [[ "$k8scri" == cri-resmgr* ]]; then
+                # launch cri-resmgr as the top element in the k8s container runtime stack
+                cri_resmgr_mode="-relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket $cri_sock -image-socket $cri_sock"
+            else
+                # launch cri-resmgr as an NRI plugin to running container runtime
+                cri_resmgr_mode="-use-nri-plugin"
+            fi
+            launch_cmd="cri-resmgr $cri_resmgr_mode $cri_resmgr_config_option $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
             vm-command-q "echo '$launch_cmd' > cri-resmgr.launch.sh ; rm -f cri-resmgr.output.txt"
             vm-command "$launch_cmd  >cri-resmgr.output.txt 2>&1 &"
             sleep 2 >/dev/null 2>&1
@@ -848,7 +871,7 @@ create() { # script API
         images="$(grep -E '^ *image: .*$' "$OUTPUT_DIR/$NAME.yaml" | sed -E 's/^ *image: *([^ ]*)$/\1/g' | sort -u)"
         if [ "${#pulled_images_on_vm[@]}" = "0" ]; then
             # Initialize pulled images available on VM
-            vm-command "crictl -i unix:///var/run/cri-resmgr/cri-resmgr.sock images" >/dev/null &&
+            vm-command "crictl -i unix://${k8scri_sock} images" >/dev/null &&
             while read -r image tag _; do
                 if [ "$image" = "IMAGE" ]; then
                     continue
@@ -867,7 +890,7 @@ create() { # script API
         fi
         for image in $images; do
             if ! [[ " ${pulled_images_on_vm[*]} " == *" ${image} "* ]]; then
-                vm-command "crictl -i unix:///var/run/cri-resmgr/cri-resmgr.sock pull \"$image\"" || {
+                vm-command "crictl -i unix://${k8scri_sock} pull \"$image\"" || {
                     errormsg="pulling image \"$image\" for \"$OUTPUT_DIR/$NAME.yaml\" failed."
                     if is-hooked on_create_fail; then
                         echo "$errormsg"
@@ -951,23 +974,67 @@ test-user-code() {
 }
 
 # Validate parameters
-input_var_names="mode user_script_file vm speed binsrc reinstall_cri_resmgr outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
+input_var_names="mode user_script_file distro k8scri vm cgroups speed binsrc reinstall_containerd reinstall_crio reinstall_cri_resmgr outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
 
 INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
 distro=${distro:=$DEFAULT_DISTRO}
-cri=${cri:=containerd}
+k8scri=${k8scri:="cri-resmgr|containerd"}
+case "${k8scri}" in
+    "cri-resmgr|containerd")
+        k8scri_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+        cri_sock="/var/run/containerd/containerd.sock"
+        cri=containerd
+        ;;
+    "cri-resmgr|crio")
+        k8scri_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+        cri_sock="/var/run/crio/crio.sock"
+        cri=crio
+        ;;
+    "containerd&cri-resmgr")
+        k8scri_sock="/var/run/containerd/containerd.sock"
+        cri_sock="/var/run/containerd/containerd.sock"
+        cri=containerd
+        ;;
+    "containerd")
+        k8scri_sock="/var/run/containerd/containerd.sock"
+        cri_sock="/var/run/containerd/containerd.sock"
+        cri=containerd
+        omit_cri_resmgr=1
+        omit_agent=1
+        ;;
+    "crio")
+        k8scri_sock="/var/run/crio/crio.sock"
+        cri_sock="/var/run/crio/crio.sock"
+        cri=crio
+        omit_cri_resmgr=1
+        omit_agent=1
+        ;;
+    *)
+        error "unsupported k8scri: \"${k8scri}\""
+        ;;
+esac
+containerd_src=${containerd_src:=}
+crio_src=${crio_src:=}
+crirm_src=${crirm_src:=$HOST_PROJECT_DIR}
+runc_src=${runc_src:=}
+BIN_DIR=${crirm_src}/bin
 TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
 vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
 vm_files=${vm_files:-""}
+cgroups=${cgroups:-v1}
 cri_resmgr_cfg=${cri_resmgr_cfg:-"${SCRIPT_DIR}/cri-resmgr-topology-aware.cfg"}
 cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
 cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
 cleanup=${cleanup:-0}
+reinstall_containerd=${reinstall_containerd:-0}
+reinstall_crio=${reinstall_crio:-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr:-0}
 reinstall_cri_resmgr_agent=${reinstall_cri_resmgr_agent:-0}
+reinstall_runc=${reinstall_runc:-0}
 omit_agent=${omit_agent:-0}
+omit_cri_resmgr=${omit_cri_resmgr:-0}
 py_consts="${py_consts:-''}"
 topology=${topology:-'[
     {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
@@ -1075,7 +1142,9 @@ for var in $input_var_names; do
 done
 
 if [ "$binsrc" == "local" ]; then
-    [ -f "${BIN_DIR}/cri-resmgr" ] || error "missing \"${BIN_DIR}/cri-resmgr\""
+    if [ "$omit_cri_resmgr" != "1" ]; then
+        [ -f "${BIN_DIR}/cri-resmgr" ] || error "missing \"${BIN_DIR}/cri-resmgr\""
+    fi
     if [ "$omit_agent" != "1" ]; then
         [ -f "${BIN_DIR}/cri-resmgr-agent" ] || error "missing \"${BIN_DIR}/cri-resmgr-agent\""
     fi
@@ -1097,6 +1166,14 @@ if ! vm-command-q "type -p kubelet >/dev/null"; then
     screen-install-k8s
 fi
 
+if [ "$reinstall_runc" == "1" ]; then
+    vm-install-runc
+fi
+
+if [ "$reinstall_containerd" == "1" ] || [ "$reinstall_crio" == "1" ]; then
+    vm-install-cri
+fi
+
 if [ "$reinstall_cri_resmgr" == "1" ]; then
     uninstall cri-resmgr
 fi
@@ -1105,20 +1182,66 @@ if [ "$reinstall_cri_resmgr_agent" == "1" ]; then
     uninstall cri-resmgr-agent
 fi
 
-if ! vm-command-q "type -p cri-resmgr >/dev/null"; then
-    install cri-resmgr
+if [[ "$k8scri" == cri-resmgr* ]] || [ -n "$crirm_src" ]; then
+    if [ "$omit_cri_resmgr" != "1" ]; then
+        if ! vm-command-q "type -p cri-resmgr >/dev/null"; then
+            install cri-resmgr
+        fi
+    fi
+
+    if [ "$omit_agent" != "1" ]; then
+        if ! vm-command-q "type -p cri-resmgr-agent >/dev/null"; then
+            install cri-resmgr-agent
+        fi
+    fi
 fi
 
-if ! vm-command-q "type -p cri-resmgr-agent >/dev/null"; then
-    install cri-resmgr-agent
+if [ "$mode" == "debug" ]; then
+    vm-command-q "[ -x /root/go/bin/dlv ]" || vm-install-dlv
+    if [ -d "$crio_src" ]; then
+        vm-dlv-add-src "$crio_src"
+    fi
+    if [ -d "$containerd_src" ]; then
+        vm-dlv-add-src "$containerd_src"
+    fi
+    if [ -d "$crirm_src" ]; then
+        vm-dlv-add-src "$crirm_src"
+    fi
+    if [ -d "$runc_src" ]; then
+        vm-dlv-add-src "$runc_src"
+    fi
+    echo "How to debug cri-resmgr:"
+    echo "- Attach debugger to running cri-resmgr:"
+    echo "  ssh $VM_SSH_USER@$VM_IP"
+    echo "  sudo /root/go/bin/dlv attach \$(pidof cri-resmgr)"
+    echo "- Relaunch cri-resmgr in debugger:"
+    echo "  ssh $VM_SSH_USER@$VM_IP"
+    echo "  sudo -i"
+    echo "  kill -9 \$(pidof cri-resmgr); /root/go/bin/dlv exec /usr/local/bin/cri-resmgr -- -force-config /home/$VM_SSH_USER/*.cfg"
+    echo "dlv on VM is ready for use"
+    exit 0
+fi
+
+if [ -n "$containerd_src" ] && [[ "$k8scri" == *containerd* ]]; then
+    vm-check-source-files-changed "$containerd_src" "$containerd_src/bin/containerd"
+    vm-check-running-binary "$containerd_src/bin/containerd"
+fi
+
+if [ -n "$crio_src" ] && [[ "$k8scri" == *crio* ]]; then
+    vm-check-source-files-changed "$crio_src" "$crio_src/bin/crio"
+    vm-check-running-binary "$crio_src/bin/crio"
 fi
 
 # Start cri-resmgr if not already running
-if ! vm-command-q "pidof cri-resmgr" >/dev/null; then
-    screen-launch-cri-resmgr
+if [ "$omit_cri_resmgr" != "1" ]; then
+    if ! vm-command-q "pidof cri-resmgr" >/dev/null; then
+        screen-launch-cri-resmgr
+    fi
+    if [ -n "$crirm_src" ]; then
+        vm-check-source-files-changed "$crirm_src" "$crirm_src/bin/cri-resmgr"
+        vm-check-running-binary "$crirm_src/bin/cri-resmgr"
+    fi
 fi
-
-vm-check-binary-cri-resmgr
 
 # Create kubernetes cluster or wait that it is online
 if vm-command-q "[ ! -f /var/lib/kubelet/config.yaml ]"; then
@@ -1135,18 +1258,7 @@ if [ "$omit_agent" != "1" ]; then
     fi
 fi
 
-if [ "$mode" == "debug" ]; then
-    screen-install-cri-resmgr-debugging
-    echo "How to debug cri-resmgr:"
-    echo "- Attach debugger to running cri-resmgr:"
-    echo "  ssh $VM_SSH_USER@$VM_IP"
-    echo "  sudo /root/go/bin/dlv attach \$(pidof cri-resmgr)"
-    echo "- Relaunch cri-resmgr in debugger:"
-    echo "  ssh $VM_SSH_USER@$VM_IP"
-    echo "  sudo -i"
-    echo "  kill -9 \$(pidof cri-resmgr); /root/go/bin/dlv exec /usr/local/bin/cri-resmgr -- -force-config /home/$VM_SSH_USER/*.cfg"
-    exit 0
-fi
+is-hooked "on_k8s_online" && run-hook "on_k8s_online"
 
 declare -A kind_count # associative arrays for counting created objects, like kind_count[pod]=1
 eval "${yaml_in_defaults}"
