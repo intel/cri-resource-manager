@@ -1,0 +1,2 @@
+[crio.runtime]
+blockio_config_file="/etc/containers/blockio.yaml"

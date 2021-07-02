@@ -1,0 +1,2 @@
+[plugins.blockio]
+config_file="/etc/containers/blockio.yaml"
