@@ -8,7 +8,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>End-to-End tests &mdash; CRI Resource Manager 0.5.0-39-g8adb0e10 documentation</title>
+  <title>End-to-End tests &mdash; CRI Resource Manager 0.5.0-41-g213e4ffe documentation</title>
   
 
   
@@ -207,7 +207,7 @@
 <li><p><code class="docutils literal notranslate"><span class="pre">docker</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">govm</span></code>
 In case of errors in building <code class="docutils literal notranslate"><span class="pre">govm</span></code> with <code class="docutils literal notranslate"><span class="pre">go</span> <span class="pre">get</span></code>, or creating a virtual machine (<code class="docutils literal notranslate"><span class="pre">Error</span> <span class="pre">when</span> <span class="pre">creating</span> <span class="pre">the</span> <span class="pre">new</span> <span class="pre">VM:</span> <span class="pre">repository</span> <span class="pre">name</span> <span class="pre">must</span> <span class="pre">be</span> <span class="pre">canonical</span></code>), these are the workarounds:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">~/</span><span class="n">go</span><span class="o">/</span><span class="n">src</span> <span class="o">&amp;&amp;</span> <span class="n">go</span> <span class="n">get</span> <span class="o">-</span><span class="n">d</span> <span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">govm</span><span class="o">-</span><span class="n">project</span><span class="o">/</span><span class="n">govm</span> <span class="o">&amp;&amp;</span> <span class="n">cd</span> <span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">govm</span><span class="o">-</span><span class="n">project</span><span class="o">/</span><span class="n">govm</span> <span class="o">&amp;&amp;</span> <span class="n">go</span> <span class="n">install</span>  <span class="o">&amp;&amp;</span> <span class="n">cd</span> <span class="o">..</span> <span class="o">&amp;&amp;</span> <span class="n">docker</span> <span class="n">build</span> <span class="n">govm</span> <span class="o">-</span><span class="n">f</span> <span class="n">govm</span><span class="o">/</span><span class="n">Dockerfile</span> <span class="o">-</span><span class="n">t</span> <span class="n">govm</span><span class="o">/</span><span class="n">govm</span><span class="p">:</span><span class="n">latest</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GO111MODULE=off go get -d github.com/govm-project/govm &amp;&amp; cd $GOPATH/src/github.com/govm-project/govm &amp;&amp; go mod tidy &amp;&amp; go mod download &amp;&amp; go install &amp;&amp; cd .. &amp;&amp; docker build govm -f govm/Dockerfile -t govm/govm:latest
 </pre></div>
 </div>
 </li>
