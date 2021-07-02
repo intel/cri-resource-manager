@@ -166,7 +166,7 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
     (
         for CFG_FILE in "$POLICY_DIR"/*.cfg; do
             if ! [ -f "$CFG_FILE" ]; then
-                error "cannot find cri-resmgr configuration $POLICY_DIR/*.cfg"
+                continue
             fi
             export cri_resmgr_cfg=$CFG_FILE
         done
