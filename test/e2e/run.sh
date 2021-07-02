@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEMO_TITLE="CRI Resource Manager: End-to-End Testing"
+DEMO_TITLE="Container Runtime End-to-End Testing"
 DEFAULT_DISTRO="ubuntu-20.04"
 
 PV='pv -qL'
