@@ -630,6 +630,22 @@ vm-install-golang() {
     distro-install-golang
 }
 
+vm-install-runc() {
+    local host_runc="$runc_src/runc"
+    local vm_runc="/usr/sbin/runc"
+    if [ -n "$runc_src" ]; then
+        # Check if runc is already installed on VM.
+        # If it is, replace existing binary with local build."
+        vm-command 'command -v runc'
+        if [ -n "$COMMAND_OUTPUT" ] && [ "x$COMMAND_STATUS" == "x0" ]; then
+            vm_runc="$COMMAND_OUTPUT"
+        fi
+        vm-put-file "$host_runc" "$vm_runc"
+    else
+        distro-install-pkg runc
+    fi
+}
+
 vm-install-cri() {
     distro-install-"$VM_CRI"
     distro-config-"$VM_CRI"
