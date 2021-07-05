@@ -1,0 +1,137 @@
+#!/bin/bash
+
+usage() {
+    cat <<EOF
+Usage: kube-cgroups [options]
+
+Options:
+  -g CGDIR            print cgroup data under CGDIR.
+                      The default is /sys/fs/cgroup.
+  -E                  print also empty files.
+                      The default is to print non-empty files only.
+  -F                  print full cgroup filename.
+                      The default is basename only.
+  Filtering options:
+  -n NS_REGEXP        print only pods in namespaces matching NS_REGEXP
+  -p POD_REGEXP       print only pods matching POD_REGEXP
+  -c CNTR_REGEXP      print only containers matching CNTR_REGEXP
+  -f CGFILE_REGEXP    print only cgroup files matching CGFILE_REGEXP
+
+Examples:
+
+  # print cgroup information of pods in any namespace
+  kube-cgroups -n .
+
+  # print read bps and iops throttling of containers in mypod
+  kube-cgroups -g /sys/fs/cgroup/blkio -p mypod -f read
+EOF
+}
+
+error() {
+    echo "kube-cgroups: $*" >&2
+    exit 1
+}
+
+full_filename=0
+empty_files=0
+ns_regexp="default" # regexp matching
+pod_regexp="." # regexp matching any pod name
+cntr_regexp="." # regexp matching any container line
+cgfile_regexp="cpuset.cpus|cpuset.mems|blkio.throttle.*_device" # regexp matching any cgroup file
+
+cg_controller_dir=/sys/fs/cgroup
+
+while getopts "hg:EFn:p:c:f:" OPTION; do
+    case $OPTION in
+        h)
+            usage
+            exit 0
+            ;;
+        g)
+            cg_controller_dir="$OPTARG"
+            ;;
+        E)
+            empty_files=1
+            ;;
+        F)
+            full_filename=1
+            ;;
+        n)
+            ns_regexp="$OPTARG"
+            ;;
+        p)
+            pod_regexp="$OPTARG"
+            ;;
+        c)
+            cntr_regexp="$OPTARG"
+            ;;
+        f)
+            cgfile_regexp="$OPTARG"
+            ;;
+        *)
+            error "invalid option $OPTION"
+            ;;
+    esac
+done
+
+if [ ! -d "$cg_controller_dir" ]; then
+    error "cgroup directory '$cg_controller_dir' does not exist"
+fi
+
+kubectl get pods -A | grep -E "$pod_regexp" | while read -r namespace podname rest; do
+
+    [ "$namespace" == "NAMESPACE" ] && continue
+
+    grep -q -E "$ns_regexp" <<< "$namespace" || continue
+
+    kubectl describe pod -n "$namespace" "$podname" | grep -B1 'Container ID:' | while read -r container _ containerid; do
+
+        if [[ "$container" != "Container" ]] && [[ "$container" != "--" ]]; then
+            containername="${container%%:*}"
+            continue
+        fi
+
+        containerID=${containerid#*://}
+
+        if [[ -z "$containerID" ]]; then
+            continue
+        fi
+
+        grep -q -E "$cntr_regexp" <<< "$containername" || continue
+
+        while read -r cgroupdir; do
+            for filename in "$cgroupdir"/*; do
+                if [[ ! -f "$filename" ]]; then
+                    continue
+                fi
+                filename_nodir="${filename##*/}"
+                grep -q -E "$cgfile_regexp" <<< "$filename_nodir" || continue
+                if [[ -n "$podname" ]]; then
+                    echo "$namespace/$podname:"
+                    unset podname
+                fi
+                [[ -n "$containername" ]] && {
+                    echo "  $containername:"
+                    unset containername
+                }
+                linecount="$(wc -l < "$filename")"
+                if [[ "$linecount" == "0" ]] && [[ "$empty_files" == "0" ]]; then
+                    continue
+                fi
+                if [[ "$full_filename" == "1" ]]; then
+                    print_filename="$filename"
+                else
+                    print_filename="$filename_nodir"
+                fi
+                if (( "$linecount" <= 1 )); then
+                    # print contents of a single-line file after filename
+                    echo "    $print_filename: $(< "$filename")"
+                else
+                    # print contents of a multiline file indented
+                    echo "    $print_filename:"
+                    sed "s/^/      /g" < "$filename"
+                fi
+            done
+        done <<< "$(find "$cg_controller_dir" -name "$containerID")"
+    done
+done
