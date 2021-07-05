@@ -695,6 +695,30 @@ EOF'
 EOF'
 }
 
+vm-install-dlv() {
+    vm-install-golang
+    vm-install-pkg rsync
+    vm-command "go get github.com/go-delve/delve/cmd/dlv" || {
+        command-error "installing delve failed"
+    }
+    echo '[ "`id -u`" -eq 0 ] && PATH=$PATH:/root/go/bin' | vm-pipe-to-file /etc/profile.d/root-path-go.sh
+    vm-command "mkdir -p \"\$HOME/.config/dlv/config.yml.d\""
+    vm-command "echo 'substitute-path:' > \"\$HOME/.config/dlv/config.yml.d/00-substitute-path\""
+}
+
+vm-dlv-add-src() {
+    local host_src_dir="$1"
+    [ -d "$host_src_dir" ] || error "vm-dlv-add-src: invalid source directory \"$host_src_dir\", existing go project directory expected"
+    vm-command "mkdir -p /home/$VM_SSH_USER/src; chmod a+rwX /home/$VM_SSH_USER/src"
+    host-command "cd \"$host_src_dir/..\" && rsync -avz --include \"*/\" --include \"**/*.go\" --exclude \"*\" \"$(basename "$host_src_dir")\" $VM_SSH_USER@$VM_IP:src/"
+    vm-command "echo ' - {from: \"$host_src_dir\", to: \"/home/$VM_SSH_USER/src/$(basename "$host_src_dir")\"}' > \"\$HOME/.config/dlv/config.yml.d/01-$(basename "$host_src_dir")\""
+    vm-dlv-update-config
+}
+
+vm-dlv-update-config() {
+    vm-command "cat \$HOME/.config/dlv/config.yml.d/* > \$HOME/.config/dlv/config.yml"
+}
+
 vm-install-k8s() {
     distro-install-k8s
     distro-restart-$VM_CRI
