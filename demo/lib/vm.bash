@@ -43,6 +43,19 @@ vm-ssh-user() {
 }
 
 vm-check-env() {
+    # If VM IP address is already defined, govm is not needed.
+    if [ -n "$VM_IP" ]; then
+        if [ "x$(vm-command-q "whoami")" != "xroot" ]; then
+            echo "ERROR:"
+            echo "ERROR: environment check failed:"
+            echo "ERROR:   cannot run commands (with sudo) when connecting"
+            echo "ERROR:   $SSH $VM_SSH_USER@$VM_IP"
+            echo "ERROR:"
+            return 1
+        fi
+        return 0
+    fi
+    # Check that VM created/managed with govm in this environment.
     type -p govm >& /dev/null || {
         echo "ERROR:"
         echo "ERROR: environment check failed:"
