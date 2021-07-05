@@ -8,7 +8,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Node Agent &mdash; CRI Resource Manager 0.5.0-79-g2ccbdcb1 documentation</title>
+  <title>Node Agent &mdash; CRI Resource Manager 0.5.0-81-gc8a65058 documentation</title>
   
 
   
@@ -176,9 +176,9 @@
 <h1>Node Agent<a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h1>
 <p>CRI Resource Manager can be configured dynamically using the CRI Resource
 Manager Node Agent and Kubernetes* ConfigMaps. The agent can be build using
-the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/2ccbdcb1602c1aa92dfe47c46dfc5a094244f24a/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be
+the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/c8a650585131f79b9436b825be11418b5357b34e/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be
 deployed as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/2ccbdcb1602c1aa92dfe47c46dfc5a094244f24a/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/c8a650585131f79b9436b825be11418b5357b34e/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
 <p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment
 variable <code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running
 on. If necessary pass it the credentials for accessing the cluster using
@@ -200,7 +200,7 @@ configuration</p></li>
 the configuration group. You can remove a node from its group by deleting
 the node group label.</p>
 <p>There is a
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/2ccbdcb1602c1aa92dfe47c46dfc5a094244f24a/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/c8a650585131f79b9436b825be11418b5357b34e/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
 that contains a node-specific, a group-specific, and a default ConfigMap
 example. See <a class="reference internal" href="policy/index.html">any available policy-specific documentation</a>
 for more information on the policy configurations.</p>
