@@ -128,16 +128,16 @@ vm-check-env() {
     fi
 }
 
-vm-check-binary-cri-resmgr() {
-    # Check running cri-resmgr version, print warning if it is not
-    # the latest local build.
-    # shellcheck disable=SC2016
-    if [ -f "$BIN_DIR/cri-resmgr" ] && [ "$(vm-command-q 'md5sum < /proc/$(pidof cri-resmgr)/exe')" != "$(md5sum < "$BIN_DIR/cri-resmgr")" ]; then
+vm-check-running-binary() {
+    local bin_file="$1"
+    local bin_name
+    bin_name="$(basename "$bin_file")"
+    pid_of_bin="$(vm-command-q "pidof $bin_name")"
+    if [ -f "$bin_file" ] && [ -n "$pid_of_bin" ] && [ "$(vm-command-q "md5sum < /proc/$pid_of_bin/exe")" != "$(md5sum < "$bin_file")" ]; then
         echo "WARNING:"
-        echo "WARNING: Running cri-resmgr binary is different from"
-        echo "WARNING: $BIN_DIR/cri-resmgr"
-        echo "WARNING: Consider restarting with \"reinstall_cri_resmgr=1\" or"
-        echo "WARNING: run.sh> uninstall cri-resmgr; install cri-resmgr; launch cri-resmgr"
+        echo "WARNING: Running $bin_name binary is different from"
+        echo "WARNING: $bin_file"
+        echo "WARNING: Consider restarting with reinstall_${bin_name//-/_}=1."
         echo "WARNING:"
         sleep "${warning_delay:-0}"
         return 1
@@ -510,17 +510,6 @@ vm-install-cri-resmgr() {
         }
         vm-command "systemctl daemon-reload"
     elif [ -z "$binsrc" ] || [ "$binsrc" == "local" ]; then
-        local bin_change
-        local src_change
-        bin_change=$(stat --format "%Z" "$BIN_DIR/cri-resmgr")
-        src_change=$(find "$HOST_PROJECT_DIR" -name '*.go' -type f -print0 | xargs -0 stat --format "%Z" | sort -n | tail -n 1)
-        if [[ "$src_change" > "$bin_change" ]]; then
-            echo "WARNING:"
-            echo "WARNING: Source files changed - installing possibly outdated binaries from"
-            echo "WARNING: $BIN_DIR/"
-            echo "WARNING:"
-            sleep "${warning_delay:-0}"
-        fi
         vm-put-file "$BIN_DIR/cri-resmgr" "$prefix/bin/cri-resmgr"
         vm-put-file "$BIN_DIR/cri-resmgr-agent" "$prefix/bin/cri-resmgr-agent"
     else
@@ -666,6 +655,24 @@ vm-install-runc() {
 vm-install-cri() {
     distro-install-"$VM_CRI"
     distro-config-"$VM_CRI"
+    if [ "$VM_CRI" == "containerd" ]; then
+        if [ -n "$containerd_src" ]; then
+            vm-command "systemctl stop containerd"
+            for f in ctr containerd containerd-stress containerd-shim containerd-shim-runc-v1 containerd-shim-runc-v2; do
+                vm-put-file "$containerd_src/bin/$f" "/usr/bin/$f"
+            done
+            vm-command "systemctl start containerd"
+        fi
+    elif [ "$VM_CRI" == "crio" ]; then
+        if [ -n "$crio_src" ]; then
+            vm-command "systemctl stop crio"
+            for f in crio crio-status pinns; do
+                vm-put-file "$crio_src/bin/$f" "/usr/bin/$f"
+            done
+            vm-command "systemctl enable crio"
+            vm-command "systemctl start crio"
+        fi
+    fi
 }
 
 vm-install-containernetworking() {
@@ -751,7 +758,7 @@ vm-create-singlenode-cluster() {
 }
 
 vm-create-cluster() {
-    vm-command "kubeadm init --pod-network-cidr=$CNI_SUBNET --cri-socket /var/run/cri-resmgr/cri-resmgr.sock"
+    vm-command "kubeadm init --pod-network-cidr=$CNI_SUBNET --cri-socket ${k8scri_sock}"
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
         command-error "kubeadm init failed"
     fi
