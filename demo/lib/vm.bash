@@ -540,7 +540,17 @@ vm-cri-import-image() {
     esac
 }
 
-vm-put-docker-image() {
+vm-put-docker-image() { # script API
+    # Usage: vm-put-docker-image IMAGE
+    #
+    # Exports IMAGE from docker images on the host, and
+    # imports it in the "k8s.io" namespace (visible
+    # for kubernetes containers) on the vm.
+    #
+    # Works with containerd only.
+    #
+    # Examples:
+    #   vm-put-docker-image busybox:latest
     local image_name="$1"
     local image_file_on_vm="images/${image_name//:/__}"
     vm-command-q "mkdir -p $(dirname "$image_file_on_vm")"
