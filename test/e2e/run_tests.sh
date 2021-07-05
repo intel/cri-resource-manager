@@ -46,7 +46,11 @@ $(< "$var_filepath")"
             else
                 echo "exporting $var_name - overriding from $var_filepath"
             fi
-            export "$var_name"="$(< "$var_filepath")"
+            if [[ "$var_file_name" == *.var.in.* ]]; then
+                export "$var_name"="$(eval "echo -e \"$(<"${var_filepath}")\"")"
+            else
+                export "$var_name"="$(< "$var_filepath")"
+            fi
         fi
     done
 }
