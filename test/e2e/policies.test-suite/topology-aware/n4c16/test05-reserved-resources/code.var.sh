@@ -5,6 +5,8 @@
 
 AVAILABLE_CPU="cpuset:4-7,8-13"
 
+cri_resmgr_cfg_orig=$cri_resmgr_cfg
+
 # This script will create pods to the kube-system namespace
 # that is not automatically cleaned up by the framework.
 # Make sure the namespace is clear when starting the test and clean it up
@@ -94,3 +96,7 @@ namespace=kube-system CPU=2 CONTCOUNT=1 create besteffort
 verify "cpus['pod0c0'] == {'cpu04', 'cpu05', 'cpu06'}"
 
 kubectl delete -n kube-system pods/pod0
+
+terminate cri-resmgr
+cri_resmgr_cfg=$cri_resmgr_cfg_orig
+launch cri-resmgr
