@@ -1,0 +1,20 @@
+Classes:
+  lowprio:
+  - Weight: 88
+  - Devices:
+    - /dev/vd[a-z]
+    ThrottleReadBps: 1M
+    ThrottleWriteBps: 512k
+    ThrottleReadIOPS: 2000
+    ThrottleWriteIOPS: 300
+  normal:
+  - ThrottleWriteBps: 16M
+    Devices:
+    - /dev/vda
+  highprio:
+  - Devices:
+    - /dev/vda
+    Weight: 444
+  - Devices:
+    - /dev/vdb
+    Weight: 555
