@@ -73,9 +73,9 @@ var sstlog = logger.NewLogger("sst")
 func SstSupported() bool {
 	if _, err := os.Stat(isstDevPath); err != nil {
 		if !os.IsNotExist(err) {
-			sstlog.Warn("failed to access sst device %q: %v", isstDevPath, err)
+			sstlog.Warnf("failed to access sst device %q: %v", isstDevPath, err)
 		} else {
-			sstlog.Debug("sst device %q does not exist", isstDevPath)
+			sstlog.Debugf("sst device %q does not exist", isstDevPath)
 		}
 		return false
 	}
@@ -102,7 +102,7 @@ func getSstPackageInfo(pkg *cpuPackage) (SstPackageInfo, error) {
 
 	// Forget about older hw with partial/convoluted support
 	if info.PPVersion < 3 {
-		sstlog.Info("SST PP version %d (less than 3), giving up...")
+		sstlog.Infof("SST PP version %d (less than 3), giving up...")
 		return info, nil
 	}
 
@@ -169,7 +169,7 @@ func getSstPackageInfo(pkg *cpuPackage) (SstPackageInfo, error) {
 
 		closEnabled := isBitSet(rsp, 1)
 		if closEnabled != info.CPEnabled {
-			sstlog.Warn("SST firmware returned conflicting CP enabled status %v vs. %v", info.CPEnabled, closEnabled)
+			sstlog.Warnf("SST firmware returned conflicting CP enabled status %v vs. %v", info.CPEnabled, closEnabled)
 		}
 		info.CPEnabled = closEnabled
 		info.CPPriority = CPPriorityType(getBits(rsp, 2, 2))

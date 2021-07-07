@@ -87,7 +87,7 @@ func newK8sWatcher(k8sCli *k8sclient.Clientset, resmgrCli *resmgrcli.CriresmgrV1
 
 // Start runs a k8sWatcher instance
 func (w *watcher) Start() error {
-	w.Info("starting watcher...")
+	w.Infof("starting watcher...")
 	if nodeName == "" {
 		return agentError("node name not set, NODE_NAME env variable should be set to match the name of this k8s Node")
 	}
@@ -103,7 +103,7 @@ func (w *watcher) Stop() {
 	select {
 	case w.stop <- struct{}{}:
 	default:
-		w.Debug("stop already sent")
+		w.Debugf("stop already sent")
 	}
 }
 
@@ -120,7 +120,7 @@ func (w *watcher) AdjustmentChan() <-chan resmgrAdjustment {
 // GetConfig returns the current cri-resmgr configuration
 func (w *watcher) GetConfig() resmgrConfig {
 	cfg, kind := w.currentConfig.getConfig()
-	w.Info("giving %s configuration in reply to query", kind)
+	w.Infof("giving %s configuration in reply to query", kind)
 	return cfg
 }
 
@@ -148,13 +148,13 @@ func (w *watcher) PatchAdjustmentStatus(status *resmgrStatus) error {
 	errCnt := 0
 	for _, adjust := range inscope {
 		if err := w.patchAdjustment(adjust, true, errors); err != nil {
-			w.Error("%v", err)
+			w.Errorf("%v", err)
 			errCnt++
 		}
 	}
 	for _, adjust := range ignored {
 		if err := w.patchAdjustment(adjust, false, errors); err != nil {
-			w.Error("%v", err)
+			w.Errorf("%v", err)
 			errCnt++
 		}
 	}
@@ -174,7 +174,7 @@ func (w *watcher) patchAdjustment(adjust *resmgr.Adjustment, inscope bool, error
 
 	if !inscope {
 		if !ok {
-			w.Debug("adjustment %s does not need status patching...", adjust.Name)
+			w.Debugf("adjustment %s does not need status patching...", adjust.Name)
 			return nil
 		}
 		current := &resmgr.Adjustment{
@@ -221,7 +221,7 @@ func (w *watcher) patchAdjustment(adjust *resmgr.Adjustment, inscope bool, error
 
 	ptype := pkgtypes.MergePatchType
 
-	w.Debug("patching status of adjustment %s status with %v...", adjust.Name, string(pdata))
+	w.Debugf("patching status of adjustment %s status with %v...", adjust.Name, string(pdata))
 
 	if _, err := w.resmgrCli.Adjustments(opts.configNs).Patch(adjust.Name, ptype, pdata); err != nil {
 		return agentError("failed to patch Adjustment CRD %q: %v", adjust.Name, err)
@@ -242,7 +242,7 @@ func (w *watcher) patchAdjustment(adjust *resmgr.Adjustment, inscope bool, error
 // sendConfig sends the current configuration.
 func (w *watcher) sendConfig() {
 	cfg, kind := w.currentConfig.getConfig()
-	w.Info("pushing %s configuration to client", kind)
+	w.Infof("pushing %s configuration to client", kind)
 	w.configChan <- cfg
 }
 
@@ -257,25 +257,25 @@ func (w *watcher) watch() error {
 	group := ""
 
 	if node, err := nodew.Query(); err != nil {
-		w.Warn("failed to query node %q: %v", nodeName, err)
+		w.Warnf("failed to query node %q: %v", nodeName, err)
 	} else if node == nil {
-		w.Warn("failed to query node %q, make sure that NODE_NAME is correctly set", nodeName)
+		w.Warnf("failed to query node %q, make sure that NODE_NAME is correctly set", nodeName)
 	} else {
 		group = node.(*core_v1.Node).Labels[opts.labelName]
-		w.Info("configuration group is set to '%s'", group)
+		w.Infof("configuration group is set to '%s'", group)
 	}
 
 	cfgw := newConfigMapWatch(w, opts.configMapName+".node."+nodeName, namespace(opts.configNs))
 	grpw := newConfigMapWatch(w, groupMapName(group), namespace(opts.configNs))
 	crdw := newAdjustmentCRDWatch(w, namespace(opts.configNs))
 
-	w.Info("watcher running")
+	w.Infof("watcher running")
 	w.sendConfig()
 
 	for {
 		select {
 		case _ = <-w.stop:
-			w.Info("stopping configuration watcher")
+			w.Infof("stopping configuration watcher")
 			nodew.Stop()
 			cfgw.Stop()
 			grpw.Stop()
@@ -286,15 +286,15 @@ func (w *watcher) watch() error {
 			if ok {
 				switch e.Type {
 				case k8swatch.Added, k8swatch.Modified:
-					w.Info("node (%s) configuration updated", nodeName)
+					w.Infof("node (%s) configuration updated", nodeName)
 					label, _ := e.Object.(*core_v1.Node).Labels[opts.labelName]
 					if group != label {
 						group = label
-						w.Info("configuration group is set to '%s'", group)
+						w.Infof("configuration group is set to '%s'", group)
 						grpw.Start(groupMapName(group))
 					}
 				case k8swatch.Deleted:
-					w.Warn("Hmm, our node got removed...")
+					w.Warnf("Hmm, our node got removed...")
 				}
 				continue
 			}
@@ -303,13 +303,13 @@ func (w *watcher) watch() error {
 			if ok {
 				switch e.Type {
 				case k8swatch.Added, k8swatch.Modified:
-					w.Info("node ConfigMap updated")
+					w.Infof("node ConfigMap updated")
 					cm := e.Object.(*core_v1.ConfigMap)
 					w.currentConfig.setNode(&cm.Data)
 					w.sendConfig()
 
 				case k8swatch.Deleted, SyntheticMissing:
-					w.Info("node ConfigMap deleted")
+					w.Infof("node ConfigMap deleted")
 					w.currentConfig.setNode(nil)
 					w.sendConfig()
 				}
@@ -320,13 +320,13 @@ func (w *watcher) watch() error {
 			if ok {
 				switch e.Type {
 				case k8swatch.Added, k8swatch.Modified:
-					w.Info("group/default ConfigMap updated")
+					w.Infof("group/default ConfigMap updated")
 					cm := e.Object.(*core_v1.ConfigMap)
 					if w.currentConfig.setGroup(group, &cm.Data) {
 						w.sendConfig()
 					}
 				case k8swatch.Deleted, SyntheticMissing:
-					w.Info("group/default ConfigMap deleted")
+					w.Infof("group/default ConfigMap deleted")
 					if w.currentConfig.setGroup(group, nil) {
 						w.sendConfig()
 					}
@@ -338,20 +338,20 @@ func (w *watcher) watch() error {
 			if ok {
 				switch e.Type {
 				case k8swatch.Added, k8swatch.Modified:
-					w.Info("Adjustment CRD(s) updated: %T, %+v", e.Object, e.Object)
-					w.Info("Adjustment CRD(s): %+v", e.Object.(*resmgr.Adjustment).Spec)
+					w.Infof("Adjustment CRD(s) updated: %T, %+v", e.Object, e.Object)
+					w.Infof("Adjustment CRD(s): %+v", e.Object.(*resmgr.Adjustment).Spec)
 					if w.currentConfig.setAdjustment(e.Object.(*resmgr.Adjustment)) {
 						w.sendAdjustment()
 					}
 
 				case k8swatch.Deleted:
-					w.Info("Adjustment CRD(s) (%T) deleted", e.Object)
+					w.Infof("Adjustment CRD(s) (%T) deleted", e.Object)
 					if w.currentConfig.deleteAdjustment(e.Object.(*resmgr.Adjustment)) {
 						w.sendAdjustment()
 					}
 
 				case SyntheticMissing:
-					w.Info("No Adjustment CRD(s)")
+					w.Infof("No Adjustment CRD(s)")
 					w.sendAdjustment()
 				}
 				continue

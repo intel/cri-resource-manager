@@ -111,12 +111,12 @@ func isolatedCPUsPreference(pod cache.Pod, container cache.Container) (bool, boo
 
 	preference, err := strconv.ParseBool(value)
 	if err != nil {
-		log.Error("invalid CPU isolation preference annotation (%q, %q): %v",
+		log.Errorf("invalid CPU isolation preference annotation (%q, %q): %v",
 			key, value, err)
 		return opt.PreferIsolated, false
 	}
 
-	log.Debug("%s: effective CPU isolation preference %v", container.PrettyName(), preference)
+	log.Debugf("%s: effective CPU isolation preference %v", container.PrettyName(), preference)
 
 	return preference, true
 }
@@ -136,12 +136,12 @@ func sharedCPUsPreference(pod cache.Pod, container cache.Container) (bool, bool)
 
 	preference, err := strconv.ParseBool(value)
 	if err != nil {
-		log.Error("invalid shared CPU preference annotation (%q, %q): %v",
+		log.Errorf("invalid shared CPU preference annotation (%q, %q): %v",
 			key, value, err)
 		return opt.PreferShared, false
 	}
 
-	log.Debug("%s: effective shared CPU preference %v", container.PrettyName(), preference)
+	log.Debugf("%s: effective shared CPU preference %v", container.PrettyName(), preference)
 
 	return preference, true
 }
@@ -159,11 +159,11 @@ func memoryTypePreference(pod cache.Pod, container cache.Container) memoryType {
 
 	mtype, err := parseMemoryType(value)
 	if err != nil {
-		log.Error("invalid memory type preference (%q, %q): %v", key, value, err)
+		log.Errorf("invalid memory type preference (%q, %q): %v", key, value, err)
 		return memoryUnspec
 	}
 
-	log.Debug("%s: effective cold start preference %v", container.PrettyName(), mtype)
+	log.Debugf("%s: effective cold start preference %v", container.PrettyName(), mtype)
 
 	return mtype
 }
@@ -183,7 +183,7 @@ func coldStartPreference(pod cache.Pod, container cache.Container) (ColdStartPre
 
 	preference := ColdStartPreference{}
 	if err := yaml.Unmarshal([]byte(value), &preference); err != nil {
-		log.Error("failed to parse cold start preference (%q, %q): %v",
+		log.Errorf("failed to parse cold start preference (%q, %q): %v",
 			keyColdStartPreference, value, err)
 		return ColdStartPreference{}, policyError("invalid cold start preference %q: %v",
 			value, err)
@@ -194,7 +194,7 @@ func coldStartPreference(pod cache.Pod, container cache.Container) (ColdStartPre
 			preference.Duration.String())
 	}
 
-	log.Debug("%s: effective cold start preference %v",
+	log.Debugf("%s: effective cold start preference %v",
 		container.PrettyName(), preference.Duration.String())
 
 	return preference, nil
@@ -210,10 +210,10 @@ func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, boo
 		return opt.PreferIsolated, false
 	}
 
-	log.Warn("WARNING: using deprecated annotation %q", key)
-	log.Warn("WARNING: consider using instead")
-	log.Warn("WARNING:     %q, or", preferIsolatedCPUsKey+"/container."+container.GetName())
-	log.Warn("WARNING:     %q", preferIsolatedCPUsKey+"/pod")
+	log.Warnf("WARNING: using deprecated annotation %q", key)
+	log.Warnf("WARNING: consider using instead")
+	log.Warnf("WARNING:     %q, or", preferIsolatedCPUsKey+"/container."+container.GetName())
+	log.Warnf("WARNING:     %q", preferIsolatedCPUsKey+"/pod")
 
 	if value == "false" || value == "true" {
 		return (value[0] == 't'), true
@@ -221,18 +221,18 @@ func podIsolationPreference(pod cache.Pod, container cache.Container) (bool, boo
 
 	preferences := map[string]bool{}
 	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
-		log.Error("failed to parse isolation preference %s = '%s': %v",
+		log.Errorf("failed to parse isolation preference %s = '%s': %v",
 			keyIsolationPreference, value, err)
 		return opt.PreferIsolated, false
 	}
 
 	name := container.GetName()
 	if pref, ok := preferences[name]; ok {
-		log.Debug("%s per-container isolation preference '%v'", name, pref)
+		log.Debugf("%s per-container isolation preference '%v'", name, pref)
 		return pref, true
 	}
 
-	log.Debug("%s defaults to isolation preference '%v'", name, opt.PreferIsolated)
+	log.Debugf("%s defaults to isolation preference '%v'", name, opt.PreferIsolated)
 	return opt.PreferIsolated, false
 }
 
@@ -247,10 +247,10 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, boo
 		return opt.PreferShared, false
 	}
 
-	log.Warn("WARNING: using deprecated annotation %q", key)
-	log.Warn("WARNING: consider using instead")
-	log.Warn("WARNING:     %q, or", preferSharedCPUsKey+"/container."+container.GetName())
-	log.Warn("WARNING:     %q", preferSharedCPUsKey+"/pod")
+	log.Warnf("WARNING: using deprecated annotation %q", key)
+	log.Warnf("WARNING: consider using instead")
+	log.Warnf("WARNING:     %q, or", preferSharedCPUsKey+"/container."+container.GetName())
+	log.Warnf("WARNING:     %q", preferSharedCPUsKey+"/pod")
 
 	if value == "false" || value == "true" {
 		return value[0] == 't', true
@@ -258,7 +258,7 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, boo
 
 	preferences := map[string]string{}
 	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
-		log.Error("failed to parse shared CPU preference %s = '%s': %v",
+		log.Errorf("failed to parse shared CPU preference %s = '%s': %v",
 			keySharedCPUPreference, value, err)
 		return opt.PreferShared, false
 	}
@@ -272,7 +272,7 @@ func podSharedCPUPreference(pod cache.Pod, container cache.Container) (bool, boo
 		return pref[0] == 't', true
 	}
 
-	log.Error("invalid shared CPU boolean preference for container %s: %s", name, pref)
+	log.Errorf("invalid shared CPU boolean preference for container %s: %s", name, pref)
 	return opt.PreferShared, false
 }
 
@@ -293,21 +293,21 @@ func podColdStartPreference(pod cache.Pod, container cache.Container) (ColdStart
 		return ColdStartPreference{}, nil
 	}
 
-	log.Warn("WARNING: using deprecated annotation %q", key)
-	log.Warn("WARNING: consider using instead")
-	log.Warn("WARNING:     %q, or", preferColdStartKey+"/container."+container.GetName())
-	log.Warn("WARNING:     %q", preferColdStartKey+"/pod")
+	log.Warnf("WARNING: using deprecated annotation %q", key)
+	log.Warnf("WARNING: consider using instead")
+	log.Warnf("WARNING:     %q, or", preferColdStartKey+"/container."+container.GetName())
+	log.Warnf("WARNING:     %q", preferColdStartKey+"/pod")
 
 	preferences := map[string]ColdStartPreference{}
 	if err := yaml.Unmarshal([]byte(value), &preferences); err != nil {
-		log.Error("failed to parse cold start preference %s = '%s': %v",
+		log.Errorf("failed to parse cold start preference %s = '%s': %v",
 			key, value, err)
 		return ColdStartPreference{}, err
 	}
 	name := container.GetName()
 	preference, ok := preferences[name]
 	if !ok {
-		log.Debug("container %s has no entry among cold start preferences", container.PrettyName())
+		log.Debugf("container %s has no entry among cold start preferences", container.PrettyName())
 		return ColdStartPreference{}, nil
 	}
 
@@ -446,14 +446,14 @@ func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
 	key := keyMemoryTypePreference
 	value, ok := pod.GetResmgrAnnotation(key)
 	if !ok {
-		log.Debug("pod %s has no memory preference annotations", pod.GetName())
+		log.Debugf("pod %s has no memory preference annotations", pod.GetName())
 		return memoryUnspec
 	}
 
-	log.Warn("WARNING: using deprecated annotation %q", key)
-	log.Warn("WARNING: consider using instead")
-	log.Warn("WARNING:     %q, or", keyMemoryTypePreference+"/container."+c.GetName())
-	log.Warn("WARNING:     %q", keyMemoryTypePreference+"/pod")
+	log.Warnf("WARNING: using deprecated annotation %q", key)
+	log.Warnf("WARNING: consider using instead")
+	log.Warnf("WARNING:     %q, or", keyMemoryTypePreference+"/container."+c.GetName())
+	log.Warnf("WARNING:     %q", keyMemoryTypePreference+"/pod")
 
 	// Try to parse as per-container preference. Assume common for all containers if fails.
 	pref := ""
@@ -462,7 +462,7 @@ func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
 		name := c.GetName()
 		p, ok := preferences[name]
 		if !ok {
-			log.Debug("container %s has no entry among memory preferences", c.PrettyName())
+			log.Debugf("container %s has no entry among memory preferences", c.PrettyName())
 			return memoryUnspec
 		}
 		pref = p
@@ -472,11 +472,11 @@ func podMemoryTypePreference(pod cache.Pod, c cache.Container) memoryType {
 
 	mtype, err := parseMemoryType(pref)
 	if err != nil {
-		log.Error("invalid memory type preference ('%s') in annotation %s: %v",
+		log.Errorf("invalid memory type preference ('%s') in annotation %s: %v",
 			pref, keyMemoryTypePreference, err)
 		return memoryUnspec
 	}
-	log.Debug("container %s has effective memory preference: %s", c.PrettyName(), mtype)
+	log.Debugf("container %s has effective memory preference: %s", c.PrettyName(), mtype)
 	return mtype
 }
 

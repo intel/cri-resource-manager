@@ -42,51 +42,51 @@ type grpclogger struct {
 }
 
 func (g grpclogger) Info(args ...interface{}) {
-	g.Logger.Debug("%s", fmt.Sprint(args...))
+	g.Logger.Debugf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Infoln(args ...interface{}) {
-	g.Logger.Debug("%s", fmt.Sprint(args...))
+	g.Logger.Debugf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Infof(format string, args ...interface{}) {
-	g.Logger.Debug(format, args...)
+	g.Logger.Debugf(format, args...)
 }
 
 func (g grpclogger) Warning(args ...interface{}) {
-	g.Logger.Warn("%s", fmt.Sprint(args...))
+	g.Logger.Warnf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Warningln(args ...interface{}) {
-	g.Logger.Warn("%s", fmt.Sprint(args...))
+	g.Logger.Warnf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Warningf(format string, args ...interface{}) {
-	g.Logger.Warn(format, args...)
+	g.Logger.Warnf(format, args...)
 }
 
 func (g grpclogger) Error(args ...interface{}) {
-	g.Logger.Error("%s", fmt.Sprint(args...))
+	g.Logger.Errorf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Errorln(args ...interface{}) {
-	g.Logger.Error("%s", fmt.Sprint(args...))
+	g.Logger.Errorf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Errorf(format string, args ...interface{}) {
-	g.Logger.Error(format, args...)
+	g.Logger.Errorf(format, args...)
 }
 
 func (g grpclogger) Fatal(args ...interface{}) {
-	g.Logger.Fatal("%s", fmt.Sprint(args...))
+	g.Logger.Fatalf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Fatalln(args ...interface{}) {
-	g.Logger.Fatal("%s", fmt.Sprint(args...))
+	g.Logger.Fatalf("%s", fmt.Sprint(args...))
 }
 
 func (g grpclogger) Fatalf(format string, args ...interface{}) {
-	g.Logger.Fatal(format, args...)
+	g.Logger.Fatalf(format, args...)
 }
 
 func (g grpclogger) V(l int) bool {

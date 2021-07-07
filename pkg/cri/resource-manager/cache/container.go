@@ -77,12 +77,12 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 	if hintSetting, ok := c.GetEffectiveAnnotation(TopologyHintsKey); ok {
 		preference, err := strconv.ParseBool(hintSetting)
 		if err != nil {
-			c.cache.Error("invalid annotation %q=%q: %v", TopologyHintsKey, hintSetting, err)
+			c.cache.Errorf("invalid annotation %q=%q: %v", TopologyHintsKey, hintSetting, err)
 		} else {
 			genHints = preference
 		}
 	}
-	c.cache.Info("automatic topology hint generation %s for %q",
+	c.cache.Infof("automatic topology hint generation %s for %q",
 		map[bool]string{false: "disabled", true: "enabled"}[genHints], c.PrettyName())
 
 	c.Mounts = make(map[string]*Mount)
@@ -354,7 +354,7 @@ func (c *container) GetAnnotation(key string, objPtr interface{}) (string, bool)
 
 	if objPtr != nil {
 		if err := json.Unmarshal([]byte(jsonStr), objPtr); err != nil {
-			c.cache.Error("failed to unmarshal annotation %s (%s) of pod %s into %T",
+			c.cache.Errorf("failed to unmarshal annotation %s (%s) of pod %s into %T",
 				key, jsonStr, c.ID, objPtr)
 			return "", false
 		}
@@ -754,13 +754,13 @@ func getKubeletHint(cpus, mems string) (ret topology.Hints) {
 func (c *container) GetAffinity() []*Affinity {
 	pod, ok := c.GetPod()
 	if !ok {
-		c.cache.Error("internal error: can't find Pod for container %s", c.PrettyName())
+		c.cache.Errorf("internal error: can't find Pod for container %s", c.PrettyName())
 	}
 
 	affinity := append(pod.GetContainerAffinity(c.GetName()), c.implicitAffinities()...)
-	c.cache.Debug("affinity for container %s:", c.PrettyName())
+	c.cache.Debugf("affinity for container %s:", c.PrettyName())
 	for _, a := range affinity {
-		c.cache.Debug("  - %s", a.String())
+		c.cache.Debugf("  - %s", a.String())
 	}
 
 	return affinity
@@ -974,7 +974,7 @@ func (c *container) implicitAffinities() []*Affinity {
 	implicit := []*Affinity{}
 	for name, ia := range c.cache.implicit {
 		if ia.Eligible == nil || ia.Eligible(c) {
-			c.cache.Debug("adding implicit affinity %s (%s)", name, ia.Affinity.String())
+			c.cache.Debugf("adding implicit affinity %s (%s)", name, ia.Affinity.String())
 			implicit = append(implicit, ia.Affinity)
 		}
 	}

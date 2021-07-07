@@ -24,7 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
-	"github.com/intel/cri-resource-manager/pkg/blockio"
+	"github.com/intel/goresctrl/pkg/blockio"
+
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -200,25 +201,25 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 	}
 
 	if opt.Policy == NullPolicy {
-		log.Info("activating '%s' policy (no active backend)", opt.Policy)
+		log.Infof("activating '%s' policy (no active backend)", opt.Policy)
 	} else {
 		active, ok := backends[opt.Policy]
 		if !ok {
 			return nil, policyError("unknown policy '%s' requested", opt.Policy)
 		}
 
-		log.Info("activating '%s' policy...", active.name)
+		log.Infof("activating '%s' policy...", active.name)
 
 		if len(opt.Available) != 0 {
-			log.Info("  with available resources:")
+			log.Infof("  with available resources:")
 			for n, r := range opt.Available {
-				log.Info("    - %s=%s", n, ConstraintToString(r))
+				log.Infof("    - %s=%s", n, ConstraintToString(r))
 			}
 		}
 		if len(opt.Reserved) != 0 {
-			log.Info("  with reserved resources:")
+			log.Infof("  with reserved resources:")
 			for n, r := range opt.Reserved {
-				log.Info("    - %s=%s", n, ConstraintToString(r))
+				log.Infof("    - %s=%s", n, ConstraintToString(r))
 			}
 		}
 
@@ -242,11 +243,11 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 // Start starts up policy, preparing it for resving requests.
 func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	if p.Bypassed() {
-		log.Info("policy '%s' active, nothing to start...", opt.Policy)
+		log.Infof("policy '%s' active, nothing to start...", opt.Policy)
 		return nil
 	}
 
-	log.Info("starting policy '%s'...", p.active.Name())
+	log.Infof("starting policy '%s'...", p.active.Name())
 	return p.active.Start(add, del)
 }
 
@@ -301,7 +302,7 @@ func (p *policy) ExportResourceData(c cache.Container) {
 	for _, key := range keys {
 		value := data[key]
 		if _, err := buf.WriteString(fmt.Sprintf("%s=%q\n", key, value)); err != nil {
-			log.Error("container %s: failed to export resource data (%s=%q)",
+			log.Errorf("container %s: failed to export resource data (%s=%q)",
 				c.PrettyName(), key, value)
 			buf.Reset()
 			break
@@ -385,10 +386,7 @@ func (p *policy) Introspect() *introspect.State {
 	for _, rdtClass := range rdt.GetClasses() {
 		rdtClassNames = append(rdtClassNames, rdtClass.Name())
 	}
-	blkioClassNames := []string{}
-	for _, blkioClass := range blockio.GetClasses() {
-		blkioClassNames = append(blkioClassNames, blkioClass.Name)
-	}
+	p.inspsys.BlockIOClasses = blockio.GetClasses()
 	p.inspsys.RDTClasses = rdtClassNames
 	p.inspsys.Policy = opt.Policy
 
@@ -402,7 +400,7 @@ func (p *policy) Introspect() *introspect.State {
 
 // Register registers a policy backend.
 func Register(name, description string, create CreateFn) error {
-	log.Info("registering policy '%s'...", name)
+	log.Infof("registering policy '%s'...", name)
 
 	if o, ok := backends[name]; ok {
 		return policyError("policy %s already registered (%s)", name, o.description)

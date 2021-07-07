@@ -164,12 +164,12 @@ func (s *server) SetBypassCheckFn(fn func() bool) {
 func (s *server) Start() error {
 	s.trainMessageDumper()
 
-	s.Debug("starting server on socket %s...", s.options.Socket)
+	s.Debugf("starting server on socket %s...", s.options.Socket)
 	go func() {
 		s.server.Serve(s.listener)
 	}()
 
-	s.Debug("waiting for server to become ready...")
+	s.Debugf("waiting for server to become ready...")
 	if err := utils.WaitForServer(s.options.Socket, time.Second); err != nil {
 		return serverError("starting CRI server failed: %v", err)
 	}
@@ -179,7 +179,7 @@ func (s *server) Start() error {
 
 // Stop serving CRI requests.
 func (s *server) Stop() {
-	s.Debug("stopping server on socket %s...", s.options.Socket)
+	s.Debugf("stopping server on socket %s...", s.options.Socket)
 	s.server.Stop()
 }
 
@@ -200,7 +200,7 @@ func (s *server) createGrpcServer() error {
 			return serverError("failed to create server: socket %s already in use",
 				s.options.Socket)
 		}
-		s.Warn("removing abandoned socket '%s' in use...", s.options.Socket)
+		s.Warnf("removing abandoned socket '%s' in use...", s.options.Socket)
 		os.Remove(s.options.Socket)
 		l, err = net.Listen("unix", s.options.Socket)
 		if err != nil {
@@ -239,7 +239,7 @@ func (s *server) Chmod(mode os.FileMode) error {
 			return serverError("failed to change permissions of socket %q to %v: %v",
 				s.options.Socket, mode, err)
 		}
-		s.Info("changed permissions of socket %q to %v", s.options.Socket, mode)
+		s.Infof("changed permissions of socket %q to %v", s.options.Socket, mode)
 	}
 
 	s.options.Mode = mode
@@ -262,7 +262,7 @@ func (s *server) Chown(uid, gid int) error {
 			return serverError("failed to change ownership of socket %q to %s/%s: %v",
 				s.options.Socket, userName, groupName, err)
 		}
-		s.Info("changed ownership of socket %q to %s/%s", s.options.Socket, userName, groupName)
+		s.Infof("changed ownership of socket %q to %s/%s", s.options.Socket, userName, groupName)
 	}
 
 	s.options.User = uid
@@ -360,7 +360,7 @@ func (s *server) collectStatistics(kind, name string, start, send, recv, end tim
 	server := recv.Sub(send)
 	post := end.Sub(recv)
 
-	s.Debug(" * latency for %s: preprocess: %v, CRI server: %v, postprocess: %v, total: %v",
+	s.Debugf(" * latency for %s: preprocess: %v, CRI server: %v, postprocess: %v, total: %v",
 		name, pre, server, post, pre+server+post)
 }
 

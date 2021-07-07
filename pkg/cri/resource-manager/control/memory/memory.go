@@ -119,7 +119,7 @@ func (ctl *memctl) PostStopHook(c cache.Container) error {
 func (ctl *memctl) checkToptierLimitSupport() bool {
 	_, err := os.Stat(memoryCgroupPath + "/" + toptierSoftLimitControl)
 	if err != nil && os.IsNotExist(err) {
-		log.Warn("cgroup top tier memory limit control not available")
+		log.Warnf("cgroup top tier memory limit control not available")
 		ctl.disabled = true
 	}
 	return !ctl.disabled
@@ -141,7 +141,7 @@ func (ctl *memctl) setToptierLimit(c cache.Container) error {
 		return err
 	}
 
-	log.Info("%q: memory toptier soft limit set to %v", c.PrettyName(), limit)
+	log.Infof("%q: memory toptier soft limit set to %v", c.PrettyName(), limit)
 
 	return nil
 }

@@ -109,7 +109,7 @@ func (c *control) StartStopControllers(cache cache.Cache, client client.Client) 
 	c.cache = cache
 	c.client = client
 
-	log.Info("syncing controllers with configuration...")
+	log.Infof("syncing controllers with configuration...")
 
 	for _, controller := range c.controllers {
 		if controller.mode == Disabled {
@@ -117,25 +117,25 @@ func (c *control) StartStopControllers(cache cache.Cache, client client.Client) 
 				controller.c.Stop()
 				controller.running = false
 			}
-			log.Info("controller %s: disabled", controller.name)
+			log.Infof("controller %s: disabled", controller.name)
 			continue
 		}
 
 		if controller.running {
-			log.Info("controller %s: running", controller.name)
+			log.Infof("controller %s: running", controller.name)
 			continue
 		}
 
 		err := controller.c.Start(cache, client)
 
 		if err != nil {
-			log.Error("controller %s: failed to start: %v", controller.name, err)
+			log.Errorf("controller %s: failed to start: %v", controller.name, err)
 			controller.running = false
 			switch controller.mode {
 			case Required:
 				return controlError("%s failed to start: %v", controller.name, err)
 			case Optional, Relaxed:
-				log.Warn("disabling %s, failed to start: %v", controller.name, err)
+				log.Warnf("disabling %s, failed to start: %v", controller.name, err)
 				controller.mode = Disabled
 			}
 		} else {
@@ -148,7 +148,7 @@ func (c *control) StartStopControllers(cache cache.Cache, client client.Client) 
 
 	for _, controller := range c.controllers {
 		state := map[bool]string{false: "inactive", true: "running"}
-		log.Info("controller %s is now %s, mode %s",
+		log.Infof("controller %s is now %s, mode %s",
 			controller.name, state[controller.running], controller.mode)
 	}
 
@@ -226,13 +226,13 @@ func (c *control) runhook(controller *controller, hook string, container cache.C
 		fn = controller.c.PostStopHook
 	}
 
-	log.Debug("running %s %s hook for container %s", controller.name, hook, container.PrettyName())
+	log.Debugf("running %s %s hook for container %s", controller.name, hook, container.PrettyName())
 
 	if err := fn(container); err != nil {
 		if controller.mode == Required {
 			return controlError("%s %s hook failed: %v", controller.name, hook, err)
 		}
-		log.Error("%s %s hook failed: %v", controller.name, hook, err)
+		log.Errorf("%s %s hook failed: %v", controller.name, hook, err)
 	}
 
 	return nil
@@ -240,7 +240,7 @@ func (c *control) runhook(controller *controller, hook string, container cache.C
 
 // Register registers a new controller.
 func Register(name, description string, c Controller) error {
-	log.Info("registering controller %s...", name)
+	log.Infof("registering controller %s...", name)
 
 	if oc, ok := controllers[name]; ok {
 		return controlError("controller %s (%s) already registered.", oc.name, oc.description)

@@ -144,7 +144,7 @@ func (r *relay) Server() server.Server {
 
 func (r *relay) dialNotify(socket string, uid int, gid int, mode os.FileMode, err error) {
 	if err != nil {
-		r.Error("failed to determine permissions/ownership of client socket %q: %v",
+		r.Errorf("failed to determine permissions/ownership of client socket %q: %v",
 			socket, err)
 		return
 	}
@@ -158,16 +158,16 @@ func (r *relay) dialNotify(socket string, uid int, gid int, mode os.FileMode, er
 	//   practice we choose to go with the runtime socket's properties.
 	if r.options.ImageSocket != r.options.RuntimeSocket {
 		if socket != r.options.RuntimeSocket && r.options.RuntimeSocket != client.DontConnect {
-			r.Warn("ignoring ownership/permissions of dedicated CR Image Service socket...")
+			r.Warnf("ignoring ownership/permissions of dedicated CR Image Service socket...")
 			return
 		}
 	}
 
 	if err := r.server.Chown(uid, gid); err != nil {
-		r.Error("server socket ownership change request failed: %v", err)
+		r.Errorf("server socket ownership change request failed: %v", err)
 	} else {
 		if err := r.server.Chmod(mode); err != nil {
-			r.Error("server socket permissions change request failed: %v", err)
+			r.Errorf("server socket permissions change request failed: %v", err)
 		}
 	}
 }

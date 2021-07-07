@@ -63,7 +63,7 @@ func (m *linuxPageMover) MovePagesSyscall(pid int, count uint, pages []uintptr, 
 		err = unix.Errno(en)
 	}
 
-	// log.Debug("move_pages(): pid %d, count %d, pages %v, nodes %v, flags %d: return value %d, status %d, errno %v",
+	// log.Debugf("move_pages(): pid %d, count %d, pages %v, nodes %v, flags %d: return value %d, status %d, errno %v",
 	// 	pid, count, pages, nodes, flags, uint(ret), cStatus, err)
 
 	status := make([]int, count)

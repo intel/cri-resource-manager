@@ -480,7 +480,7 @@ func (cs *supply) allocateMemory(r Request) (memoryMap, error) {
 		if remaining > 0 && (reqType&memType) != 0 {
 			available := cs.mem[memType]
 
-			log.Debug("%s: trying %s %s of %s available",
+			log.Debugf("%s: trying %s %s of %s available",
 				r.GetContainer().PrettyName(),
 				prettyMem(remaining), memType.String(), prettyMem(available))
 
@@ -506,7 +506,7 @@ func (cs *supply) allocateMemory(r Request) (memoryMap, error) {
 	}
 
 	if remaining > 0 {
-		log.Debug("%s: %s allocation from %s fell short %s",
+		log.Debugf("%s: %s allocation from %s fell short %s",
 			r.GetContainer().PrettyName(),
 			reqType.String(), cs.GetNode().Name(), prettyMem(remaining))
 
@@ -558,17 +558,17 @@ func (cs *supply) AllocateCPU(r Request) (Grant, error) {
 	cpuType := cr.cpuType
 
 	if cpuType == cpuReserved && full > 0 {
-		log.Warn("exclusive reserved CPUs not supported, allocating %d full CPUs as fractions", full)
+		log.Warnf("exclusive reserved CPUs not supported, allocating %d full CPUs as fractions", full)
 		fraction += full * 1000
 		full = 0
 	}
 
 	if cpuType == cpuReserved && fraction > 0 && cs.AllocatableReservedCPU() < fraction {
-		log.Warn("possible misconfiguration of reserved resources:")
-		log.Warn("  %s: allocatable %s", cs.GetNode().Name(), cs.DumpAllocatable())
-		log.Warn("  %s: needs %d reserved, only %d available",
+		log.Warnf("possible misconfiguration of reserved resources:")
+		log.Warnf("  %s: allocatable %s", cs.GetNode().Name(), cs.DumpAllocatable())
+		log.Warnf("  %s: needs %d reserved, only %d available",
 			cr.GetContainer().PrettyName(), fraction, cs.AllocatableReservedCPU())
-		log.Warn("  falling back to using normal unreserved CPUs instead...")
+		log.Warnf("  falling back to using normal unreserved CPUs instead...")
 		cpuType = cpuNormal
 	}
 
@@ -626,7 +626,7 @@ func (cs *supply) AllocateCPU(r Request) (Grant, error) {
 }
 
 func (cs *supply) ReallocateMemory(g Grant) error {
-	log.Debug("%s: reallocating memory (%s) from %s to %s",
+	log.Debugf("%s: reallocating memory (%s) from %s to %s",
 		g.GetContainer().PrettyName(),
 		g.MemLimit().String(),
 		g.GetMemoryNode().Name(),
@@ -666,7 +666,7 @@ func (cs *supply) ReleaseCPU(g Grant) {
 func (cs *supply) ReleaseMemory(g Grant) {
 	releasedMemory := uint64(0)
 
-	log.Debug("%s: releasing granted memory (%s) from %s",
+	log.Debugf("%s: releasing granted memory (%s) from %s",
 		g.GetContainer().PrettyName(),
 		g.MemLimit().String(), cs.GetNode().Name())
 
@@ -694,7 +694,7 @@ func (cs *supply) ExtraMemoryReservation(memType memoryType) uint64 {
 
 func (cs *supply) ReleaseExtraMemoryReservation(g Grant) {
 	if mems, ok := cs.extraMemReservations[g]; ok {
-		log.Debug("%s: releasing extra memory reservation (%s) from %s",
+		log.Debugf("%s: releasing extra memory reservation (%s) from %s",
 			g.GetContainer().PrettyName(), mems.String(),
 			cs.GetNode().Name())
 		delete(cs.extraMemReservations, g)
@@ -897,13 +897,13 @@ func (cs *supply) DumpMemoryState(prefix string) {
 		free := cs.mem[kind]
 		granted := cs.grantedMem[kind]
 		if free != 0 || granted != 0 {
-			log.Debug(prefix+"- %s: free: %s, granted %s",
+			log.Debugf(prefix+"- %s: free: %s, granted %s",
 				kind, prettyMem(free), prettyMem(granted))
 		}
 		totalFree += free
 		totalGranted += granted
 	}
-	log.Debug(prefix+"- total free: %s, total granted %s",
+	log.Debugf(prefix+"- total free: %s, total granted %s",
 		prettyMem(totalFree), prettyMem(totalGranted))
 
 	printHdr := true
@@ -929,10 +929,10 @@ func (cs *supply) DumpMemoryState(prefix string) {
 			}
 			if total > 0 {
 				if printHdr {
-					log.Debug(prefix + "- extra reservations:")
+					log.Debugf(prefix + "- extra reservations:")
 					printHdr = false
 				}
-				log.Debug(prefix+"  - %s: %s (%s)",
+				log.Debugf(prefix+"  - %s: %s (%s)",
 					g.GetContainer().PrettyName(), prettyMem(total), split)
 			}
 		}
@@ -946,7 +946,7 @@ func newRequest(container cache.Container) Request {
 	req, lim, mtype := memoryAllocationPreference(pod, container)
 	coldStart := time.Duration(0)
 
-	log.Debug("%s: CPU preferences: cpuType=%s, full=%v, fraction=%v, isolate=%v",
+	log.Debugf("%s: CPU preferences: cpuType=%s, full=%v, fraction=%v, isolate=%v",
 		container.PrettyName(), cpuType, full, fraction, isolate)
 
 	if mtype == memoryUnspec {
@@ -956,11 +956,11 @@ func newRequest(container cache.Container) Request {
 	if mtype&memoryPMEM != 0 && mtype&memoryDRAM != 0 {
 		parsedColdStart, err := coldStartPreference(pod, container)
 		if err != nil {
-			log.Error("Failed to parse cold start preference")
+			log.Errorf("Failed to parse cold start preference")
 		} else {
 			if parsedColdStart.Duration > 0 {
 				if coldStartOff {
-					log.Error("coldstart disabled (movable non-DRAM memory zones present)")
+					log.Errorf("coldstart disabled (movable non-DRAM memory zones present)")
 				} else {
 					coldStart = time.Duration(parsedColdStart.Duration)
 				}
@@ -969,7 +969,7 @@ func newRequest(container cache.Container) Request {
 	} else if mtype == memoryPMEM {
 		if coldStartOff {
 			mtype = mtype | memoryDRAM
-			log.Error("%s: forced also DRAM usage (movable non-DRAM memory zones present)",
+			log.Errorf("%s: forced also DRAM usage (movable non-DRAM memory zones present)",
 				container.PrettyName())
 		}
 	}
@@ -1119,7 +1119,7 @@ func (cs *supply) GetScore(req Request) Score {
 	score.hints = make(map[string]float64, len(hints))
 
 	for provider, hint := range cr.container.GetTopologyHints() {
-		log.Debug(" - evaluating topology hint %s", hint)
+		log.Debugf(" - evaluating topology hint %s", hint)
 		score.hints[provider] = cs.node.HintScore(hint)
 	}
 
@@ -1128,13 +1128,13 @@ func (cs *supply) GetScore(req Request) Score {
 	key := pod.GetName() + ":" + cr.container.GetName()
 	if fakeHints, ok := opt.FakeHints[key]; ok {
 		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint)
+			log.Debugf(" - evaluating fake hint %s", hint)
 			score.hints[provider] = cs.node.HintScore(hint)
 		}
 	}
 	if fakeHints, ok := opt.FakeHints[cr.container.GetName()]; ok {
 		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint)
+			log.Debugf(" - evaluating fake hint %s", hint)
 			score.hints[provider] = cs.node.HintScore(hint)
 		}
 	}
@@ -1168,21 +1168,21 @@ func (cs *supply) AllocatableSharedCPU(quiet ...bool) int {
 	//   none of them gets overcommitted as the result of fulfilling this request.
 	shared := 1000*cs.sharable.Size() - cs.node.GrantedSharedCPU()
 	if verbose {
-		log.Debug("%s: unadjusted free shared CPU: %dm", cs.node.Name(), shared)
+		log.Debugf("%s: unadjusted free shared CPU: %dm", cs.node.Name(), shared)
 	}
 	for node := cs.node.Parent(); !node.IsNil(); node = node.Parent() {
 		pSupply := node.FreeSupply()
 		pShared := 1000*pSupply.SharableCPUs().Size() - pSupply.GetNode().GrantedSharedCPU()
 		if pShared < shared {
 			if verbose {
-				log.Debug("%s: capping free shared CPU (%dm -> %dm) to avoid overcommit of %s",
+				log.Debugf("%s: capping free shared CPU (%dm -> %dm) to avoid overcommit of %s",
 					cs.node.Name(), shared, pShared, node.Name())
 			}
 			shared = pShared
 		}
 	}
 	if verbose {
-		log.Debug("%s: ancestor-adjusted free shared CPU: %dm", cs.node.Name(), shared)
+		log.Debugf("%s: ancestor-adjusted free shared CPU: %dm", cs.node.Name(), shared)
 	}
 	return shared
 }
@@ -1459,7 +1459,7 @@ func (cg *grant) ExpandMemset() (bool, error) {
 	for _, memType := range []memoryType{memoryPMEM, memoryDRAM, memoryHBM} {
 		required += cg.MemLimit()[memType]
 	}
-	log.Debug("out-of-memory risk in %s: extra reservations %s > free %s -> moving up %s total memory grant from %s",
+	log.Debugf("out-of-memory risk in %s: extra reservations %s > free %s -> moving up %s total memory grant from %s",
 		cg, prettyMem(extra), prettyMem(free), prettyMem(required), node.Name())
 
 	// Find an ancestor where the grant fits. As reservations in
@@ -1473,7 +1473,7 @@ func (cg *grant) ExpandMemset() (bool, error) {
 			required = 0
 			break
 		}
-		log.Debug("- %s has %s free but %s extra reservations, moving further up",
+		log.Debugf("- %s has %s free but %s extra reservations, moving further up",
 			parent.Name(), prettyMem(parentFree), prettyMem(parentExtra))
 	}
 	if required > 0 {

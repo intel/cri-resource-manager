@@ -104,7 +104,7 @@ func createPolicy(opts *policyapi.BackendOptions, isAlias bool) policyapi.Backen
 	}
 
 	if err := p.initialize(); err != nil {
-		log.Fatal("failed to initialize %s policy: %v", PolicyName, err)
+		log.Fatalf("failed to initialize %s policy: %v", PolicyName, err)
 	}
 
 	p.addImplicitAffinities()
@@ -143,7 +143,7 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 
 // Sync synchronizes the state of this policy.
 func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
-	log.Debug("synchronizing state...")
+	log.Debugf("synchronizing state...")
 	for _, c := range del {
 		p.ReleaseResources(c)
 	}
@@ -156,7 +156,7 @@ func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (p *policy) AllocateResources(container cache.Container) error {
-	log.Debug("allocating resources for %s...", container.PrettyName())
+	log.Debugf("allocating resources for %s...", container.PrettyName())
 
 	grant, err := p.allocatePool(container, "")
 	if err != nil {
@@ -173,7 +173,7 @@ func (p *policy) AllocateResources(container cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (p *policy) ReleaseResources(container cache.Container) error {
-	log.Debug("releasing resources of %s...", container.PrettyName())
+	log.Debugf("releasing resources of %s...", container.PrettyName())
 
 	if grant, found := p.releasePool(container); found {
 		p.updateSharedAllocations(&grant)
@@ -186,7 +186,7 @@ func (p *policy) ReleaseResources(container cache.Container) error {
 
 // UpdateResources is a resource allocation update request for this policy.
 func (p *policy) UpdateResources(c cache.Container) error {
-	log.Debug("(not) updating container %s...", c.PrettyName())
+	log.Debugf("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 
@@ -219,7 +219,7 @@ func (p *policy) Rebalance() (bool, error) {
 
 // HandleEvent handles policy-specific events.
 func (p *policy) HandleEvent(e *events.Policy) (bool, error) {
-	log.Debug("received policy event %s.%s with data %v...", e.Source, e.Type, e.Data)
+	log.Debugf("received policy event %s.%s with data %v...", e.Source, e.Type, e.Data)
 
 	switch e.Type {
 	case events.ContainerStarted:
@@ -228,7 +228,7 @@ func (p *policy) HandleEvent(e *events.Policy) (bool, error) {
 			return false, policyError("%s event: expecting cache.Container Data, got %T",
 				e.Type, e.Data)
 		}
-		log.Info("triggering coldstart period (if necessary) for %s", c.PrettyName())
+		log.Infof("triggering coldstart period (if necessary) for %s", c.PrettyName())
 		return false, p.triggerColdStart(c)
 	case ColdStartDone:
 		id, ok := e.Data.(string)
@@ -241,7 +241,7 @@ func (p *policy) HandleEvent(e *events.Policy) (bool, error) {
 			// TODO: This is probably a race condition. Should we return nil error here?
 			return false, policyError("%s event: failed to lookup container %s", id)
 		}
-		log.Info("finishing coldstart period for %s", c.PrettyName())
+		log.Infof("finishing coldstart period for %s", c.PrettyName())
 		return p.finishColdStart(c)
 	}
 	return false, nil
@@ -343,7 +343,7 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 func (p *policy) reallocateResources(containers []cache.Container, pools map[string]string) error {
 	var errors *multierror.Error
 
-	log.Info("reallocating resources...")
+	log.Infof("reallocating resources...")
 
 	cache.SortContainers(containers)
 
@@ -351,7 +351,7 @@ func (p *policy) reallocateResources(containers []cache.Container, pools map[str
 		p.releasePool(c)
 	}
 	for _, c := range containers {
-		log.Debug("reallocating resources for %s...", c.PrettyName())
+		log.Debugf("reallocating resources for %s...", c.PrettyName())
 
 		grant, err := p.allocatePool(c, pools[c.GetCacheID()])
 		if err != nil {
@@ -378,11 +378,11 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 		policyName = AliasName
 		*opt = *aliasOpt
 	}
-	log.Info("%s configuration %s:", policyName, event)
-	log.Info("  - pin containers to CPUs: %v", opt.PinCPU)
-	log.Info("  - pin containers to memory: %v", opt.PinMemory)
-	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
-	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
+	log.Infof("%s configuration %s:", policyName, event)
+	log.Infof("  - pin containers to CPUs: %v", opt.PinCPU)
+	log.Infof("  - pin containers to memory: %v", opt.PinMemory)
+	log.Infof("  - prefer isolated CPUs: %v", opt.PreferIsolated)
+	log.Infof("  - prefer shared CPUs: %v", opt.PreferShared)
 
 	var allowed, reserved cpuset.CPUSet
 	var reinit bool
@@ -399,7 +399,7 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 		case resapi.Quantity:
 			reserveCnt := (int(v.MilliValue()) + 999) / 1000
 			if reserveCnt != p.reserveCnt {
-				log.Warn("CPU reservation has changed (%v, was %v)",
+				log.Warnf("CPU reservation has changed (%v, was %v)",
 					reserveCnt, p.reserveCnt)
 				reinit = true
 			}
@@ -408,14 +408,14 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 
 	if !allowed.Equals(p.allowed) {
 		if !(allowed.Size() == 0 && p.allowed.Size() == 0) {
-			log.Warn("allowed cpuset changed (%s, was %s)",
+			log.Warnf("allowed cpuset changed (%s, was %s)",
 				p.allowed.String(), allowed.String())
 			reinit = true
 		}
 	}
 	if !reserved.Equals(p.reserved) {
 		if !(reserved.Size() == 0 && p.reserved.Size() == 0) {
-			log.Warn("reserved cpuset changed (%s, was %s)",
+			log.Warnf("reserved cpuset changed (%s, was %s)",
 				p.reserved.String(), reserved.String())
 			reinit = true
 		}
@@ -432,7 +432,7 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	//
 
 	if reinit {
-		log.Warn("reinitializing %s policy...", PolicyName)
+		log.Warnf("reinitializing %s policy...", PolicyName)
 
 		savedPolicy := *p
 		allocations := savedPolicy.allocations.clone()
@@ -449,7 +449,7 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 			}
 		}
 
-		log.Warn("updating existing allocations...")
+		log.Warnf("updating existing allocations...")
 		if err := p.restoreAllocations(&allocations); err != nil {
 			*p = savedPolicy
 			return policyError("failed to reconfigure: %v", err)
@@ -523,7 +523,7 @@ func (p *policy) checkConstraints() error {
 		cset, err := p.cpuAllocator.AllocateCpus(&p.allowed, p.reserveCnt, cpuallocator.PriorityNormal)
 		p.allowed = p.allowed.Union(cset)
 		if err != nil {
-			log.Fatal("cannot reserve %dm CPUs for ReservedResources from AvailableResources: %s", qty.MilliValue(), err)
+			log.Fatalf("cannot reserve %dm CPUs for ReservedResources from AvailableResources: %s", qty.MilliValue(), err)
 		}
 		p.reserved = cset
 	}
@@ -533,7 +533,7 @@ func (p *policy) checkConstraints() error {
 
 func (p *policy) restoreCache() error {
 	if !p.restoreConfig() {
-		log.Warn("no saved configuration found in cache...")
+		log.Warnf("no saved configuration found in cache...")
 		p.saveConfig()
 	}
 
@@ -542,7 +542,7 @@ func (p *policy) restoreCache() error {
 		if err := p.restoreAllocations(&allocations); err != nil {
 			return policyError("failed to restore allocations from cache: %v", err)
 		}
-		p.allocations.Dump(log.Info, "restored ")
+		p.allocations.Dump(log.Infof, "restored ")
 	}
 	p.saveAllocations()
 
@@ -555,7 +555,7 @@ func (p *policy) checkColdstartOff() {
 		if node.GetMemoryType() == system.MemoryTypePMEM {
 			if !node.HasNormalMemory() {
 				coldStartOff = true
-				log.Error("coldstart forced off: NUMA node #%d does not have normal memory", id)
+				log.Errorf("coldstart forced off: NUMA node #%d does not have normal memory", id)
 				return
 			}
 		}

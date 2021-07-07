@@ -18,7 +18,7 @@ type InitCollector func() (prometheus.Collector, error)
 
 // RegisterCollector registers the named prometheus.Collector for metrics collection.
 func RegisterCollector(name string, init InitCollector) error {
-	log.Info("registering collector %s...", name)
+	log.Infof("registering collector %s...", name)
 
 	if _, found := builtInCollectors[name]; found {
 		return metricsError("Collector %s already registered", name)
@@ -40,7 +40,7 @@ func NewMetricGatherer() (prometheus.Gatherer, error) {
 
 		c, err := cb()
 		if err != nil {
-			log.Error("Failed to initialize collector '%s': %v. Skipping it.", name, err)
+			log.Errorf("Failed to initialize collector '%s': %v. Skipping it.", name, err)
 			continue
 		}
 		registeredCollectors = append(registeredCollectors, c)

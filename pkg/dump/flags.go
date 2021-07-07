@@ -134,22 +134,22 @@ func (set *ruleset) String() string {
 
 // detailOf returns the level of detail for dumping the given method.
 func (set *ruleset) detailOf(method string) level {
-	log.Debug("%s: checking level of detail...", method)
+	log.Debugf("%s: checking level of detail...", method)
 	if set == nil {
 		return Off
 	}
 	detail := Off
 	for _, r := range *set {
-		log.Debug("  - checking rule '%s'...", r.method)
+		log.Debugf("  - checking rule '%s'...", r.method)
 		switch {
 		case r.method == method:
-			log.Debug("    => exact match: %v", r.detail)
+			log.Debugf("    => exact match: %v", r.detail)
 			return r.detail
 		case r.method == "*":
-			log.Debug("    => wildcard match: %v", r.detail)
+			log.Debugf("    => wildcard match: %v", r.detail)
 			detail = r.detail
 		case r.regexp != nil && r.regexp.MatchString(method):
-			log.Debug("    => regexp match (%s): %v", r.method, r.detail)
+			log.Debugf("    => regexp match (%s): %v", r.method, r.detail)
 			detail = r.detail
 		}
 	}
@@ -188,8 +188,8 @@ func defaultOptions() interface{} {
 
 // configNotify updates our runtime configuration.
 func (o *options) configNotify(event config.Event, source config.Source) error {
-	log.Info("message dumper configuration %v", event)
-	log.Info(" * config: %s", o.Config)
+	log.Infof("message dumper configuration %v", event)
+	log.Infof(" * config: %s", o.Config)
 
 	rules := ruleset{}
 	if err := rules.parse(o.Config); err != nil {
@@ -198,9 +198,9 @@ func (o *options) configNotify(event config.Event, source config.Source) error {
 
 	o.rules = rules
 
-	log.Info(" * parsed: %s", o.rules.String())
-	log.Info(" * dump file: %v", opt.File)
-	log.Info(" * log with debug: %v", opt.Debug)
+	log.Infof(" * parsed: %s", o.rules.String())
+	log.Infof(" * dump file: %v", opt.File)
+	log.Infof(" * log with debug: %v", opt.Debug)
 
 	dump.configure(o)
 

@@ -38,7 +38,7 @@ func main() {
 	args := parseArgs()
 
 	if err := Run(args); err != nil {
-		log.Fatal(err)
+		log.Fatalf("%v", err)
 	}
 
 }

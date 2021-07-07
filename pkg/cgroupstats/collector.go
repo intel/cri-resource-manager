@@ -339,7 +339,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			if err == nil {
 				updateNumaStatMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], numa)
 			} else {
-				log.Error("failed to collect NUMA stats for %s: %v", path, err)
+				log.Errorf("failed to collect NUMA stats for %s: %v", path, err)
 			}
 		},
 		func(path string, re *regexp.Regexp) {
@@ -348,7 +348,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			if err == nil {
 				updateMemoryUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], memory)
 			} else {
-				log.Error("failed to collect memory usage stats for %s: %v", path, err)
+				log.Errorf("failed to collect memory usage stats for %s: %v", path, err)
 			}
 		},
 		func(path string, re *regexp.Regexp) {
@@ -357,7 +357,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			if err == nil {
 				updateMemoryMigrateMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], migrate)
 			} else {
-				log.Error("failed to collect memory migration stats for %s: %v", path, err)
+				log.Errorf("failed to collect memory migration stats for %s: %v", path, err)
 			}
 		},
 		func(path string, re *regexp.Regexp) {
@@ -366,7 +366,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			if err == nil {
 				updateCPUAcctUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], cpuAcctUsage)
 			} else {
-				log.Error("failed to collect CPU accounting stats for %s: %v", path, err)
+				log.Errorf("failed to collect CPU accounting stats for %s: %v", path, err)
 			}
 		},
 		func(path string, re *regexp.Regexp) {
@@ -375,7 +375,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			if err == nil {
 				updateHugeTlbUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], hugeTlbUsage)
 			} else {
-				log.Error("failed to collect hugetlb stats for %s: %v", path, err)
+				log.Errorf("failed to collect hugetlb stats for %s: %v", path, err)
 			}
 		},
 		func(path string, re *regexp.Regexp) {
@@ -384,7 +384,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			if err == nil {
 				updateBlkioDeviceUsageMetric(ch, re.FindStringSubmatch(filepath.Base(path))[0], blkioDeviceUsage)
 			} else {
-				log.Error("failed to collect blkio stats for %s: %v", path, err)
+				log.Errorf("failed to collect blkio stats for %s: %v", path, err)
 			}
 		},
 	}
@@ -408,6 +408,6 @@ func init() {
 
 	err := metrics.RegisterCollector("cgroupstats", NewCollector)
 	if err != nil {
-		log.Error("failed register cgroupstats collector: %v", err)
+		log.Errorf("failed register cgroupstats collector: %v", err)
 	}
 }

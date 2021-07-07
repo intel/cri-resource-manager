@@ -77,31 +77,31 @@ func RateLimit(log Logger, rate Rate) Logger {
 	}
 }
 
-func (rl *ratelimited) Debug(format string, args ...interface{}) {
+func (rl *ratelimited) Debugf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	if limit := rl.getMessageLimit(msg); limit.Allow() {
-		rl.Logger.Debug("<rate-limited> %s", msg)
+		rl.Logger.Debugf("<rate-limited> %s", msg)
 	}
 }
 
-func (rl *ratelimited) Info(format string, args ...interface{}) {
+func (rl *ratelimited) Infof(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	if limit := rl.getMessageLimit(msg); limit.Allow() {
-		rl.Logger.Info("<rate-limited> %s", msg)
+		rl.Logger.Infof("<rate-limited> %s", msg)
 	}
 }
 
-func (rl *ratelimited) Warn(format string, args ...interface{}) {
+func (rl *ratelimited) Warnf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	if limit := rl.getMessageLimit(msg); limit.Allow() {
-		rl.Logger.Warn("<rate-limited> %s", msg)
+		rl.Logger.Warnf("<rate-limited> %s", msg)
 	}
 }
 
-func (rl *ratelimited) Error(format string, args ...interface{}) {
+func (rl *ratelimited) Errorf(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	if limit := rl.getMessageLimit(msg); limit.Allow() {
-		rl.Logger.Error("<rate-limited> %s", msg)
+		rl.Logger.Errorf("<rate-limited> %s", msg)
 	}
 }
 

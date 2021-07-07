@@ -189,7 +189,7 @@ func NewCollector() (prometheus.Collector, error) {
 
 	spec, err := bpf.LoadCollectionSpec(filepath.Join(bpfInstallpath, bpfBinaryName))
 	if err != nil {
-		log.Info("Unable to load user eBPF (%v). Using default CollectionSpec from ELF program bytes", err)
+		log.Infof("Unable to load user eBPF (%v). Using default CollectionSpec from ELF program bytes", err)
 		spec, err = bpf.LoadCollectionSpecFromReader(bytes.NewReader(program[:]))
 		if err != nil {
 			return nil, errors.Wrap(err, "unable to load default CollectionSpec from ELF program bytes")
@@ -271,16 +271,16 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 
 		}
 		cgroupids[key] = sum
-		log.Debug("cgroupid %d => counter %d", key, sum)
+		log.Debugf("cgroupid %d => counter %d", key, sum)
 
 		// reset the counter by deleting the key
 		err := m.Delete(key)
 		if err != nil {
-			log.Error("%+v", err)
+			log.Errorf("%+v", err)
 		}
 	}
 	if iter.Err() != nil {
-		log.Error("unable to iterate all elements of avx_context_switch_count: %+v", iter.Err())
+		log.Errorf("unable to iterate all elements of avx_context_switch_count: %+v", iter.Err())
 	}
 
 	for lastCPU, count := range lastCPUs {
@@ -301,7 +301,7 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 
 			path, err := cg.Find(cgroupid_)
 			if err != nil {
-				log.Error("failed to find cgroup by id: %v", err)
+				log.Errorf("failed to find cgroup by id: %v", err)
 				return
 			}
 
@@ -314,16 +314,16 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 				re.FindStringSubmatch(filepath.Base(path))[0])
 
 			if err := c.ebpf.Maps["all_context_switch_count_hash"].Lookup(uint64(cgroupid_), &allCount); err != nil {
-				log.Error("unable to find 'all' context switch count: %+v", err)
+				log.Errorf("unable to find 'all' context switch count: %+v", err)
 				return
 			}
-			log.Debug("all: %d", allCount)
+			log.Debugf("all: %d", allCount)
 
 			if err := c.ebpf.Maps["last_update_ns_hash"].Lookup(uint64(cgroupid_), &lastUpdate); err != nil {
-				log.Error("unable to find last update timestamp: %+v", err)
+				log.Errorf("unable to find last update timestamp: %+v", err)
 				return
 			}
-			log.Debug("last: %d", lastUpdate)
+			log.Debugf("last: %d", lastUpdate)
 
 			ch <- prometheus.MustNewConstMetric(
 				descriptors[allSwitchCountDesc],
@@ -351,12 +351,12 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 		// reset the counter by deleting the key
 		err := m.Delete(key)
 		if err != nil {
-			log.Error("%+v", err)
+			log.Errorf("%+v", err)
 		}
 	}
 
 	if iter.Err() != nil {
-		log.Error("unable to reset all elements of all_context_switch_count: %+v", iter.Err())
+		log.Errorf("unable to reset all elements of all_context_switch_count: %+v", iter.Err())
 	}
 }
 

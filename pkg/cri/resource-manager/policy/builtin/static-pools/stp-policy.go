@@ -87,7 +87,7 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 		nodeUpdater: newNodeUpdater(opts.AgentCli),
 	}
 
-	stp.Info("creating policy...")
+	stp.Infof("creating policy...")
 
 	pkgcfg.GetModule(PolicyPath).AddNotify(stp.configNotify)
 
@@ -119,20 +119,20 @@ func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
 	if err := stp.initializeState(); err != nil {
 		return err
 	}
-	stp.Debug("retrieved stp container states from cache:\n%s", utils.DumpJSON(*stp.getContainerRegistry()))
+	stp.Debugf("retrieved stp container states from cache:\n%s", utils.DumpJSON(*stp.getContainerRegistry()))
 
 	if err := stp.Sync(add, del); err != nil {
 		return err
 	}
 
-	stp.Debug("preparing for making decisions...")
+	stp.Debugf("preparing for making decisions...")
 
 	return nil
 }
 
 // Sync synchronizes the state of this policy.
 func (stp *stp) Sync(add []cache.Container, del []cache.Container) error {
-	stp.Debug("synchronizing state...")
+	stp.Debugf("synchronizing state...")
 	for _, c := range del {
 		stp.ReleaseResources(c)
 	}
@@ -146,7 +146,7 @@ func (stp *stp) Sync(add []cache.Container, del []cache.Container) error {
 // AllocateResources is a resource allocation request for this policy.
 func (stp *stp) AllocateResources(c cache.Container) error {
 	containerID := c.GetCacheID()
-	stp.Debug("allocating resources for container %s...", containerID)
+	stp.Debugf("allocating resources for container %s...", containerID)
 
 	cs := stpContainerStatus{Socket: -1}
 
@@ -154,7 +154,7 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 	poolName := CmkPoolShared
 
 	// Get resource requests
-	stp.Debug("RESOURCE REQUESTS: %s", c.GetResourceRequirements().Requests)
+	stp.Debugf("RESOURCE REQUESTS: %s", c.GetResourceRequirements().Requests)
 	requestedCPUs, ok := c.GetResourceRequirements().Requests[exclusiveCoreResourceName]
 	if ok {
 		nCPUs, _ := requestedCPUs.AsInt64()
@@ -173,7 +173,7 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 		c.SetCommand(cmkArgs.Command)
 		c.SetArgs([]string{})
 
-		stp.Debug("parsed options from container command line: %v", cmkArgs)
+		stp.Debugf("parsed options from container command line: %v", cmkArgs)
 	}
 
 	// Get STP options from container env
@@ -181,7 +181,7 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 	if ok {
 		socketID, err := strconv.ParseInt(envVal, 10, 32)
 		if err != nil {
-			stp.Warn("unable to parse socket id from %q: %v", StpEnvSocketID, err)
+			stp.Warnf("unable to parse socket id from %q: %v", StpEnvSocketID, err)
 		} else {
 			cs.Socket = socketID
 		}
@@ -218,26 +218,26 @@ func (stp *stp) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (stp *stp) ReleaseResources(c cache.Container) error {
-	stp.Debug("releasing resources of container %s...", c.PrettyName())
+	stp.Debugf("releasing resources of container %s...", c.PrettyName())
 	stp.releaseStpResources(c.GetCacheID())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (stp *stp) UpdateResources(c cache.Container) error {
-	stp.Debug("updating resource allocations of container %s...", c.PrettyName())
+	stp.Debugf("updating resource allocations of container %s...", c.PrettyName())
 	return nil
 }
 
 // Rebalance tries to find an optimal allocation of resources for the current containers.
 func (stp *stp) Rebalance() (bool, error) {
-	stp.Debug("(not) rebalancing containers...")
+	stp.Debugf("(not) rebalancing containers...")
 	return false, nil
 }
 
 // HandleEvent handles policy-specific events.
 func (stp *stp) HandleEvent(*events.Policy) (bool, error) {
-	stp.Debug("(not) handling event...")
+	stp.Debugf("(not) handling event...")
 	return false, nil
 }
 
@@ -252,13 +252,13 @@ func (stp *stp) Introspect(*introspect.State) {
 }
 
 func (stp *stp) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
-	stp.Info("configuration %s", event)
+	stp.Infof("configuration %s", event)
 
 	if err := stp.setConfig(conf); err != nil {
 		return err
 	}
 
-	stp.Info("config updated successfully")
+	stp.Infof("config updated successfully")
 
 	return nil
 }
@@ -267,22 +267,22 @@ func (stp *stp) setConfig(cfg *config) error {
 	// Read legacy pools configuration if the given config has no pools configured
 	if cfg.Pools == nil || len(cfg.Pools) == 0 {
 		if len(cfg.ConfDirPath) > 0 {
-			stp.Debug("Reading legacy configuration directory tree %q", cfg.ConfDirPath)
+			stp.Debugf("Reading legacy configuration directory tree %q", cfg.ConfDirPath)
 			p, err := readConfDir(cfg.ConfDirPath)
 			if err != nil {
-				stp.Warn("failed to read configuration directory: %v", err)
+				stp.Warnf("failed to read configuration directory: %v", err)
 			} else {
 				cfg.Pools = p
 			}
 		}
 		if len(cfg.ConfFilePath) > 0 {
-			stp.Debug("Reading legacy configuration file %q", cfg.ConfFilePath)
+			stp.Debugf("Reading legacy configuration file %q", cfg.ConfFilePath)
 			p, err := readConfFile(cfg.ConfFilePath)
 			if err != nil {
-				stp.Warn("failed to read configuration file: %v", err)
+				stp.Warnf("failed to read configuration file: %v", err)
 			} else {
 				if cfg.Pools != nil || len(cfg.Pools) > 0 {
-					stp.Info("Overriding pool configuration from %q with configuration from %q",
+					stp.Infof("Overriding pool configuration from %q with configuration from %q",
 						cfg.ConfDirPath, cfg.ConfFilePath)
 				}
 				cfg.Pools = p
@@ -295,7 +295,7 @@ func (stp *stp) setConfig(cfg *config) error {
 	}
 
 	stp.conf = cfg
-	stp.Debug("policy configuration:\n%s", utils.DumpJSON(stp.conf))
+	stp.Debugf("policy configuration:\n%s", utils.DumpJSON(stp.conf))
 
 	stp.nodeUpdater.update(*stp.conf)
 
@@ -316,7 +316,7 @@ func (stp *stp) initializeState() error {
 	for id := range *ccr {
 		// Remove orphaned containers
 		if _, ok := stp.state.LookupContainer(id); !ok {
-			stp.Info("removing orphaned container %s from policy cache", id)
+			stp.Infof("removing orphaned container %s from policy cache", id)
 			stp.releaseStpResources(id)
 		}
 	}
@@ -382,7 +382,7 @@ func (stp *stp) parseContainerCmdline(cmd, args []string) *cmkLegacyArgs {
 	// NOTE: This is naive implementation and not foolproof. E.g. args could be
 	// defined throught env variables
 	cmdLine := append(cmd, args...)
-	stp.Debug("Parsing container command line %v\n", cmdLine)
+	stp.Debugf("Parsing container command line %v\n", cmdLine)
 
 	cmkArgs := parseCmkCmdline(cmdLine)
 
@@ -450,7 +450,7 @@ func (stp *stp) allocateStpResources(c cache.Container, cs stpContainerStatus) e
 		if ok {
 			iNumCores, err := strconv.ParseInt(envNumCores, 10, 64)
 			if err != nil || iNumCores != cs.NExclusiveCPUs {
-				stp.Warn("Ignoring deprecated env variable setting, %s=%q does "+
+				stp.Warnf("Ignoring deprecated env variable setting, %s=%q does "+
 					"not match the number of cores (%d) from resource request",
 					CmkEnvNumCores, envNumCores, cs.NExclusiveCPUs)
 			}
@@ -495,9 +495,9 @@ func (stp *stp) allocateStpResources(c cache.Container, cs stpContainerStatus) e
 	stp.setContainerRegistry(containers)
 
 	if cs.NoAffinity {
-		stp.Info("not setting cpuset for container  %q as --no-affinity was specified", containerID)
+		stp.Infof("not setting cpuset for container  %q as --no-affinity was specified", containerID)
 	} else {
-		stp.Info("setting cpuset of container %q to %q", containerID, cpuset)
+		stp.Infof("setting cpuset of container %q to %q", containerID, cpuset)
 		c.SetCpusetCpus(cpuset)
 	}
 
@@ -592,7 +592,7 @@ func (stp *stp) getContainerRegistry() *stpContainerCache {
 	ccr := &stpContainerCache{}
 
 	if !stp.state.GetPolicyEntry(cacheKeyContainerRegistry, ccr) {
-		stp.Error("no cached container registry found")
+		stp.Errorf("no cached container registry found")
 	}
 
 	return ccr

@@ -87,11 +87,11 @@ func sendMboxCmd(cpu ID, cmd uint16, subCmd uint16, reqData uint32) (uint32, err
 		},
 	}
 
-	sstlog.Debug("MBOX SEND cpu: %d cmd: %#02x sub: %#02x data: %#x", cpu, cmd, subCmd, reqData)
+	sstlog.Debugf("MBOX SEND cpu: %d cmd: %#02x sub: %#02x data: %#x", cpu, cmd, subCmd, reqData)
 	if err := isstIoctl(ISST_IF_MBOX_COMMAND, uintptr(unsafe.Pointer(&req))); err != nil {
 		return 0, fmt.Errorf("Mbox command failed with %v", err)
 	}
-	sstlog.Debug("MBOX RECV data: %#x", req.Mbox_cmd[0].Resp_data)
+	sstlog.Debugf("MBOX RECV data: %#x", req.Mbox_cmd[0].Resp_data)
 
 	return req.Mbox_cmd[0].Resp_data, nil
 }
@@ -107,11 +107,11 @@ func sendMMIOCmd(cpu ID, reg uint32) (uint32, error) {
 			},
 		},
 	}
-	sstlog.Debug("MMIO SEND cpu: %d reg: %#x", cpu, reg)
+	sstlog.Debugf("MMIO SEND cpu: %d reg: %#x", cpu, reg)
 	if err := isstIoctl(ISST_IF_IO_CMD, uintptr(unsafe.Pointer(&req))); err != nil {
 		return 0, fmt.Errorf("MMIO command failed with %v", err)
 	}
-	sstlog.Debug("MMIO RECV data: %#x", req.Io_reg[0].Value)
+	sstlog.Debugf("MMIO RECV data: %#x", req.Io_reg[0].Value)
 
 	return req.Io_reg[0].Value, nil
 }

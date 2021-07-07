@@ -49,7 +49,7 @@ func InjectGrpcServerTrace(opts ...grpc.ServerOption) []grpc.ServerOption {
 
 // registerGrpcViews registers default client and server trace views for gRPC.
 func registerGrpcViews() error {
-	log.Debug("registering gRPC trace views...")
+	log.Debugf("registering gRPC trace views...")
 
 	if err := view.Register(ocgrpc.DefaultClientViews...); err != nil {
 		return instrumentationError("failed to register default gRPC client views: %v", err)

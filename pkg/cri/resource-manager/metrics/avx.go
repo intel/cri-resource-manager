@@ -54,7 +54,7 @@ func (m *Metrics) collectAvxEvents(raw map[string]*model.MetricFamily) *events.A
 	usage := map[string]bool{}
 	for cgroup, use := range ratio {
 		active := use >= m.opts.AvxThreshold
-		log.Debug(" %s AVX ratio = %f, active?: %v", cgroup, use, active)
+		log.Debugf(" %s AVX ratio = %f, active?: %v", cgroup, use, active)
 		usage["/"+cgroup] = active
 	}
 

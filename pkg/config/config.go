@@ -112,7 +112,7 @@ func Register(path, description string, ptr interface{}, getfn GetConfigFn, opts
 	m := lookup(path)
 
 	if !m.isImplicit() {
-		log.Fatal("module %s: conflicting module with same path already declared (%s)",
+		log.Fatalf("module %s: conflicting module with same path already declared (%s)",
 			path, m.description)
 	}
 
@@ -139,23 +139,23 @@ func setconfig(data Data, source Source) error {
 		return configError("pre-update configuration snapshot failed: %v", err)
 	}
 
-	log.Info("validating configuration...")
+	log.Infof("validating configuration...")
 	err = main.validate(data)
 	if err != nil {
 		return err
 	}
 
-	log.Info("applying configuration...")
+	log.Infof("applying configuration...")
 	err = main.configure(data, false)
 	if err != nil {
 		revertconfig(snapshot, false)
 		return err
 	}
 
-	log.Info("activating configuration...")
+	log.Infof("activating configuration...")
 	err = main.notify(UpdateEvent, source)
 	if err != nil {
-		log.Error("configuration rejected: %v", err)
+		log.Errorf("configuration rejected: %v", err)
 		revertconfig(snapshot, true)
 		return err
 	}
@@ -167,7 +167,7 @@ func setconfig(data Data, source Source) error {
 func revertconfig(snapshot Data, notify bool) {
 	err := main.configure(snapshot, true)
 	if err != nil {
-		log.Error("failed to revert configuration: %v", err)
+		log.Errorf("failed to revert configuration: %v", err)
 	}
 
 	if !notify {
@@ -176,7 +176,7 @@ func revertconfig(snapshot Data, notify bool) {
 
 	err = main.notify(RevertEvent, ConfigBackup)
 	if err != nil {
-		log.Error("reverted configuration rejected: %v", err)
+		log.Errorf("reverted configuration rejected: %v", err)
 	}
 }
 
@@ -220,14 +220,14 @@ func (m *Module) hasChild(name string) bool {
 
 // configure reconfigures the given module and its submodules with the provided data.
 func (m *Module) configure(data Data, force bool) error {
-	log.Debug("module %s: reconfiguring...", m.path)
+	log.Debugf("module %s: reconfiguring...", m.path)
 
 	modcfg, subcfg := data.split(m.hasChild)
 	if err := m.apply(modcfg); err != nil {
 		if !force {
 			return err
 		}
-		log.Error("%v", err)
+		log.Errorf("%v", err)
 	}
 
 	for name, child := range m.children {
@@ -237,14 +237,14 @@ func (m *Module) configure(data Data, force bool) error {
 			if !force {
 				return err
 			}
-			log.Error("%v", err)
+			log.Errorf("%v", err)
 		}
 		err = child.configure(childcfg, force)
 		if err != nil {
 			if !force {
 				return err
 			}
-			log.Error("%v", err)
+			log.Errorf("%v", err)
 		}
 	}
 
@@ -257,7 +257,7 @@ func (m *Module) apply(cfg Data) error {
 		return nil
 	}
 
-	log.Debug("module %s: applying module configuration...", m.path)
+	log.Debugf("module %s: applying module configuration...", m.path)
 
 	// First, reset module config to defaults
 	defcfg, err := DataFromObject(m.getdefault())
@@ -307,7 +307,7 @@ func (m *Module) check() {
 	ptrType := reflect.TypeOf(m.ptr)
 	ptr := reflect.ValueOf(m.ptr).Elem()
 	if ptrType.Kind() != reflect.Ptr || ptr.Kind() != reflect.Struct {
-		log.Fatal("module %s: configuration data must be a pointer to a struct, not %T",
+		log.Fatalf("module %s: configuration data must be a pointer to a struct, not %T",
 			m.path, m.ptr)
 	}
 
@@ -319,7 +319,7 @@ func (m *Module) check() {
 	for i := 0; i < ptr.NumField(); i++ {
 		field := ptr.Type().Field(i)
 		if m.name == fieldName(field) {
-			log.Fatal("module %s: parent has configuration data with conflicting field", m.name)
+			log.Fatalf("module %s: parent has configuration data with conflicting field", m.name)
 		}
 	}
 }
@@ -349,7 +349,7 @@ func getFields(typ reflect.Type) map[string]struct{} {
 
 // validate checks that each field of data refers to either module data or a submodule.
 func (m *Module) validate(data Data) error {
-	log.Debug("validating data for module %s...", m.path)
+	log.Debugf("validating data for module %s...", m.path)
 
 	modcfg, subcfg := data.split(m.hasChild)
 	fields := map[string]struct{}{}
@@ -364,7 +364,7 @@ func (m *Module) validate(data Data) error {
 				return configError("implicit module %s: given configuration data %s",
 					m.path, strings.Join(names, ","))
 			}
-			log.Error("implicit module %s: given configuration date %s",
+			log.Errorf("implicit module %s: given configuration date %s",
 				m.path, strings.Join(names, ","))
 		}
 	} else {
@@ -376,7 +376,7 @@ func (m *Module) validate(data Data) error {
 			if !m.noValidate {
 				return configError("module %s: given unknown configuration data %s", m.path, field)
 			}
-			log.Error("module %s: given unknown configuration data %s", m.path, field)
+			log.Errorf("module %s: given unknown configuration data %s", m.path, field)
 		}
 	}
 
@@ -452,7 +452,7 @@ func lookup(path string) *Module {
 func Print(printfn func(string, ...interface{})) {
 	data, err := GetConfig()
 	if err != nil {
-		log.Error("error: failed to get configuration: %v", err)
+		log.Errorf("error: failed to get configuration: %v", err)
 		return
 	}
 	data.Print(printfn)

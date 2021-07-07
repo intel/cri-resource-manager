@@ -44,16 +44,16 @@ type metrics struct {
 // start starts our Prometheus exporter.
 func (m *metrics) start(mux *http.ServeMux, period time.Duration, enable bool) error {
 	if !enable {
-		log.Info("%s is disabled", prometheusExporter)
+		log.Infof("%s is disabled", prometheusExporter)
 		return nil
 	}
 
-	log.Info("starting %s...", prometheusExporter)
+	log.Infof("starting %s...", prometheusExporter)
 
 	cfg := prometheus.Options{
 		Namespace: prometheusNamespace(ServiceName),
 		Gatherer:  pclient.Gatherers{dynamicGatherers},
-		OnError:   func(err error) { log.Error("prometheus error: %v", err) },
+		OnError:   func(err error) { log.Errorf("prometheus error: %v", err) },
 	}
 
 	exp, err := prometheus.NewExporter(cfg)
@@ -78,7 +78,7 @@ func (m *metrics) stop() {
 		return
 	}
 
-	log.Info("stopping %s...", prometheusExporter)
+	log.Infof("stopping %s...", prometheusExporter)
 
 	view.UnregisterExporter(m.exporter)
 	m.mux.Unregister(PrometheusMetricsPath)
@@ -88,7 +88,7 @@ func (m *metrics) stop() {
 
 // reconfigure reconfigures our Prometheus exporter.
 func (m *metrics) reconfigure(mux *http.ServeMux, period time.Duration, enable bool) error {
-	log.Info("reconfiguring %s...", prometheusExporter)
+	log.Infof("reconfiguring %s...", prometheusExporter)
 
 	if !enable {
 		m.stop()

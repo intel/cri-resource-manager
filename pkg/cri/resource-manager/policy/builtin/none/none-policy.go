@@ -39,7 +39,7 @@ var _ policy.Backend = &none{}
 // CreateNonePolicy creates a new policy instance.
 func CreateNonePolicy(opts *policy.BackendOptions) policy.Backend {
 	n := &none{Logger: logger.NewLogger(PolicyName)}
-	n.Info("creating policy...")
+	n.Infof("creating policy...")
 	return n
 }
 
@@ -55,43 +55,43 @@ func (n *none) Description() string {
 
 // Start prepares this policy for accepting allocation/release requests.
 func (n *none) Start(add []cache.Container, del []cache.Container) error {
-	n.Debug("got started...")
+	n.Debugf("got started...")
 	return nil
 }
 
 // Sync synchronizes the active policy state.
 func (n *none) Sync(add []cache.Container, del []cache.Container) error {
-	n.Debug("(not) synchronizing policy state")
+	n.Debugf("(not) synchronizing policy state")
 	return nil
 }
 
 // AllocateResources is a resource allocation request for this policy.
 func (n *none) AllocateResources(c cache.Container) error {
-	n.Debug("(not) allocating container %s...", c.PrettyName())
+	n.Debugf("(not) allocating container %s...", c.PrettyName())
 	return nil
 }
 
 // ReleaseResources is a resource release request for this policy.
 func (n *none) ReleaseResources(c cache.Container) error {
-	n.Debug("(not) releasing container %s...", c.PrettyName())
+	n.Debugf("(not) releasing container %s...", c.PrettyName())
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (n *none) UpdateResources(c cache.Container) error {
-	n.Debug("(not) updating container %s...", c.PrettyName())
+	n.Debugf("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 
 // Rebalance tries to find an optimal allocation of resources for the current containers.
 func (n *none) Rebalance() (bool, error) {
-	n.Debug("(not) rebalancing containers...")
+	n.Debugf("(not) rebalancing containers...")
 	return false, nil
 }
 
 // HandleEvent handles policy-specific events.
 func (n *none) HandleEvent(*events.Policy) (bool, error) {
-	n.Debug("(not) handling event...")
+	n.Debugf("(not) handling event...")
 	return false, nil
 }
 

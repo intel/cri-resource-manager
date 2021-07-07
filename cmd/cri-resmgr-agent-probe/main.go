@@ -48,7 +48,7 @@ func main() {
 	}
 	conn, err := grpc.Dial(*socket, dialOpts...)
 	if err != nil {
-		log.Fatal("failed to connect to agent: %v", err)
+		log.Fatalf("failed to connect to agent: %v", err)
 	}
 	cli := agent_v1.NewAgentClient(conn)
 
@@ -58,10 +58,10 @@ func main() {
 
 	rpl, err := cli.HealthCheck(ctx, &agent_v1.HealthCheckRequest{})
 	if err != nil {
-		log.Fatal("%v", err)
+		log.Fatalf("%v", err)
 	}
 	if rpl.Error != "" {
-		log.Fatal("health check negative: %s", rpl.Error)
+		log.Fatalf("health check negative: %s", rpl.Error)
 	}
-	log.Info("Health check OK")
+	log.Infof("Health check OK")
 }

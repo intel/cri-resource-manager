@@ -126,7 +126,7 @@ func CreatePodpoolsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
 		podMaxMilliCPU: make(map[string]int64),
 		cpuAllocator:   cpuallocator.NewCPUAllocator(policyOptions.System),
 	}
-	log.Info("creating %s policy...", PolicyName)
+	log.Infof("creating %s policy...", PolicyName)
 	// Handle common policy options: AvailableResources and ReservedResources.
 	// p.allowed: CPUs available for the policy
 	if allowed, ok := policyOptions.Available[policyapi.DomainCPU]; ok {
@@ -145,19 +145,19 @@ func CreatePodpoolsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
 			reserveCnt := (int(v.MilliValue()) + 999) / 1000
 			cpus, err := p.cpuAllocator.AllocateCpus(&p.allowed, reserveCnt, cpuallocator.PriorityNone)
 			if err != nil {
-				log.Fatal("failed to allocate reserved CPUs: %s", err)
+				log.Fatalf("failed to allocate reserved CPUs: %s", err)
 			}
 			p.reserved = cpus
 			p.allowed = p.allowed.Union(cpus)
 		}
 	}
 	if p.reserved.IsEmpty() {
-		log.Fatal("%s cannot run without reserved CPUs that are also AvailableResources", PolicyName)
+		log.Fatalf("%s cannot run without reserved CPUs that are also AvailableResources", PolicyName)
 	}
 	// Handle policy-specific options
-	log.Debug("creating %s configuration", PolicyName)
+	log.Debugf("creating %s configuration", PolicyName)
 	if err := p.setConfig(podpoolsOptions); err != nil {
-		log.Fatal("failed to create %s policy: %v", PolicyName, err)
+		log.Fatalf("failed to create %s policy: %v", PolicyName, err)
 	}
 
 	pkgcfg.GetModule(PolicyPath).AddNotify(p.configNotify)
@@ -177,13 +177,13 @@ func (p *podpools) Description() string {
 
 // Start prepares this policy for accepting allocation/release requests.
 func (p *podpools) Start(add []cache.Container, del []cache.Container) error {
-	log.Info("%s policy started", PolicyName)
+	log.Infof("%s policy started", PolicyName)
 	return p.Sync(add, del)
 }
 
 // Sync synchronizes the active policy state.
 func (p *podpools) Sync(add []cache.Container, del []cache.Container) error {
-	log.Debug("synchronizing state...")
+	log.Debugf("synchronizing state...")
 	for _, c := range del {
 		p.ReleaseResources(c)
 	}
@@ -195,7 +195,7 @@ func (p *podpools) Sync(add []cache.Container, del []cache.Container) error {
 
 // AllocateResources is a resource allocation request for this policy.
 func (p *podpools) AllocateResources(c cache.Container) error {
-	log.Debug("allocating container %s...", c.PrettyName())
+	log.Debugf("allocating container %s...", c.PrettyName())
 	// Assign container to correct pool.
 	pod, ok := c.GetPod()
 	if !ok {
@@ -205,7 +205,7 @@ func (p *podpools) AllocateResources(c cache.Container) error {
 		p.assignContainer(c, pool)
 		p.trackPodCPU(pod, pool)
 		if log.DebugEnabled() {
-			log.Debug(p.dumpPool(pool))
+			log.Debugf(p.dumpPool(pool))
 		}
 	} else {
 		// Cannot assign container to any of the pooled CPUs.
@@ -216,7 +216,7 @@ func (p *podpools) AllocateResources(c cache.Container) error {
 
 // ReleaseResources is a resource release request for this policy.
 func (p *podpools) ReleaseResources(c cache.Container) error {
-	log.Debug("releasing container %s...", c.PrettyName())
+	log.Debugf("releasing container %s...", c.PrettyName())
 	pod, ok := c.GetPod()
 	if !ok {
 		return podpoolsError("cannot find pod of container %s from the cache", c.PrettyName())
@@ -224,34 +224,34 @@ func (p *podpools) ReleaseResources(c cache.Container) error {
 	if pool := p.allocatedPool(pod); pool != nil {
 		p.dismissContainer(c, pool)
 		if log.DebugEnabled() {
-			log.Debug(p.dumpPool(pool))
+			log.Debugf(p.dumpPool(pool))
 		}
 		if p.containersInPool(pod, pool) == 0 {
-			log.Debug("all containers removed, free pool allocation %s for pod %q", pool.PrettyName(), pod.GetName())
+			log.Debugf("all containers removed, free pool allocation %s for pod %q", pool.PrettyName(), pod.GetName())
 			p.validatePodCPU(pod, pool)
 			p.freePool(pod, pool)
 		}
 	} else {
-		log.Debug("ReleaseResources: pool-less container %s, nothing to release", c.PrettyName())
+		log.Debugf("ReleaseResources: pool-less container %s, nothing to release", c.PrettyName())
 	}
 	return nil
 }
 
 // UpdateResources is a resource allocation update request for this policy.
 func (p *podpools) UpdateResources(c cache.Container) error {
-	log.Debug("(not) updating container %s...", c.PrettyName())
+	log.Debugf("(not) updating container %s...", c.PrettyName())
 	return nil
 }
 
 // Rebalance tries to find an optimal allocation of resources for the current containers.
 func (p *podpools) Rebalance() (bool, error) {
-	log.Debug("(not) rebalancing containers...")
+	log.Debugf("(not) rebalancing containers...")
 	return false, nil
 }
 
 // HandleEvent handles policy-specific events.
 func (p *podpools) HandleEvent(*events.Policy) (bool, error) {
-	log.Debug("(not) handling event...")
+	log.Debugf("(not) handling event...")
 	return false, nil
 }
 
@@ -305,14 +305,14 @@ func (p *podpools) allocatePool(pod cache.Pod) *Pool {
 		// FirstFree is already the first of the pools list.
 	}
 	if len(pools) == 0 {
-		log.Error("cannot find free %q pool for pod %q, falling back to %q", poolDef.Name, pod.GetName(), defaultPoolDefName)
+		log.Errorf("cannot find free %q pool for pod %q, falling back to %q", poolDef.Name, pod.GetName(), defaultPoolDefName)
 		pools = []*Pool{p.pools[1]}
 	}
 	// Found a suitable pool. Allocate it for the pod.
 	podID := pod.GetID()
 	pool := pools[0]
 	pool.PodIDs[podID] = []string{}
-	log.Debug("allocated pool %s[%d] for pod %q", pool.Def.Name, pool.Instance, pod.GetName())
+	log.Debugf("allocated pool %s[%d] for pod %q", pool.Def.Name, pool.Instance, pod.GetName())
 	return pool
 }
 
@@ -373,7 +373,7 @@ func (p *podpools) trackPodCPU(pod cache.Pod, pool *Pool) {
 	}
 	// Check overbooking
 	if cpuAvail := p.availableMilliCPUs(pool); cpuAvail < 0 {
-		log.Error("overbooked pool %q, cpuset:%s: %dm / %dm CPUs used, %d mCPU available", pool.PrettyName(), pool.CPUs, pool.CPUs.Size()*1000-int(cpuAvail), pool.CPUs.Size()*1000, cpuAvail)
+		log.Errorf("overbooked pool %q, cpuset:%s: %dm / %dm CPUs used, %d mCPU available", pool.PrettyName(), pool.CPUs, pool.CPUs.Size()*1000-int(cpuAvail), pool.CPUs.Size()*1000, cpuAvail)
 	}
 }
 
@@ -396,7 +396,7 @@ func (p *podpools) validatePodCPU(pod cache.Pod, pool *Pool) {
 				if pod, ok := p.cch.LookupPod(podID); ok {
 					podName = pod.GetName()
 				}
-				log.Error("bad CPU requests: pod %q requested %d mCPUs, but in pool %q pods must request %d mCPUs.", podName, podmCPU, pool.Def.Name, poolmCPUperPod)
+				log.Errorf("bad CPU requests: pod %q requested %d mCPUs, but in pool %q pods must request %d mCPUs.", podName, podmCPU, pool.Def.Name, poolmCPUperPod)
 			}
 		}
 	}
@@ -417,12 +417,12 @@ func (p *podpools) getPodMilliCPU(podID string) int64 {
 
 // configNotify applies new configuration.
 func (p *podpools) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
-	log.Info("configuration %s", event)
+	log.Infof("configuration %s", event)
 	if err := p.setConfig(podpoolsOptions); err != nil {
-		log.Error("config update failed: %v", err)
+		log.Errorf("config update failed: %v", err)
 		return err
 	}
-	log.Info("config updated successfully")
+	log.Infof("config updated successfully")
 	p.Sync(p.cch.GetContainers(), nil)
 	return nil
 }
@@ -452,7 +452,7 @@ func (p *podpools) getPoolDef(pod cache.Pod) *PoolDef {
 			return poolDef
 		}
 	}
-	log.Error("pod %q pool %q does not match any pool definition, falling back to %q", pod.GetName(), poolDefName, p.defaultPoolDef.Name)
+	log.Errorf("pod %q pool %q does not match any pool definition, falling back to %q", pod.GetName(), poolDefName, p.defaultPoolDef.Name)
 	return p.defaultPoolDef
 }
 
@@ -521,7 +521,7 @@ func (p *podpools) applyPoolDef(pools *[]*Pool, poolDef *PoolDef, freeCpus *cpus
 		if poolCount > 1 && poolDef.FillOrder == FillPacked && poolDef.MaxPods == 0 {
 			return podpoolsError("pool %q: %d pool(s) unreachable due to unlimited pod capacity and FillOrder: %s", poolDef.Name, poolCount-1, poolDef.FillOrder)
 		}
-		log.Debug("allocating %d out of %d non-reserved CPUs for %d %q pools", poolCount*cpusPerPool, nonReservedCpuCount, poolCount, poolDef.Name)
+		log.Debugf("allocating %d out of %d non-reserved CPUs for %d %q pools", poolCount*cpusPerPool, nonReservedCpuCount, poolCount, poolDef.Name)
 		for poolIndex := 0; poolIndex < poolCount; poolIndex++ {
 			if cpusPerPool > freeCpus.Size() {
 				return podpoolsError("insufficient CPUs when trying to allocate %d CPUs for pool %s[%d]", cpusPerPool, poolDef.Name, poolIndex)
@@ -577,27 +577,27 @@ func (p *podpools) setConfig(ppoptions *PodpoolsOptions) error {
 	if freeCpus.Size() > 0 {
 		if defaultPool.CPUs.Intersection(reservedPool.CPUs).IsEmpty() {
 			// User has reallocated "default" pool CPUs
-			log.Debug("%d unused CPUs are added to the default pool.", freeCpus.Size())
+			log.Debugf("%d unused CPUs are added to the default pool.", freeCpus.Size())
 			defaultPool.CPUs = defaultPool.CPUs.Union(freeCpus)
 		} else {
-			log.Debug("%d unused CPUs are used as the default pool.", freeCpus.Size())
+			log.Debugf("%d unused CPUs are used as the default pool.", freeCpus.Size())
 			defaultPool.CPUs = freeCpus
 		}
 	}
 	// Finish pool instance initialization.
-	log.Info("%s policy pools:", PolicyName)
+	log.Infof("%s policy pools:", PolicyName)
 	for index, pool := range pools {
 		pool.Mems = p.closestMems(pool.CPUs)
 		pool.PodIDs = make(map[string][]string)
-		log.Info("- pool %d: %s", index, pool)
+		log.Infof("- pool %d: %s", index, pool)
 	}
 	// No errors in pool creation, take new configuration into use.
-	log.Debug("new %s configuration:\n%s", PolicyName, utils.DumpJSON(ppoptions))
+	log.Debugf("new %s configuration:\n%s", PolicyName, utils.DumpJSON(ppoptions))
 	p.pools = pools
 	p.ppoptions = *ppoptions
 	// Warning on multiple user-defined pools.
 	if userPoolDefs > 1 {
-		log.Warn("Multiple (%d) user-defined pool definitions on the node. kube-scheduler does not know which of the pools has CPUs left for new workloads, and may overbook pools on the node.", userPoolDefs)
+		log.Warnf("Multiple (%d) user-defined pool definitions on the node. kube-scheduler does not know which of the pools has CPUs left for new workloads, and may overbook pools on the node.", userPoolDefs)
 	}
 	return nil
 }
@@ -696,7 +696,7 @@ func (p *podpools) availableMilliCPUs(pool *Pool) int64 {
 
 // assignContainer adds a container to a pool
 func (p *podpools) assignContainer(c cache.Container, pool *Pool) {
-	log.Info("assigning container %s to pool %s", c.PrettyName(), pool)
+	log.Infof("assigning container %s to pool %s", c.PrettyName(), pool)
 	podID := c.GetPodID()
 	pool.PodIDs[podID] = append(pool.PodIDs[podID], c.GetCacheID())
 	p.pinCpuMem(c, pool.CPUs, pool.Mems)
@@ -711,7 +711,7 @@ func (p *podpools) dismissContainer(c cache.Container, pool *Pool) {
 // pinCpuMem pins container to CPUs and memory nodes if flagged
 func (p *podpools) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems sysfs.IDSet) {
 	if p.ppoptions.PinCPU {
-		log.Debug("  - pinning to cpuset: %s", cpus)
+		log.Debugf("  - pinning to cpuset: %s", cpus)
 		c.SetCpusetCpus(cpus.String())
 		if reqCpu, ok := c.GetResourceRequirements().Requests[corev1.ResourceCPU]; ok {
 			mCpu := int(reqCpu.MilliValue())
@@ -719,7 +719,7 @@ func (p *podpools) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems sysfs.I
 		}
 	}
 	if p.ppoptions.PinMemory {
-		log.Debug("  - pinning to memory %s", mems)
+		log.Debugf("  - pinning to memory %s", mems)
 		c.SetCpusetMems(mems.String())
 	}
 }

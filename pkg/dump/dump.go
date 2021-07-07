@@ -193,7 +193,7 @@ func (d *dumper) configure(o *options) {
 
 	if d.path != o.File || d.disabled != o.Disabled {
 		if d.file != nil {
-			log.Info("closing old message dump file %q...", d.path)
+			log.Infof("closing old message dump file %q...", d.path)
 			d.file.Close()
 			d.file = nil
 		}
@@ -206,10 +206,10 @@ func (d *dumper) configure(o *options) {
 		d.path = o.File
 		if d.path != "" {
 			var err error
-			log.Info("opening new message dump file %q...", d.path)
+			log.Infof("opening new message dump file %q...", d.path)
 			d.file, err = os.Create(d.path)
 			if err != nil {
-				log.Error("failed to open file %q: %v", d.path, err)
+				log.Errorf("failed to open file %q: %v", d.path, err)
 			}
 		}
 	}
@@ -228,7 +228,7 @@ func (d *dumper) train(names []string) {
 	for idx, name := range names {
 		method := methodName(name)
 		detail := d.rules.detailOf(method)
-		log.Info("%s: %v", method, detail)
+		log.Infof("%s: %v", method, detail)
 		d.methods[idx] = method
 		d.details[method] = detail
 	}
@@ -297,9 +297,9 @@ func (d *dumper) full(dir direction, kind, method, qualifier string, msg interfa
 func (d *dumper) line(dir direction, latency time.Duration, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	if !d.debug {
-		message.Info("%s", msg)
+		message.Infof("%s", msg)
 	} else {
-		message.Debug("%s", msg)
+		message.Debugf("%s", msg)
 	}
 	if d.file != nil {
 		d.tofile(dir, latency, "%s", msg)
@@ -323,7 +323,7 @@ func (d *dumper) block(dir direction, latency time.Duration, prefix, msg string)
 // warn dumps a single line as a warning.
 func (d *dumper) warn(dir direction, latency time.Duration, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	message.Warn("%s", msg)
+	message.Warnf("%s", msg)
 	if d.file != nil {
 		d.tofile(dir, latency, "%s", msg)
 	}
