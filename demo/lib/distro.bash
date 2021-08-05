@@ -27,6 +27,7 @@ distro-remove-pkg()         { distro-resolve "$@"; }
 distro-setup-proxies()      { distro-resolve "$@"; }
 distro-install-utils()      { distro-resolve "$@"; }
 distro-install-golang()     { distro-resolve "$@"; }
+distro-install-runc()       { distro-resolve "$@"; }
 distro-install-containerd() { distro-resolve "$@"; }
 distro-config-containerd()  { distro-resolve "$@"; }
 distro-restart-containerd() { distro-resolve "$@"; }
@@ -194,7 +195,18 @@ debian-install-pkg() {
     # /etc/containerd/config.toml and then apt-get installs
     # containerd. 'yes ""' will continue with the default answer (N:
     # keep existing) in this case. Without 'yes' installation fails.
-    vm-command "yes \"\" | apt-get install -y $*" ||
+
+    # Add apt-get option "--reinstall" if any environment variable
+    # reinstall_<pkg>=1
+    local pkg
+    local opts=""
+    for pkg in "$@"; do
+        if [ "$(eval echo \$reinstall_$pkg)" == "1" ]; then
+            opts="$opts --reinstall"
+            break
+        fi
+    done
+    vm-command "yes \"\" | apt-get install $opts -y $*" ||
         command-error "failed to install $*"
 }
 
@@ -319,8 +331,27 @@ fedora-install-repo() {
 }
 
 fedora-install-pkg() {
+    local pkg
+    local do_reinstall=0
+    for pkg in "$@"; do
+        if [ "$(eval echo \$reinstall_$pkg)" == "1" ]; then
+            do_reinstall=1
+            break
+        fi
+    done
     vm-command "dnf install -y $*" ||
         command-error "failed to install $*"
+    # When requesting reinstallation, detect which packages were
+    # already installed and reinstall those.
+    # (Unlike apt and zypper, dnf offers no option for reinstalling
+    # existing and installing new packages on the same run.)
+    if [ "$do_reinstall" == "1" ]; then
+        local reinstall_pkgs
+        reinstall_pkgs=$(awk -F '[ -]' -v ORS=" " '/Package .* already installed/{print $2}' <<< "$COMMAND_OUTPUT")
+        if [ -n "$reinstall_pkgs" ]; then
+            vm-command "dnf reinstall -y $reinstall_pkgs"
+        fi
+    fi
 }
 
 fedora-remove-pkg() {
@@ -439,13 +470,23 @@ opensuse-install-repo() {
 }
 
 opensuse-refresh-pkg-db() {
+    opensuse-wait-for-zypper
     vm-command "$ZYPPER refresh" ||
-        command-err "failed to refresh zypper package DB"
+        command-error "failed to refresh zypper package DB"
 }
 
 opensuse-install-pkg() {
     opensuse-wait-for-zypper
-    vm-command "$ZYPPER install $*" ||
+    # Add zypper option "--force" if environment variable reinstall_<pkg>=1
+    local pkg
+    local opts=""
+    for pkg in "$@"; do
+        if [ "$(eval echo \$reinstall_$pkg)" == "1" ]; then
+            opts="$opts --force"
+            break
+        fi
+    done
+    vm-command "$ZYPPER install $opts $*" ||
         command-error "failed to install $*"
 }
 
@@ -464,17 +505,27 @@ opensuse-wait-for-zypper() {
         error "Failed to stop zypper running in the background"
 }
 
-opensuse-install-crio-pre() {
-    distro-install-pkg runc conmon
-    vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
-}
-
-opensuse-install-containerd() {
+opensuse-require-repo-virtualization-containers() {
     vm-command "zypper ls"
     if ! grep -q Virtualization_containers <<< "$COMMAND_OUTPUT"; then
         opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/openSUSE_Leap_15.2/Virtualization:containers.repo
         opensuse-refresh-pkg-db
     fi
+}
+
+opensuse-install-crio-pre() {
+    opensuse-require-repo-virtualization-containers
+    distro-install-pkg --from Virtualization_containers runc conmon
+    vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
+}
+
+opensuse-install-runc() {
+    opensuse-require-repo-virtualization-containers
+    distro-install-pkg --from Virtualization_containers runc
+}
+
+opensuse-install-containerd() {
+    opensuse-require-repo-virtualization-containers
     distro-install-pkg --from Virtualization_containers containerd containerd-ctr
     vm-command "ln -sf /usr/sbin/containerd-ctr /usr/sbin/ctr"
 
@@ -670,9 +721,12 @@ default-k8s-cni() {
     echo cilium
 }
 
+default-install-runc() {
+    distro-install-pkg runc
+}
+
 default-install-containerd() {
     vm-command-q "[ -f /usr/bin/containerd ]" || {
-        distro-refresh-pkg-db
         distro-install-pkg containerd
     }
 }

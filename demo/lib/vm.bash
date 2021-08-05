@@ -145,7 +145,6 @@ vm-check-running-binary() {
     return 0
 }
 
-
 vm-check-source-files-changed() {
     local bin_change
     local src_change
@@ -634,7 +633,7 @@ vm-install-pkg() {
 
 vm-setup-oneshot() {
     local util
-    distro-refresh-pkg-db
+    ( distro-refresh-pkg-db ) || true
     distro-install-utils
     # Verify that all required utilities exit on the VM.
     for util in pidof killall; do
@@ -660,7 +659,7 @@ vm-install-runc() {
         fi
         vm-put-file "$host_runc" "$vm_runc"
     else
-        distro-install-pkg runc
+        distro-install-runc
     fi
 }
 
@@ -780,8 +779,12 @@ vm-create-cluster() {
     vm-command "cp /etc/kubernetes/admin.conf ~root/.kube/config"
 }
 
+vm-destroy-cluster() {
+    vm-command "yes | kubeadm reset; rm -f \$HOME/.kube/config ~root/.kube/config /etc/kubernetes"
+}
+
 vm-install-cni-cilium() {
-    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.8/install/kubernetes/quick-install.yaml"
+    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.9/install/kubernetes/quick-install.yaml"
     if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
         command-error "installing cilium CNI to Kubernetes timed out"
     fi
