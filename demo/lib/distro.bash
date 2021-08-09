@@ -445,9 +445,47 @@ sles-ssh-user() {
 }
 
 sles-install-utils() {
-    vm-command-q "$ZYPPER lr openSUSE-Oss >/dev/null" || {
-        distro-install-repo http://download.opensuse.org/distribution/leap/15.3/repo/oss/ openSUSE-Oss
+    local sles_registered=0
+    local sles_version=""
+    vm-command "SUSEConnect -s" || {
+        command-error "cannot run SUSEConnect"
     }
+    # Parse registration status and SLES version.
+    if [ "$(jq '.[] | select(.identifier == "SLES") | .status' <<< $COMMAND_OUTPUT)" == '"Registered"' ]; then
+        sles_registered=1
+    fi
+    sles_version="$(jq -r '.[] | select(.identifier == "SLES") | .version' <<< $COMMAND_OUTPUT)"
+    if [ -z "$sles_version" ]; then
+        command-error "cannot read SLES version information from SUSEConnect -s output"
+    fi
+    # Try automatic registration if registration code is provided.
+    if [ "$sles_registered" == 0 ] && [ -n "$VM_SLES_REGCODE" ]; then
+            vm-command "SUSEConnect -r $VM_SLES_REGCODE" || {
+                echo "ERROR:"
+                echo "ERROR: Registering to SUSE Customer Center failed."
+                echo "ERROR: - Verify VM_SLES_REGCODE and try again."
+                echo "ERROR: - Unset VM_SLES_REGCODE to skip registration (use unsupported repos)."
+                echo "ERROR:"
+                exit 1
+            }
+            sles_registered=1
+    fi
+    # Add correct repo, depending on registration status.
+    if [ "$sles_registered" == 0 ]; then
+        echo "WARNING:"
+        echo "WARNING: Unregistered SUSE Linux Enterprise Server."
+        echo "WARNING: VM_SLES_REGCODE is not set, automatic registration skipped."
+        echo "WARNING: Fallback to use OpenSUSE OSS repository."
+        echo "WARNING:"
+        sleep "${warning_delay:-0}"
+        vm-command-q "$ZYPPER lr openSUSE-Oss >/dev/null" || {
+            distro-install-repo "http://download.opensuse.org/distribution/leap/${sles_version}/repo/oss/" openSUSE-Oss
+        }
+    else
+        vm-command-q "$ZYPPER lr | grep -q SUSE-PackageHub" || {
+            vm-command "SUSEConnect -p PackageHub/${sles_version}/x86_64"
+        }
+    fi
     distro-install-pkg sysvinit-tools psmisc
 }
 
@@ -567,8 +605,8 @@ opensuse-install-k8s() {
     if ! grep -q snappy <<< "$COMMAND_OUTPUT"; then
         distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.2 snappy"
         distro-refresh-pkg-db
-        distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
     fi
+    distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
     vm-install-containernetworking
     vm-command "systemctl enable --now snapd"
     vm-command "snap wait system seed.loaded"
