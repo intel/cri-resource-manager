@@ -8,7 +8,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>End-to-End tests &mdash; CRI Resource Manager 0.5.0-85-g73524c48 documentation</title>
+  <title>End-to-End tests &mdash; CRI Resource Manager 0.5.0-87-g8e490f79 documentation</title>
   
 
   
@@ -291,7 +291,7 @@ local git sources will not be affected:</p>
 <section id="custom-tests">
 <h2>Custom tests<a class="headerlink" href="#custom-tests" title="Permalink to this headline">¶</a></h2>
 <p>You can run a custom test script in a virtual machine that runs
-single-node Kubernetes cluster. Example:</p>
+single-node Kubernetes* cluster. Example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cat &gt; myscript.sh &lt;&lt; EOF
 # create two pods, each requesting two CPUs
 CPU=2 n=2 create guaranteed
@@ -351,7 +351,7 @@ two threads. And with a NUMA node with 16G of non-volatile memory
 variable <code class="docutils literal notranslate"><span class="pre">outdir</span></code>. The default is <code class="docutils literal notranslate"><span class="pre">./output</span></code>.</p>
 <p>Executed commands with their output, exit status and timestamps are
 saved under the <code class="docutils literal notranslate"><span class="pre">output/commands</span></code> directory.</p>
-<p>You can find Qemu output from Docker logs. For instance, output of the
+<p>You can find Qemu output from Docker* logs. For instance, output of the
 most recent Qemu launced by <code class="docutils literal notranslate"><span class="pre">govm</span></code>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ docker logs $(docker ps | awk &#39;/govm/{print $1; exit}&#39;)
 </pre></div>
@@ -368,7 +368,7 @@ run.sh&gt; CPU=2 n=2 create guaranteed
 <p>You can get help on functions available in test scripts with <code class="docutils literal notranslate"><span class="pre">./run.sh</span> <span class="pre">help</span> <span class="pre">script</span></code>, or with <code class="docutils literal notranslate"><span class="pre">help</span></code> and <code class="docutils literal notranslate"><span class="pre">help</span> <span class="pre">FUNCTION</span></code> when in the
 interactive mode.</p>
 <p>If a test has stopped to a failing <code class="docutils literal notranslate"><span class="pre">verify</span></code>, you can inspect
-<code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> cache and allowed OS resources in Python after the test
+<code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> cache and allowed OS resources in Python* after the test
 run:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ PYTHONPATH=&lt;TEST-OUTPUT-DIR&gt; python3
 &gt;&gt;&gt; from pyexec_state import *

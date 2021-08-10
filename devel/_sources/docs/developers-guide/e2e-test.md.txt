@@ -102,7 +102,7 @@ e2e$ reinstall_cri_resmgr=1 binsrc=github ./run.sh play
 ## Custom tests
 
 You can run a custom test script in a virtual machine that runs
-single-node Kubernetes cluster. Example:
+single-node Kubernetes\* cluster. Example:
 
 ```
 $ cat > myscript.sh << EOF
@@ -171,7 +171,7 @@ variable `outdir`. The default is `./output`.
 Executed commands with their output, exit status and timestamps are
 saved under the `output/commands` directory.
 
-You can find Qemu output from Docker logs. For instance, output of the
+You can find Qemu output from Docker\* logs. For instance, output of the
 most recent Qemu launced by `govm`:
 ```
 $ docker logs $(docker ps | awk '/govm/{print $1; exit}')
@@ -192,7 +192,7 @@ help script`, or with `help` and `help FUNCTION` when in the
 interactive mode.
 
 If a test has stopped to a failing `verify`, you can inspect
-`cri-resmgr` cache and allowed OS resources in Python after the test
+`cri-resmgr` cache and allowed OS resources in Python\* after the test
 run:
 
 ```
