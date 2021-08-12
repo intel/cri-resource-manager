@@ -64,6 +64,8 @@ usage() {
     echo "             then reinstall and restart it before starting test run."
     echo "             The default is 0."
     echo "             Set containerd_src/crio_src/runc_src to install a local build."
+    echo "    reinstall_k8s: if 1, destroy existing k8s cluster and create a new one."
+    echo "    reinstall_all: if 1, set all above reinstall_* options to 1."
     echo "    omit_cri_resmgr: if 1, omit checking/installing/starting cri-resmgr."
     echo "    omit_agent: if 1, omit checking/installing/starting cri-resmgr-agent."
     echo "    outdir:  Save output under given directory."
@@ -153,13 +155,6 @@ screen-create-vm() {
     if [ -z "$VM_IP" ]; then
         error "creating VM failed"
     fi
-}
-
-screen-install-k8s() {
-    speed=60 out "### Installing CRI Runtime to the VM."
-    vm-install-cri
-    speed=60 out "### Installing Kubernetes to the VM."
-    vm-install-k8s
 }
 
 screen-install-cri-resmgr() {
@@ -974,7 +969,7 @@ test-user-code() {
 }
 
 # Validate parameters
-input_var_names="mode user_script_file distro k8scri vm cgroups speed binsrc reinstall_containerd reinstall_crio reinstall_cri_resmgr outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
+input_var_names="mode user_script_file distro k8scri vm cgroups speed binsrc reinstall_all reinstall_containerd reinstall_crio reinstall_cri_resmgr reinstall_k8s reinstall_oneshot outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
 
 INTERACTIVE_MODE=0
 mode=$1
@@ -1028,11 +1023,22 @@ cri_resmgr_cfg=${cri_resmgr_cfg:-"${SCRIPT_DIR}/cri-resmgr-topology-aware.cfg"}
 cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
 cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
 cleanup=${cleanup:-0}
+reinstall_all=${reinstall_all:-0}
 reinstall_containerd=${reinstall_containerd:-0}
-reinstall_crio=${reinstall_crio:-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr:-0}
 reinstall_cri_resmgr_agent=${reinstall_cri_resmgr_agent:-0}
+reinstall_crio=${reinstall_crio:-0}
+reinstall_k8s=${reinstall_k8s:-0}
+reinstall_kubeadm=${reinstall_kubeadm:-0}
+reinstall_kubectl=${reinstall_kubectl:-0}
+reinstall_kubelet=${reinstall_kubelet:-0}
+reinstall_oneshot=${reinstall_oneshot:-0}
 reinstall_runc=${reinstall_runc:-0}
+if [ "$reinstall_all" == "1" ]; then
+    for reinstall_var in ${!reinstall_*}; do
+        eval "${reinstall_var}=1"
+    done
+fi
 omit_agent=${omit_agent:-0}
 omit_cri_resmgr=${omit_cri_resmgr:-0}
 py_consts="${py_consts:-''}"
@@ -1170,16 +1176,20 @@ if [ -n "$vm_files" ]; then
     install-files "$vm_files"
 fi
 
-if ! vm-command-q "type -p kubelet >/dev/null"; then
-    screen-install-k8s
+if [ "$reinstall_containerd" == "1" ] || [ "$reinstall_crio" == "1" ] || ! vm-command-q "( type -p containerd || type -p crio ) >/dev/null"; then
+    vm-install-cri
 fi
 
-if [ "$reinstall_runc" == "1" ]; then
+# runc is installed as a dependency of containerd and crio.
+# If reinstalling runc is explictly wished for, it is safe to do
+# only after (re)installing contaienrd/crio. Otherwise
+# a custom locally built runc may be overridden from packages.
+if [ "$reinstall_runc" == "1" ] || ! vm-command-q "type -p runc >/dev/null"; then
     vm-install-runc
 fi
 
-if [ "$reinstall_containerd" == "1" ] || [ "$reinstall_crio" == "1" ]; then
-    vm-install-cri
+if [ "$reinstall_k8s" == "1" ] || ! vm-command-q "type -p kubelet >/dev/null"; then
+    vm-install-k8s
 fi
 
 if [ "$reinstall_cri_resmgr" == "1" ]; then
@@ -1252,6 +1262,10 @@ if [ "$omit_cri_resmgr" != "1" ]; then
 fi
 
 # Create kubernetes cluster or wait that it is online
+if [ "$reinstall_k8s" == "1" ]; then
+    vm-destroy-cluster
+fi
+
 if vm-command-q "[ ! -f /var/lib/kubelet/config.yaml ]"; then
     screen-create-singlenode-cluster
 else
