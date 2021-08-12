@@ -235,13 +235,17 @@ debian-install-crio-pre() {
 }
 
 debian-install-k8s() {
+    local k8sverparam
     debian-refresh-pkg-db
     debian-install-pkg apt-transport-https curl
     debian-install-repo-key "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
     debian-install-repo "deb https://apt.kubernetes.io/ kubernetes-xenial main"
-    debian-install-pkg kubeadm kubelet kubectl
-    vm-command "apt-get update && apt-get install -y kubelet kubeadm kubectl" ||
-        command-error "failed to install kubernetes packages"
+    if [ -n "$k8s" ]; then
+        k8sverparam="=${k8s}-00"
+    else
+        k8sverparam=""
+    fi
+    debian-install-pkg "kubeadm$k8sverparam" "kubelet$k8sverparam" "kubectl$k8sverparam"
 }
 
 debian-set-kernel-cmdline() {
@@ -401,7 +405,12 @@ gpgkey=$yumkey $rpmkey
 EOF
       vm-pipe-to-file $repo
 
-    distro-install-pkg tc kubelet kubeadm kubectl
+    if [ -n "$k8s" ]; then
+        k8sverparam="-${k8s}-0"
+    else
+        k8sverparam=""
+    fi
+    distro-install-pkg tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
 }
@@ -573,7 +582,32 @@ opensuse-install-k8s() {
     vm-command "systemctl enable --now snapd"
     vm-command "snap wait system seed.loaded"
     for kubepart in kubelet kubectl kubeadm; do
-        vm-command "snap install $kubepart --classic"
+        local snapcmd=install
+        local k8sverparam
+        if vm-command-q "snap info $kubepart | grep -q tracking"; then
+            # $kubepart is already installed, either refresh or reinstall it.
+            if [ "$(eval echo \$reinstall_$kubepart)" == "1" ]; then
+                # Reinstalling $kubepart requested.
+                # snap has no option for direct reinstalling,
+                # so the package needs to be removed first.
+                vm-command "snap remove $kubepart"
+                snapcmd=install
+            else
+                snapcmd=refresh
+            fi
+        fi
+        # Specify snap channel if user has requested a specific k8s version.
+        if [[ "$k8s" == *.*.* ]]; then
+            echo "WARNING: cannot snap install k8s=X.Y.Z, installing latest X.Y"
+            k8sverparam="--channel ${k8s%.*}/edge"
+        elif [[ "$k8s" == *.* ]]; then
+            k8sverparam="--channel ${k8s}/edge"
+        elif [[ -z "$k8s" ]]; then
+            k8sverparam=""
+        else
+            error "invalid k8s version ${k8s}, expected k8s=X.Y"
+        fi
+        vm-command "snap $snapcmd $k8sverparam $kubepart --classic"
     done
     # Manage kubelet with systemd rather than snap
     vm-command "snap stop kubelet"

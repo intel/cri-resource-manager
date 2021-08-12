@@ -93,6 +93,9 @@ usage() {
     echo "                 fedora, opensuse, ubuntu-18.10, ubuntu-20.04"
     echo "    cgroups: cgroups version in the VM, v1 or v2. The default is v1."
     echo "             cgroups=v2 is supported only on distro=fedora"
+    echo "    k8s:     Kubernetes version to be installed on VM creation"
+    echo "             The default is the latest available on selected distro."
+    echo "             Example: k8s=1.18.10"
     echo "    k8scri:  The container runtime pipe where kubelet connects to."
     echo "             Options are:"
     echo "             \"cri-resmgr|containerd\" cri-resmgr is a proxy to containerd."
@@ -123,8 +126,8 @@ usage() {
     echo ""
     echo "Default test input VARs: ./run.sh help defaults"
     echo ""
-    echo "Development cycle example:"
-    echo "pushd ../..; make; popd; reinstall_cri_resmgr=1 speed=120 ./run.sh play"
+    echo "Create VM 'foo' that runs k8s 1.20.2 on Debian Sid:"
+    echo "vm=foo distro=debian-sid k8s=1.20.2 ./run.sh interactive"
 }
 
 error() {
@@ -975,6 +978,7 @@ INTERACTIVE_MODE=0
 mode=$1
 user_script_file=$2
 distro=${distro:=$DEFAULT_DISTRO}
+k8s=${k8s:=}
 k8scri=${k8scri:="cri-resmgr|containerd"}
 case "${k8scri}" in
     "cri-resmgr|containerd")
@@ -1039,6 +1043,11 @@ if [ "$reinstall_all" == "1" ]; then
         eval "${reinstall_var}=1"
     done
 fi
+if [ "$reinstall_k8s" == "1" ]; then
+    reinstall_kubeadm=1
+    reinstall_kubectl=1
+    reinstall_kubelet=1
+fi
 omit_agent=${omit_agent:-0}
 omit_cri_resmgr=${omit_cri_resmgr:-0}
 py_consts="${py_consts:-''}"
@@ -1080,6 +1089,8 @@ if [ "$mode" == "help" ]; then
         echo "Test input defaults:"
         echo ""
         echo "topology=${topology}"
+        echo "distro=${distro}"
+        echo "k8s=${k8s}"
         echo ""
         echo "cri_resmgr_cfg=${cri_resmgr_cfg}"
         echo ""
