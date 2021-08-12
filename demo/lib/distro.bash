@@ -25,6 +25,7 @@ distro-refresh-pkg-db()     { distro-resolve "$@"; }
 distro-install-pkg()        { distro-resolve "$@"; }
 distro-remove-pkg()         { distro-resolve "$@"; }
 distro-setup-proxies()      { distro-resolve "$@"; }
+distro-install-utils()      { distro-resolve "$@"; }
 distro-install-golang()     { distro-resolve "$@"; }
 distro-install-containerd() { distro-resolve "$@"; }
 distro-config-containerd()  { distro-resolve "$@"; }
@@ -78,6 +79,7 @@ distro-resolve-fn() {
         centos*) candidates="$candidates fedora-$apifn rpm-$apifn";;
         fedora*) candidates="$candidates rpm-$apifn";;
         *suse*)  candidates="$candidates rpm-$apifn";;
+        sles*)   candidates="$candidates opensuse-$apifn rpm-$apifn";;
     esac
     case $apifn in
         *-pre|*-post) ;;
@@ -398,10 +400,25 @@ EOF
 ###########################################################################
 
 #
-# OpenSUSE 15.2
+# OpenSUSE 15.2 and SLES
 #
 
 ZYPPER="zypper --non-interactive --no-gpg-checks"
+
+sles-image-url() {
+    echo "/DOWNLOAD-MANUALLY-TO-HOME/vms/images/SLES15-SP3-JeOS.x86_64-15.3-OpenStack-Cloud-GM.qcow2"
+}
+
+sles-ssh-user() {
+    echo "sles"
+}
+
+sles-install-utils() {
+    vm-command-q "$ZYPPER lr openSUSE-Oss >/dev/null" || {
+        distro-install-repo http://download.opensuse.org/distribution/leap/15.3/repo/oss/ openSUSE-Oss
+    }
+    distro-install-pkg sysvinit-tools psmisc
+}
 
 opensuse-image-url() {
     echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
@@ -438,12 +455,12 @@ opensuse-remove-pkg() {
 }
 
 opensuse-install-golang() {
-    opensuse-install-pkg wget tar gzip git-core
+    distro-install-pkg wget tar gzip git-core
     from-tarball-install-golang
 }
 
 opensuse-wait-for-zypper() {
-    vm-run-until --timeout 5 '( ! pidof zypper >/dev/null ) || ( killall zypper; sleep 1; exit 1 )' ||
+    vm-run-until --timeout 5 '( ! pgrep zypper >/dev/null ) || ( pkill -9 zypper; sleep 1; exit 1 )' ||
         error "Failed to stop zypper running in the background"
 }
 
@@ -458,7 +475,7 @@ opensuse-install-containerd() {
         opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/openSUSE_Leap_15.2/Virtualization:containers.repo
         opensuse-refresh-pkg-db
     fi
-    opensuse-install-pkg --from Virtualization_containers containerd containerd-ctr
+    distro-install-pkg --from Virtualization_containers containerd containerd-ctr
     vm-command "ln -sf /usr/sbin/containerd-ctr /usr/sbin/ctr"
 
 cat <<EOF |
@@ -497,9 +514,9 @@ opensuse-install-k8s() {
     vm-command "echo 1 > /proc/sys/net/ipv4/ip_forward"
     vm-command "zypper ls"
     if ! grep -q snappy <<< "$COMMAND_OUTPUT"; then
-        opensuse-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.2 snappy"
-        opensuse-refresh-pkg-db
-        opensuse-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd"
+        distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.2 snappy"
+        distro-refresh-pkg-db
+        distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
     fi
     vm-install-containernetworking
     vm-command "systemctl enable --now snapd"
@@ -640,6 +657,13 @@ EOF
 EOF
         vm-pipe-to-file $file
     done
+}
+
+default-install-utils() {
+    # $distro-install-utils() is responsible for installing common
+    # utilities, such as pidof and killall, that the test framework
+    # and tests in general can expect to be found on VM.
+    :
 }
 
 default-k8s-cni() {

@@ -632,6 +632,18 @@ vm-install-pkg() {
     distro-install-pkg "$@"
 }
 
+vm-setup-oneshot() {
+    local util
+    distro-refresh-pkg-db
+    distro-install-utils
+    # Verify that all required utilities exit on the VM.
+    for util in pidof killall; do
+        vm-command-q "command -v $util >/dev/null" || {
+            error "required command '$util' missing on VM, fix/implement $distro-install-utils()"
+        }
+    done
+}
+
 vm-install-golang() {
     distro-install-golang
 }

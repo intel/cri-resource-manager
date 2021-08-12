@@ -1161,6 +1161,11 @@ fi
 
 is-hooked "on_vm_online" && run-hook "on_vm_online"
 
+if [ "$reinstall_oneshot" == "1" ] || ! vm-command-q "[ -f .vm-setup-oneshot ]"; then
+    vm-setup-oneshot
+    vm-command-q "touch .vm-setup-oneshot"
+fi
+
 if [ -n "$vm_files" ]; then
     install-files "$vm_files"
 fi
