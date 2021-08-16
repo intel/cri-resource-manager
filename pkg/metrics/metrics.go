@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -11,10 +12,25 @@ var (
 	registeredCollectors  = []prometheus.Collector{}
 	initializedCollectors = make(map[string]struct{})
 	log                   = logger.NewLogger("collectors")
+	policyMetrics         string
 )
+
+// PolicyMetrics is used to collect metrics from different policy.
+type PolicyMetrics struct {
+	Policy string // active policy
+	Data   []byte // metrics data from different policy
+}
 
 // InitCollector is the type for functions that initialize collectors.
 type InitCollector func() (prometheus.Collector, error)
+
+func Get() string {
+	return policyMetrics
+}
+
+func Set(pm string) {
+	policyMetrics = pm
+}
 
 // RegisterCollector registers the named prometheus.Collector for metrics collection.
 func RegisterCollector(name string, init InitCollector) error {

@@ -26,6 +26,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
@@ -284,6 +285,11 @@ func (p *policy) Introspect(state *introspect.State) {
 		assignments[a.ContainerID] = a
 	}
 	state.Assignments = assignments
+}
+
+// PullMetrics provides policy metrics for monitoring.
+func (p *policy) PullMetrics(*metrics.PolicyMetrics) {
+	return
 }
 
 // ExportResourceData provides resource data to export for the container.

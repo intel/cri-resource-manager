@@ -15,6 +15,7 @@
 package podpools
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -33,6 +34,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
@@ -69,6 +71,23 @@ type podpools struct {
 	pools           []*Pool                   // pools for pods: reserved, default and user-defined
 	podMaxMilliCPU  map[string]int64          // maximum total MilliCPUs requested by containers of pods in pools
 	cpuAllocator    cpuallocator.CPUAllocator // CPU allocator used by the policy
+	metrics         *Metrics
+}
+
+// Metrics defines the metrics from policy level.
+type Metrics struct {
+	PoolMetrics map[string]*PoolMetrics
+}
+
+// PoolMetrics defines the metrics from pool level.
+type PoolMetrics struct {
+	DefName        string
+	PrettyName     string
+	CPUs           string
+	CPUMiliSize    string
+	Memory         string
+	ContainerNames string
+	PodNames       string
 }
 
 // Pool contains attributes of a pool instance
@@ -263,6 +282,59 @@ func (p *podpools) ExportResourceData(c cache.Container) map[string]string {
 // Introspect provides data for external introspection.
 func (p *podpools) Introspect(*introspect.State) {
 	return
+}
+
+// PullMetrics provides policy metrics for monitoring.
+func (p *podpools) PullMetrics(m *metrics.PolicyMetrics) {
+	if p.pools == nil || len(p.pools) <= 0 || m == nil {
+		log.Error("Failed to pull metrics.")
+		return
+	}
+	p.metrics = &Metrics{}
+	p.metrics.PoolMetrics = make(map[string]*PoolMetrics, len(p.pools))
+
+	for _, pool := range p.pools {
+		p.metrics.PoolMetrics[pool.PrettyName()] = &PoolMetrics{}
+		p.metrics.PoolMetrics[pool.PrettyName()].DefName = pool.Def.Name
+		p.metrics.PoolMetrics[pool.PrettyName()].PrettyName = pool.PrettyName()
+		p.metrics.PoolMetrics[pool.PrettyName()].CPUs = pool.CPUs.String()
+		p.metrics.PoolMetrics[pool.PrettyName()].CPUMiliSize = strconv.Itoa(pool.CPUs.Size() * 1000)
+		p.metrics.PoolMetrics[pool.PrettyName()].Memory = pool.Mems.String()
+		p.metrics.PoolMetrics[pool.PrettyName()].ContainerNames = ""
+		p.metrics.PoolMetrics[pool.PrettyName()].PodNames = ""
+		if len(pool.PodIDs) > 0 {
+			podIds := make([]string, 0, len(pool.PodIDs))
+			for podId := range pool.PodIDs {
+				podIds = append(podIds, podId)
+			}
+			sort.Sort(sort.StringSlice(podIds))
+			for _, podId := range podIds {
+				for _, containerId := range pool.PodIDs[podId] {
+					if container, ok := p.cch.LookupContainer(containerId); ok && container != nil {
+						containerName := container.PrettyName()
+						if p.metrics.PoolMetrics[pool.PrettyName()].ContainerNames == "" {
+							p.metrics.PoolMetrics[pool.PrettyName()].ContainerNames = containerName
+						} else {
+							p.metrics.PoolMetrics[pool.PrettyName()].ContainerNames = fmt.Sprintf("%s,%s", p.metrics.PoolMetrics[pool.PrettyName()].ContainerNames, containerName)
+						}
+					}
+				}
+				if pod, ok := p.cch.LookupPod(podId); ok && pod != nil {
+					podName := pod.GetName()
+					if p.metrics.PoolMetrics[pool.PrettyName()].PodNames == "" {
+						p.metrics.PoolMetrics[pool.PrettyName()].PodNames = podName
+					} else {
+						p.metrics.PoolMetrics[pool.PrettyName()].PodNames = fmt.Sprintf("%s,%s", p.metrics.PoolMetrics[pool.PrettyName()].PodNames, podName)
+					}
+				}
+			}
+		}
+	}
+	data, err := json.Marshal(p.metrics)
+	if err != nil {
+		log.Error("failed to marshal podpools-policy metrics for monitor: %v", err)
+	}
+	m.Data = data
 }
 
 // allocatedPool returns a pool already allocated for a pod.

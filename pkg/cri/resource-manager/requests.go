@@ -236,6 +236,7 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 
 	pod := m.cache.InsertPod(podID, request, nil)
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	// search for any lingering old version and clean up if found
 	released := false
@@ -321,6 +322,7 @@ func (m *resmgr) StopPod(ctx context.Context, method string, request interface{}
 	}
 
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return reply, rqerr
 }
@@ -373,6 +375,7 @@ func (m *resmgr) RemovePod(ctx context.Context, method string, request interface
 
 	m.cache.DeletePod(podID)
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return reply, rqerr
 }
@@ -443,6 +446,7 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 	m.cache.UpdateContainerID(container.GetCacheID(), reply)
 	container.UpdateState(cache.ContainerStateCreated)
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return reply, nil
 }
@@ -496,6 +500,7 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 	}
 
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return reply, rqerr
 }
@@ -542,6 +547,7 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 	}
 
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return reply, rqerr
 }
@@ -583,6 +589,7 @@ func (m *resmgr) RemoveContainer(ctx context.Context, method string, request int
 	}
 
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return reply, rqerr
 }
@@ -648,6 +655,7 @@ func (m *resmgr) ListContainers(ctx context.Context, method string, request inte
 		}
 	}
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return reply, nil
 }
@@ -673,6 +681,7 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 	}
 
 	m.updateIntrospection()
+	m.updatePolicyMetrics()
 
 	return &criapi.UpdateContainerResourcesResponse{}, nil
 }

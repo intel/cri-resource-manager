@@ -31,6 +31,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/rdt"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
+
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
@@ -127,6 +129,8 @@ type Backend interface {
 	ExportResourceData(cache.Container) map[string]string
 	// Introspect provides data for external introspection.
 	Introspect(*introspect.State)
+	// PullMetrics provides policy metrics for monitoring.
+	PullMetrics(*metrics.PolicyMetrics)
 }
 
 // Policy is the exposed interface for container resource allocations decision making.
@@ -151,6 +155,8 @@ type Policy interface {
 	ExportResourceData(cache.Container)
 	// Introspect provides data for external introspection.
 	Introspect() *introspect.State
+	// PullMetrics provides policy metrics for monitoring.
+	PullMetrics() *metrics.PolicyMetrics
 	// Bypassed checks if local policy processing is effectively disabled/bypassed.
 	Bypassed() bool
 }
@@ -400,6 +406,14 @@ func (p *policy) Introspect() *introspect.State {
 	return state
 }
 
+func (p *policy) PullMetrics() *metrics.PolicyMetrics {
+	policyMetrics := &metrics.PolicyMetrics{Policy: opt.Policy}
+	if !p.Bypassed() {
+		p.active.PullMetrics(policyMetrics)
+	}
+	return policyMetrics
+}
+
 // Register registers a policy backend.
 func Register(name, description string, create CreateFn) error {
 	log.Info("registering policy '%s'...", name)
@@ -435,7 +449,7 @@ func ConstraintToString(value Constraint) string {
 }
 
 // configNotify is the configuration change notification callback for the genric policy layer.
-func configNotify(event config.Event, src config.Source) error {
+func configNotify(config.Event, config.Source) error {
 	// let the active policy know of changes
 	backendOpts.Available = opt.Available
 	backendOpts.Reserved = opt.Reserved

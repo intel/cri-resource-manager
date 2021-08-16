@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -211,6 +212,11 @@ func (p *staticplus) ExportResourceData(c cache.Container) map[string]string {
 
 // Introspect provides data for external introspection.
 func (p *staticplus) Introspect(*introspect.State) {
+	return
+}
+
+// PullMetrics provides policy metrics for monitoring.
+func (p *staticplus) PullMetrics(*metrics.PolicyMetrics) {
 	return
 }
 

@@ -28,6 +28,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
@@ -248,6 +249,11 @@ func (stp *stp) ExportResourceData(c cache.Container) map[string]string {
 
 // Introspect provides data for external introspection.
 func (stp *stp) Introspect(*introspect.State) {
+	return
+}
+
+// PullMetrics provides policy metrics for monitoring.
+func (p *stp) PullMetrics(*metrics.PolicyMetrics) {
 	return
 }
 

@@ -15,7 +15,6 @@
 package resmgr
 
 import (
-	"golang.org/x/sys/unix"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -36,6 +35,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	"golang.org/x/sys/unix"
 )
 
 // ResourceManager is the interface we expose for controlling the CRI resource manager.
@@ -153,6 +153,7 @@ func (m *resmgr) Start() error {
 	}
 
 	m.startIntrospection()
+	m.updatePolicyMetrics()
 
 	if err := m.relay.Start(); err != nil {
 		return resmgrError("failed to start CRI relay: %v", err)
@@ -514,4 +515,9 @@ func (m *resmgr) stopIntrospection() {
 // updateIntrospection pushes updated data for external introspection·
 func (m *resmgr) updateIntrospection() {
 	m.introspect.Set(m.policy.Introspect())
+}
+
+// updatePolicyMetrics pushes updated policy metrics for monitoring·
+func (m *resmgr) updatePolicyMetrics() {
+	m.metrics.Set(m.policy.PullMetrics())
 }

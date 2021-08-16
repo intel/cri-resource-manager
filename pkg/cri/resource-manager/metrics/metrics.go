@@ -16,6 +16,7 @@ package metrics
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -30,6 +31,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	"github.com/intel/cri-resource-manager/pkg/metrics"
+
 	// pull in all metrics collectors
 	_ "github.com/intel/cri-resource-manager/pkg/metrics/register"
 )
@@ -52,11 +54,12 @@ type Options struct {
 // Metrics implements collecting, caching and processing of raw metrics.
 type Metrics struct {
 	sync.RWMutex
-	opts Options               // metrics collecting options
-	g    prometheus.Gatherer   // prometheus/raw metrics gatherer
-	stop chan interface{}      // channel to stop polling goroutine
-	raw  []*model.MetricFamily // latest set of raw metrics
-	pend []*model.MetricFamily // pending metrics for forwarding
+	opts          Options                // metrics collecting options
+	g             prometheus.Gatherer    // prometheus/raw metrics gatherer
+	stop          chan interface{}       // channel to stop polling goroutine
+	raw           []*model.MetricFamily  // latest set of raw metrics
+	pend          []*model.MetricFamily  // pending metrics for forwarding
+	policyMetrics *metrics.PolicyMetrics // policy metrics for monitoring
 }
 
 // Our logger instance.
@@ -192,4 +195,17 @@ func dump(prefix string, f *model.MetricFamily) {
 // metricsError returns a new formatted error specific to metrics-processing.
 func metricsError(format string, args ...interface{}) error {
 	return fmt.Errorf("metrics: "+format, args...)
+}
+
+// set the updated policy metrics.
+func (m *Metrics) Set(pm *metrics.PolicyMetrics) {
+	data, err := json.Marshal(m.policyMetrics)
+	if err != nil {
+		err = metricsError("failed to marshal policy metrics for monitor: %v", err)
+		return
+	}
+	m.Lock()
+	defer m.Unlock()
+	m.policyMetrics = pm
+	metrics.Set(string(data))
 }

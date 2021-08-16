@@ -20,6 +20,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/metrics"
 )
 
 const (
@@ -37,7 +38,7 @@ type none struct {
 var _ policy.Backend = &none{}
 
 // CreateNonePolicy creates a new policy instance.
-func CreateNonePolicy(opts *policy.BackendOptions) policy.Backend {
+func CreateNonePolicy(*policy.BackendOptions) policy.Backend {
 	n := &none{Logger: logger.NewLogger(PolicyName)}
 	n.Info("creating policy...")
 	return n
@@ -102,6 +103,11 @@ func (n *none) ExportResourceData(c cache.Container) map[string]string {
 
 // Introspect provides data for external introspection.
 func (n *none) Introspect(*introspect.State) {
+	return
+}
+
+// PullMetrics provides policy metrics for monitoring.
+func (p *none) PullMetrics(*metrics.PolicyMetrics) {
 	return
 }
 
