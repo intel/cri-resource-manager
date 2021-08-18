@@ -100,6 +100,9 @@ kubectl get pods -A | grep -E "$pod_regexp" | while read -r namespace podname re
         grep -q -E "$cntr_regexp" <<< "$containername" || continue
 
         while read -r cgroupdir; do
+            if [[ "$cgroupdir" == *crio-conmon* ]]; then
+                continue
+            fi
             for filename in "$cgroupdir"/*; do
                 if [[ ! -f "$filename" ]]; then
                     continue
@@ -132,6 +135,6 @@ kubectl get pods -A | grep -E "$pod_regexp" | while read -r namespace podname re
                     sed "s/^/      /g" < "$filename"
                 fi
             done
-        done <<< "$(find "$cg_controller_dir" -name "$containerID")"
+        done <<< "$(find "$cg_controller_dir" -name "*${containerID}*")"
     done
 done
