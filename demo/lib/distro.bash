@@ -303,6 +303,15 @@ centos-7-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
 }
 
+centos-8-install-crio-pre() {
+    if [ -z "$crio_src" ]; then
+        local os=CentOS_8
+        local version=${crio_version:-1.20}
+        vm-command "curl -L -o /etc/yum.repos.d/libcontainers-stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$os/devel:kubic:libcontainers:stable.repo"
+        vm-command "curl -L -o /etc/yum.repos.d/crio.repo https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$version/$os/devel:kubic:libcontainers:stable:cri-o:$version.repo"
+    fi
+}
+
 centos-8-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
 }
@@ -371,6 +380,18 @@ fedora-install-golang() {
 fedora-install-crio-pre() {
     distro-install-pkg runc conmon
     vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
+
+    if [ -z "$crio_src" ]; then
+        vm-command "dnf -y module enable cri-o:${crio_version:-1.20}"
+    fi
+}
+
+fedora-install-crio() {
+    if [ -n "$crio_src" ]; then
+        default-install-crio
+    else
+        distro-install-pkg cri-o
+    fi
 }
 
 fedora-install-containerd-pre() {
