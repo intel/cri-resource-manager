@@ -116,7 +116,7 @@ ubuntu-20_04-image-url() {
 }
 
 ubuntu-20_10-image-url() {
-    echo "https://cloud-images.ubuntu.com/groovy/current/groovy-server-cloudimg-amd64.img"
+    echo "https://cloud-images.ubuntu.com/releases/groovy/release/ubuntu-20.10-server-cloudimg-amd64.img"
 }
 
 debian-10-image-url() {
