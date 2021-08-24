@@ -170,7 +170,7 @@ debian-install-repo-key() {
         vm-command "apt-get update && apt-get install -y gnupg2"
     }
     for key in "$@"; do
-        vm-command "curl -s $key | apt-key add -" ||
+        vm-command "curl -L -s $key | apt-key add -" ||
             command-error "failed to install repo key $key"
     done
 }
