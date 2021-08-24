@@ -247,6 +247,39 @@ debian-install-crio-pre() {
     debian-install-pkg libgpgme11 conmon runc containernetworking-plugins conntrack || true
 }
 
+ubuntu-install-crio() {
+    if [ -n "$crio_src" ]; then
+        default-install-crio
+        return $?
+    fi
+
+    cat <<EOF |
+deb http://deb.debian.org/debian buster-backports main
+EOF
+    vm-pipe-to-file /etc/apt/sources.list.d/backports.list
+
+    local os=xUbuntu_${distro#*-}
+    local version=${crio_version:-1.20}
+    local missing_keys="648ACFD622F3D138 0E98404D386FA1D9"
+    local repo_keys="https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:/$version/$os/Release.key https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$os/Release.key"
+
+    vm-command "apt-key adv --keyserver keyserver.ubuntu.com \$([ -z \"\$http_proxy\" ] || echo --keyserver-options http-proxy=\$http_proxy) --recv-keys $missing_keys"
+    distro-install-repo-key $repo_keys
+
+    cat <<EOF |
+deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$os/ /
+EOF
+    vm-pipe-to-file /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+
+    cat <<EOF |
+deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$version/$os/ /
+EOF
+    vm-pipe-to-file /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$version.list
+
+    distro-refresh-pkg-db
+    distro-install-pkg cri-o cri-o-runc conmon
+}
+
 debian-install-k8s() {
     local k8sverparam
     debian-refresh-pkg-db
