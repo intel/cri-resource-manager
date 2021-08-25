@@ -48,7 +48,8 @@ usage() {
     echo "    crio_src:"
     echo "             \"/host/path/to/go/project\": replace vm /usr/bin binaries"
     echo "             from /host/path/to/go/project/bin directory."
-    echo "             Must be set if crio is a part of \$k8scri."
+    echo "             Must be set if crio is a part of \$k8scri and the vm distro"
+    echo "             does not have (or implement installing) cri-o packages."
     echo "    crirm_src:"
     echo "             \"/host/path/to/go/project\": replace vm /usr/local/bin binaries"
     echo "             from /host/path/to/go/project/bin directory."
@@ -106,6 +107,8 @@ usage() {
     echo "             \"containerd\"            containerd, no cri-resmgr."
     echo "             \"crio\"                  cri-o, no cri-resmgr."
     echo "             The default is \"cri-resmgr|containerd\"."
+    echo "    crio_version: Version of cri-o to try to pull in, if cri-o is"
+    echo "                  not being installed from sources."
     echo ""
     echo "  Test input VARs:"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
@@ -1020,6 +1023,7 @@ containerd_src=${containerd_src:=}
 crio_src=${crio_src:=}
 crirm_src=${crirm_src:=$HOST_PROJECT_DIR}
 runc_src=${runc_src:=}
+crio_version=${crio_version:=}
 BIN_DIR=${crirm_src}/bin
 TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
 vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
