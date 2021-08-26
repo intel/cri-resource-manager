@@ -634,6 +634,7 @@ vm-install-pkg() {
 vm-setup-oneshot() {
     local util
     ( distro-refresh-pkg-db ) || true
+    distro-setup-oneshot
     distro-install-utils
     # Verify that all required utilities exit on the VM.
     for util in pidof killall; do
