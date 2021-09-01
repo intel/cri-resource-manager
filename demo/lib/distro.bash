@@ -25,6 +25,7 @@ distro-refresh-pkg-db()     { distro-resolve "$@"; }
 distro-install-pkg()        { distro-resolve "$@"; }
 distro-remove-pkg()         { distro-resolve "$@"; }
 distro-setup-proxies()      { distro-resolve "$@"; }
+distro-setup-oneshot()      { distro-resolve "$@"; }
 distro-install-utils()      { distro-resolve "$@"; }
 distro-install-golang()     { distro-resolve "$@"; }
 distro-install-runc()       { distro-resolve "$@"; }
@@ -531,6 +532,12 @@ opensuse-pkg-type() {
     echo "rpm"
 }
 
+opensuse-setup-oneshot() {
+    # Remove bad version of containerd if it is already installed,
+    # otherwise valid version of the package will not be installed.
+    vm-command "rpm -q containerd && ( zypper info containerd | awk '/Repository/{print $3}' | grep -v Virtualization ) && echo Removing wrong containerd version && zypper --non-interactive rm containerd"
+}
+
 opensuse-install-repo() {
     opensuse-wait-for-zypper
     vm-command "$ZYPPER addrepo $* && $ZYPPER refresh" ||
@@ -691,11 +698,9 @@ EOF
         command-error "failed to enable kubelet"
 }
 
-opensuse-bootstrap-commands() {
+opensuse-bootstrap-commands-pre() {
     cat <<EOF
-export HTTP_PROXY="$http_proxy"
-export HTTPS_PROXY="$http_proxy"
-zypper refresh && zypper install ssh && systemctl enable ssh && systemctl start ssh
+sed -e '/Signature checking/a gpgcheck = off' -i /etc/zypp/zypp.conf
 EOF
 }
 
@@ -801,6 +806,10 @@ EOF
 EOF
         vm-pipe-to-file $file
     done
+}
+
+default-setup-oneshot() {
+    :
 }
 
 default-install-utils() {
