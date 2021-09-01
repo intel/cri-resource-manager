@@ -198,14 +198,17 @@ for POLICY_DIR in "$TESTS_ROOT_DIR"/*; do
                     "cri-resmgr|crio")
                         criname=crirm-crio
                         ;;
-                    "containerd&cri-resmgr")
-                        criname=nrirm-containerd
-                        ;;
                     "containerd")
                         criname=containerd
                         ;;
+                    "containerd&cri-resmgr")
+                        criname=nrirm-containerd
+                        ;;
                     "crio")
                         criname=crio
+                        ;;
+                    "crio&cri-resmgr")
+                        criname=nrirm-crio
                         ;;
                     *)
                         error "unsupported k8scri: \"${k8scri}\""
