@@ -24,6 +24,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -200,6 +201,21 @@ func (s *static) ExportResourceData(c cache.Container) map[string]string {
 // Introspect provides data for external introspection.
 func (s *static) Introspect(*introspect.State) {
 	return
+}
+
+// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+func (p *static) DescribeMetrics() []*prometheus.Desc {
+	return nil
+}
+
+// PollMetrics provides policy metrics for monitoring.
+func (p *static) PollMetrics() policy.Metrics {
+	return nil
+}
+
+// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+func (p *static) CollectMetrics(policy.Metrics) ([]prometheus.Metric, error) {
+	return nil, nil
 }
 
 func (s *static) configNotify(event config.Event, source config.Source) error {

@@ -15,13 +15,14 @@
 package resmgr
 
 import (
-	"golang.org/x/sys/unix"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/relay"
@@ -35,6 +36,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/visualizer"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+
+	policyCollector "github.com/intel/cri-resource-manager/pkg/policycollector"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
@@ -107,6 +110,10 @@ func NewResourceManager() (ResourceManager, error) {
 	}
 
 	if err := m.setupPolicy(); err != nil {
+		return nil, err
+	}
+
+	if err := m.registerPolicyMetricsCollector(); err != nil {
 		return nil, err
 	}
 
@@ -514,4 +521,15 @@ func (m *resmgr) stopIntrospection() {
 // updateIntrospection pushes updated data for external introspection·
 func (m *resmgr) updateIntrospection() {
 	m.introspect.Set(m.policy.Introspect())
+}
+
+// registerPolicyMetricsCollector registers policy metrics collector·
+func (m *resmgr) registerPolicyMetricsCollector() error {
+	pc := &policyCollector.PolicyCollector{}
+	pc.SetPolicy(m.policy)
+	if pc.HasPolicySpecificMetrics() {
+		return pc.RegisterPolicyMetricsCollector()
+	}
+	m.Info("%s policy has no policy-specific metrics.", policy.ActivePolicy())
+	return nil
 }
