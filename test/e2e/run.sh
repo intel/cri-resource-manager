@@ -103,9 +103,10 @@ usage() {
     echo "             Options are:"
     echo "             \"cri-resmgr|containerd\" cri-resmgr is a proxy to containerd."
     echo "             \"cri-resmgr|crio\"       cri-resmgr is a proxy to cri-o."
-    echo "             \"containerd&cri-resmgr\" containerd, cri-resmgr is an NRI plugin."
     echo "             \"containerd\"            containerd, no cri-resmgr."
+    echo "             \"containerd&cri-resmgr\" containerd, cri-resmgr is an NRI plugin."
     echo "             \"crio\"                  cri-o, no cri-resmgr."
+    echo "             \"crio&cri-resmgr\"       cri-o, cri-resmgr is an NRI plugin."
     echo "             The default is \"cri-resmgr|containerd\"."
     echo "    crio_version: Version of cri-o to try to pull in, if cri-o is"
     echo "                  not being installed from sources."
@@ -996,11 +997,6 @@ case "${k8scri}" in
         cri_sock="/var/run/crio/crio.sock"
         cri=crio
         ;;
-    "containerd&cri-resmgr")
-        k8scri_sock="/var/run/containerd/containerd.sock"
-        cri_sock="/var/run/containerd/containerd.sock"
-        cri=containerd
-        ;;
     "containerd")
         k8scri_sock="/var/run/containerd/containerd.sock"
         cri_sock="/var/run/containerd/containerd.sock"
@@ -1008,12 +1004,22 @@ case "${k8scri}" in
         omit_cri_resmgr=1
         omit_agent=1
         ;;
+    "containerd&cri-resmgr")
+        k8scri_sock="/var/run/containerd/containerd.sock"
+        cri_sock="/var/run/containerd/containerd.sock"
+        cri=containerd
+        ;;
     "crio")
         k8scri_sock="/var/run/crio/crio.sock"
         cri_sock="/var/run/crio/crio.sock"
         cri=crio
         omit_cri_resmgr=1
         omit_agent=1
+        ;;
+    "crio&cri-resmgr")
+        k8scri_sock="/var/run/crio/crio.sock"
+        cri_sock="/var/run/crio/crio.sock"
+        cri=crio
         ;;
     *)
         error "unsupported k8scri: \"${k8scri}\""
