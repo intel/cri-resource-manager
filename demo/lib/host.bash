@@ -199,6 +199,7 @@ host-create-vm() {
     echo "# VM Qemu monitor: docker exec -it $VM_CONTAINER_ID nc local:/data/monitor"
     VM_MONITOR="docker exec -i $VM_CONTAINER_ID nc local:/data/monitor"
     host-wait-vm-ssh-server
+    host-wait-cloud-init
 }
 
 host-wait-vm-ssh-server() {
@@ -223,6 +224,23 @@ host-wait-vm-ssh-server() {
     while ! $SSH ${VM_SSH_USER}@${VM_IP} -o ConnectTimeout=2 true 2>/dev/null; do
         if [ "$retries" == "$retries_left" ]; then
             echo -n "Waiting for VM SSH server to respond..."
+        fi
+        sleep 2
+        echo -n "."
+        retries_left=$(( $retries_left - 1 ))
+        if [ "$retries_left" == "0" ]; then
+            error "timeout"
+        fi
+    done
+    [ "$retries" == "$retries_left" ] || echo ""
+}
+
+host-wait-cloud-init() {
+    retries=60
+    retries_left=$retries
+    while ! $SSH -o ConnectTimeout=2 ${VM_SSH_USER}@${VM_IP} sudo cloud-init status --wait 2>/dev/null; do
+        if [ "$retries" == "$retries_left" ]; then
+            echo -n "Waiting for VM cloud-init to finish..."
         fi
         sleep 2
         echo -n "."
