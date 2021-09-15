@@ -744,6 +744,12 @@ touch /etc/sysctl.d/k8s.conf
 echo "net.bridge.bridge-nf-call-ip6tables = 1" >> /etc/sysctl.d/k8s.conf
 echo "net.bridge.bridge-nf-call-iptables = 1" >> /etc/sysctl.d/k8s.conf
 echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.d/k8s.conf
+
+# rp_filter (partially) mitigates DDOS attacks with spoofed IP addresses
+# by dropping packages with non-routable (unanswerable) source addresses.
+# However, rp_filter > 0 breaks cilium networking. Make sure it's disabled.
+echo "net.ipv4.conf.*.rp_filter = 0" >> /etc/sysctl.d/k8s.conf
+
 /sbin/sysctl -p /etc/sysctl.d/k8s.conf
 EOF
 }
