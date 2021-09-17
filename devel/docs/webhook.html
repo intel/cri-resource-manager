@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Webhook &mdash; CRI Resource Manager 0.5.0-115-g54d85ca7 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <title>Webhook &mdash; CRI Resource Manager 0.5.0-117-gb388590a documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
@@ -94,13 +94,13 @@ not possible to use these parameters to estimate <code class="docutils literal n
 Pod. This is necessary if you plan using or writing a policy which needs
 <em>extended resource</em>s.</p>
 <p>This process can be fully automated using the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/54d85ca77f689d6604ab0f21bdc659889e8e20eb/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating Webhook</a>. Once you
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/b388590add5d1da95ca1a73cd3ea1b0a7d6b9eee/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating Webhook</a>. Once you
 built the Docker* image for it using the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/54d85ca77f689d6604ab0f21bdc659889e8e20eb/cmd/cri-resmgr-webhook/Dockerfile">provided Dockerfile</a> and published it,
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/b388590add5d1da95ca1a73cd3ea1b0a7d6b9eee/cmd/cri-resmgr-webhook/Dockerfile">provided Dockerfile</a> and published it,
 you can set up the webhook as follows:</p>
 <ul>
 <li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">IMAGE_PLACEHOLDER</span></code> in
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/54d85ca77f689d6604ab0f21bdc659889e8e20eb/cmd/cri-resmgr-webhook/webhook-deployment.yaml">webhook-deployment.yaml</a>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/b388590add5d1da95ca1a73cd3ea1b0a7d6b9eee/cmd/cri-resmgr-webhook/webhook-deployment.yaml">webhook-deployment.yaml</a>
 to match the image.</p></li>
 <li><p>Create a <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook-secret</span></code> that carries a key and a certificate
 to <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook</span></code>. You can create a key, a self-signed certificate
@@ -128,7 +128,7 @@ kubectl create -f cmd/cri-resmgr-webhook/webhook-secret.yaml
 </div>
 </li>
 <li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">CA_BUNDLE_PLACEHOLDER</span></code> in
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/54d85ca77f689d6604ab0f21bdc659889e8e20eb/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml">mutating-webhook-config.yaml</a>.
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/b388590add5d1da95ca1a73cd3ea1b0a7d6b9eee/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml">mutating-webhook-config.yaml</a>.
 If you created the key and the certificate with the commands above,
 you can do this with the following command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sed -e <span class="s2">&quot;s/CA_BUNDLE_PLACEHOLDER/</span><span class="k">$(</span>base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem<span class="k">)</span><span class="s2">/&quot;</span> <span class="se">\</span>
