@@ -338,6 +338,10 @@ fedora-ssh-user() {
     echo fedora
 }
 
+fedora-install-utils() {
+    distro-install-pkg /usr/bin/pidof
+}
+
 fedora-install-repo() {
     distro-install-pkg dnf-plugins-core
     vm-command "dnf config-manager --add-repo $*" ||
