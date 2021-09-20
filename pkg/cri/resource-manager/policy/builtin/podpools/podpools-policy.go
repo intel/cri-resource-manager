@@ -33,8 +33,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	"github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 const (
@@ -82,7 +82,7 @@ type Pool struct {
 	CPUs cpuset.CPUSet
 	// Mems is the set of memory nodes with minimal access delay
 	// from CPUs.
-	Mems sysfs.IDSet
+	Mems idset.IDSet
 	// PodIDs maps pod ID to list of container IDs.
 	// - len(PodIDs) is the number of pods in the pool.
 	// - len(PodIDs[podID]) is the number of containers of podID
@@ -604,8 +604,8 @@ func (p *podpools) setConfig(ppoptions *PodpoolsOptions) error {
 
 // closestMems returns memory node IDs good for pinning containers
 // that run on given CPUs
-func (p *podpools) closestMems(cpus cpuset.CPUSet) sysfs.IDSet {
-	mems := sysfs.NewIDSet()
+func (p *podpools) closestMems(cpus cpuset.CPUSet) idset.IDSet {
+	mems := idset.NewIDSet()
 	sys := p.options.System
 	for _, nodeID := range sys.NodeIDs() {
 		if !cpus.Intersection(sys.Node(nodeID).CPUSet()).IsEmpty() {
@@ -709,7 +709,7 @@ func (p *podpools) dismissContainer(c cache.Container, pool *Pool) {
 }
 
 // pinCpuMem pins container to CPUs and memory nodes if flagged
-func (p *podpools) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems sysfs.IDSet) {
+func (p *podpools) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems idset.IDSet) {
 	if p.ppoptions.PinCPU {
 		log.Debug("  - pinning to cpuset: %s", cpus)
 		c.SetCpusetCpus(cpus.String())

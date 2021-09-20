@@ -29,6 +29,7 @@ import (
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 const (
@@ -309,9 +310,9 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	}
 
 	mems := grant.Memset()
-	dram := system.NewIDSet()
-	pmem := system.NewIDSet()
-	hbm := system.NewIDSet()
+	dram := idset.NewIDSet()
+	pmem := idset.NewIDSet()
+	hbm := idset.NewIDSet()
 	for _, id := range mems.SortedMembers() {
 		node := p.sys.Node(id)
 		switch node.GetMemoryType() {

@@ -27,7 +27,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/config"
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 // Support dynamic pushing of unused pages from DRAM to PMEM.
@@ -83,7 +83,7 @@ type pagePool struct {
 
 type demotion struct {
 	pagePool    pagePool
-	targetNodes system.IDSet
+	targetNodes idset.IDSet
 }
 
 func copyPagePool(p pagePool) pagePool {
@@ -137,7 +137,7 @@ func (d *demoter) Reconfigure() {
 	d.start()
 }
 
-func (d *demoter) updateDemoter(cid string, p pagePool, targetNodes system.IDSet) {
+func (d *demoter) updateDemoter(cid string, p pagePool, targetNodes idset.IDSet) {
 	channel, found := d.containerDemoters[cid]
 	if !found {
 		channel := make(chan interface{})
@@ -306,7 +306,7 @@ func (d *demoter) scanPages() {
 	d.stopUnusedDemoters(d.migration.containers)
 }
 
-func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (pagePool, error) {
+func (d *demoter) getPagesForContainer(c *container, sourceNodes idset.IDSet) (pagePool, error) {
 	pool := pagePool{
 		pages:        make(map[int][]page, 0),
 		longestRange: 0,
@@ -463,7 +463,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes system.IDSet) (
 	return pool, nil
 }
 
-func pickClosestPMEMNode(currentNode system.ID, targetNodes system.IDSet) system.ID {
+func pickClosestPMEMNode(currentNode idset.ID, targetNodes idset.IDSet) idset.ID {
 	// TODO: analyze the topology information (and possibly the amount of free memory) and choose the "best"
 	// PMEM node to demote the page to. The array targetNodes already contains only the subset of PMEM nodes
 	// available in this topology subtree. Right now just pick a random controller.
@@ -471,7 +471,7 @@ func pickClosestPMEMNode(currentNode system.ID, targetNodes system.IDSet) system
 	return nodes[rand.Intn(len(nodes))]
 }
 
-func (d *demoter) movePagesForPid(p []page, count uint, pid int, targetNodes system.IDSet) (uint, error) {
+func (d *demoter) movePagesForPid(p []page, count uint, pid int, targetNodes idset.IDSet) (uint, error) {
 	// We move at max count pages, but there might not be that much.
 	nPages := count
 	if uint(len(p)) < count {
@@ -507,10 +507,10 @@ func (d *demoter) movePagesForPid(p []page, count uint, pid int, targetNodes sys
 			continue
 		}
 		// log.Debug("page 0x%08X: old status %d", pages[i], pageStatus)
-		if !targetNodes.Has(system.ID(pageStatus)) {
+		if !targetNodes.Has(idset.ID(pageStatus)) {
 			// In case of many PMEM controllers choose the one that is the closest.
 			dramPages = append(dramPages, pages[i])
-			nodes = append(nodes, int(pickClosestPMEMNode(system.ID(pageStatus), targetNodes)))
+			nodes = append(nodes, int(pickClosestPMEMNode(idset.ID(pageStatus), targetNodes)))
 		} // else no need to move.
 	}
 
@@ -521,7 +521,7 @@ func (d *demoter) movePagesForPid(p []page, count uint, pid int, targetNodes sys
 	return nPages, err
 }
 
-func (d *demoter) movePages(p pagePool, count uint, targetNodes system.IDSet) error {
+func (d *demoter) movePages(p pagePool, count uint, targetNodes idset.IDSet) error {
 	// Select pid for moving the pages so that the process with the largest number
 	// of non-dirty pages gets the pages moved first.
 	processedPids := make(map[int]bool, 0)

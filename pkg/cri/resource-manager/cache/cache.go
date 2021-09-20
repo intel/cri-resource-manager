@@ -33,8 +33,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 const (
@@ -481,8 +481,8 @@ type Device struct {
 
 // PageMigrate contains the policy/preferences for container page migration.
 type PageMigrate struct {
-	SourceNodes system.IDSet // idle memory pages on these NUMA nodes
-	TargetNodes system.IDSet // should be migrated to these NUMA nodes
+	SourceNodes idset.IDSet // idle memory pages on these NUMA nodes
+	TargetNodes idset.IDSet // should be migrated to these NUMA nodes
 }
 
 // Clone creates a copy of the page migration policy/preferences.

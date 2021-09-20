@@ -24,6 +24,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 var globalPolicy *policy
@@ -55,8 +56,8 @@ func TestColdStart(t *testing.T) {
 		expectedColdStartTimeout time.Duration
 		expectedDRAMNodeID       int
 		expectedPMEMNodeID       int
-		expectedDRAMSystemNodeID system.ID
-		expectedPMEMSystemNodeID system.ID
+		expectedDRAMSystemNodeID idset.ID
+		expectedPMEMSystemNodeID idset.ID
 	}{
 		{
 			name: "three node cold start",
@@ -76,8 +77,8 @@ func TestColdStart(t *testing.T) {
 			},
 			expectedColdStartTimeout: 1000 * time.Millisecond,
 			expectedDRAMNodeID:       101,
-			expectedDRAMSystemNodeID: system.ID(1),
-			expectedPMEMSystemNodeID: system.ID(2),
+			expectedDRAMSystemNodeID: idset.ID(1),
+			expectedPMEMSystemNodeID: idset.ID(2),
 			expectedPMEMNodeID:       102,
 		},
 	}
