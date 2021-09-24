@@ -528,6 +528,14 @@ opensuse-image-url() {
     echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
 }
 
+opensuse-tumbleweed-image-url() {
+    echo "https://ftp.uni-erlangen.de/opensuse/tumbleweed/appliances/openSUSE-Tumbleweed-JeOS.x86_64-OpenStack-Cloud.qcow2"
+}
+
+opensuse-tumbleweed-install-utils() {
+    distro-install-pkg psmisc
+}
+
 opensuse-ssh-user() {
     echo "opensuse"
 }
@@ -649,6 +657,14 @@ opensuse-install-k8s() {
     fi
     distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
     vm-install-containernetworking
+    # In some snap packages snap-seccomp launching fails on bad path:
+    # cannot obtain snap-seccomp version information: fork/exec /usr/libexec/snapd/snap-seccomp: no such file or directory
+    # But snap-seccomp may be installed to /usr/lib/snapd/snap-seccomp.
+    # (Found in opensuse-tumbleweed/20210921.)
+    # Workaround this problem by making sure that /usr/libexec/snapd/snap-seccomp is found.
+    vm-command-q "[ ! -d /usr/libexec/snapd ] && [ -f /usr/lib/snapd/snap-seccomp ]" &&
+        vm-command "ln -s /usr/lib/snapd /usr/libexec/snapd"
+
     vm-command "systemctl enable --now snapd"
     vm-command "snap wait system seed.loaded"
     for kubepart in kubelet kubectl kubeadm; do
