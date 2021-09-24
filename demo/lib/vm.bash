@@ -417,6 +417,48 @@ vm-put-file() { # script API
     fi
 }
 
+vm-put-pkg() { # script API
+    # Usage: vm-put-pkg [--force] HOST-FILE...
+    #
+    # Copies HOST-FILEs from host to vm and installs them.
+    #
+    # Examples:
+    #   vm-put-pkg /tmp/kernel.rpm /tmp/myutil.rpm
+    local host_pkg
+    local vm_pkgs=""
+    local force=""
+    if [ "$1" == "--force" ]; then
+        force="--force "
+        shift
+    fi
+    for host_pkg in "$@"; do
+        local vm_pkg="pkgs/$(basename "$host_pkg")"
+        vm-command-q "mkdir -p $(dirname "$vm_pkg")"
+        vm-put-file "$host_pkg" "$vm_pkg"
+        vm_pkgs="$vm_pkgs $vm_pkg"
+    done
+    distro-install-pkg-local $force "$vm_pkgs"
+}
+
+vm-put-docker-image() { # script API
+    # Usage: vm-put-docker-image IMAGE
+    #
+    # Exports IMAGE from docker images on the host, and
+    # imports it in the "k8s.io" namespace (visible
+    # for kubernetes containers) on the vm.
+    #
+    # Works with containerd only.
+    #
+    # Examples:
+    #   vm-put-docker-image busybox:latest
+    local image_name="$1"
+    local image_file_on_vm="images/${image_name//:/__}"
+    vm-command-q "mkdir -p $(dirname "$image_file_on_vm")"
+    docker save "$image_name" | vm-pipe-to-file "$image_file_on_vm" ||
+        error "failed to save and pipe image '$image_name'"
+    vm-cri-import-image "$image_name" "$image_file_on_vm"
+}
+
 vm-pipe-to-file() { # script API
     # Usage: vm-pipe-to-file [--append] DST-VM-FILE
     #
@@ -543,25 +585,6 @@ vm-cri-import-image() {
         *)
             error "vm-cri-import-image unsupported container runtime: \"$VM_CRI\""
     esac
-}
-
-vm-put-docker-image() { # script API
-    # Usage: vm-put-docker-image IMAGE
-    #
-    # Exports IMAGE from docker images on the host, and
-    # imports it in the "k8s.io" namespace (visible
-    # for kubernetes containers) on the vm.
-    #
-    # Works with containerd only.
-    #
-    # Examples:
-    #   vm-put-docker-image busybox:latest
-    local image_name="$1"
-    local image_file_on_vm="images/${image_name//:/__}"
-    vm-command-q "mkdir -p $(dirname "$image_file_on_vm")"
-    docker save "$image_name" | vm-pipe-to-file "$image_file_on_vm" ||
-        error "failed to save and pipe image '$image_name'"
-    vm-cri-import-image "$image_name" "$image_file_on_vm"
 }
 
 vm-install-cri-resmgr-webhook() {

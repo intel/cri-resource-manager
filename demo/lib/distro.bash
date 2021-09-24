@@ -23,6 +23,7 @@ distro-install-repo-key()   { distro-resolve "$@"; }
 distro-install-repo()       { distro-resolve "$@"; }
 distro-refresh-pkg-db()     { distro-resolve "$@"; }
 distro-install-pkg()        { distro-resolve "$@"; }
+distro-install-pkg-local()  { distro-resolve "$@"; }
 distro-remove-pkg()         { distro-resolve "$@"; }
 distro-setup-proxies()      { distro-resolve "$@"; }
 distro-setup-oneshot()      { distro-resolve "$@"; }
@@ -216,6 +217,16 @@ debian-remove-pkg() {
         command-error "failed to remove package(s) $*"
 }
 
+debian-install-pkg-local() {
+    local force=""
+    if [ "$1" == "--force" ]; then
+        force="--force-all"
+        shift
+    fi
+    vm-command "dpkg -i $force $*" ||
+        command-error "failed to install local package(s)"
+}
+
 debian-install-golang() {
     debian-install-pkg golang git-core
 }
@@ -375,6 +386,16 @@ fedora-install-pkg() {
 fedora-remove-pkg() {
     vm-command "dnf remove -y $*" ||
         command-error "failed to remove package(s) $*"
+}
+
+fedora-install-pkg-local() {
+    local force=""
+    if [ "$1" == "--force" ]; then
+        force="--nodeps --force"
+        shift
+    fi
+    vm-command "rpm -Uvh $force $*" ||
+        command-error "failed to install local package(s)"
 }
 
 fedora-install-golang() {
@@ -567,6 +588,17 @@ opensuse-install-pkg() {
     done
     vm-command "$ZYPPER install $opts $*" ||
         command-error "failed to install $*"
+}
+
+opensuse-install-pkg-local() {
+    opensuse-wait-for-zypper
+    local force=""
+    if [ "$1" == "--force" ]; then
+        force="--nodeps --force"
+        shift
+    fi
+    vm-command "rpm -Uvh $force $*" ||
+        command-error "failed to install local package(s)"
 }
 
 opensuse-remove-pkg() {
