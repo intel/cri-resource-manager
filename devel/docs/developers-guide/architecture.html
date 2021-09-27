@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Architecture &mdash; CRI Resource Manager 0.5.0-123-g2529560c documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Architecture &mdash; CRI Resource Manager 0.5.0-125-g4cec89f7 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -160,17 +160,17 @@ ConfigMaps and the CRI-RM Node Agent.</p>
 <section id="components">
 <h2>Components<a class="headerlink" href="#components" title="Permalink to this headline">¶</a></h2>
 <section id="node-agent">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/agent/">Node Agent</a><a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/agent/">Node Agent</a><a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h3>
 <p>The node agent is a component external to CRI-RM itself. All interactions
 by CRI-RM with the Kubernetes Control Plane go through the node agent with
 the node agent performing any direct interactions on behalf of CRI-RM.</p>
 <p>The node agent communicates with CRI-RM using two gRPC interfaces. The
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/config/api/v1/">config interface</a> is used to:</p>
+<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/config/api/v1/">config interface</a> is used to:</p>
 <ul class="simple">
 <li><p>push updated external configuration data to CRI-RM</p></li>
 <li><p>push adjustments to container resource assignments to CRI-RM</p></li>
 </ul>
-<p>The <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/agent/api/v1/">cluster interface</a> implements the necessary
+<p>The <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/agent/api/v1/">cluster interface</a> implements the necessary
 low-level plumbing for the agent interface CRI-RM internally exposes
 for its policies and other components. This interface in turn implements
 the following:</p>
@@ -183,7 +183,7 @@ the following:</p>
 <p>The config interface is defined and has its gRPC server running in
 CRI-RM. The agent acts as a gRPC client for this interface. The low-level
 cluster interface is defined and has its gRPC server running in the agent,
-with the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/agent">convenience layer</a> defined in
+with the <a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/agent">convenience layer</a> defined in
 CRI-RM. CRI-RM acts as a gRPC client for the low-level plumbing interface.</p>
 <p>Additionally, the stock node agent that comes with CRI-RM implements schemes
 for:</p>
@@ -196,7 +196,7 @@ for:</p>
 <img src="figures/cri-resmgr.png" title="Architecture Overview" width="50%">
 </p></section>
 <section id="resource-manager">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/">Resource Manager</a><a class="headerlink" href="#resource-manager" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/">Resource Manager</a><a class="headerlink" href="#resource-manager" title="Permalink to this headline">¶</a></h3>
 <p>CRI-RM implements a request processing pipeline and an event processing
 pipeline.
 The request processing pipeline takes care of proxying CRI requests and
@@ -285,7 +285,7 @@ following, based on the event type:</p>
 </ul>
 </section>
 <section id="cache">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/cache/">Cache</a><a class="headerlink" href="#cache" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/cache/">Cache</a><a class="headerlink" href="#cache" title="Permalink to this headline">¶</a></h3>
 <p>The cache is a shared internal storage location within CRI-RM. It tracks the
 runtime state of pods and containers known to CRI-RM, as well as the state
 of CRI-RM itself, including the active configuration and the state of the
@@ -314,20 +314,20 @@ the policy’s event handler with the injected event as an argument and with
 the cache properly locked.</p>
 </section>
 <section id="generic-policy-layer">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/policy/policy.go">Generic Policy Layer</a><a class="headerlink" href="#generic-policy-layer" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/policy/policy.go">Generic Policy Layer</a><a class="headerlink" href="#generic-policy-layer" title="Permalink to this headline">¶</a></h3>
 <p>The generic policy layer defines the abstract interface the rest of CRI-RM
 uses to interact with policy implementations and takes care of the details
 of activating and dispatching calls through to the configured active policy.</p>
 </section>
 <section id="generic-resource-controller-layer">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/control/control.go">Generic Resource Controller Layer</a><a class="headerlink" href="#generic-resource-controller-layer" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/control/control.go">Generic Resource Controller Layer</a><a class="headerlink" href="#generic-resource-controller-layer" title="Permalink to this headline">¶</a></h3>
 <p>The generic resource controller layer defines the abstract interface the rest
 of CRI-RM uses to interact with resource controller implementations and takes
 care of the details of dispatching calls to the controller implementations
 for post-policy enforcment of decisions.</p>
 </section>
 <section id="metrics-collector">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/metrics/">Metrics Collector</a><a class="headerlink" href="#metrics-collector" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/metrics/">Metrics Collector</a><a class="headerlink" href="#metrics-collector" title="Permalink to this headline">¶</a></h3>
 <p>The metrics collector gathers a set of runtime metrics about the containers
 running on the node. CRI-RM can be configured to periodically evaluate this
 collected data to determine how optimal the current assignment of container
@@ -335,41 +335,41 @@ resources is and to attempt a rebalancing/reallocation if it is deemed
 both possible and necessary.</p>
 </section>
 <section id="policy-implementations">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/policy/builtin/">Policy Implementations</a><a class="headerlink" href="#policy-implementations" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/policy/builtin/">Policy Implementations</a><a class="headerlink" href="#policy-implementations" title="Permalink to this headline">¶</a></h3>
 <section id="none">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/policy/builtin/none/">None</a><a class="headerlink" href="#none" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/policy/builtin/none/">None</a><a class="headerlink" href="#none" title="Permalink to this headline">¶</a></h4>
 <p>An empty policy that makes no policy decisions. It is included
 merely for the sake of completeness, analoguous to the none policy of the
 CPU Manager in kubelet.</p>
 </section>
 <section id="static-pools">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/policy/builtin/static-pools/">Static Pools</a><a class="headerlink" href="#static-pools" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/policy/builtin/static-pools/">Static Pools</a><a class="headerlink" href="#static-pools" title="Permalink to this headline">¶</a></h4>
 <p>A backward-compatible reimplementation of
 <a class="reference external" href="https://github.com/intel/CPU-Manager-for-Kubernetes">CMK</a>
 for CRI-RM with a few extra features.</p>
 </section>
 <section id="static">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/policy/builtin/static/">Static</a><a class="headerlink" href="#static" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/policy/builtin/static/">Static</a><a class="headerlink" href="#static" title="Permalink to this headline">¶</a></h4>
 <p>Part of the code from the static policy of CPU Manager in kubelet, that has
 been brutally hacked to work within CRI-RM. Serves merely as a
 proof-of-concept that the current policies of kubelet can be implemented in
 CRI-RM.</p>
 </section>
 <section id="static-plus">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/policy/builtin/static-plus/">Static Plus</a><a class="headerlink" href="#static-plus" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/policy/builtin/static-plus/">Static Plus</a><a class="headerlink" href="#static-plus" title="Permalink to this headline">¶</a></h4>
 <p>A fairly simplistic policy similar in spirit to the static policy of
 CPU Manager in kubelet, with a few extra features.</p>
 </section>
 <section id="topology-aware">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/policy/builtin/topology-aware/">Topology Aware</a><a class="headerlink" href="#topology-aware" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/policy/builtin/topology-aware/">Topology Aware</a><a class="headerlink" href="#topology-aware" title="Permalink to this headline">¶</a></h4>
 <p>A topology-aware policy capable of handling multiple tiers/types of memory,
 typically a DRAM/PMEM combination configured in 2-layer memory mode.</p>
 </section>
 </section>
 <section id="resource-controller-implementations">
-<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/control/">Resource Controller Implementations</a><a class="headerlink" href="#resource-controller-implementations" title="Permalink to this headline">¶</a></h3>
+<h3><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/control/">Resource Controller Implementations</a><a class="headerlink" href="#resource-controller-implementations" title="Permalink to this headline">¶</a></h3>
 <section id="intel-rdt">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/control/rdt/">Intel RDT</a><a class="headerlink" href="#intel-rdt" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/control/rdt/">Intel RDT</a><a class="headerlink" href="#intel-rdt" title="Permalink to this headline">¶</a></h4>
 <p>A resource controller implementation responsible for the practical details of
 associating a container with Intel RDT classes. This class effectively
 determines how much last level cache and memory bandwidth will be available
@@ -377,7 +377,7 @@ for the container. This controller uses the resctrl pseudo filesystem of the
 Linux* kernel for control.</p>
 </section>
 <section id="block-i-o">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/control/blockio/">Block I/O</a><a class="headerlink" href="#block-i-o" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/control/blockio/">Block I/O</a><a class="headerlink" href="#block-i-o" title="Permalink to this headline">¶</a></h4>
 <p>A resource controller implementation responsible for the practical details of
 associating a container with a Block I/O class. This class effectively
 determines how much Block I/O bandwidth will be available for the container.
@@ -385,7 +385,7 @@ This controller uses the blkio cgroup controller and the cgroupfs pseudo-
 filesystem of the Linux kernel for control.</p>
 </section>
 <section id="cri">
-<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/2529560c3502a1d3b2b6d5791a28de4647e46ecc/pkg/cri/resource-manager/control/cri/">CRI</a><a class="headerlink" href="#cri" title="Permalink to this headline">¶</a></h4>
+<h4><a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/4cec89f775bb402806360060350a14cc3f820d7c/pkg/cri/resource-manager/control/cri/">CRI</a><a class="headerlink" href="#cri" title="Permalink to this headline">¶</a></h4>
 <p>A resource controller responsible for modifying intercepted CRI container
 creation requests and creating CRI container resource update requests,
 according to the changes the active policy makes to containers.</p>
