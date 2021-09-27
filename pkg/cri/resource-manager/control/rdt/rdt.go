@@ -41,7 +41,7 @@ const (
 // rdtctl encapsulates the runtime state of our RTD enforcement/controller.
 type rdtctl struct {
 	cache        cache.Cache   // resource manager cache
-	noQoSClasses bool          // true if we run without any classes configured
+	noQoSClasses bool          // true if mapping pod qos class to rdt class is disabled
 	mode         OperatingMode // track the mode here to capture mode changes
 	opt          *config
 }
@@ -316,10 +316,10 @@ func (ctl *rdtctl) configure() error {
 			return rdtError("failed to discover classes from fs: %v", err)
 		}
 
-		// Set idle to true if none of the Pod QoS class equivalents exist
+		// Disable mapping from Pod QoS to RDT class if no Pod QoS class equivalents exist
 		ctl.noQoSClasses = true
 		cs := []corev1.PodQOSClass{corev1.PodQOSBestEffort, corev1.PodQOSBurstable, corev1.PodQOSGuaranteed}
-		for c := range cs {
+		for _, c := range cs {
 			if _, ok := rdt.GetClass(string(c)); ok {
 				ctl.noQoSClasses = false
 				break
@@ -338,6 +338,7 @@ func (ctl *rdtctl) configure() error {
 		if err := rdt.SetConfig(&ctl.opt.Config, true); err != nil {
 			return err
 		}
+		// Disable mapping from Pod QoS to RDT class if no classes have been defined
 		ctl.noQoSClasses = len(rdt.GetClasses()) <= 1
 		ctl.mode = ctl.opt.Options.Mode
 		ctl.assignAll("")
