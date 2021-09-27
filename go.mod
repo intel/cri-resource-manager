@@ -5,29 +5,31 @@ go 1.14
 require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.1-0.20191218042359-6151c48ac7fa
+	github.com/apache/thrift v0.13.0 // indirect
 	github.com/cilium/ebpf v0.0.0-20200702112145-1c8d4c9ef775
-	github.com/evanphx/json-patch v4.9.0+incompatible
-	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.4.0
-	github.com/hashicorp/go-multierror v1.0.0
+	github.com/evanphx/json-patch v4.11.0+incompatible
+	github.com/golang/protobuf v1.5.2
+	github.com/google/go-cmp v0.5.6
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
-	github.com/intel/goresctrl v0.0.0-20210216084728-8e0ae5411bf4
+	github.com/intel/goresctrl v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.8.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.14.0
+	github.com/prometheus/common v0.30.0
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd
-	go.opencensus.io v0.22.2
-	golang.org/x/net v0.0.0-20200707034311-ab3426394381
-	golang.org/x/sys v0.0.0-20201015000850-e3ed0017c211
+	go.opencensus.io v0.22.4
+	go.uber.org/zap v1.13.0 // indirect
+	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
+	golang.org/x/sys v0.0.0-20210903071746-97244b99971b
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/grpc v1.27.0
+	google.golang.org/grpc v1.31.0
 	k8s.io/api v0.19.4
-	k8s.io/apimachinery v0.19.4
+	k8s.io/apimachinery v0.22.1
 	k8s.io/client-go v0.19.4
 	k8s.io/cri-api v0.0.0
-	k8s.io/klog/v2 v2.4.0
+	k8s.io/klog/v2 v2.9.0
 	k8s.io/kubernetes v1.19.4
 	sigs.k8s.io/yaml v1.2.0
 )
