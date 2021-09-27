@@ -34,13 +34,13 @@ jobs:
     - name: Build
       run: make
 
+    - name: Test
+      run: make test
+
     - name: Golangci-lint
       run: |
         export PATH=$PATH:$(go env GOPATH)/bin
         make golangci-lint
-
-    - name: Test
-      run: make test
 
     - name: Codecov report
       run: bash <(curl -s https://codecov.io/bash)
