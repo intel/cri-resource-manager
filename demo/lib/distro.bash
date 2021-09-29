@@ -37,6 +37,7 @@ distro-install-crio()       { distro-resolve "$@"; }
 distro-config-crio()        { distro-resolve "$@"; }
 distro-restart-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
+distro-install-kernel-dev() { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
@@ -748,6 +749,15 @@ EOF
     vm-pipe-to-file /etc/systemd/system/kubelet.service
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
+}
+
+opensuse-install-kernel-dev() {
+    vm-command-q "zypper lr | grep -q openSUSE_Tools" ||
+        distro-install-repo "http://download.opensuse.org/repositories/openSUSE:/Tools/openSUSE_Factory/openSUSE:Tools.repo"
+    distro-install-pkg "git-core make gcc flex bison bc ncurses-devel patch bzip2 osc build python quilt"
+    vm-command "cd /root; [ -d kernel ] || git clone --depth=100 https://github.com/SUSE/kernel"
+    vm-command "cd /root; [ -d kernel-source ] || git clone --depth=100 https://github.com/SUSE/kernel-source"
+    vm-command "[ -f /etc/profile.d/linux_git.sh ] || echo export LINUX_GIT=/root/kernel > /etc/profile.d/linux_git.sh"
 }
 
 opensuse-bootstrap-commands-pre() {
