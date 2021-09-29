@@ -73,7 +73,7 @@ UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
 
 # Right now we don't depend on libexec/%.o on purpose so make sure the file
 # is always up-to-date when elf/avx512.c is changed.
-GEN_TARGETS := pkg/avx/programbytes_gendata.go pkg/sysfs/sst_types_amd64.go pkg/sysfs/sst_types_priv.go
+GEN_TARGETS := pkg/avx/programbytes_gendata.go
 
 # Determine binary version and buildid, and versions for rpm, deb, and tar packages.
 BUILD_VERSION := $(shell scripts/build/get-buildid --version --shell=no)

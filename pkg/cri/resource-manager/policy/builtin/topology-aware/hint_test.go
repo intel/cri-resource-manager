@@ -17,8 +17,8 @@ package topologyaware
 import (
 	"testing"
 
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	idset "github.com/intel/goresctrl/pkg/utils"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -73,7 +73,7 @@ func TestNumaHintScore(t *testing.T) {
 		name     string
 		expected float64
 		hint     topology.Hint
-		ids      []system.ID
+		ids      []idset.ID
 	}{
 		{
 			name: "handle unparsable NUMAs gracefully",
@@ -89,7 +89,7 @@ func TestNumaHintScore(t *testing.T) {
 		},
 		{
 			name: "hint corresponding to a given ID",
-			ids:  []system.ID{1},
+			ids:  []idset.ID{1},
 			hint: topology.Hint{
 				NUMAs: "1,2",
 			},
@@ -111,7 +111,7 @@ func TestSocketHintScore(t *testing.T) {
 		name     string
 		expected float64
 		hint     topology.Hint
-		id       system.ID
+		id       idset.ID
 	}{
 		{
 			name: "handle unparsable Sockets gracefully",

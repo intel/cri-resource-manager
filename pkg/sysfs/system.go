@@ -26,6 +26,8 @@ import (
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	"github.com/intel/goresctrl/pkg/sst"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 const (
@@ -72,91 +74,91 @@ const (
 // System devices
 type System interface {
 	Discover(flags DiscoveryFlag) error
-	SetCpusOnline(online bool, cpus IDSet) (IDSet, error)
-	SetCPUFrequencyLimits(min, max uint64, cpus IDSet) error
-	PackageIDs() []ID
-	NodeIDs() []ID
-	CPUIDs() []ID
+	SetCpusOnline(online bool, cpus idset.IDSet) (idset.IDSet, error)
+	SetCPUFrequencyLimits(min, max uint64, cpus idset.IDSet) error
+	PackageIDs() []idset.ID
+	NodeIDs() []idset.ID
+	CPUIDs() []idset.ID
 	PackageCount() int
 	SocketCount() int
 	CPUCount() int
 	NUMANodeCount() int
 	ThreadCount() int
 	CPUSet() cpuset.CPUSet
-	Package(id ID) CPUPackage
-	Node(id ID) Node
-	NodeDistance(from, to ID) int
-	CPU(id ID) CPU
+	Package(id idset.ID) CPUPackage
+	Node(id idset.ID) Node
+	NodeDistance(from, to idset.ID) int
+	CPU(id idset.ID) CPU
 	Offlined() cpuset.CPUSet
 	Isolated() cpuset.CPUSet
 }
 
 // System devices
 type system struct {
-	logger.Logger                    // our logger instance
-	flags         DiscoveryFlag      // system discovery flags
-	path          string             // sysfs mount point
-	packages      map[ID]*cpuPackage // physical packages
-	nodes         map[ID]*node       // NUMA nodes
-	cpus          map[ID]*cpu        // CPUs
-	cache         map[ID]*Cache      // Cache
-	offline       IDSet              // offlined CPUs
-	isolated      IDSet              // isolated CPUs
-	threads       int                // hyperthreads per core
+	logger.Logger                          // our logger instance
+	flags         DiscoveryFlag            // system discovery flags
+	path          string                   // sysfs mount point
+	packages      map[idset.ID]*cpuPackage // physical packages
+	nodes         map[idset.ID]*node       // NUMA nodes
+	cpus          map[idset.ID]*cpu        // CPUs
+	cache         map[idset.ID]*Cache      // Cache
+	offline       idset.IDSet              // offlined CPUs
+	isolated      idset.IDSet              // isolated CPUs
+	threads       int                      // hyperthreads per core
 }
 
 // CPUPackage is a physical package (a collection of CPUs).
 type CPUPackage interface {
-	ID() ID
+	ID() idset.ID
 	CPUSet() cpuset.CPUSet
-	DieIDs() []ID
-	NodeIDs() []ID
-	DieNodeIDs(ID) []ID
-	DieCPUSet(ID) cpuset.CPUSet
-	SstInfo() SstPackageInfo
+	DieIDs() []idset.ID
+	NodeIDs() []idset.ID
+	DieNodeIDs(idset.ID) []idset.ID
+	DieCPUSet(idset.ID) cpuset.CPUSet
+	SstInfo() sst.SstPackageInfo
 }
 
 type cpuPackage struct {
-	id       ID             // package id
-	cpus     IDSet          // CPUs in this package
-	nodes    IDSet          // nodes in this package
-	dies     IDSet          // dies in this package
-	dieCPUs  map[ID]IDSet   // CPUs per die
-	dieNodes map[ID]IDSet   // NUMA nodes per die
-	sstInfo  SstPackageInfo // Speed Select Technology info
+	id       idset.ID                 // package id
+	cpus     idset.IDSet              // CPUs in this package
+	nodes    idset.IDSet              // nodes in this package
+	dies     idset.IDSet              // dies in this package
+	dieCPUs  map[idset.ID]idset.IDSet // CPUs per die
+	dieNodes map[idset.ID]idset.IDSet // NUMA nodes per die
+	sstInfo  sst.SstPackageInfo       // Speed Select Technology info
 }
 
 // Node represents a NUMA node.
 type Node interface {
-	ID() ID
-	PackageID() ID
-	DieID() ID
+	ID() idset.ID
+	PackageID() idset.ID
+	DieID() idset.ID
 	CPUSet() cpuset.CPUSet
 	Distance() []int
-	DistanceFrom(id ID) int
+	DistanceFrom(id idset.ID) int
 	MemoryInfo() (*MemInfo, error)
 	GetMemoryType() MemoryType
 	HasNormalMemory() bool
 }
 
 type node struct {
-	path       string     // sysfs path
-	id         ID         // node id
-	pkg        ID         // package id
-	die        ID         // die id
-	cpus       IDSet      // cpus in this node
-	memoryType MemoryType // node memory type
-	normalMem  bool       // node has memory in a normal (kernel space allocatable) zone
-	distance   []int      // distance/cost to other NUMA nodes
+	path       string      // sysfs path
+	id         idset.ID    // node id
+	pkg        idset.ID    // package id
+	die        idset.ID    // die id
+	cpus       idset.IDSet // cpus in this node
+	memoryType MemoryType  // node memory type
+	normalMem  bool        // node has memory in a normal (kernel space allocatable) zone
+	distance   []int       // distance/cost to other NUMA nodes
 }
 
 // CPU is a CPU core.
 type CPU interface {
-	ID() ID
-	PackageID() ID
-	DieID() ID
-	NodeID() ID
-	CoreID() ID
+	ID() idset.ID
+	PackageID() idset.ID
+	DieID() idset.ID
+	NodeID() idset.ID
+	CoreID() idset.ID
 	ThreadCPUSet() cpuset.CPUSet
 	BaseFrequency() uint64
 	FrequencyRange() CPUFreq
@@ -168,19 +170,19 @@ type CPU interface {
 }
 
 type cpu struct {
-	path     string  // sysfs path
-	id       ID      // CPU id
-	pkg      ID      // package id
-	die      ID      // die id
-	node     ID      // node id
-	core     ID      // core id
-	threads  IDSet   // sibling/hyper-threads
-	baseFreq uint64  // CPU base frequency
-	freq     CPUFreq // CPU frequencies
-	epp      EPP     // Energy Performance Preference from cpufreq governor
-	online   bool    // whether this CPU is online
-	isolated bool    // whether this CPU is isolated
-	sstClos  int     // SST-CP CLOS the CPU is associated with
+	path     string      // sysfs path
+	id       idset.ID    // CPU id
+	pkg      idset.ID    // package id
+	die      idset.ID    // die id
+	node     idset.ID    // node id
+	core     idset.ID    // core id
+	threads  idset.IDSet // sibling/hyper-threads
+	baseFreq uint64      // CPU base frequency
+	freq     CPUFreq     // CPU frequencies
+	epp      EPP         // Energy Performance Preference from cpufreq governor
+	online   bool        // whether this CPU is online
+	isolated bool        // whether this CPU is isolated
+	sstClos  int         // SST-CP CLOS the CPU is associated with
 }
 
 // CPUFreq is a CPU frequency scaling range
@@ -227,11 +229,11 @@ const (
 
 // Cache has details about cache.
 type Cache struct {
-	id    ID        // cache id
-	kind  CacheType // cache type
-	size  uint64    // cache size
-	level uint8     // cache level
-	cpus  IDSet     // CPUs sharing this cache
+	id    idset.ID    // cache id
+	kind  CacheType   // cache type
+	size  uint64      // cache size
+	level uint8       // cache level
+	cpus  idset.IDSet // CPUs sharing this cache
 }
 
 // DiscoverSystem performs discovery of the running systems details.
@@ -255,7 +257,7 @@ func DiscoverSystemAt(path string, args ...DiscoveryFlag) (System, error) {
 	sys := &system{
 		Logger:  logger.NewLogger("sysfs"),
 		path:    path,
-		offline: NewIDSet(),
+		offline: idset.NewIDSet(),
 	}
 
 	if err := sys.Discover(flags); err != nil {
@@ -363,7 +365,7 @@ func (sys *system) Discover(flags DiscoveryFlag) error {
 }
 
 // SetCpusOnline puts a set of CPUs online. Return the toggled set. Nil set implies all CPUs.
-func (sys *system) SetCpusOnline(online bool, cpus IDSet) (IDSet, error) {
+func (sys *system) SetCpusOnline(online bool, cpus idset.IDSet) (idset.IDSet, error) {
 	var entries []string
 
 	if cpus == nil {
@@ -376,7 +378,7 @@ func (sys *system) SetCpusOnline(online bool, cpus IDSet) (IDSet, error) {
 	}
 
 	desired := map[bool]int{false: 0, true: 1}[online]
-	changed := NewIDSet()
+	changed := idset.NewIDSet()
 
 	for _, entry := range entries {
 		var current int
@@ -408,9 +410,9 @@ func (sys *system) SetCpusOnline(online bool, cpus IDSet) (IDSet, error) {
 }
 
 // SetCPUFrequencyLimits sets the CPU frequency scaling limits. Nil set implies all CPUs.
-func (sys *system) SetCPUFrequencyLimits(min, max uint64, cpus IDSet) error {
+func (sys *system) SetCPUFrequencyLimits(min, max uint64, cpus idset.IDSet) error {
 	if cpus == nil {
-		cpus = NewIDSet(sys.CPUIDs()...)
+		cpus = idset.NewIDSet(sys.CPUIDs()...)
 	}
 
 	for _, id := range cpus.Members() {
@@ -425,8 +427,8 @@ func (sys *system) SetCPUFrequencyLimits(min, max uint64, cpus IDSet) error {
 }
 
 // PackageIDs gets the ids of all packages present in the system.
-func (sys *system) PackageIDs() []ID {
-	ids := make([]ID, len(sys.packages))
+func (sys *system) PackageIDs() []idset.ID {
+	ids := make([]idset.ID, len(sys.packages))
 	idx := 0
 	for id := range sys.packages {
 		ids[idx] = id
@@ -441,8 +443,8 @@ func (sys *system) PackageIDs() []ID {
 }
 
 // NodeIDs gets the ids of all NUMA nodes present in the system.
-func (sys *system) NodeIDs() []ID {
-	ids := make([]ID, len(sys.nodes))
+func (sys *system) NodeIDs() []idset.ID {
+	ids := make([]idset.ID, len(sys.nodes))
 	idx := 0
 	for id := range sys.nodes {
 		ids[idx] = id
@@ -457,8 +459,8 @@ func (sys *system) NodeIDs() []ID {
 }
 
 // CPUIDs gets the ids of all CPUs present in the system.
-func (sys *system) CPUIDs() []ID {
-	ids := make([]ID, len(sys.cpus))
+func (sys *system) CPUIDs() []idset.ID {
+	ids := make([]idset.ID, len(sys.cpus))
 	idx := 0
 	for id := range sys.cpus {
 		ids[idx] = id
@@ -503,37 +505,37 @@ func (sys *system) ThreadCount() int {
 
 // CPUSet gets the ids of all CPUs present in the system as a CPUSet.
 func (sys *system) CPUSet() cpuset.CPUSet {
-	return NewIDSet(sys.CPUIDs()...).CPUSet()
+	return CPUSetFromIDSet(idset.NewIDSet(sys.CPUIDs()...))
 }
 
 // Package gets the package with a given package id.
-func (sys *system) Package(id ID) CPUPackage {
+func (sys *system) Package(id idset.ID) CPUPackage {
 	return sys.packages[id]
 }
 
 // Node gets the node with a given node id.
-func (sys *system) Node(id ID) Node {
+func (sys *system) Node(id idset.ID) Node {
 	return sys.nodes[id]
 }
 
 // NodeDistance gets the distance between two NUMA nodes.
-func (sys *system) NodeDistance(from, to ID) int {
+func (sys *system) NodeDistance(from, to idset.ID) int {
 	return sys.nodes[from].DistanceFrom(to)
 }
 
 // CPU gets the CPU with a given CPU id.
-func (sys *system) CPU(id ID) CPU {
+func (sys *system) CPU(id idset.ID) CPU {
 	return sys.cpus[id]
 }
 
 // Offlined gets the set of offlined CPUs.
 func (sys *system) Offlined() cpuset.CPUSet {
-	return sys.offline.CPUSet()
+	return CPUSetFromIDSet(sys.offline)
 }
 
 // Isolated gets the set of isolated CPUs."
 func (sys *system) Isolated() cpuset.CPUSet {
-	return sys.isolated.CPUSet()
+	return CPUSetFromIDSet(sys.isolated)
 }
 
 // Discover Cpus present in the system.
@@ -542,7 +544,7 @@ func (sys *system) discoverCPUs() error {
 		return nil
 	}
 
-	sys.cpus = make(map[ID]*cpu)
+	sys.cpus = make(map[idset.ID]*cpu)
 
 	_, err := readSysfsEntry(sys.path, filepath.Join(sysfsCPUPath, "isolated"), &sys.isolated, ",")
 	if err != nil {
@@ -624,33 +626,33 @@ func (sys *system) discoverCPU(path string) error {
 }
 
 // ID returns the id of this CPU.
-func (c *cpu) ID() ID {
+func (c *cpu) ID() idset.ID {
 	return c.id
 }
 
 // PackageID returns package id of this CPU.
-func (c *cpu) PackageID() ID {
+func (c *cpu) PackageID() idset.ID {
 	return c.pkg
 }
 
 // DieID returns the die id of this CPU.
-func (c *cpu) DieID() ID {
+func (c *cpu) DieID() idset.ID {
 	return c.die
 }
 
 // NodeID returns the node id of this CPU.
-func (c *cpu) NodeID() ID {
+func (c *cpu) NodeID() idset.ID {
 	return c.node
 }
 
 // CoreID returns the core id of this CPU (lowest CPU id of all thread siblings).
-func (c *cpu) CoreID() ID {
+func (c *cpu) CoreID() idset.ID {
 	return c.core
 }
 
 // ThreadCPUSet returns the CPUSet for all threads in this core.
 func (c *cpu) ThreadCPUSet() cpuset.CPUSet {
-	return c.threads.CPUSet()
+	return CPUSetFromIDSet(c.threads)
 }
 
 // BaseFrequency returns the base frequency setting for this CPU.
@@ -733,7 +735,7 @@ func (sys *system) discoverNodes() error {
 	}
 
 	sysNodesPath := filepath.Join(sys.path, sysfsNumaNodePath)
-	sys.nodes = make(map[ID]*node)
+	sys.nodes = make(map[idset.ID]*node)
 	entries, _ := filepath.Glob(filepath.Join(sysNodesPath, "node[0-9]*"))
 	for _, entry := range entries {
 		if err := sys.discoverNode(entry); err != nil {
@@ -778,10 +780,10 @@ func (sys *system) discoverNodes() error {
 	dramNodes := memoryNodes.Intersection(cpuNodes)
 	pmemOrHbmNodes := memoryNodes.Difference(dramNodes)
 
-	dramNodeIds := FromCPUSet(dramNodes)
-	pmemOrHbmNodeIds := FromCPUSet(pmemOrHbmNodes)
+	dramNodeIds := IDSetFromCPUSet(dramNodes)
+	pmemOrHbmNodeIds := IDSetFromCPUSet(pmemOrHbmNodes)
 
-	infos := make(map[ID]*MemInfo)
+	infos := make(map[idset.ID]*MemInfo)
 	dramAvg := uint64(0)
 	if len(pmemOrHbmNodeIds) > 0 && len(dramNodeIds) > 0 {
 		// There is special memory present in the system.
@@ -848,23 +850,23 @@ func (sys *system) discoverNode(path string) error {
 }
 
 // ID returns id of this node.
-func (n *node) ID() ID {
+func (n *node) ID() idset.ID {
 	return n.id
 }
 
 // PackageID returns the package id for this node.
-func (n *node) PackageID() ID {
+func (n *node) PackageID() idset.ID {
 	return n.pkg
 }
 
 // DieID returns the die id for this node.
-func (n *node) DieID() ID {
+func (n *node) DieID() idset.ID {
 	return n.die
 }
 
 // CPUSet returns the CPUSet for all cores/threads in this node.
 func (n *node) CPUSet() cpuset.CPUSet {
-	return n.cpus.CPUSet()
+	return CPUSetFromIDSet(n.cpus)
 }
 
 // Distance returns the distance vector for this node.
@@ -873,7 +875,7 @@ func (n *node) Distance() []int {
 }
 
 // DistanceFrom returns the distance of this and a given node.
-func (n *node) DistanceFrom(id ID) int {
+func (n *node) DistanceFrom(id idset.ID) int {
 	if int(id) < len(n.distance) {
 		return n.distance[int(id)]
 	}
@@ -927,18 +929,18 @@ func (sys *system) discoverPackages() error {
 		return nil
 	}
 
-	sys.packages = make(map[ID]*cpuPackage)
+	sys.packages = make(map[idset.ID]*cpuPackage)
 
 	for _, cpu := range sys.cpus {
 		pkg, found := sys.packages[cpu.pkg]
 		if !found {
 			pkg = &cpuPackage{
 				id:       cpu.pkg,
-				cpus:     NewIDSet(),
-				nodes:    NewIDSet(),
-				dies:     NewIDSet(),
-				dieCPUs:  make(map[ID]IDSet),
-				dieNodes: make(map[ID]IDSet),
+				cpus:     idset.NewIDSet(),
+				nodes:    idset.NewIDSet(),
+				dies:     idset.NewIDSet(),
+				dieCPUs:  make(map[idset.ID]idset.IDSet),
+				dieNodes: make(map[idset.ID]idset.IDSet),
 			}
 			sys.packages[cpu.pkg] = pkg
 		}
@@ -947,12 +949,12 @@ func (sys *system) discoverPackages() error {
 		pkg.dies.Add(cpu.die)
 
 		if dieCPUs, ok := pkg.dieCPUs[cpu.die]; !ok {
-			pkg.dieCPUs[cpu.die] = NewIDSet(cpu.id)
+			pkg.dieCPUs[cpu.die] = idset.NewIDSet(cpu.id)
 		} else {
 			dieCPUs.Add(cpu.id)
 		}
 		if dieNodes, ok := pkg.dieNodes[cpu.die]; !ok {
-			pkg.dieNodes[cpu.die] = NewIDSet(cpu.node)
+			pkg.dieNodes[cpu.die] = idset.NewIDSet(cpu.node)
 		} else {
 			dieNodes.Add(cpu.node)
 		}
@@ -962,13 +964,13 @@ func (sys *system) discoverPackages() error {
 }
 
 func (sys *system) discoverSst() error {
-	if !SstSupported() {
+	if !sst.SstSupported() {
 		sys.Info("Speed Select Technology (SST) support not detected")
 		return nil
 	}
 
 	for _, pkg := range sys.packages {
-		sstInfo, err := getSstPackageInfo(pkg)
+		sstInfo, err := sst.GetPackageInfo(pkg.id)
 		if err != nil {
 			return fmt.Errorf("failed to get SST info for package %d: %v", pkg.id, err)
 		}
@@ -976,12 +978,14 @@ func (sys *system) discoverSst() error {
 
 		if sstInfo.CPEnabled {
 			ids := pkg.cpus.SortedMembers()
-			clos, err := getCPUClosIDs(ids)
-			if err != nil {
-				return fmt.Errorf("failed to get SST-CP clos ids for package %d: %v", pkg.id, err)
-			}
-			for i, id := range ids {
-				sys.cpus[id].sstClos = clos[i]
+
+			for _, id := range ids {
+				clos, err := sst.GetCPUClosID(id)
+				if err != nil {
+					return fmt.Errorf("failed to get SST-CP clos id for cpu %d: %v", id, err)
+				}
+
+				sys.cpus[id].sstClos = clos
 			}
 		}
 		pkg.sstInfo = sstInfo
@@ -991,42 +995,42 @@ func (sys *system) discoverSst() error {
 }
 
 // ID returns the id of this package.
-func (p *cpuPackage) ID() ID {
+func (p *cpuPackage) ID() idset.ID {
 	return p.id
 }
 
 // CPUSet returns the CPUSet for all cores/threads in this package.
 func (p *cpuPackage) CPUSet() cpuset.CPUSet {
-	return p.cpus.CPUSet()
+	return CPUSetFromIDSet(p.cpus)
 }
 
 // DieIDs returns the die ids for this package.
-func (p *cpuPackage) DieIDs() []ID {
+func (p *cpuPackage) DieIDs() []idset.ID {
 	return p.dies.SortedMembers()
 }
 
 // NodeIDs returns the NUMA node ids for this package.
-func (p *cpuPackage) NodeIDs() []ID {
+func (p *cpuPackage) NodeIDs() []idset.ID {
 	return p.nodes.SortedMembers()
 }
 
 // DieNodeIDs returns the set of NUMA nodes in the given die of this package.
-func (p *cpuPackage) DieNodeIDs(id ID) []ID {
+func (p *cpuPackage) DieNodeIDs(id idset.ID) []idset.ID {
 	if dieNodes, ok := p.dieNodes[id]; ok {
 		return dieNodes.SortedMembers()
 	}
-	return []ID{}
+	return []idset.ID{}
 }
 
 // DieCPUSet returns the set of CPUs in the given die of this package.
-func (p *cpuPackage) DieCPUSet(id ID) cpuset.CPUSet {
+func (p *cpuPackage) DieCPUSet(id idset.ID) cpuset.CPUSet {
 	if dieCPUs, ok := p.dieCPUs[id]; ok {
-		return dieCPUs.CPUSet()
+		return CPUSetFromIDSet(dieCPUs)
 	}
 	return cpuset.NewCPUSet()
 }
 
-func (p *cpuPackage) SstInfo() SstPackageInfo {
+func (p *cpuPackage) SstInfo() sst.SstPackageInfo {
 	return p.sstInfo
 }
 
@@ -1035,14 +1039,14 @@ func (p *cpuPackage) SstInfo() SstPackageInfo {
 //     I'm not sure how to interpret the cache information under sysfs. This code is now effectively
 //     disabled by forcing the associated discovery bit off in the discovery flags.
 func (sys *system) discoverCache(path string) error {
-	var id ID
+	var id idset.ID
 
 	if _, err := readSysfsEntry(path, "id", &id); err != nil {
 		return sysfsError(path, "can't read cache id: %v", err)
 	}
 
 	if sys.cache == nil {
-		sys.cache = make(map[ID]*Cache)
+		sys.cache = make(map[idset.ID]*Cache)
 	}
 
 	if _, found := sys.cache[id]; found {

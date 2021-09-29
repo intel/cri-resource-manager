@@ -16,9 +16,8 @@ package pagemigrate
 
 import (
 	"fmt"
+	idset "github.com/intel/goresctrl/pkg/utils"
 	"testing"
-
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
 type mockPageMover struct {
@@ -58,7 +57,7 @@ func TestMovePages(t *testing.T) {
 	tcases := []struct {
 		name                       string
 		pool                       pagePool
-		targetNodes                system.IDSet
+		targetNodes                idset.IDSet
 		pageCount                  uint
 		expectedRemainingPageCount uint
 		expectedError              bool
@@ -89,7 +88,7 @@ func TestMovePages(t *testing.T) {
 				firstStatus:                []int{0, 0},
 				expectedPagesForSecondCall: 2,
 			},
-			targetNodes:                system.NewIDSet(1, 2),
+			targetNodes:                idset.NewIDSet(1, 2),
 			expectedError:              false,
 			expectedRemainingPageCount: 0,
 		},
@@ -117,7 +116,7 @@ func TestMovePages(t *testing.T) {
 				firstStatus:                []int{0, 2},
 				expectedPagesForSecondCall: 1,
 			},
-			targetNodes:                system.NewIDSet(1, 2),
+			targetNodes:                idset.NewIDSet(1, 2),
 			expectedError:              false,
 			expectedRemainingPageCount: 0,
 		},
@@ -145,7 +144,7 @@ func TestMovePages(t *testing.T) {
 				firstStatus:                []int{2, 1},
 				expectedPagesForSecondCall: 0,
 			},
-			targetNodes:                system.NewIDSet(1, 2),
+			targetNodes:                idset.NewIDSet(1, 2),
 			expectedError:              false,
 			expectedRemainingPageCount: 0,
 		},
@@ -173,7 +172,7 @@ func TestMovePages(t *testing.T) {
 				firstStatus:                []int{0},
 				expectedPagesForSecondCall: 1,
 			},
-			targetNodes:                system.NewIDSet(1, 2),
+			targetNodes:                idset.NewIDSet(1, 2),
 			expectedError:              false,
 			expectedRemainingPageCount: 1,
 		},
@@ -201,7 +200,7 @@ func TestMovePages(t *testing.T) {
 				firstStatus:                []int{0, 0},
 				expectedPagesForSecondCall: 0,
 			},
-			targetNodes:                system.NewIDSet(1, 2),
+			targetNodes:                idset.NewIDSet(1, 2),
 			expectedError:              true,
 			expectedRemainingPageCount: 2,
 		},
@@ -229,7 +228,7 @@ func TestMovePages(t *testing.T) {
 				firstStatus:                []int{0, 0},
 				expectedPagesForSecondCall: 0,
 			},
-			targetNodes:                system.NewIDSet(1, 2),
+			targetNodes:                idset.NewIDSet(1, 2),
 			expectedError:              true,
 			expectedRemainingPageCount: 2,
 		},

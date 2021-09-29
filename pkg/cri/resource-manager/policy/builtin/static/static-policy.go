@@ -32,6 +32,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 const (
@@ -78,7 +79,7 @@ func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 
 	s.Info("creating policy...")
 
-	s.numHT = s.sys.CPU(sysfs.ID(0)).ThreadCPUSet().Size()
+	s.numHT = s.sys.CPU(idset.ID(0)).ThreadCPUSet().Size()
 
 	if err := s.checkConstraints(); err != nil {
 		s.Fatal("cannot start with given constraints: %v", err)

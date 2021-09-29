@@ -17,6 +17,7 @@ package topologyaware
 import (
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	idset "github.com/intel/goresctrl/pkg/utils"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"strconv"
 	"strings"
@@ -34,7 +35,7 @@ func cpuHintScore(hint topology.Hint, CPUs cpuset.CPUSet) float64 {
 }
 
 // Calculate the NUMA node score of the given hint and NUMA node.
-func numaHintScore(hint topology.Hint, sysIDs ...system.ID) float64 {
+func numaHintScore(hint topology.Hint, sysIDs ...idset.ID) float64 {
 	for _, idstr := range strings.Split(hint.NUMAs, ",") {
 		hID, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
@@ -53,8 +54,8 @@ func numaHintScore(hint topology.Hint, sysIDs ...system.ID) float64 {
 }
 
 // Calculate the die node score of the given hint and die.
-func dieHintScore(hint topology.Hint, sysID system.ID, socket system.CPUPackage) float64 {
-	numaNodes := system.NewIDSet(socket.DieNodeIDs(sysID)...)
+func dieHintScore(hint topology.Hint, sysID idset.ID, socket system.CPUPackage) float64 {
+	numaNodes := idset.NewIDSet(socket.DieNodeIDs(sysID)...)
 
 	for _, idstr := range strings.Split(hint.NUMAs, ",") {
 		hID, err := strconv.ParseInt(idstr, 0, 0)
@@ -63,7 +64,7 @@ func dieHintScore(hint topology.Hint, sysID system.ID, socket system.CPUPackage)
 			return 0.0
 		}
 
-		if numaNodes.Has(system.ID(hID)) {
+		if numaNodes.Has(idset.ID(hID)) {
 			return 1.0
 		}
 	}
@@ -72,7 +73,7 @@ func dieHintScore(hint topology.Hint, sysID system.ID, socket system.CPUPackage)
 }
 
 // Calculate the socket node score of the given hint and NUMA node.
-func socketHintScore(hint topology.Hint, sysID system.ID) float64 {
+func socketHintScore(hint topology.Hint, sysID idset.ID) float64 {
 	for _, idstr := range strings.Split(hint.Sockets, ",") {
 		id, err := strconv.ParseInt(idstr, 0, 0)
 		if err != nil {
@@ -98,7 +99,7 @@ func (cs *supply) hintCpus(h topology.Hint) cpuset.CPUSet {
 	case h.NUMAs != "":
 		for _, idstr := range strings.Split(h.NUMAs, ",") {
 			if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-				if node := cs.node.System().Node(system.ID(id)); node != nil {
+				if node := cs.node.System().Node(idset.ID(id)); node != nil {
 					cpus = cpus.Union(node.CPUSet())
 				}
 			}
@@ -107,7 +108,7 @@ func (cs *supply) hintCpus(h topology.Hint) cpuset.CPUSet {
 	case h.Sockets != "":
 		for _, idstr := range strings.Split(h.Sockets, ",") {
 			if id, err := strconv.ParseInt(idstr, 0, 0); err == nil {
-				if pkg := cs.node.System().Package(system.ID(id)); pkg != nil {
+				if pkg := cs.node.System().Package(idset.ID(id)); pkg != nil {
 					cpus = cpus.Union(pkg.CPUSet())
 				}
 			}

@@ -55,6 +55,15 @@ var levelTag = map[Level]string{
 
 // Logger is the interface for producing log messages for/from a particular source.
 type Logger interface {
+	// Standardized Logger interface functions so that this interface can be
+	// used from goresctrl library.
+	Debugf(format string, v ...interface{})
+	Infof(format string, v ...interface{})
+	Warnf(format string, v ...interface{})
+	Errorf(format string, v ...interface{})
+	Panicf(format string, v ...interface{})
+	Fatalf(format string, v ...interface{})
+
 	// Debug formats and emits a debug message.
 	Debug(format string, args ...interface{})
 	// Info formats and emits an informational message.
@@ -451,4 +460,28 @@ func (l logger) block(level Level, prefix, format string, args ...interface{}) {
 // loggerError produces a formatted logger-specific error.
 func loggerError(format string, args ...interface{}) error {
 	return fmt.Errorf("logger: "+format, args...)
+}
+
+func (l logger) Debugf(format string, args ...interface{}) {
+	l.Debug(format, args...)
+}
+
+func (l logger) Infof(format string, args ...interface{}) {
+	l.Info(format, args...)
+}
+
+func (l logger) Warnf(format string, args ...interface{}) {
+	l.Warn(format, args...)
+}
+
+func (l logger) Errorf(format string, args ...interface{}) {
+	l.Error(format, args...)
+}
+
+func (l logger) Panicf(format string, args ...interface{}) {
+	l.Panic(format, args...)
+}
+
+func (l logger) Fatalf(format string, args ...interface{}) {
+	l.Fatal(format, args...)
 }

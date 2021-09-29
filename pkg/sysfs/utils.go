@@ -16,7 +16,9 @@ package sysfs
 
 import (
 	"fmt"
+	idset "github.com/intel/goresctrl/pkg/utils"
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -24,7 +26,7 @@ import (
 )
 
 // Get the trailing enumeration part of a name.
-func getEnumeratedID(name string) ID {
+func getEnumeratedID(name string) idset.ID {
 	id := 0
 	base := 1
 	for idx := len(name) - 1; idx > 0; idx-- {
@@ -35,14 +37,14 @@ func getEnumeratedID(name string) ID {
 			base *= 10
 		} else {
 			if base > 1 {
-				return ID(id)
+				return idset.ID(id)
 			}
 
-			return ID(-1)
+			return idset.ID(-1)
 		}
 	}
 
-	return ID(-1)
+	return idset.ID(-1)
 }
 
 // Read content of a sysfs entry and convert it according to the type of a given pointer.
@@ -62,14 +64,14 @@ func readSysfsEntry(base, entry string, ptr interface{}, args ...interface{}) (s
 	}
 
 	switch ptr.(type) {
-	case *string, *ID, *int, *uint, *int8, *uint8, *int16, *uint16, *int32, *uint32, *int64, *uint64:
+	case *string, *int, *uint, *int8, *uint8, *int16, *uint16, *int32, *uint32, *int64, *uint64:
 		err := parseValue(buf, ptr)
 		if err != nil {
 			return "", sysfsError(path, "%v", err)
 		}
 		return buf, nil
 
-	case *IDSet, *[]int, *[]uint, *[]int8, *[]uint8, *[]int16, *[]uint16, *[]int32, *[]uint32, *[]int64, *[]uint64:
+	case *idset.IDSet, *[]int, *[]uint, *[]int8, *[]uint8, *[]int16, *[]uint16, *[]int32, *[]uint32, *[]int64, *[]uint64:
 		sep, err := getSeparator(" ", args)
 		if err != nil {
 			return "", sysfsError(path, "%v", err)
@@ -101,13 +103,13 @@ func writeSysfsEntry(base, entry string, val, oldp interface{}, args ...interfac
 	path := filepath.Join(base, entry)
 
 	switch val.(type) {
-	case string, ID, int, uint, int8, uint8, int16, uint16, int32, uint32, int64, uint64:
+	case string, int, uint, int8, uint8, int16, uint16, int32, uint32, int64, uint64:
 		buf, err = formatValue(val)
 		if err != nil {
 			return "", sysfsError(path, "%v", err)
 		}
 
-	case IDSet, []int, []uint, []int8, []uint8, []int16, []uint16, []int32, []uint32, []int64, []uint64:
+	case idset.IDSet, []int, []uint, []int8, []uint8, []int16, []uint16, []int32, []uint32, []int64, []uint64:
 		sep, err := getSeparator(" ", args)
 		if err != nil {
 			return "", sysfsError(path, "%v", err)
@@ -152,15 +154,13 @@ func parseValue(str string, value interface{}) error {
 	case *string:
 		*value.(*string) = str
 
-	case *ID, *int, *int8, *int16, *int32, *int64:
+	case *int, *int8, *int16, *int32, *int64:
 		v, err := strconv.ParseInt(str, 0, 0)
 		if err != nil {
 			return fmt.Errorf("invalid entry '%s': %v", str, err)
 		}
 
 		switch value.(type) {
-		case *ID:
-			*value.(*ID) = ID(v)
 		case *int:
 			*value.(*int) = int(v)
 		case *int8:
@@ -201,8 +201,8 @@ func parseValueList(str, sep string, valuep interface{}) error {
 	var value interface{}
 
 	switch valuep.(type) {
-	case *IDSet:
-		value = NewIDSet()
+	case *idset.IDSet:
+		value = idset.NewIDSet()
 	case *[]int:
 		value = []int{}
 	case *[]uint:
@@ -232,13 +232,13 @@ func parseValueList(str, sep string, valuep interface{}) error {
 			break
 		}
 		switch value.(type) {
-		case IDSet:
+		case idset.IDSet:
 			if rng := strings.Split(s, "-"); len(rng) == 1 {
 				id, err := strconv.Atoi(s)
 				if err != nil {
 					return fmt.Errorf("invalid entry '%s': %v", s, err)
 				}
-				value.(IDSet).Add(ID(id))
+				value.(idset.IDSet).Add(idset.ID(id))
 			} else {
 				beg, err := strconv.Atoi(rng[0])
 				if err != nil {
@@ -249,7 +249,7 @@ func parseValueList(str, sep string, valuep interface{}) error {
 					return fmt.Errorf("invalid entry '%s': %v", s, err)
 				}
 				for id := beg; id <= end; id++ {
-					value.(IDSet).Add(ID(id))
+					value.(idset.IDSet).Add(idset.ID(id))
 				}
 			}
 
@@ -292,8 +292,8 @@ func parseValueList(str, sep string, valuep interface{}) error {
 	}
 
 	switch valuep.(type) {
-	case *IDSet:
-		*valuep.(*IDSet) = value.(IDSet)
+	case *idset.IDSet:
+		*valuep.(*idset.IDSet) = value.(idset.IDSet)
 	case *[]int:
 		*valuep.(*[]int) = value.([]int)
 	case *[]uint:
@@ -324,7 +324,7 @@ func formatValue(value interface{}) (string, error) {
 	switch value.(type) {
 	case string:
 		return value.(string), nil
-	case ID, int, uint, int8, uint8, int16, uint16, int32, uint32, int64, uint64:
+	case int, uint, int8, uint8, int16, uint16, int32, uint32, int64, uint64:
 		return fmt.Sprintf("%d", value), nil
 	default:
 		return "", fmt.Errorf("invalid value type %T", value)
@@ -336,8 +336,8 @@ func formatValueList(sep string, value interface{}) (string, error) {
 	var v []interface{}
 
 	switch value.(type) {
-	case IDSet:
-		return value.(IDSet).StringWithSeparator(sep), nil
+	case idset.IDSet:
+		return value.(idset.IDSet).StringWithSeparator(sep), nil
 	case []int, []uint, []int8, []uint8, []int16, []uint16, []int32, []uint32, []int64, []uint64:
 		v = value.([]interface{})
 	default:
@@ -352,4 +352,18 @@ func formatValueList(sep string, value interface{}) (string, error) {
 	}
 
 	return "", nil
+}
+
+// IDSetFromCPUSet returns an id set corresponding to a cpuset.CPUSet.
+func IDSetFromCPUSet(cset cpuset.CPUSet) idset.IDSet {
+	return idset.NewIDSetFromIntSlice(cset.ToSlice()...)
+}
+
+// CPUSetFromIDSet returns a cpuset.CPUSet corresponding to an id set.
+func CPUSetFromIDSet(s idset.IDSet) cpuset.CPUSet {
+	b := cpuset.NewBuilder()
+	for id := range s {
+		b.Add(int(id))
+	}
+	return b.Result()
 }

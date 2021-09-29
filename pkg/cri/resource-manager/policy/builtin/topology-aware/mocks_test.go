@@ -23,13 +23,15 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	"github.com/intel/goresctrl/pkg/sst"
+	idset "github.com/intel/goresctrl/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 type mockSystemNode struct {
-	id       system.ID // node id
+	id       idset.ID // node id
 	memFree  uint64
 	memTotal uint64
 	memType  system.MemoryType
@@ -40,15 +42,15 @@ func (fake *mockSystemNode) MemoryInfo() (*system.MemInfo, error) {
 	return &system.MemInfo{MemFree: fake.memFree, MemTotal: fake.memTotal}, nil
 }
 
-func (fake *mockSystemNode) PackageID() system.ID {
+func (fake *mockSystemNode) PackageID() idset.ID {
 	return 0
 }
 
-func (fake *mockSystemNode) DieID() system.ID {
+func (fake *mockSystemNode) DieID() idset.ID {
 	return 0
 }
 
-func (fake *mockSystemNode) ID() system.ID {
+func (fake *mockSystemNode) ID() idset.ID {
 	return fake.id
 }
 
@@ -71,45 +73,45 @@ func (fake *mockSystemNode) Distance() []int {
 	return fake.distance
 }
 
-func (fake *mockSystemNode) DistanceFrom(id system.ID) int {
+func (fake *mockSystemNode) DistanceFrom(id idset.ID) int {
 	return 0
 }
 
 type mockCPUPackage struct {
 }
 
-func (p *mockCPUPackage) ID() system.ID {
-	return system.ID(0)
+func (p *mockCPUPackage) ID() idset.ID {
+	return idset.ID(0)
 }
 
 func (p *mockCPUPackage) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func (p *mockCPUPackage) NodeIDs() []system.ID {
-	return []system.ID{}
+func (p *mockCPUPackage) NodeIDs() []idset.ID {
+	return []idset.ID{}
 }
 
-func (p *mockCPUPackage) DieIDs() []system.ID {
-	return []system.ID{0}
+func (p *mockCPUPackage) DieIDs() []idset.ID {
+	return []idset.ID{0}
 }
 
-func (p *mockCPUPackage) DieCPUSet(system.ID) cpuset.CPUSet {
+func (p *mockCPUPackage) DieCPUSet(idset.ID) cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func (p *mockCPUPackage) DieNodeIDs(system.ID) []system.ID {
-	return []system.ID{}
+func (p *mockCPUPackage) DieNodeIDs(idset.ID) []idset.ID {
+	return []idset.ID{}
 }
 
-func (p *mockCPUPackage) SstInfo() system.SstPackageInfo {
-	return system.SstPackageInfo{}
+func (p *mockCPUPackage) SstInfo() sst.SstPackageInfo {
+	return sst.SstPackageInfo{}
 }
 
 type mockCPU struct {
 	isolated cpuset.CPUSet
 	online   cpuset.CPUSet
-	id       system.ID
+	id       idset.ID
 	node     mockSystemNode
 	pkg      mockCPUPackage
 }
@@ -120,19 +122,19 @@ func (c *mockCPU) BaseFrequency() uint64 {
 func (c *mockCPU) EPP() system.EPP {
 	return system.EPPUnknown
 }
-func (c *mockCPU) ID() system.ID {
-	return system.ID(0)
+func (c *mockCPU) ID() idset.ID {
+	return idset.ID(0)
 }
-func (c *mockCPU) PackageID() system.ID {
+func (c *mockCPU) PackageID() idset.ID {
 	return c.pkg.ID()
 }
-func (c *mockCPU) DieID() system.ID {
-	return system.ID(0)
+func (c *mockCPU) DieID() idset.ID {
+	return idset.ID(0)
 }
-func (c *mockCPU) NodeID() system.ID {
+func (c *mockCPU) NodeID() idset.ID {
 	return c.node.ID()
 }
-func (c *mockCPU) CoreID() system.ID {
+func (c *mockCPU) CoreID() idset.ID {
 	return c.id
 }
 func (c *mockCPU) ThreadCPUSet() cpuset.CPUSet {
@@ -163,7 +165,7 @@ type mockSystem struct {
 	socketCount  int
 }
 
-func (fake *mockSystem) Node(id system.ID) system.Node {
+func (fake *mockSystem) Node(id idset.ID) system.Node {
 	for _, node := range fake.nodes {
 		if node.ID() == id {
 			return node
@@ -172,7 +174,7 @@ func (fake *mockSystem) Node(id system.ID) system.Node {
 	return &mockSystemNode{}
 }
 
-func (fake *mockSystem) CPU(system.ID) system.CPU {
+func (fake *mockSystem) CPU(idset.ID) system.CPU {
 	return &mockCPU{}
 }
 func (fake *mockSystem) CPUCount() int {
@@ -184,7 +186,7 @@ func (fake *mockSystem) CPUCount() int {
 func (fake *mockSystem) Discover(flags system.DiscoveryFlag) error {
 	return nil
 }
-func (fake *mockSystem) Package(system.ID) system.CPUPackage {
+func (fake *mockSystem) Package(idset.ID) system.CPUPackage {
 	return &mockCPUPackage{}
 }
 func (fake *mockSystem) Offlined() cpuset.CPUSet {
@@ -200,8 +202,8 @@ func (fake *mockSystem) Isolated() cpuset.CPUSet {
 func (fake *mockSystem) CPUSet() cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
-func (fake *mockSystem) CPUIDs() []system.ID {
-	return []system.ID{}
+func (fake *mockSystem) CPUIDs() []idset.ID {
+	return []idset.ID{}
 }
 func (fake *mockSystem) PackageCount() int {
 	if fake.packageCount == 0 {
@@ -224,27 +226,27 @@ func (fake *mockSystem) ThreadCount() int {
 	}
 	return fake.cpuCount
 }
-func (fake *mockSystem) PackageIDs() []system.ID {
-	ids := make([]system.ID, len(fake.nodes))
+func (fake *mockSystem) PackageIDs() []idset.ID {
+	ids := make([]idset.ID, len(fake.nodes))
 	for i, node := range fake.nodes {
 		ids[i] = node.PackageID()
 	}
 	return ids
 }
-func (fake *mockSystem) NodeIDs() []system.ID {
-	ids := make([]system.ID, len(fake.nodes))
+func (fake *mockSystem) NodeIDs() []idset.ID {
+	ids := make([]idset.ID, len(fake.nodes))
 	for i, node := range fake.nodes {
 		ids[i] = node.ID()
 	}
 	return ids
 }
-func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus system.IDSet) error {
+func (fake *mockSystem) SetCPUFrequencyLimits(min, max uint64, cpus idset.IDSet) error {
 	return nil
 }
-func (fake *mockSystem) SetCpusOnline(online bool, cpus system.IDSet) (system.IDSet, error) {
-	return system.NewIDSet(), nil
+func (fake *mockSystem) SetCpusOnline(online bool, cpus idset.IDSet) (idset.IDSet, error) {
+	return idset.NewIDSet(), nil
 }
-func (fake *mockSystem) NodeDistance(system.ID, system.ID) int {
+func (fake *mockSystem) NodeDistance(idset.ID, idset.ID) int {
 	return 10
 }
 

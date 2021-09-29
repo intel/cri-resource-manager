@@ -23,6 +23,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 // buildPoolsByTopology builds a hierarchical tree of pools based on HW topology.
@@ -68,7 +69,7 @@ func (p *policy) buildPoolsByTopology() error {
 	}
 
 	// create socket nodes, for a single-socket system set the only socket as the root
-	sockets := map[system.ID]Node{}
+	sockets := map[idset.ID]Node{}
 	for _, socketID := range p.sys.PackageIDs() {
 		var socket Node
 
@@ -86,7 +87,7 @@ func (p *policy) buildPoolsByTopology() error {
 	}
 
 	// create dies for every socket, but only if we have more than one die in the socket
-	numaDies := map[system.ID]Node{} // created die Nodes per NUMA node id
+	numaDies := map[idset.ID]Node{} // created die Nodes per NUMA node id
 	for socketID, socket := range sockets {
 		dieIDs := p.sys.Package(socketID).DieIDs()
 		if len(dieIDs) < 2 {
@@ -105,9 +106,9 @@ func (p *policy) buildPoolsByTopology() error {
 	}
 
 	// create pool nodes for NUMA nodes
-	pmemNodes := map[system.ID]system.Node{} // collected PMEM-only nodes
-	dramNodes := map[system.ID]system.Node{} // collected DRAM-only nodes
-	numaSurrogates := map[system.ID]Node{}   // surrogate leaf nodes for omitted NUMA nodes
+	pmemNodes := map[idset.ID]system.Node{} // collected PMEM-only nodes
+	dramNodes := map[idset.ID]system.Node{} // collected DRAM-only nodes
+	numaSurrogates := map[idset.ID]Node{}   // surrogate leaf nodes for omitted NUMA nodes
 	for _, numaNodeID := range p.sys.NodeIDs() {
 		var numaNode Node
 
@@ -161,7 +162,7 @@ func (p *policy) buildPoolsByTopology() error {
 	assigned := p.assignNUMANodes(numaSurrogates, pmemNodes, dramNodes)
 	log.Debug("NUMA node to pool assignment:")
 	for n, numaNodeIDs := range assigned {
-		log.Debug("  pool %q: NUMA nodes #%s", n.Name(), system.NewIDSet(numaNodeIDs...))
+		log.Debug("  pool %q: NUMA nodes #%s", n.Name(), idset.NewIDSet(numaNodeIDs...))
 	}
 
 	// enumerate pools, calculate depth, discover resource capacity, assign NUMA nodes
@@ -185,7 +186,7 @@ func (p *policy) buildPoolsByTopology() error {
 	if len(assigned) > 0 {
 		for node, pmem := range assigned {
 			log.Error("failed to assign PMEM NUMA nodes #%s (to NUMA node/surrogate %s %v)",
-				system.NewIDSet(pmem...), node.Name(), node)
+				idset.NewIDSet(pmem...), node.Name(), node)
 		}
 		log.Fatal("internal error: unassigned PMEM NUMA nodes remaining")
 	}
@@ -210,14 +211,14 @@ func (p *policy) parentNumaNodeCountWithCPUs(numaNode system.Node) int {
 }
 
 // assignNUMANodes assigns each PMEM node to one of the closest DRAM nodes
-func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[system.ID]system.Node) map[Node][]system.ID {
-	// collect the closest DRAM NUMA nodes (sorted by system.ID) for each PMEM NUMA node.
-	closest := map[system.ID][]system.ID{}
+func (p *policy) assignNUMANodes(surrogates map[idset.ID]Node, pmem, dram map[idset.ID]system.Node) map[Node][]idset.ID {
+	// collect the closest DRAM NUMA nodes (sorted by idset.ID) for each PMEM NUMA node.
+	closest := map[idset.ID][]idset.ID{}
 	for pmemID := range pmem {
-		var min []system.ID
+		var min []idset.ID
 		for dramID := range dram {
 			if len(min) < 1 {
-				min = []system.ID{dramID}
+				min = []idset.ID{dramID}
 			} else {
 				minDist := p.sys.NodeDistance(pmemID, min[0])
 				newDist := p.sys.NodeDistance(pmemID, dramID)
@@ -225,7 +226,7 @@ func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[s
 				case newDist == minDist:
 					min = append(min, dramID)
 				case newDist < minDist:
-					min = []system.ID{dramID}
+					min = []idset.ID{dramID}
 				}
 			}
 		}
@@ -233,12 +234,12 @@ func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[s
 		closest[pmemID] = min
 	}
 
-	assigned := map[Node][]system.ID{}
+	assigned := map[Node][]idset.ID{}
 
 	// assign each PMEM node to the closest DRAM surrogate with the least PMEM assigned
 	for pmemID, min := range closest {
 		var taker Node
-		var takerID system.ID
+		var takerID idset.ID
 
 		for _, dramID := range min {
 			if taker == nil {
@@ -263,7 +264,7 @@ func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[s
 	// assign each DRAM node to its own surrogate (can be the DRAM node itself)
 	for dramID := range dram {
 		taker := surrogates[dramID]
-		assigned[taker] = append([]system.ID{dramID}, assigned[taker]...)
+		assigned[taker] = append([]idset.ID{dramID}, assigned[taker]...)
 		log.Debug("        + DRAM node #%d assigned to %s", dramID, taker.Name())
 	}
 
@@ -273,10 +274,10 @@ func (p *policy) assignNUMANodes(surrogates map[system.ID]Node, pmem, dram map[s
 // checkHWTopology verifies our otherwise implicit assumptions about the HW.
 func (p *policy) checkHWTopology() error {
 	// NUMA nodes (memory controllers) should not be shared by multiple sockets.
-	socketNodes := map[system.ID]cpuset.CPUSet{}
+	socketNodes := map[idset.ID]cpuset.CPUSet{}
 	for _, socketID := range p.sys.PackageIDs() {
 		pkg := p.sys.Package(socketID)
-		socketNodes[socketID] = system.NewIDSet(pkg.NodeIDs()...).CPUSet()
+		socketNodes[socketID] = system.CPUSetFromIDSet(idset.NewIDSet(pkg.NodeIDs()...))
 	}
 	for id1, nodes1 := range socketNodes {
 		for id2, nodes2 := range socketNodes {
@@ -296,13 +297,13 @@ func (p *policy) checkHWTopology() error {
 	for _, socketID := range p.sys.PackageIDs() {
 		pkg := p.sys.Package(socketID)
 		for _, id1 := range pkg.DieIDs() {
-			nodes1 := system.NewIDSet(pkg.DieNodeIDs(id1)...)
+			nodes1 := idset.NewIDSet(pkg.DieNodeIDs(id1)...)
 			for _, id2 := range pkg.DieIDs() {
 				if id1 == id2 {
 					continue
 				}
-				nodes2 := system.NewIDSet(pkg.DieNodeIDs(id2)...)
-				if shared := nodes1.CPUSet().Intersection(nodes2.CPUSet()); !shared.IsEmpty() {
+				nodes2 := idset.NewIDSet(pkg.DieNodeIDs(id2)...)
+				if shared := system.CPUSetFromIDSet(nodes1).Intersection(system.CPUSetFromIDSet(nodes2)); !shared.IsEmpty() {
 					log.Error("can't handle HW topology: "+
 						"socket #%v, dies #%v,%v share NUMA node(s) #%s",
 						socketID, id1, id2, shared.String())

@@ -378,6 +378,30 @@ func (*testlog) Panic(format string, args ...interface{}) {
 	panic(msg)
 }
 
+func (t *testlog) Infof(format string, args ...interface{}) {
+	t.Info(format, args...)
+}
+
+func (t *testlog) Warnf(format string, args ...interface{}) {
+	t.Warn(format, args...)
+}
+
+func (t *testlog) Errorf(format string, args ...interface{}) {
+	t.Error(format, args...)
+}
+
+func (t *testlog) Debugf(format string, args ...interface{}) {
+	t.Debug(format, args...)
+}
+
+func (t *testlog) Fatalf(format string, args ...interface{}) {
+	t.Fatal(format, args...)
+}
+
+func (t *testlog) Panicf(format string, args ...interface{}) {
+	t.Panic(format, args...)
+}
+
 func (*testlog) Block(fn func(string, ...interface{}), prfx string, frmt string, a ...interface{}) {
 	for _, line := range strings.Split(fmt.Sprintf(frmt, a...), "\n") {
 		fn("%s%s", prfx, line)

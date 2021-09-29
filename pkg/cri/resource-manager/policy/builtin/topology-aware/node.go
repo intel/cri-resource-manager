@@ -19,6 +19,7 @@ import (
 
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	idset "github.com/intel/goresctrl/pkg/utils"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
@@ -90,7 +91,7 @@ type Node interface {
 	// Policy returns the policy back pointer.
 	Policy() *policy
 	// DiscoverSupply
-	DiscoverSupply(assignedNUMANodes []system.ID) Supply
+	DiscoverSupply(assignedNUMANodes []idset.ID) Supply
 	// GetSupply returns the full CPU at this node.
 	GetSupply() Supply
 	// FreeSupply returns the available CPU supply of this node.
@@ -100,9 +101,9 @@ type Node interface {
 	// GrantedSharedCPU returns the amount of granted shared CPU of this node and its children.
 	GrantedSharedCPU() int
 	// GetMemset
-	GetMemset(mtype memoryType) system.IDSet
+	GetMemset(mtype memoryType) idset.IDSet
 	// AssignNUMANodes assigns the given set of NUMA nodes to this one.
-	AssignNUMANodes(ids []system.ID)
+	AssignNUMANodes(ids []idset.ID)
 	// DepthFirst traverse the tree@node calling the function at each node.
 	DepthFirst(func(Node) error) error
 	// BreadthFirst traverse the tree@node calling the function at each node.
@@ -114,7 +115,7 @@ type Node interface {
 
 	GetMemoryType() memoryType
 	HasMemoryType(memoryType) bool
-	GetPhysicalNodeIDs() []system.ID
+	GetPhysicalNodeIDs() []idset.ID
 
 	GetScore(Request) Score
 	HintScore(topology.Hint) float64
@@ -122,19 +123,19 @@ type Node interface {
 
 // node represents data common to all node types.
 type node struct {
-	policy   *policy      // policy back pointer
-	self     nodeself     // upcasted/type-specific interface
-	name     string       // node name
-	id       int          // node id
-	kind     NodeKind     // node type
-	depth    int          // node depth in the tree
-	parent   Node         // parent node
-	children []Node       // child nodes
-	noderes  Supply       // CPU and memory available at this node
-	freeres  Supply       // CPU and memory allocatable at this node
-	mem      system.IDSet // controllers with normal DRAM attached
-	pMem     system.IDSet // controllers with PMEM attached
-	hbm      system.IDSet // controllers with HBM attached
+	policy   *policy     // policy back pointer
+	self     nodeself    // upcasted/type-specific interface
+	name     string      // node name
+	id       int         // node id
+	kind     NodeKind    // node type
+	depth    int         // node depth in the tree
+	parent   Node        // parent node
+	children []Node      // child nodes
+	noderes  Supply      // CPU and memory available at this node
+	freeres  Supply      // CPU and memory allocatable at this node
+	mem      idset.IDSet // controllers with normal DRAM attached
+	pMem     idset.IDSet // controllers with PMEM attached
+	hbm      idset.IDSet // controllers with HBM attached
 }
 
 // nodeself is used to 'upcast' a generic Node interface to a type-specific one.
@@ -145,21 +146,21 @@ type nodeself struct {
 // socketnode represents a physical CPU package/socket in the system.
 type socketnode struct {
 	node                     // common node data
-	id     system.ID         // NUMA node socket id
+	id     idset.ID          // NUMA node socket id
 	syspkg system.CPUPackage // corresponding system.Package
 }
 
 // dienode represents a die within a physical CPU package/socket in the system.
 type dienode struct {
 	node                     // common node data
-	id     system.ID         // die id within socket
+	id     idset.ID          // die id within socket
 	syspkg system.CPUPackage // corresponding system.Package
 }
 
 // numanode represents a NUMA node in the system.
 type numanode struct {
 	node                // common node data
-	id      system.ID   // NUMA node system id
+	id      idset.ID    // NUMA node system id
 	sysnode system.Node // corresponding system.Node
 }
 
@@ -187,9 +188,9 @@ func (n *node) init(p *policy, name string, kind NodeKind, parent Node) {
 
 	n.LinkParent(parent)
 
-	n.mem = system.NewIDSet()
-	n.pMem = system.NewIDSet()
-	n.hbm = system.NewIDSet()
+	n.mem = idset.NewIDSet()
+	n.pMem = idset.NewIDSet()
+	n.hbm = idset.NewIDSet()
 }
 
 // IsNil tests if a node
@@ -377,12 +378,12 @@ func (n *node) GetSupply() Supply {
 }
 
 // Discover CPU available at this node.
-func (n *node) DiscoverSupply(assignedNUMANodes []system.ID) Supply {
+func (n *node) DiscoverSupply(assignedNUMANodes []idset.ID) Supply {
 	return n.self.node.DiscoverSupply(assignedNUMANodes)
 }
 
 // discoverSupply discovers the resource supply assigned to this pool node.
-func (n *node) discoverSupply(assignedNUMANodes []system.ID) Supply {
+func (n *node) discoverSupply(assignedNUMANodes []idset.ID) Supply {
 	if n.noderes != nil {
 		return n.noderes.Clone()
 	}
@@ -476,20 +477,20 @@ func (n *node) FreeSupply() Supply {
 }
 
 // Get the set of memory attached to this node.
-func (n *node) GetMemset(mtype memoryType) system.IDSet {
+func (n *node) GetMemset(mtype memoryType) idset.IDSet {
 	if n.self.node == nil { // protect against &node{}-abuse by test cases...
-		return system.NewIDSet()
+		return idset.NewIDSet()
 	}
 	return n.self.node.GetMemset(mtype)
 }
 
 // AssignNUMANodes assigns the given set of NUMA nodes to this one.
-func (n *node) AssignNUMANodes(ids []system.ID) {
+func (n *node) AssignNUMANodes(ids []idset.ID) {
 	n.self.node.AssignNUMANodes(ids)
 }
 
 // assignNUMANodes assigns the given set of NUMA nodes to this one.
-func (n *node) assignNUMANodes(ids []system.ID) {
+func (n *node) assignNUMANodes(ids []idset.ID) {
 	mem := createMemoryMap(0, 0, 0)
 
 	for _, numaNodeID := range ids {
@@ -533,7 +534,7 @@ func (n *node) assignNUMANodes(ids []system.ID) {
 }
 
 // Discover the set of memory attached to this node.
-func (n *node) GetPhysicalNodeIDs() []system.ID {
+func (n *node) GetPhysicalNodeIDs() []idset.ID {
 	return n.self.node.GetPhysicalNodeIDs()
 }
 
@@ -586,7 +587,7 @@ func (n *node) HasMemoryType(reqType memoryType) bool {
 }
 
 // NewNumaNode create a node for a CPU socket.
-func (p *policy) NewNumaNode(id system.ID, parent Node) Node {
+func (p *policy) NewNumaNode(id idset.ID, parent Node) Node {
 	n := &numanode{}
 	n.self.node = n
 	n.node.init(p, fmt.Sprintf("NUMA node #%v", id), NumaNode, parent)
@@ -606,18 +607,18 @@ func (n *numanode) GetSupply() Supply {
 	return n.noderes.Clone()
 }
 
-func (n *numanode) GetPhysicalNodeIDs() []system.ID {
-	return []system.ID{n.id}
+func (n *numanode) GetPhysicalNodeIDs() []idset.ID {
+	return []idset.ID{n.id}
 }
 
 // DiscoverSupply discovers the CPU supply available at this node.
-func (n *numanode) DiscoverSupply(assignedNUMANodes []system.ID) Supply {
+func (n *numanode) DiscoverSupply(assignedNUMANodes []idset.ID) Supply {
 	return n.node.discoverSupply(assignedNUMANodes)
 }
 
 // GetMemset returns the set of memory attached to this node.
-func (n *numanode) GetMemset(mtype memoryType) system.IDSet {
-	mset := system.NewIDSet()
+func (n *numanode) GetMemset(mtype memoryType) idset.IDSet {
+	mset := idset.NewIDSet()
 
 	if mtype&memoryDRAM != 0 {
 		mset.Add(n.mem.Members()...)
@@ -633,7 +634,7 @@ func (n *numanode) GetMemset(mtype memoryType) system.IDSet {
 }
 
 // AssignNUMANodes assigns the given NUMA nodes to this one.
-func (n *numanode) AssignNUMANodes(ids []system.ID) {
+func (n *numanode) AssignNUMANodes(ids []idset.ID) {
 	n.node.assignNUMANodes(ids)
 }
 
@@ -660,7 +661,7 @@ func (n *numanode) HintScore(hint topology.Hint) float64 {
 }
 
 // NewDieNode create a node for a CPU die.
-func (p *policy) NewDieNode(id system.ID, parent Node) Node {
+func (p *policy) NewDieNode(id idset.ID, parent Node) Node {
 	pkg := parent.(*socketnode)
 	n := &dienode{}
 	n.self.node = n
@@ -681,8 +682,8 @@ func (n *dienode) GetSupply() Supply {
 	return n.noderes.Clone()
 }
 
-func (n *dienode) GetPhysicalNodeIDs() []system.ID {
-	ids := make([]system.ID, 0)
+func (n *dienode) GetPhysicalNodeIDs() []idset.ID {
+	ids := make([]idset.ID, 0)
 	ids = append(ids, n.id)
 	for _, c := range n.children {
 		cIds := c.GetPhysicalNodeIDs()
@@ -692,13 +693,13 @@ func (n *dienode) GetPhysicalNodeIDs() []system.ID {
 }
 
 // DiscoverSupply discovers the CPU supply available at this die.
-func (n *dienode) DiscoverSupply(assignedNUMANodes []system.ID) Supply {
+func (n *dienode) DiscoverSupply(assignedNUMANodes []idset.ID) Supply {
 	return n.node.discoverSupply(assignedNUMANodes)
 }
 
 // GetMemset returns the set of memory attached to this die.
-func (n *dienode) GetMemset(mtype memoryType) system.IDSet {
-	mset := system.NewIDSet()
+func (n *dienode) GetMemset(mtype memoryType) idset.IDSet {
+	mset := idset.NewIDSet()
 
 	if mtype&memoryDRAM != 0 {
 		mset.Add(n.mem.Members()...)
@@ -714,7 +715,7 @@ func (n *dienode) GetMemset(mtype memoryType) system.IDSet {
 }
 
 // AssignNUMANodes assigns the given NUMA nodes to this one.
-func (n *dienode) AssignNUMANodes(ids []system.ID) {
+func (n *dienode) AssignNUMANodes(ids []idset.ID) {
 	n.node.assignNUMANodes(ids)
 }
 
@@ -740,7 +741,7 @@ func (n *dienode) HintScore(hint topology.Hint) float64 {
 }
 
 // NewSocketNode create a node for a CPU socket.
-func (p *policy) NewSocketNode(id system.ID, parent Node) Node {
+func (p *policy) NewSocketNode(id idset.ID, parent Node) Node {
 	n := &socketnode{}
 	n.self.node = n
 	n.node.init(p, fmt.Sprintf("socket #%v", id), SocketNode, parent)
@@ -760,8 +761,8 @@ func (n *socketnode) GetSupply() Supply {
 	return n.noderes.Clone()
 }
 
-func (n *socketnode) GetPhysicalNodeIDs() []system.ID {
-	ids := make([]system.ID, 0)
+func (n *socketnode) GetPhysicalNodeIDs() []idset.ID {
+	ids := make([]idset.ID, 0)
 	ids = append(ids, n.id)
 	for _, c := range n.children {
 		cIds := c.GetPhysicalNodeIDs()
@@ -771,13 +772,13 @@ func (n *socketnode) GetPhysicalNodeIDs() []system.ID {
 }
 
 // DiscoverSupply discovers the CPU supply available at this socket.
-func (n *socketnode) DiscoverSupply(assignedNUMANodes []system.ID) Supply {
+func (n *socketnode) DiscoverSupply(assignedNUMANodes []idset.ID) Supply {
 	return n.node.discoverSupply(assignedNUMANodes)
 }
 
 // GetMemset returns the set of memory attached to this socket.
-func (n *socketnode) GetMemset(mtype memoryType) system.IDSet {
-	mset := system.NewIDSet()
+func (n *socketnode) GetMemset(mtype memoryType) idset.IDSet {
+	mset := idset.NewIDSet()
 
 	if mtype&memoryDRAM != 0 {
 		mset.Add(n.mem.Members()...)
@@ -793,7 +794,7 @@ func (n *socketnode) GetMemset(mtype memoryType) system.IDSet {
 }
 
 // AssignNUMANodes assigns the given NUMA nodes to this one.
-func (n *socketnode) AssignNUMANodes(ids []system.ID) {
+func (n *socketnode) AssignNUMANodes(ids []idset.ID) {
 	n.node.assignNUMANodes(ids)
 }
 
@@ -833,13 +834,13 @@ func (n *virtualnode) GetSupply() Supply {
 }
 
 // DiscoverSupply discovers the CPU supply available at this node.
-func (n *virtualnode) DiscoverSupply(assignedNUMANodes []system.ID) Supply {
+func (n *virtualnode) DiscoverSupply(assignedNUMANodes []idset.ID) Supply {
 	return n.node.discoverSupply(assignedNUMANodes)
 }
 
 // GetMemset returns the set of memory attached to this socket.
-func (n *virtualnode) GetMemset(mtype memoryType) system.IDSet {
-	mset := system.NewIDSet()
+func (n *virtualnode) GetMemset(mtype memoryType) idset.IDSet {
+	mset := idset.NewIDSet()
 
 	if mtype&memoryDRAM != 0 {
 		mset.Add(n.mem.Members()...)
@@ -855,9 +856,9 @@ func (n *virtualnode) GetMemset(mtype memoryType) system.IDSet {
 }
 
 // AssignNUMANodes assigns the given NUMA nodes to this one.
-func (n *virtualnode) AssignNUMANodes(ids []system.ID) {
+func (n *virtualnode) AssignNUMANodes(ids []idset.ID) {
 	log.Panic("cannot assign NUMA nodes #%s to %s",
-		system.NewIDSet(ids...).String(), n.Name())
+		idset.NewIDSet(ids...).String(), n.Name())
 }
 
 // HintScore calculates the (CPU) score of the node for the given topology hint.
@@ -877,8 +878,8 @@ func (n *virtualnode) HintScore(hint topology.Hint) float64 {
 	return 0.0
 }
 
-func (n *virtualnode) GetPhysicalNodeIDs() []system.ID {
-	ids := make([]system.ID, 0)
+func (n *virtualnode) GetPhysicalNodeIDs() []idset.ID {
+	ids := make([]idset.ID, 0)
 	for _, c := range n.children {
 		cIds := c.GetPhysicalNodeIDs()
 		ids = append(ids, cIds...)

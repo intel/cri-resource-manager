@@ -25,7 +25,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 // Supply represents avaialbe CPU and memory capacity of a node.
@@ -150,7 +150,7 @@ type Grant interface {
 	// SetMemoryNode updates the grant memory controllers.
 	SetMemoryNode(Node)
 	// Memset returns the granted memory controllers as a string.
-	Memset() system.IDSet
+	Memset() idset.IDSet
 	// ExpandMemset() makes the memory controller set larger as the grant
 	// is moved up in the node hierarchy.
 	ExpandMemset() (bool, error)
@@ -247,7 +247,7 @@ type grant struct {
 	cpuType        cpuClass        // type of CPUs (normal, reserved, ...)
 	cpuPortion     int             // milliCPUs granted from CPUs of cpuType
 	memType        memoryType      // requested types of memory
-	memset         system.IDSet    // assigned memory nodes
+	memset         idset.IDSet     // assigned memory nodes
 	allocatedMem   memoryMap       // memory limit
 	coldStart      time.Duration   // how long until cold start is done
 	coldStartTimer *time.Timer     // timer to trigger cold start timeout
@@ -1369,7 +1369,7 @@ func (cg *grant) MemoryType() memoryType {
 }
 
 // Memset returns the granted memory controllers as an IDSet.
-func (cg *grant) Memset() system.IDSet {
+func (cg *grant) Memset() idset.IDSet {
 	return cg.memset
 }
 

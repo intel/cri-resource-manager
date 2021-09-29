@@ -21,7 +21,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
-	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 const (
@@ -119,7 +119,7 @@ type cachedGrant struct {
 	Pool        string
 	MemoryPool  string
 	MemType     memoryType
-	Memset      system.IDSet
+	Memset      idset.IDSet
 	MemoryLimit memoryMap
 	ColdStart   time.Duration
 }
