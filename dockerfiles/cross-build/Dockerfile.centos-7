@@ -1,7 +1,7 @@
 # pull in base + a minimal set of useful packages
 FROM centos:7 as centos-7-build
 
-ARG GOLANG_VERSION=1.14.8
+ARG GOLANG_VERSION=1.16.8
 ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG GIT_VERSION=2.27.0
 ARG GIT_URLDIR=https://github.com/git/git/archive

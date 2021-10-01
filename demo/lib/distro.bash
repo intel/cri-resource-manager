@@ -1,6 +1,6 @@
 # shellcheck disable=SC2120
 GO_URLDIR=https://golang.org/dl
-GO_VERSION=1.14.9
+GO_VERSION=1.16.8
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
 CNI_SUBNET=10.217.0.0/16
 
