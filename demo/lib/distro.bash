@@ -208,7 +208,7 @@ debian-install-pkg() {
             break
         fi
     done
-    vm-command "yes \"\" | apt-get install $opts -y $*" ||
+    vm-command "yes \"\" | DEBIAN_FRONTEND=noninteractive apt-get install $opts -y $*" ||
         command-error "failed to install $*"
 }
 
