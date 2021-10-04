@@ -292,6 +292,10 @@ centos-ssh-user() {
     echo centos
 }
 
+centos-7-install-utils() {
+    distro-install-pkg /usr/bin/killall
+}
+
 centos-7-install-repo() {
     vm-command-q "type -t yum-config-manager >&/dev/null" || {
         distro-install-pkg yum-utils
@@ -326,10 +330,6 @@ centos-8-install-crio-pre() {
 
 centos-8-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
-}
-
-centos-7-install-k8s-post() {
-    vm-sed-file /etc/sysconfig/kubelet 's/^KUBELET_EXTRA_ARGS=/KUBELET_EXTRA_ARGS="--feature-gates=SupportNodePidsLimit=false,SupportPodPidsLimit=false"/'
 }
 
 centos-7-k8s-cni() {
