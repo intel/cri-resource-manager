@@ -147,6 +147,14 @@ DOCKER_RPM_BUILD := \
     done && \
     cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
 
+# Docker boilerplate/commands to build binaries.
+DOCKER_BIN_BUILD := \
+    mkdir ~/build && cd ~/build && \
+    tar -xvzf /build/input/cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) && \
+    cd cri-resource-manager-$(TAR_VERSION) && \
+    make && \
+    cp -v bin/* /output
+
 # Documentation-related variables
 SPHINXOPTS    ?= -W
 SPHINXBUILD   = sphinx-build
@@ -173,6 +181,9 @@ SUPPORTED_RPM_DISTROS := $(shell \
 
 # Directory to leave built distro packages and collateral in.
 PACKAGES_DIR := packages
+
+# Directory to leave build distro binaries in.
+BINARIES_DIR := binaries
 
 # Directory to use to build distro packages.
 BUILD_DIR := build
@@ -437,6 +448,9 @@ cross-rpm: $(foreach d,$(SUPPORTED_RPM_DISTROS),cross-rpm.$(d))
 
 cross-deb: $(foreach d,$(SUPPORTED_DEB_DISTROS),cross-deb.$(d))
 
+cross-bin: $(foreach d,$(SUPPORTED_RPM_DISTROS),cross-bin.$(d)) \
+           $(foreach d,$(SUPPORTED_DEB_DISTROS),cross-bin.$(d))
+
 #
 # Rules for building dist-tarballs, rpm, and deb packages.
 #
@@ -570,6 +584,22 @@ cross-deb.%: docker/cross-build/% \
 
 deb: debian/changelog debian/control debian/rules debian/compat dist
 	dpkg-buildpackage -uc
+
+cross-bin.%: docker/cross-build/% dist
+	$(Q)distro=$(patsubst cross-bin.%,%,$@); \
+	echo "Docker cross-building $$distro binaries..."; \
+	builddir=$(BUILD_DIR)/docker/$$distro; \
+	outdir=$(BINARIES_DIR)/$$distro; \
+	mkdir -p $(BINARIES_DIR)/$$distro && \
+	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
+	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
+	    -v $$(pwd)/$$builddir:/build \
+	    -v $$(pwd)/$$outdir:/output \
+	    $$distro-build /bin/bash -c '$(DOCKER_BIN_BUILD)' && \
+	rm -fr $$builddir
+
 
 # Build a docker image (for distro cross-building).
 docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
