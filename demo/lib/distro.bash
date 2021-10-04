@@ -117,8 +117,8 @@ ubuntu-20_04-image-url() {
     echo "https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img"
 }
 
-ubuntu-20_10-image-url() {
-    echo "https://cloud-images.ubuntu.com/releases/groovy/release/ubuntu-20.10-server-cloudimg-amd64.img"
+ubuntu-21_04-image-url() {
+    echo "https://cloud-images.ubuntu.com/releases/hirsute/release/ubuntu-21.04-server-cloudimg-amd64.img"
 }
 
 debian-10-image-url() {
