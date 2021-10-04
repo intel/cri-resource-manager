@@ -1,7 +1,7 @@
 # pull in base + a minimal set of useful packages
 FROM debian:sid as debian-sid-build
 
-ARG GOLANG_VERSION=1.14.8
+ARG GOLANG_VERSION=1.16.8
 ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG CREATE_USER="test"
 ARG USER_OPTIONS=""
