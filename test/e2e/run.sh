@@ -57,9 +57,13 @@ usage() {
     echo "    runc_src:"
     echo "             \"/host/path/to/go/project\": replace vm /usr/bin binaries"
     echo "             from /host/path/to/go/project/bin directory."
+    echo "    distro_binaries:"
+    echo "             0: use the normal binaries built for this host (the default)."
+    echo "             1: use binaries cross-built for distros."
     echo "    binsrc:  Where to get cri-resmgr to the vm."
     echo "             \"github\": go get from master and build inside vm."
-    echo "             \"local\": copy from \${crirm_src}/bin (the default)."
+    echo "             \"local\": (the default) copy from \${crirm_src}/bin, or"
+    echo "                      from \${crirm_src}/binaries/\$distro if \$distro_binaries=1."
     echo "             \"packages/<distro>\": use distro packages from this dir"
     echo "    reinstall_<containerd|crio|cri_resmgr|cri_resmgr_agent|runc>:"
     echo "             If 1, stop the daemon (if not runc),"
@@ -1026,12 +1030,20 @@ case "${k8scri}" in
         error "unsupported k8scri: \"${k8scri}\""
         ;;
 esac
+distro_binaries=${distro_binaries:=0}
 containerd_src=${containerd_src:=}
 crio_src=${crio_src:=}
 crirm_src=${crirm_src:=$HOST_PROJECT_DIR}
 runc_src=${runc_src:=}
 crio_version=${crio_version:=}
-BIN_DIR=${crirm_src}/bin
+if [ "$distro_binaries" = "1" ]; then
+    if [ -z "$distro" ]; then
+        error "distro_binaries=1 but distro is not set"
+    fi
+    BIN_DIR=${crirm_src}/binaries/$distro
+else
+    BIN_DIR=${crirm_src}/bin
+fi
 TOPOLOGY_DIR=${TOPOLOGY_DIR:=e2e}
 vm=${vm:=$(basename ${TOPOLOGY_DIR})-${distro}-${cri}}
 vm_files=${vm_files:-""}
