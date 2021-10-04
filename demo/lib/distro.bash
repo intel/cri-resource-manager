@@ -126,7 +126,7 @@ debian-10-image-url() {
 }
 
 debian-sid-image-url() {
-    echo "https://cloud.debian.org/images/cloud/sid/daily/20201013-422/debian-sid-generic-amd64-daily-20201013-422.qcow2"
+    echo "https://cloud.debian.org/images/cloud/sid/daily/latest/debian-sid-generic-amd64-daily.qcow2"
 }
 
 ubuntu-download-kernel() {
