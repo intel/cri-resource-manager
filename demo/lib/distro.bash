@@ -892,9 +892,17 @@ default-install-containerd() {
 }
 
 default-config-containerd() {
-    if vm-command-q "[ -f /etc/containerd/config.toml ]"; then
-        vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
+    if vm-command-q "[ ! -f /etc/containerd/config.toml ]"; then
+        vm-command "mkdir -p /etc/containerd && containerd config default > /etc/containerd/config.toml"
     fi
+
+    vm-sed-file /etc/containerd/config.toml 's/^.*disabled_plugins *= *.*$/disabled_plugins = []/'
+
+    if vm-command-q "containerd config dump | grep -v -q SystemdCgroup"; then
+        vm-command "containerd config dump > /etc/containerd/config.toml"
+    fi
+
+    vm-sed-file /etc/containerd/config.toml 's/SystemdCgroup = false/SystemdCgroup = true/g'
 }
 
 default-restart-containerd() {
