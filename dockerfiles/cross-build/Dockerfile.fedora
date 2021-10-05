@@ -1,5 +1,5 @@
 # pull in base + a minimal set of useful packages
-FROM fedora as fedora-build
+FROM fedora:latest as fedora-build
 
 ARG GOLANG_VERSION=1.16.8
 ARG GOLANG_URLDIR=https://dl.google.com/go
