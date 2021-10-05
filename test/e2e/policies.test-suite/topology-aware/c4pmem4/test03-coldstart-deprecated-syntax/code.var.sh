@@ -10,17 +10,17 @@
 
 PMEM_NODES='{"node4", "node5", "node6", "node7"}'
 
-# pmem-active returns total Active (allocated) memory on PMEM nodes
-pmem-active() {
+# pmem-used returns total MemUsed (allocated) memory on PMEM nodes
+pmem-used() {
     local pmem_nodes_shell=${PMEM_NODES//[\" ]/}
-    vm-command "cat /sys/devices/system/node/$pmem_nodes_shell/meminfo | awk '/Active:/{mem+=\$4}END{print mem}'" >/dev/null ||
+    vm-command "cat /sys/devices/system/node/$pmem_nodes_shell/meminfo | awk '/MemUsed:/{mem+=\$4}END{print mem}'" >/dev/null ||
         command-error "cannot read PMEM usage from node $node"
     echo "$COMMAND_OUTPUT"
 }
 
 CRI_RESMGR_OUTPUT="cat cri-resmgr.output.txt"
 
-PMEM_ACTIVE_BEFORE_POD0="$(pmem-active)"
+PMEM_USED_BEFORE_POD0="$(pmem-used)"
 
 DURATION=10s
 COLD_ALLOC=$((10 * 1024))kB
@@ -40,11 +40,12 @@ vm-run-until "pgrep -f '^sh -c paused after cold_alloc'" >/dev/null ||
     error "cold memory allocation timed out"
 
 echo "Verify PMEM consumption during cold period."
-PMEM_ERROR_MARGIN=1024 # meminfo Active vs dd bytes error margin
-PMEM_ACTIVE_COLD_POD0="$(pmem-active)"
-PMEM_COLD_CONSUMED=$(( $PMEM_ACTIVE_COLD_POD0 - $PMEM_ACTIVE_BEFORE_POD0 ))
+PMEM_ERROR_MARGIN=1024 # meminfo MemUsed vs dd bytes error margin
+sleep 1
+PMEM_USED_COLD_POD0="$(pmem-used)"
+PMEM_COLD_CONSUMED=$(( $PMEM_USED_COLD_POD0 - $PMEM_USED_BEFORE_POD0 ))
 if (( $PMEM_COLD_CONSUMED + $PMEM_ERROR_MARGIN < ${COLD_ALLOC%kB} )); then
-    error "pod0 did not allocate $COLD_ALLOC from PMEM. Active PMEM delta: $PMEM_COLD_CONSUMED"
+    error "pod0 did not allocate $COLD_ALLOC from PMEM. MemUsed PMEM delta: $PMEM_COLD_CONSUMED"
 else
     echo "### Verified: PMEM memory consumed during cold period: $PMEM_COLD_CONSUMED kB, pod script allocated: ${COLD_ALLOC%kB} kB"
 fi
@@ -69,8 +70,9 @@ vm-run-until "pgrep -f '^sh -c paused after warm_alloc'"  ||
     error "warm memory allocation timed out"
 
 echo "Verify (soft): PMEM consumption after cold period."
-PMEM_ACTIVE_WARM_POD0="$(pmem-active)"
-PMEM_WARM_CONSUMED=$(( $PMEM_ACTIVE_WARM_POD0 - $PMEM_ACTIVE_COLD_POD0 ))
+sleep 1
+PMEM_USED_WARM_POD0="$(pmem-used)"
+PMEM_WARM_CONSUMED=$(( $PMEM_USED_WARM_POD0 - $PMEM_USED_COLD_POD0 ))
 if (( $PMEM_WARM_CONSUMED > 0 )); then
     echo "### Verify (soft) failed: pod0 allocated $WARM_ALLOC from PMEM. Should have been taken from DRAM."
 else
