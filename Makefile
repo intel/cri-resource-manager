@@ -753,6 +753,14 @@ bin/webhook: $(wildcard cmd/cri-resmgr-webhook/*.go) \
                 find $$dir -name \*.go; \
             done | sort | uniq)
 
+bin/memtierd: $(wildcard cmd/memtierd/*.go) \
+    $(shell for dir in \
+                  $(shell go list -f '{{ join .Deps  "\n"}}' ./cmd/memtierd/... | \
+                          grep cri-resource-manager/pkg/ | \
+                          sed 's#github.com/intel/cri-resource-manager/##g'); do \
+                find $$dir -name \*.go; \
+            done | sort | uniq)
+
 #
 # rules to run go generators
 #
