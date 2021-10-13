@@ -22,6 +22,21 @@ func (pp *Pages) Pages() []Page {
 	return pp.pages
 }
 
+// Offset returns pages starting from an offset
+func (pp *Pages) Offset(offset int) *Pages {
+	pagesLeft := len(pp.pages)
+	if offset > pagesLeft {
+		offset = pagesLeft
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return &Pages{
+		pid:   pp.pid,
+		pages: pp.pages[offset:],
+	}
+}
+
 // InAddrRanges returns process pages that are in any of given address ranges
 func (pp *Pages) InAddrRanges(addrRanges ...AddrRange) *Pages {
 	// TODO: Implement me!
@@ -29,19 +44,49 @@ func (pp *Pages) InAddrRanges(addrRanges ...AddrRange) *Pages {
 	return &Pages{pid: pp.pid}
 }
 
-func (pp *Pages) MoveTo(node Node, count uint) error {
+func (pp *Pages) MoveTo(node Node, count int) (int, error) {
 	pageCount, pages := pp.countAddrs()
-	if count > pageCount {
-		count = pageCount
+	uCount := uint(count)
+	if uCount > pageCount {
+		uCount = pageCount
 	}
 	flags := MPOL_MF_MOVE
-	pages = pages[:count]
-	nodes := make([]int, count)
-	for i := range nodes {
-		nodes[i] = int(node)
+	pages = pages[:uCount]
+	if len(pages) == 0 {
+		return 0, nil
 	}
-	_, _, err := movePagesSyscall(pp.pid, count, pages, nodes, flags)
-	return err
+	nodes := make([]int, uCount)
+	intNode := int(node)
+	for i := range nodes {
+		nodes[i] = intNode
+	}
+	sysRet, status, err := movePagesSyscall(pp.pid, uCount, pages, nodes, flags)
+	destNodeCount := 0
+	otherNodeCount := 0
+	errCount := 0
+	if sysRet == 0 {
+		for _, node := range status {
+			if node == intNode {
+				destNodeCount += 1
+			} else if node < 0 {
+				errCount += 1
+			} else {
+				otherNodeCount += 1
+			}
+		}
+	}
+	if stats != nil {
+		stats.Store(StatsMoved{
+			pid:            pp.pid,
+			sysRet:         sysRet,
+			firstPageAddr:  pages[0],
+			reqCount:       int(count),
+			destNodeCount:  destNodeCount,
+			otherNodeCount: otherNodeCount,
+			errCount:       errCount,
+		})
+	}
+	return destNodeCount, err
 }
 
 // OnNode returns only those Pages that are on the given node.

@@ -15,6 +15,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
@@ -80,10 +81,11 @@ func parseOptRanges(rangeStr string) []memtier.AddrRange {
 func main() {
 	optPid := flag.Int("pid", 0, "-pid=PID operate on this process")
 	optPages := flag.String("pages", "", "-pages=[Exclusive,Dirty,NotDirty,InHeap,InAnonymous]")
+	optMover := flag.String("mover", "oneshot", "-mover=<oneshot|{'Interval':100,'Bandwidth':20}>")
 	optRanges := flag.String("ranges", "", "-ranges=START-STOP[,START-STOP...] include only given ranges")
 	optMoveFrom := flag.Int("move-from", -1, "-move-from=NUMA source memory node")
 	optMoveTo := flag.Int("move-to", -1, "-move-to=NUMA target memory node")
-	optCount := flag.Uint("count", 100, "-count=PAGECOUNT number of pages to move at a time")
+	optCount := flag.Int("count", 100, "-count=PAGECOUNT number of pages to move at a time")
 
 	flag.Parse()
 
@@ -118,19 +120,40 @@ func main() {
 	// Find pages with wanted attributes from the address ranges
 	pgs, err := ar.PagesMatching(pageAttributes)
 	fmt.Printf("found total %d pages\n", len(pgs.Pages()))
-
-	// Move pages if --move-to is given
-	if *optMoveTo != -1 {
-		if *optMoveFrom == -1 {
-			// source node not defined, move from any
-			// other node to dstNode
-			dstNode := memtier.Node(*optMoveTo)
-			pgs.NotOnNode(dstNode).MoveTo(dstNode, *optCount)
+	if *optMover == "" {
+		fmt.Printf("missing --mover, doing nothing\n")
+	} else if *optMover == "oneshot" {
+		// Move pages if --move-to is given
+		if *optMoveTo != -1 {
+			if *optMoveFrom == -1 {
+				// source node not defined, move from any
+				// other node to dstNode
+				dstNode := memtier.Node(*optMoveTo)
+				pgs.NotOnNode(dstNode).MoveTo(dstNode, *optCount)
+			} else {
+				srcNode := memtier.Node(*optMoveFrom)
+				dstNode := memtier.Node(*optMoveTo)
+				pgs.OnNode(srcNode).MoveTo(dstNode, *optCount)
+			}
 		} else {
-			srcNode := memtier.Node(*optMoveFrom)
-			dstNode := memtier.Node(*optMoveTo)
-			pgs.OnNode(srcNode).MoveTo(dstNode, *optCount)
+			fmt.Printf("oneshot: nothing to do without --move-to\n")
 		}
+	} else if strings.HasPrefix(*optMover, "{") {
+		mover := memtier.NewMover()
+		if err := mover.SetConfigJson(*optMover); err != nil {
+			exit("invalid mover configuration: %v", err)
+		}
+		mover.Start()
+		if *optMoveTo != -1 {
+			mover.AddTask(memtier.NewMoverTask(pgs, memtier.Node(*optMoveTo)))
+		} else {
+			fmt.Printf("mover: nothing to do without --move-to\n")
+		}
+		bufio.NewReader(os.Stdin).ReadBytes('\n')
+		fmt.Printf(memtier.Stats().Dump() + "\n")
+
+	} else {
+		exit("invalid --mover, expected \"oneshot\" or MoverConfig JSON")
 	}
 
 	// Print node/page status
