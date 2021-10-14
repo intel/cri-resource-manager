@@ -20,10 +20,16 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/memtier"
 )
+
+type Cmd struct {
+	description string
+	Run         func([]string) commandStatus
+}
 
 type Prompt struct {
 	r     *bufio.Reader
@@ -31,23 +37,33 @@ type Prompt struct {
 	f     *flag.FlagSet
 	mover *memtier.Mover
 	pages *memtier.Pages
+	cmds  map[string]Cmd
 	ps1   string
+	quit  bool
 }
 
-type promptAction int
+type commandStatus int
 
 const (
-	paCommandOk promptAction = iota
-	paQuit
+	csOk commandStatus = iota
+	csErr
 )
 
 func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
-	return &Prompt{
+	p := Prompt{
 		r:     reader,
 		w:     writer,
 		ps1:   ps1,
 		mover: memtier.NewMover(),
 	}
+	p.cmds = map[string]Cmd{
+		"q":     Cmd{"quit interactive prompt", p.cmdQuit},
+		"stats": Cmd{"print statistics", p.cmdStats},
+		"pages": Cmd{"select pages with -pid... or print current status", p.cmdPages},
+		"mover": Cmd{"(re)configure and control low-level page mover, move selected pages", p.cmdMover},
+		"help":  Cmd{"print help", p.cmdHelp},
+	}
+	return &p
 }
 
 func (p *Prompt) output(format string, a ...interface{}) {
@@ -59,59 +75,92 @@ func (p *Prompt) output(format string, a ...interface{}) {
 }
 
 func (p *Prompt) interact() {
-	pa := paCommandOk
-	for pa != paQuit {
+	for !p.quit {
 		p.output(p.ps1)
-		cmd, err := p.r.ReadString(byte('\n'))
+		rawcmd, err := p.r.ReadString(byte('\n'))
 		if err != nil {
-			p.output("quitting prompt: %s\n", err)
+			p.output("quit: %s\n", err)
 			break
 		}
-		cmdSlice := strings.Split(strings.TrimSpace(cmd), " ")
+		cmdSlice := strings.Split(strings.TrimSpace(rawcmd), " ")
 		if len(cmdSlice) == 0 {
 			continue
 		}
 		p.f = flag.NewFlagSet(cmdSlice[0], flag.ContinueOnError)
-		switch cmdSlice[0] {
-		case "q", "quit":
-			pa = p.cmdQuit(cmdSlice[1:])
-		case "stats":
-			pa = p.cmdStats(cmdSlice[1:])
-		case "mover":
-			pa = p.cmdMover(cmdSlice[1:])
-		case "pages":
-			pa = p.cmdPages(cmdSlice[1:])
-		case "":
-			pa = paCommandOk
-		default:
+		if cmd, ok := p.cmds[cmdSlice[0]]; ok {
+			cmd.Run(cmdSlice[1:])
+		} else if len(cmdSlice[0]) > 0 {
 			p.output("unknown command\n")
-			pa = paCommandOk
 		}
 	}
-	p.output("quitting prompt.\n")
+	p.output("quit.\n")
 }
 
-func (p *Prompt) cmdPages(args []string) promptAction {
+func sortedStringKeys(m map[string]Cmd) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func sortedNodeKeys(m map[memtier.Node]uint) []memtier.Node {
+	keys := make([]int, 0, len(m))
+	nodes := make([]memtier.Node, len(m))
+	for k := range m {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	for i, key := range keys {
+		nodes[i] = memtier.Node(key)
+	}
+	return nodes
+}
+
+func (p *Prompt) cmdHelp(args []string) commandStatus {
+	for _, name := range sortedStringKeys(p.cmds) {
+		p.output("%-12s %s\n", name, p.cmds[name].description)
+	}
+	return csOk
+}
+
+func (p *Prompt) cmdPages(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	attrs := p.f.String("attrs", "", "include only <Exclusive,Dirty,NotDirty,InHeap,InAnonymous> pages")
 	ranges := p.f.String("ranges", "", "-ranges=START-STOP[,START-STOP...] include only given ranges")
 	fromNode := p.f.Int("node", -1, "include only pages currently on NODE")
 	if err := p.f.Parse(args); err != nil {
-		return paCommandOk
+		return csOk
 	}
+	// if launched without arguments, report current status of selected pages
+	if len(args) == 0 {
+		if p.pages == nil {
+			p.output("no pages selelected, try pages -pid PID\n")
+			return csOk
+		}
+		nodePageCount := p.pages.NodePageCount()
+		p.output("pages of pid %d\n", p.pages.Pid())
+		for _, node := range sortedNodeKeys(nodePageCount) {
+			p.output("node %d: %d\n", node, nodePageCount[node])
+		}
+		return csOk
+	}
+	// there are arguments, select new set of pages
 	if *pid <= 0 {
-		p.output("missing valid -pid=PID\n")
-		return paCommandOk
+		p.output("missing -pid=PID\n")
+		return csOk
 	}
+	p.output("selecting pages of pid %d\n", *pid)
 	process := memtier.NewProcess(*pid)
 	ar, err := process.AddressRanges()
 	if err != nil {
 		p.output("error reading address ranges of process %d: %v\n", *pid, err)
-		return paCommandOk
+		return csOk
 	}
 	if ar == nil {
 		p.output("address ranges not found for process %d\n", *pid)
-		return paCommandOk
+		return csOk
 	}
 	p.output("found %d address ranges\n", len(ar.Ranges()))
 	selectedRanges := []memtier.AddrRange{}
@@ -124,12 +173,12 @@ func (p *Prompt) cmdPages(args []string) promptAction {
 	}
 	if len(ar.Ranges()) == 0 {
 		p.output("no address ranges from which to find pages\n")
-		return paCommandOk
+		return csOk
 	}
 	pageAttributes, err := parseOptPages(*attrs)
 	if err != nil {
 		p.output("invalid -attrs: %v\n", err)
-		return paCommandOk
+		return csOk
 	}
 	pp, err := ar.PagesMatching(pageAttributes)
 	if err != nil {
@@ -139,22 +188,19 @@ func (p *Prompt) cmdPages(args []string) promptAction {
 	if *fromNode >= 0 {
 		pp = pp.OnNode(memtier.Node(*fromNode))
 	}
-	p.output("current pages:\n")
-	for node, pageCount := range pp.NodePageCount() {
-		p.output("   node %d: %d\n", node, pageCount)
-	}
 	p.pages = pp
-	return paCommandOk
+	return csOk
 }
 
-func (p *Prompt) cmdMover(args []string) promptAction {
+func (p *Prompt) cmdMover(args []string) commandStatus {
 	config := p.f.String("config", "", "reconfigure mover with JSON string")
 	pagesTo := p.f.Int("pages-to", -1, "move pages to NODE int")
 	pause := p.f.Bool("pause", false, "pause moving")
 	cont := p.f.Bool("continue", false, "continue moving")
 	tasks := p.f.Bool("tasks", false, "print current tasks")
+	removeTask := p.f.Int("remove-task", -1, "remove task ID")
 	if err := p.f.Parse(args); err != nil {
-		return paCommandOk
+		return csOk
 	}
 	if *config != "" {
 		if err := p.mover.SetConfigJson(*config); err != nil {
@@ -162,10 +208,14 @@ func (p *Prompt) cmdMover(args []string) promptAction {
 		}
 	}
 	if *pagesTo >= 0 {
-		p.mover.Start()
+		err := p.mover.Start()
+		if err != nil {
+			p.output("mover error: %v\n", err)
+			return csOk
+		}
 		if p.pages == nil {
 			p.output("mover error: set pages before moving\n")
-			return paCommandOk
+			return csOk
 		}
 		toNode := memtier.Node(*pagesTo)
 		task := memtier.NewMoverTask(p.pages, toNode)
@@ -178,30 +228,33 @@ func (p *Prompt) cmdMover(args []string) promptAction {
 		p.mover.Continue()
 	}
 	if *tasks {
-		p.output("IMPLEMENT ME\n")
+		for taskId, task := range p.mover.Tasks() {
+			p.output("%-8d %s\n", taskId, task)
+		}
 	}
-	return paCommandOk
+	if *removeTask != -1 {
+		p.mover.RemoveTask(*removeTask)
+	}
+	return csOk
 }
 
-func (p *Prompt) cmdStats(args []string) promptAction {
+func (p *Prompt) cmdStats(args []string) commandStatus {
 	moves := p.f.Bool("m", false, "dump all moves")
 	if err := p.f.Parse(args); err != nil {
-		return paCommandOk
+		return csOk
 	}
 	if *moves {
 		p.output(memtier.Stats().Dump() + "\n")
 	} else {
 		p.output(memtier.Stats().Summarize() + "\n")
 	}
-	return paCommandOk
+	return csOk
 }
 
-func (p *Prompt) cmdQuit(args []string) promptAction {
-	help := p.f.Bool("h", false, "print help")
-	p.f.Parse(args)
-	if *help {
-		p.output("quit interactive prompt\n")
-		return paCommandOk
+func (p *Prompt) cmdQuit(args []string) commandStatus {
+	if err := p.f.Parse(args); err != nil {
+		return csOk
 	}
-	return paQuit
+	p.quit = true
+	return csOk
 }

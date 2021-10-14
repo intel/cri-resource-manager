@@ -57,6 +57,16 @@ func NewMoverTask(pages *Pages, toNode Node) *MoverTask {
 	}
 }
 
+func (mt *MoverTask) String() string {
+	pid := mt.pages.Pid()
+	p := mt.pages.Pages()
+	nextAddr := "N/A"
+	if len(p) > mt.offset {
+		nextAddr = fmt.Sprintf("%x", p[mt.offset].Addr())
+	}
+	return fmt.Sprintf("MoverTask{pid: %d, next: %s, page: %d out of %d, dest: %v}", pid, nextAddr, mt.offset, len(p), mt.to)
+}
+
 func (m *Mover) SetConfigJson(configJson string) error {
 	var config MoverConfig
 	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
@@ -72,13 +82,17 @@ func (m *Mover) SetConfig(config *MoverConfig) {
 	m.config = config
 }
 
-func (m *Mover) Start() {
+func (m *Mover) Start() error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	if m.config == nil {
+		return fmt.Errorf("starting failed, mover unconfigured")
+	}
 	if m.toTaskHandler == nil {
-		m.toTaskHandler = make(chan taskHandlerCmd)
+		m.toTaskHandler = make(chan taskHandlerCmd, 8)
 		go m.taskHandler()
 	}
+	return nil
 }
 
 func (m *Mover) Pause() {
@@ -93,6 +107,17 @@ func (m *Mover) Continue() {
 	}
 }
 
+func (m *Mover) Tasks() []*MoverTask {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	tasks := make([]*MoverTask, 0, len(m.tasks))
+	for _, task := range m.tasks {
+		taskCopy := *task
+		tasks = append(tasks, &taskCopy)
+	}
+	return tasks
+}
+
 func (m *Mover) AddTask(task *MoverTask) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -100,9 +125,17 @@ func (m *Mover) AddTask(task *MoverTask) {
 	m.toTaskHandler <- thContinue
 }
 
+func (m *Mover) RemoveTask(taskId int) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if taskId < 0 || taskId >= len(m.tasks) {
+		return
+	}
+	m.tasks = append(m.tasks[0:taskId], m.tasks[taskId+1:]...)
+}
+
 func (m *Mover) taskHandler() {
 	for {
-		fmt.Printf("taskHandler: waiting for a task\n")
 		// blocking channel read when there are no tasks
 		cmd := <-m.toTaskHandler
 		switch cmd {
@@ -120,7 +153,6 @@ func (m *Mover) taskHandler() {
 				break
 			}
 			if ts := m.handleTask(task); ts == tsContinue {
-				fmt.Printf("taskHandler: will rehandle the task\n")
 				m.mutex.Lock()
 				m.tasks = append(m.tasks, task)
 				m.mutex.Unlock()

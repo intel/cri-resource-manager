@@ -14,6 +14,10 @@
 
 package memtier
 
+func (p Page) Addr() uint64 {
+	return p.addr
+}
+
 func (pp *Pages) Pid() int {
 	return pp.pid
 }
@@ -79,6 +83,7 @@ func (pp *Pages) MoveTo(node Node, count int) (int, error) {
 		stats.Store(StatsMoved{
 			pid:            pp.pid,
 			sysRet:         sysRet,
+			destNode:       intNode,
 			firstPageAddr:  pages[0],
 			reqCount:       int(count),
 			destNodeCount:  destNodeCount,

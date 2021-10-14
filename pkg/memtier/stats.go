@@ -34,7 +34,6 @@ func Stats() *StatsStorage {
 
 func (s *StatsStorage) Store(stat interface{}) {
 	s.stored = append(s.stored, stat)
-	fmt.Printf("DEBUG STORE: %v\n", stat)
 }
 
 func (s *StatsStorage) Summarize() string {
