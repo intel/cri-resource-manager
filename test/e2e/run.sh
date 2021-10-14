@@ -1293,6 +1293,32 @@ if [ "$reinstall_oneshot" == "1" ] || ! vm-command-q "[ -f .vm-setup-oneshot ]";
     vm-command-q "touch .vm-setup-oneshot"
 fi
 
+if [ "$mode" == "debug" ]; then
+    vm-command-q "[ -x /root/go/bin/dlv ]" || vm-install-dlv
+    if [ -d "$crio_src" ]; then
+        vm-dlv-add-src "$crio_src"
+    fi
+    if [ -d "$containerd_src" ]; then
+        vm-dlv-add-src "$containerd_src"
+    fi
+    if [ -d "$crirm_src" ]; then
+        vm-dlv-add-src "$crirm_src"
+    fi
+    if [ -d "$runc_src" ]; then
+        vm-dlv-add-src "$runc_src"
+    fi
+    echo "How to debug cri-resmgr:"
+    echo "- Attach debugger to running cri-resmgr:"
+    echo "  ssh $VM_SSH_USER@$VM_IP"
+    echo "  sudo /root/go/bin/dlv attach \$(pidof cri-resmgr)"
+    echo "- Relaunch cri-resmgr in debugger:"
+    echo "  ssh $VM_SSH_USER@$VM_IP"
+    echo "  sudo -i"
+    echo "  kill -9 \$(pidof cri-resmgr); /root/go/bin/dlv exec /usr/local/bin/cri-resmgr -- -force-config /home/$VM_SSH_USER/*.cfg"
+    echo "dlv on VM is ready for use"
+    exit 0
+fi
+
 if [ -n "$vm_files" ]; then
     install-files "$vm_files"
 fi
@@ -1336,32 +1362,6 @@ if [[ "$k8scri" == cri-resmgr* ]] || [ -n "$crirm_src" ]; then
             install cri-resmgr-agent
         fi
     fi
-fi
-
-if [ "$mode" == "debug" ]; then
-    vm-command-q "[ -x /root/go/bin/dlv ]" || vm-install-dlv
-    if [ -d "$crio_src" ]; then
-        vm-dlv-add-src "$crio_src"
-    fi
-    if [ -d "$containerd_src" ]; then
-        vm-dlv-add-src "$containerd_src"
-    fi
-    if [ -d "$crirm_src" ]; then
-        vm-dlv-add-src "$crirm_src"
-    fi
-    if [ -d "$runc_src" ]; then
-        vm-dlv-add-src "$runc_src"
-    fi
-    echo "How to debug cri-resmgr:"
-    echo "- Attach debugger to running cri-resmgr:"
-    echo "  ssh $VM_SSH_USER@$VM_IP"
-    echo "  sudo /root/go/bin/dlv attach \$(pidof cri-resmgr)"
-    echo "- Relaunch cri-resmgr in debugger:"
-    echo "  ssh $VM_SSH_USER@$VM_IP"
-    echo "  sudo -i"
-    echo "  kill -9 \$(pidof cri-resmgr); /root/go/bin/dlv exec /usr/local/bin/cri-resmgr -- -force-config /home/$VM_SSH_USER/*.cfg"
-    echo "dlv on VM is ready for use"
-    exit 0
 fi
 
 if [ -n "$containerd_src" ] && [[ "$k8scri" == *containerd* ]]; then

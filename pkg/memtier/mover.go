@@ -34,17 +34,19 @@ type taskStatus int
 const (
 	thContinue taskHandlerCmd = iota
 	thQuit
+	thPause
 
 	tsContinue taskStatus = iota
 	tsDone
 	tsNoPagesOnSources
 	tsNoDestinations
+	tsBlocked
 	tsError
 )
 
 func NewMover() *Mover {
 	return &Mover{
-		toTaskHandler: make(chan taskHandlerCmd),
+		toTaskHandler: nil,
 	}
 }
 
@@ -71,7 +73,24 @@ func (m *Mover) SetConfig(config *MoverConfig) {
 }
 
 func (m *Mover) Start() {
-	go m.taskHandler()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.toTaskHandler == nil {
+		m.toTaskHandler = make(chan taskHandlerCmd)
+		go m.taskHandler()
+	}
+}
+
+func (m *Mover) Pause() {
+	if m.toTaskHandler != nil {
+		m.toTaskHandler <- thPause
+	}
+}
+
+func (m *Mover) Continue() {
+	if m.toTaskHandler != nil {
+		m.toTaskHandler <- thContinue
+	}
 }
 
 func (m *Mover) AddTask(task *MoverTask) {
@@ -84,16 +103,20 @@ func (m *Mover) AddTask(task *MoverTask) {
 func (m *Mover) taskHandler() {
 	for {
 		fmt.Printf("taskHandler: waiting for a task\n")
-		// wait for a command without polling
-		if cmd := <-m.toTaskHandler; cmd == thQuit {
+		// blocking channel read when there are no tasks
+		cmd := <-m.toTaskHandler
+		switch cmd {
+		case thQuit:
+			return
+		case thPause:
 			break
 		}
+	busyloop:
 		for {
-			fmt.Printf("taskHandler: handling a task\n")
 			// handle tasks
 			task := m.popTask()
 			if task == nil {
-				// no more tasks
+				// no more tasks, back to blocking reads
 				break
 			}
 			if ts := m.handleTask(task); ts == tsContinue {
@@ -101,10 +124,19 @@ func (m *Mover) taskHandler() {
 				m.mutex.Lock()
 				m.tasks = append(m.tasks, task)
 				m.mutex.Unlock()
-				// m.AddTask(task) cannot use AddTask due to writing to chan
 			}
-			fmt.Printf("taskHandler: sleeping\n")
-			time.Sleep(time.Duration(m.config.Interval) * time.Millisecond)
+			// non-blocking channel read when there are tasks
+			select {
+			case cmd := <-m.toTaskHandler:
+				switch cmd {
+				case thQuit:
+					return
+				case thPause:
+					break busyloop
+				}
+			default:
+				time.Sleep(time.Duration(m.config.Interval) * time.Millisecond)
+			}
 		}
 	}
 }
@@ -127,6 +159,9 @@ func (m *Mover) handleTask(task *MoverTask) taskStatus {
 	// constPagesize is 4096 kB/page
 	// count is ([kB/s] / [kB/page] = [page/s]) * ([ms] / 1000 [ms/s] == [s]) = [page]
 	count := (m.config.Bandwidth * 1024 * 1024 / int(constPagesize)) * m.config.Interval / 1000
+	if count == 0 {
+		return tsBlocked
+	}
 	if _, err := pp.MoveTo(toNode, count); err != nil {
 		return tsError
 	}

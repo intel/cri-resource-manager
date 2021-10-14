@@ -79,6 +79,8 @@ func parseOptRanges(rangeStr string) []memtier.AddrRange {
 }
 
 func main() {
+
+	optPrompt := flag.Bool("prompt", false, "launch interactive prompt (ignore other parameters)")
 	optPid := flag.Int("pid", 0, "-pid=PID operate on this process")
 	optPages := flag.String("pages", "", "-pages=[Exclusive,Dirty,NotDirty,InHeap,InAnonymous]")
 	optMover := flag.String("mover", "oneshot", "-mover=<oneshot|{'Interval':100,'Bandwidth':20}>")
@@ -88,6 +90,12 @@ func main() {
 	optCount := flag.Int("count", 100, "-count=PAGECOUNT number of pages to move at a time")
 
 	flag.Parse()
+
+	if *optPrompt {
+		prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
+		prompt.interact()
+		return
+	}
 
 	// Get pages of a PID
 	if *optPid == 0 {
@@ -108,6 +116,13 @@ func main() {
 
 	p := memtier.NewProcess(*optPid)
 	ar, err := p.AddressRanges()
+	if err != nil {
+		exit("error reading address ranges of process %d: %v", *optPid, err)
+	}
+	if ar == nil {
+		exit("address ranges not found for process %d", *optPid)
+	}
+
 	fmt.Printf("found %d address ranges\n", len(ar.Ranges()))
 	if err != nil {
 		exit("%v", err)
@@ -149,7 +164,8 @@ func main() {
 		} else {
 			fmt.Printf("mover: nothing to do without --move-to\n")
 		}
-		bufio.NewReader(os.Stdin).ReadBytes('\n')
+		prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
+		prompt.interact()
 		fmt.Printf(memtier.Stats().Dump() + "\n")
 
 	} else {
