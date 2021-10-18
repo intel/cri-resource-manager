@@ -20,7 +20,7 @@ import (
 
 const (
 	// pageAttributes
-	PagePresent = 1 << iota
+	PagePresent uint64 = 1 << iota
 	PageExclusive
 	PageDirty
 	PageNotDirty

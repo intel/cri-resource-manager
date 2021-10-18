@@ -32,14 +32,16 @@ type Cmd struct {
 }
 
 type Prompt struct {
-	r     *bufio.Reader
-	w     *bufio.Writer
-	f     *flag.FlagSet
-	mover *memtier.Mover
-	pages *memtier.Pages
-	cmds  map[string]Cmd
-	ps1   string
-	quit  bool
+	r       *bufio.Reader
+	w       *bufio.Writer
+	f       *flag.FlagSet
+	mover   *memtier.Mover
+	pages   *memtier.Pages
+	aranges *memtier.AddrRanges
+	tracker memtier.Tracker
+	cmds    map[string]Cmd
+	ps1     string
+	quit    bool
 }
 
 type commandStatus int
@@ -57,11 +59,13 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		mover: memtier.NewMover(),
 	}
 	p.cmds = map[string]Cmd{
-		"q":     Cmd{"quit interactive prompt", p.cmdQuit},
-		"stats": Cmd{"print statistics", p.cmdStats},
-		"pages": Cmd{"select pages with -pid... or print current status", p.cmdPages},
-		"mover": Cmd{"(re)configure and control low-level page mover, move selected pages", p.cmdMover},
-		"help":  Cmd{"print help", p.cmdHelp},
+		"q":       Cmd{"quit interactive prompt", p.cmdQuit},
+		"tracker": Cmd{"track selected aranges or manage mem tracker", p.cmdTracker},
+		"stats":   Cmd{"print statistics", p.cmdStats},
+		"pages":   Cmd{"select pages and aranges, or print current status", p.cmdPages},
+		"arange":  Cmd{"select/split/filter arange", p.cmdArange},
+		"mover":   Cmd{"move selected pages or manage mem mover", p.cmdMover},
+		"help":    Cmd{"print help", p.cmdHelp},
 	}
 	return &p
 }
@@ -125,6 +129,45 @@ func (p *Prompt) cmdHelp(args []string) commandStatus {
 	return csOk
 }
 
+func (p *Prompt) cmdArange(args []string) commandStatus {
+	pid := p.f.Int("pid", -1, "look for pages of PID")
+	ls := p.f.Bool("ls", false, "list address ranges")
+	splitLen := p.f.Uint64("split-length", 0, "split long ranges into many ranges of max LENGTH")
+	minLen := p.f.Uint64("min-length", 0, "exclude address ranges sorter than LENGTH")
+	if err := p.f.Parse(args); err != nil {
+		return csOk
+	}
+	if *pid != -1 {
+		process := memtier.NewProcess(*pid)
+		if ar, err := process.AddressRanges(); err == nil {
+			p.aranges = ar
+		} else {
+			p.output("error selecting aranges for pid %d: %v\n",
+				*pid, err)
+			return csOk
+		}
+	}
+	if p.aranges == nil {
+		p.output("no aranges selected, use -pid PID\n")
+		return csOk
+	}
+	if *splitLen != 0 {
+		p.aranges = p.aranges.SplitLength(*splitLen)
+	}
+	if *minLen != 0 {
+		p.aranges = p.aranges.Filter(func(ar memtier.AddrRange) bool {
+			return ar.Length() >= *minLen
+		})
+	}
+	if *ls {
+		for _, r := range p.aranges.Ranges() {
+			p.output("%s\n", r)
+		}
+	}
+	p.output("selected address ranges: %d\n", len(p.aranges.Ranges()))
+	return csOk
+}
+
 func (p *Prompt) cmdPages(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	attrs := p.f.String("attrs", "", "include only <Exclusive,Dirty,NotDirty,InHeap,InAnonymous> pages")
@@ -175,6 +218,8 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 		p.output("no address ranges from which to find pages\n")
 		return csOk
 	}
+	p.aranges = ar
+	p.output("aranges = <%d address ranges of pid %d>\n", len(ar.Ranges()), ar.Pid())
 	pageAttributes, err := parseOptPages(*attrs)
 	if err != nil {
 		p.output("invalid -attrs: %v\n", err)
@@ -184,7 +229,7 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 	if err != nil {
 		p.output("finding pages from address ranges failed: %v\n", err)
 	}
-	p.output("found %d pages matching the attributes\n", len(pp.Pages()))
+	p.output("pages = <%d pages of pid %d>\n", len(pp.Pages()), pp.Pid())
 	if *fromNode >= 0 {
 		pp = pp.OnNode(memtier.Node(*fromNode))
 	}
@@ -243,10 +288,80 @@ func (p *Prompt) cmdStats(args []string) commandStatus {
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
+	if err := p.f.Parse(args); err != nil {
+		return csOk
+	}
 	if *moves {
 		p.output(memtier.Stats().Dump() + "\n")
 	} else {
 		p.output(memtier.Stats().Summarize() + "\n")
+	}
+	return csOk
+}
+
+func (p *Prompt) cmdTracker(args []string) commandStatus {
+	ls := p.f.Bool("ls", false, "list names of memory trackers")
+	create := p.f.String("create", "", "create new tracker NAME (string), see list")
+	config := p.f.String("config", "", "configure tracker with JSON string")
+	track := p.f.Bool("track", false, "start tracking selected address ranges (aranges)")
+	reset := p.f.Bool("reset", false, "reset page access counters")
+	counters := p.f.Bool("counters", false, "read page access counters")
+
+	if err := p.f.Parse(args); err != nil {
+		return csOk
+	}
+	if *ls {
+		p.output(strings.Join(memtier.Trackers(), "\n") + "\n")
+		return csOk
+	}
+	if *create != "" {
+		if tracker := memtier.NewTracker(*create); tracker != nil {
+			p.tracker = tracker
+			p.output("tracker created\n")
+		} else {
+			p.output("invalid tracker name\n")
+			return csOk
+		}
+	}
+	// Next actions will require existing tracker
+	if p.tracker == nil {
+		p.output("no tracker, create one with -create NAME [-config CONFIG]\n")
+		return csOk
+	}
+	if *config != "" {
+		if err := p.tracker.SetConfigJson(*config); err != nil {
+			p.output("tracker configuration error: %v\n", err)
+		} else {
+			p.output("tracker configured successfully\n")
+		}
+	}
+	if *track {
+		if p.aranges == nil {
+			p.output("-track error: address ranges (aranges) not set, try pages -pid first\n")
+			return csOk
+		}
+		flattenRanges := p.aranges.Flatten()
+		for _, ar := range flattenRanges {
+			p.tracker.AddRanges(ar)
+		}
+		p.output("added %d address ranges to be tracked\n", len(flattenRanges))
+	}
+	if *counters {
+		tcs := p.tracker.GetCounters()
+		if tcs == nil {
+			p.output("cannot get tracker counters\n")
+			return csOk
+		}
+		if len(*tcs) == 0 {
+			p.output("no counter entries\n")
+			return csOk
+		}
+		tcs.SortByAccesses()
+		p.output(tcs.String() + "\n")
+	}
+	if *reset {
+		p.tracker.Reset()
+		p.output("tracker counters reset\n")
 	}
 	return csOk
 }

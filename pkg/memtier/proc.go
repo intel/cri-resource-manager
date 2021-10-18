@@ -47,7 +47,7 @@ func procPagemap(pid int, addressRanges []AddrRange, pageAttributes uint64) ([]P
 			// log.Error("Failed to seek: %v\n", err)
 			continue
 		}
-		readBuf := make([]byte, 4*constPagesize) // read from pagemap, chunks of len(readBuf)
+		readBuf := make([]byte, 8*constPagesize) // read from pagemap, chunks of len(readBuf)
 		readData := readBuf[0:0]                 // valid data in readBuf
 		for i := uint64(0); i < addressRange.length; i++ {
 			if len(readData) == 0 {

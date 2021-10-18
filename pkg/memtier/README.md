@@ -1,15 +1,25 @@
 # Structure
 
 ```
-                  Mover        (mover.go)
-          handles MoverTasks   (mover.go)
+                  Tracker      (tracker.go)
+follows memory usages of processes. There are alternative
+data sources: tracker_damon.go, tracker_softdirty.go, ...
 
-... each active task has unmoved pages of a single
+                  Policy       (policy.go)
+makes memory move decisions based on tracker data. For moving
+it uses
+
+                  Mover        (mover.go)
+     that handles MoverTasks   (mover.go)
+
+each active task has unmoved pages of a single
 
                   Process      (process.go)
          that has AddrRanges   (addrrange.go)
 each of which has Pages        (page.go)
 
+
+Adaptation to system happens through
 -----------------------+---------------------
 proc.go                |  move_linux.go
 -----------------------+---------------------

@@ -14,6 +14,11 @@
 
 package memtier
 
+import (
+	"fmt"
+	"strings"
+)
+
 func NewAddrRange(startAddr, stopAddr uint64) *AddrRange {
 	if stopAddr < startAddr {
 		startAddr, stopAddr = stopAddr, startAddr
@@ -21,8 +26,76 @@ func NewAddrRange(startAddr, stopAddr uint64) *AddrRange {
 	return &AddrRange{addr: startAddr, length: (stopAddr - startAddr) / uint64(constPagesize)}
 }
 
+func (r *AddrRange) Length() uint64 {
+	return r.length
+}
+
+func (ar *AddrRanges) Pid() int {
+	return ar.pid
+}
+
 func (ar *AddrRanges) Ranges() []AddrRange {
 	return ar.addrs
+}
+
+func (ar *AddrRanges) String() string {
+	rs := []string{}
+	for _, r := range ar.addrs {
+		rs = append(rs, r.String())
+	}
+	s := fmt.Sprintf("AddrRanges{pid=%d ranges=%s}",
+		ar.pid, strings.Join(rs, ","))
+	return s
+}
+
+// Flatten returns AddrRanges where each item includes only one address range
+func (ar *AddrRanges) Flatten() []*AddrRanges {
+	rv := []*AddrRanges{}
+	for _, r := range ar.addrs {
+		newAr := &AddrRanges{
+			pid:   ar.pid,
+			addrs: []AddrRange{r},
+		}
+		rv = append(rv, newAr)
+	}
+	return rv
+}
+
+func (ar *AddrRanges) Filter(accept func(ar AddrRange) bool) *AddrRanges {
+	newAr := &AddrRanges{
+		pid:   ar.pid,
+		addrs: []AddrRange{},
+	}
+	for _, r := range ar.addrs {
+		if accept(r) {
+			newAr.addrs = append(newAr.addrs, r)
+		}
+	}
+	return newAr
+}
+
+func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
+	newAr := &AddrRanges{
+		pid:   ar.pid,
+		addrs: make([]AddrRange, 0, len(ar.addrs)),
+	}
+	for _, r := range ar.addrs {
+		addr := r.addr
+		length := r.length
+		for length > maxLength {
+			newAr.addrs = append(newAr.addrs, AddrRange{addr, maxLength})
+			length -= maxLength
+			addr += maxLength
+		}
+		if length > 0 {
+			newAr.addrs = append(newAr.addrs, AddrRange{addr, length})
+		}
+	}
+	return newAr
+}
+
+func (r AddrRange) String() string {
+	return fmt.Sprintf("%x(%d)", r.addr, r.length)
 }
 
 // PagesMatching returns pages with selected pagetable attributes
