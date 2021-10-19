@@ -300,8 +300,8 @@ func (p *Prompt) cmdStats(args []string) commandStatus {
 }
 
 func (p *Prompt) cmdTracker(args []string) commandStatus {
-	ls := p.f.Bool("ls", false, "list names of memory trackers")
-	create := p.f.String("create", "", "create new tracker NAME (string), see list")
+	ls := p.f.Bool("ls", false, "list available memory trackers")
+	create := p.f.String("create", "", "create new tracker NAME (string), see -ls")
 	config := p.f.String("config", "", "configure tracker with JSON string")
 	track := p.f.Bool("track", false, "start tracking selected address ranges (aranges)")
 	reset := p.f.Bool("reset", false, "reset page access counters")
@@ -311,16 +311,16 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 		return csOk
 	}
 	if *ls {
-		p.output(strings.Join(memtier.Trackers(), "\n") + "\n")
+		p.output(strings.Join(memtier.TrackerList(), "\n") + "\n")
 		return csOk
 	}
 	if *create != "" {
-		if tracker := memtier.NewTracker(*create); tracker != nil {
+		if tracker, err := memtier.NewTracker(*create); err != nil {
+			p.output("creating tracker failed: %v\n", err)
+			return csOk
+		} else {
 			p.tracker = tracker
 			p.output("tracker created\n")
-		} else {
-			p.output("invalid tracker name\n")
-			return csOk
 		}
 	}
 	// Next actions will require existing tracker
@@ -360,7 +360,7 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 		p.output(tcs.String() + "\n")
 	}
 	if *reset {
-		p.tracker.Reset()
+		p.tracker.ResetCounters()
 		p.output("tracker counters reset\n")
 	}
 	return csOk

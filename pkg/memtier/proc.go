@@ -23,6 +23,17 @@ import (
 	"strings"
 )
 
+func procFileExists(path string) bool {
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
+}
+
+func procWrite(path string, data []byte) error {
+	return ioutil.WriteFile(path, data, 0600)
+}
+
 // procPagemap returns pages of a process from address ranges
 func procPagemap(pid int, addressRanges []AddrRange, pageAttributes uint64) ([]Page, error) {
 	pageMustBePresent := (pageAttributes&PagePresent == PagePresent)

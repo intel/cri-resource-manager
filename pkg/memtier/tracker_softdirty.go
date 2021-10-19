@@ -1,10 +1,24 @@
+// Copyright 2021 Intel Corporation. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // The soft dirty tracker is capable of detecting memory writes.
 // https://www.kernel.org/doc/Documentation/vm/soft-dirty.txt
 
 package memtier
 
 import (
-	"io/ioutil"
+	"fmt"
 	"strconv"
 )
 
@@ -13,45 +27,48 @@ type TrackerSoftDirty struct {
 }
 
 func init() {
-	trackers["softdirty"] = NewTrackerSoftDirty
+	TrackerRegister("softdirty", NewTrackerSoftDirty)
 }
 
-func NewTrackerSoftDirty() Tracker {
+func NewTrackerSoftDirty() (Tracker, error) {
+	if !procFileExists("/proc/self/clear_refs") {
+		return nil, fmt.Errorf("no platform support: /proc/pid/clear_refs missing")
+	}
 	return &TrackerSoftDirty{
 		regions: make(map[int][]*AddrRanges, 0),
-	}
+	}, nil
 }
 
-func (tsd *TrackerSoftDirty) SetConfigJson(configJson string) error {
+func (t *TrackerSoftDirty) SetConfigJson(configJson string) error {
 	return nil
 }
 
-func (tsd *TrackerSoftDirty) AddRanges(ar *AddrRanges) {
+func (t *TrackerSoftDirty) AddRanges(ar *AddrRanges) {
 	pid := ar.Pid()
-	if regions, ok := tsd.regions[pid]; ok {
-		tsd.regions[pid] = append(regions, ar)
+	if regions, ok := t.regions[pid]; ok {
+		t.regions[pid] = append(regions, ar)
 	} else {
-		tsd.regions[pid] = []*AddrRanges{ar}
+		t.regions[pid] = []*AddrRanges{ar}
 	}
 }
 
-func (tsd *TrackerSoftDirty) RemovePid(pid int) {
-	delete(tsd.regions, pid)
+func (t *TrackerSoftDirty) RemovePid(pid int) {
+	delete(t.regions, pid)
 }
 
-func (tsd *TrackerSoftDirty) Reset() {
-	for pid := range tsd.regions {
+func (t *TrackerSoftDirty) ResetCounters() {
+	for pid := range t.regions {
 		pidString := strconv.Itoa(pid)
 		path := "/proc/" + pidString + "/clear_refs"
-		err := ioutil.WriteFile(path, []byte("4"), 0600)
+		err := procWrite(path, []byte("4"))
 		if err != nil {
 			// This process cannot be tracked anymore, remove it.
-			tsd.RemovePid(pid)
+			t.RemovePid(pid)
 		}
 	}
 }
 
-func (tsd *TrackerSoftDirty) GetCounters() *TrackerCounters {
+func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
 	// Room for optimization:
 	// 1. We use only the number of pages per address range. This
 	//    could be done without building the list of pages.
@@ -59,11 +76,11 @@ func (tsd *TrackerSoftDirty) GetCounters() *TrackerCounters {
 	//    yet once would be enough.
 	tcs := &TrackerCounters{}
 	pageAttrs := PagePresent | PageExclusive | PageDirty
-	for pid, allPidAddrRanges := range tsd.regions {
+	for pid, allPidAddrRanges := range t.regions {
 		for _, addrRanges := range allPidAddrRanges {
 			pageSet, err := addrRanges.PagesMatching(pageAttrs)
 			if err != nil {
-				tsd.RemovePid(pid)
+				t.RemovePid(pid)
 				break
 			}
 			numberOfPagesWritten := len(pageSet.Pages())
