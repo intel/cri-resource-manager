@@ -63,7 +63,7 @@ func parseOptRanges(rangeStr string) []memtier.AddrRange {
 	for _, startStopStr := range strings.Split(rangeStr, ",") {
 		startStopSlice := strings.Split(startStopStr, "-")
 		if len(startStopSlice) != 2 {
-			exit("invalid addresss range %q, expected STARTADDR-STOPADDR")
+			exit("invalid addresss range %q, expected STARTADDR-STOPADDR", startStopStr)
 		}
 		startAddr, err := strconv.ParseUint(startStopSlice[0], 16, 64)
 		if err != nil {

@@ -7,16 +7,18 @@ import (
 	"time"
 )
 
-type MoverTask struct {
-	pages  *Pages
-	to     []Node
-	offset int // index to the first page that is still to be moved
-}
-
 type MoverConfig struct {
 	// process/container mem access prices per NUMA node
 	Interval  int // in ms
 	Bandwidth int // in MB/s
+}
+
+const moverDefaults string = "{\"interval\":10,\"bandwidth\":100}"
+
+type MoverTask struct {
+	pages  *Pages
+	to     []Node
+	offset int // index to the first page that is still to be moved
 }
 
 type Mover struct {
@@ -83,11 +85,13 @@ func (m *Mover) SetConfig(config *MoverConfig) {
 }
 
 func (m *Mover) Start() error {
+	if m.config == nil {
+		if err := m.SetConfigJson(moverDefaults); err != nil {
+			return fmt.Errorf("start failed on default configuration error: %w", err)
+		}
+	}
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	if m.config == nil {
-		return fmt.Errorf("starting failed, mover unconfigured")
-	}
 	if m.toTaskHandler == nil {
 		m.toTaskHandler = make(chan taskHandlerCmd, 8)
 		go m.taskHandler()

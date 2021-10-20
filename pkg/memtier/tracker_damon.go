@@ -19,17 +19,14 @@
 package memtier
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 )
-
-type TrackerDamon struct {
-	damonDir string
-	config   *TrackerDamonConfig
-	regions  map[int][]*AddrRanges
-}
 
 type TrackerDamonConfig struct {
 	Connection       string
@@ -40,6 +37,18 @@ type TrackerDamonConfig struct {
 	MaxTargetRegions uint64
 }
 
+const trackerDamonDefaults string = "{\"Connection\":\"perf\"}"
+
+type TrackerDamon struct {
+	mutex             sync.Mutex
+	damonDir          string
+	config            *TrackerDamonConfig
+	pids              []int
+	perfReaderRunning bool
+	// accesses maps startAddr -> lengthPgs -> accessCount
+	accesses map[uint64]map[uint64]uint64
+}
+
 func init() {
 	TrackerRegister("damon", NewTrackerDamon)
 }
@@ -47,12 +56,13 @@ func init() {
 func NewTrackerDamon() (Tracker, error) {
 	t := TrackerDamon{
 		damonDir: "/sys/kernel/debug/damon",
-		regions:  make(map[int][]*AddrRanges, 0),
+		accesses: make(map[uint64]map[uint64]uint64),
 	}
 
 	if !procFileExists(t.damonDir) {
 		return nil, fmt.Errorf("no platform support: %q missing", t.damonDir)
 	}
+	t.Stop()
 	return &t, nil
 }
 
@@ -86,6 +96,34 @@ func (t *TrackerDamon) SetConfigJson(configJson string) error {
 	return nil
 }
 
+func (t *TrackerDamon) AddPids(pids []int) {
+	for _, pid := range pids {
+		t.pids = append(t.pids, pid)
+	}
+}
+
+func (t *TrackerDamon) RemovePids(pids []int) {
+	if pids == nil {
+		t.pids = []int{}
+		return
+	}
+	for _, pid := range pids {
+		t.removePid(pid)
+	}
+}
+
+func (t *TrackerDamon) removePid(pid int) {
+	for index, p := range t.pids {
+		if p == pid {
+			if index < len(t.pids)-1 {
+				t.pids[index] = t.pids[len(t.pids)-1]
+			}
+			t.pids = t.pids[:len(t.pids)-1]
+			break
+		}
+	}
+}
+
 func (t *TrackerDamon) applyAttrs(config *TrackerDamonConfig) error {
 	utoa := func(u uint64) string { return strconv.FormatUint(u, 10) }
 	configStr := utoa(config.SamplingUs) +
@@ -99,17 +137,41 @@ func (t *TrackerDamon) applyAttrs(config *TrackerDamonConfig) error {
 	return nil
 }
 
-func (t *TrackerDamon) AddRanges(ar *AddrRanges) {
-	pid := ar.Pid()
-	if regions, ok := t.regions[pid]; ok {
-		t.regions[pid] = append(regions, ar)
-	} else {
-		t.regions[pid] = []*AddrRanges{ar}
+func (t *TrackerDamon) Start() error {
+	// Reset configuration.
+	if t.config == nil {
+		if err := t.SetConfigJson(trackerDamonDefaults); err != nil {
+			return fmt.Errorf("start failed on default configuration error: %w", err)
+		}
 	}
-}
+	t.applyAttrs(t.config)
 
-func (t *TrackerDamon) RemovePid(pid int) {
-	delete(t.regions, pid)
+	// Refresh all pids to be monitored.
+	// Writing a non-existing pids to target_ids causes an error.
+	pids := make([]string, 0, len(t.pids))
+	for _, pid := range t.pids {
+		pidStr := strconv.Itoa(pid)
+		if procFileExists("/proc/" + pidStr) {
+			pids = append(pids, pidStr)
+		} else {
+			t.removePid(pid)
+		}
+	}
+	pidsStr := strings.Join(pids, " ")
+	if err := procWrite(t.damonDir+"/target_ids", []byte(pidsStr)); err != nil {
+	}
+
+	if t.config.Connection == "perf" && !t.perfReaderRunning {
+		t.perfReaderRunning = true
+		go t.perfReader()
+	}
+
+	// Start monitoring.
+	if len(pids) > 0 {
+		if err := procWrite(t.damonDir+"/monitor_on", []byte("on")); err != nil {
+		}
+	}
+	return nil
 }
 
 func (t *TrackerDamon) Stop() {
@@ -119,34 +181,104 @@ func (t *TrackerDamon) Stop() {
 }
 
 func (t *TrackerDamon) ResetCounters() {
-	// Stop monitoring.
-	t.Stop()
-
-	// Reset configuration.
-	t.applyAttrs(t.config)
-
-	// Refresh all pids to be monitored.
-	pids := make([]string, 0, len(t.regions))
-	for pid := range t.regions {
-		pidStr := strconv.Itoa(pid)
-		if procFileExists("/proc/" + pidStr) {
-			pids = append(pids, pidStr)
-		} else {
-			t.RemovePid(pid)
-		}
-	}
-	pidsStr := strings.Join(pids, " ")
-	procWrite(t.damonDir+"/target_ids", []byte(pidsStr))
-
-	// Todo: reset connection (now restart perf, possibly delete file).
-
-	// Start monitoring.
-	if len(pids) > 0 {
-		if err := procWrite(t.damonDir+"/monitor_on", []byte("on")); err != nil {
-		}
-	}
+	// TODO: lock!? so that perfReader wouldn't need lock on every line?
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.accesses = make(map[uint64]map[uint64]uint64)
 }
 
 func (t *TrackerDamon) GetCounters() *TrackerCounters {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	tcs := &TrackerCounters{}
+	for start, lengthCount := range t.accesses {
+		for length, count := range lengthCount {
+			addrRange := AddrRanges{
+				pid: 0, // FIXME: this is bad
+				addrs: []AddrRange{
+					{
+						addr:   start,
+						length: length,
+					},
+				},
+			}
+			tc := TrackerCounter{
+				Accesses: int(count),
+				Reads:    0,
+				Writes:   0,
+				AR:       &addrRange,
+			}
+			*tcs = append(*tcs, tc)
+		}
+	}
+	return tcs
+}
+
+func (t *TrackerDamon) perfReader() error {
+	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated", "--filter", "nr_accesses > 0")
+	errPipe, err := cmd.StderrPipe()
+	perfOutput := bufio.NewReader(errPipe)
+	if err != nil {
+		return fmt.Errorf("creating stderr pipe for perf failed: %w", err)
+	}
+	if err = cmd.Start(); err != nil {
+		return fmt.Errorf("starting perf failed: %w", err)
+	}
+	for {
+		line, err := perfOutput.ReadString('\n')
+		if err != nil || line == "" {
+			break
+		}
+		t.perfHandleLine(line)
+	}
+	cmd.Wait()
+	fmt.Printf("perfReader quitting\n")
+	return nil
+}
+
+func (t *TrackerDamon) perfHandleLine(line string) error {
+	// Parse line. Example of perf damon:damon_aggregated output line:
+	// 12400.049 kdamond.0/30572 damon:damon_aggregated(target_id: -121171723722880, nr_regions: 13, start: 139995295608832, end: 139995297484800, nr_accesses: 1)
+
+	// TODO: how to convert target_id to pid?
+	csLine := strings.Split(line, ", ")
+	if len(csLine) < 4 {
+		return fmt.Errorf("invalid bad line %q", csLine)
+	}
+	startStr := csLine[2][7:]
+	endStr := csLine[3][5:]
+	nrStr := ""
+	if len(csLine) == 5 {
+		nrStr = csLine[4][13 : len(csLine[4])-2]
+	}
+	start, err := strconv.Atoi(startStr)
+	if err != nil {
+		return fmt.Errorf("parse error on startStr %q element %q line %q\n", startStr, csLine[2], line)
+	}
+	end, err := strconv.Atoi(endStr)
+	if err != nil {
+		return fmt.Errorf("parse error on endStr %q element %q line %q\n", endStr, csLine[3], line)
+	}
+	nr := 0
+	if len(nrStr) > 0 {
+		nr, err = strconv.Atoi(nrStr)
+		if err != nil {
+			return fmt.Errorf("parse error on nrStr %q element %q line %q\n", nrStr, csLine[4], line)
+		}
+	}
+	// ?? How to avoid locking this often
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	lengthPgs := uint64(int64(end-start) / constPagesize)
+	lengthCount, ok := t.accesses[uint64(start)]
+	if !ok {
+		lengthCount = make(map[uint64]uint64)
+		t.accesses[uint64(start)] = lengthCount
+	}
+	if count, ok := lengthCount[lengthPgs]; ok {
+		lengthCount[lengthPgs] = count + uint64(nr)
+	} else {
+		lengthCount[lengthPgs] = uint64(nr)
+	}
 	return nil
 }

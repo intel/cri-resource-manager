@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/memtier"
@@ -60,11 +61,11 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 	}
 	p.cmds = map[string]Cmd{
 		"q":       Cmd{"quit interactive prompt", p.cmdQuit},
-		"tracker": Cmd{"track selected aranges or manage mem tracker", p.cmdTracker},
+		"tracker": Cmd{"track memory accesses and manage trackers", p.cmdTracker},
 		"stats":   Cmd{"print statistics", p.cmdStats},
-		"pages":   Cmd{"select pages and aranges, or print current status", p.cmdPages},
+		"pages":   Cmd{"select pages, or print current pages", p.cmdPages},
 		"arange":  Cmd{"select/split/filter arange", p.cmdArange},
-		"mover":   Cmd{"move selected pages or manage mem mover", p.cmdMover},
+		"mover":   Cmd{"move selected pages or manage mover", p.cmdMover},
 		"help":    Cmd{"print help", p.cmdHelp},
 	}
 	return &p
@@ -301,10 +302,11 @@ func (p *Prompt) cmdStats(args []string) commandStatus {
 
 func (p *Prompt) cmdTracker(args []string) commandStatus {
 	ls := p.f.Bool("ls", false, "list available memory trackers")
-	create := p.f.String("create", "", "create new tracker NAME (string), see -ls")
+	create := p.f.String("create", "", "create new tracker NAME")
 	config := p.f.String("config", "", "configure tracker with JSON string")
-	track := p.f.Bool("track", false, "start tracking selected address ranges (aranges)")
+	start := p.f.String("start", "", "start tracking PID[,PID...]")
 	reset := p.f.Bool("reset", false, "reset page access counters")
+	stop := p.f.Bool("stop", false, "stop tracker")
 	counters := p.f.Bool("counters", false, "read page access counters")
 
 	if err := p.f.Parse(args); err != nil {
@@ -335,16 +337,25 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 			p.output("tracker configured successfully\n")
 		}
 	}
-	if *track {
-		if p.aranges == nil {
-			p.output("-track error: address ranges (aranges) not set, try pages -pid first\n")
+	if *stop {
+		p.tracker.Stop()
+	}
+	if *start != "" {
+		p.tracker.Stop()
+		p.tracker.RemovePids(nil)
+		for _, pidStr := range strings.Split(*start, ",") {
+			if pid, err := strconv.Atoi(pidStr); err == nil {
+				p.tracker.AddPids([]int{pid})
+			} else {
+				p.output("invalid pid: %q\n", pidStr)
+				return csOk
+			}
+		}
+		if err := p.tracker.Start(); err != nil {
+			p.output("start failed: %v\n", err)
 			return csOk
 		}
-		flattenRanges := p.aranges.Flatten()
-		for _, ar := range flattenRanges {
-			p.tracker.AddRanges(ar)
-		}
-		p.output("added %d address ranges to be tracked\n", len(flattenRanges))
+		p.output("tracker started\n")
 	}
 	if *counters {
 		tcs := p.tracker.GetCounters()

@@ -18,11 +18,16 @@
 package memtier
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 )
 
+type TrackerSoftDirtyConfig struct {
+}
+
 type TrackerSoftDirty struct {
+	config  *TrackerSoftDirtyConfig
 	regions map[int][]*AddrRanges
 }
 
@@ -40,19 +45,48 @@ func NewTrackerSoftDirty() (Tracker, error) {
 }
 
 func (t *TrackerSoftDirty) SetConfigJson(configJson string) error {
+	config := TrackerSoftDirtyConfig{}
+	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (t *TrackerSoftDirty) AddRanges(ar *AddrRanges) {
+func (t *TrackerSoftDirty) addRanges(ar *AddrRanges) {
 	pid := ar.Pid()
-	if regions, ok := t.regions[pid]; ok {
-		t.regions[pid] = append(regions, ar)
-	} else {
-		t.regions[pid] = []*AddrRanges{ar}
+	for _, r := range ar.Flatten() {
+		if regions, ok := t.regions[pid]; ok {
+			t.regions[pid] = append(regions, r)
+		} else {
+			t.regions[pid] = []*AddrRanges{r}
+		}
 	}
 }
 
-func (t *TrackerSoftDirty) RemovePid(pid int) {
+func (t *TrackerSoftDirty) AddPids(pids []int) {
+	for _, pid := range pids {
+		p := NewProcess(pid)
+		if ar, err := p.AddressRanges(); err == nil {
+			// filter out single-page address ranges
+			ar = ar.Filter(func(r AddrRange) bool { return r.Length() > 1 })
+			ar = ar.SplitLength(256) // 256 * 4k pages = 1MB regions
+			t.addRanges(ar)
+			continue
+		}
+	}
+}
+
+func (t *TrackerSoftDirty) RemovePids(pids []int) {
+	if pids == nil {
+		t.regions = make(map[int][]*AddrRanges, 0)
+		return
+	}
+	for _, pid := range pids {
+		t.removePid(pid)
+	}
+}
+
+func (t *TrackerSoftDirty) removePid(pid int) {
 	delete(t.regions, pid)
 }
 
@@ -63,7 +97,7 @@ func (t *TrackerSoftDirty) ResetCounters() {
 		err := procWrite(path, []byte("4"))
 		if err != nil {
 			// This process cannot be tracked anymore, remove it.
-			t.RemovePid(pid)
+			t.removePid(pid)
 		}
 	}
 }
@@ -80,7 +114,7 @@ func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
 		for _, addrRanges := range allPidAddrRanges {
 			pageSet, err := addrRanges.PagesMatching(pageAttrs)
 			if err != nil {
-				t.RemovePid(pid)
+				t.removePid(pid)
 				break
 			}
 			numberOfPagesWritten := len(pageSet.Pages())
@@ -94,4 +128,12 @@ func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
 		}
 	}
 	return tcs
+}
+
+func (t *TrackerSoftDirty) Start() error {
+	t.ResetCounters()
+	return nil
+}
+
+func (t *TrackerSoftDirty) Stop() {
 }

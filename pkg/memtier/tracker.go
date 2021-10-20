@@ -30,9 +30,11 @@ type TrackerCounter struct {
 }
 
 type Tracker interface {
-	SetConfigJson(configJson string) error
-	AddRanges(ar *AddrRanges)
-	RemovePid(int)
+	SetConfigJson(string) error // Set new configuration.
+	AddPids([]int)              // Add pids to be tracked.
+	RemovePids([]int)           // Remove pids, RemovePids(nil) clears all.
+	Start() error               // Start tracking.
+	Stop()                      // Stop tracking.
 	ResetCounters()
 	GetCounters() *TrackerCounters
 }

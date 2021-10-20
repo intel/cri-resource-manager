@@ -29,10 +29,17 @@ func (t *TrackerStub) SetConfigJson(configJson string) error {
 	return nil
 }
 
-func (t *TrackerStub) AddRanges(ar *AddrRanges) {
+func (t *TrackerStub) AddPids(pids []int) {
 }
 
-func (t *TrackerStub) RemovePid(pid int) {
+func (t *TrackerStub) RemovePids(pids []int) {
+}
+
+func (t *TrackerStub) Start() error {
+	return nil
+}
+
+func (t *TrackerStub) Stop() {
 }
 
 func (t *TrackerStub) ResetCounters() {
