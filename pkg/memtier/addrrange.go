@@ -16,6 +16,7 @@ package memtier
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -24,6 +25,10 @@ func NewAddrRange(startAddr, stopAddr uint64) *AddrRange {
 		startAddr, stopAddr = stopAddr, startAddr
 	}
 	return &AddrRange{addr: startAddr, length: (stopAddr - startAddr) / uint64(constPagesize)}
+}
+
+func (r *AddrRange) Addr() uint64 {
+	return r.addr
 }
 
 func (r *AddrRange) Length() uint64 {
@@ -85,7 +90,7 @@ func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
 		for length > maxLength {
 			newAr.addrs = append(newAr.addrs, AddrRange{addr, maxLength})
 			length -= maxLength
-			addr += maxLength
+			addr += maxLength * uint64(constPagesize)
 		}
 		if length > 0 {
 			newAr.addrs = append(newAr.addrs, AddrRange{addr, length})
@@ -95,16 +100,48 @@ func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
 }
 
 func (r AddrRange) String() string {
-	return fmt.Sprintf("%x(%d)", r.addr, r.length)
+	return fmt.Sprintf("%x-%x(%d)", r.addr, r.addr+(r.length*uint64(constPagesize)), r.length*uint64(constPagesize))
 }
 
-// PagesMatching returns pages with selected pagetable attributes
-func (ar *AddrRanges) PagesMatching(pageAttributes uint64) (*Pages, error) {
-	pages, err := procPagemap(ar.pid, ar.addrs, pageAttributes)
+// PagesMatching returns pages with pagetable attributes.
+func (ar *AddrRanges) PagesMatching(pageAttributes uint64, pageMap *os.File) (*Pages, error) {
+	if pageMap == nil {
+		pageMap, err := procPagemapOpen(ar.pid)
+		if err != nil {
+			return nil, err
+		}
+		defer pageMap.Close()
+	}
+	pp := &Pages{pid: ar.pid, pages: []Page{}}
+	err := procPagemapCb(pageMap, ar.Ranges(), pageAttributes,
+		func(addr uint64) int {
+			pp.pages = append(pp.pages, Page{addr: addr})
+			return 0
+		},
+		nil)
 	if err != nil {
 		return nil, err
 	}
-	return &Pages{pid: ar.pid, pages: pages}, nil
+	return pp, nil
+}
+
+// PageCountMatching returns number of pages matching pagetable attributes.
+func (ar *AddrRanges) PageCountMatching(pageAttributes uint64, pageMap *os.File, skipRead func(uint64) bool) (uint64, error) {
+	if pageMap == nil {
+		pageMap, err := procPagemapOpen(ar.pid)
+		if err != nil {
+			return 0, err
+		}
+		defer pageMap.Close()
+	}
+	pageCount := uint64(0)
+	err := procPagemapCb(pageMap, ar.Ranges(), pageAttributes,
+		func(addr uint64) int {
+			pageCount += 1
+			return 0
+		},
+		skipRead)
+	return pageCount, err
 }
 
 func (ar *AddrRanges) Intersection(intRanges []AddrRange) {

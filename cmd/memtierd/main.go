@@ -133,7 +133,7 @@ func main() {
 	fmt.Printf("using %d address ranges\n", len(ar.Ranges()))
 
 	// Find pages with wanted attributes from the address ranges
-	pgs, err := ar.PagesMatching(pageAttributes)
+	pgs, err := ar.PagesMatching(pageAttributes, nil)
 	fmt.Printf("found total %d pages\n", len(pgs.Pages()))
 	if *optMover == "" {
 		fmt.Printf("missing --mover, doing nothing\n")

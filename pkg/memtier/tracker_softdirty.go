@@ -20,15 +20,28 @@ package memtier
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strconv"
+	"sync"
+	"time"
 )
 
 type TrackerSoftDirtyConfig struct {
+	SkipPageProb    int    // 100000 = probability 1.0
+	AggregationUs   uint64 // interval in microseconds
+	PagesInRegion   uint64 // number of pages in a region
+	RegionsUpdateUs uint64 // interval in microseconds
 }
 
+const trackerSoftDirtyDefaults string = `{"AggregationUs":1000000,"PagesInRegion":512,"SkipPageProb":0}`
+
 type TrackerSoftDirty struct {
+	mutex   sync.Mutex
 	config  *TrackerSoftDirtyConfig
 	regions map[int][]*AddrRanges
+	// accesses maps pid -> startAddr -> lengthPages -> writeCount
+	accesses  map[int]map[uint64]map[uint64]uint64
+	toSampler chan byte
 }
 
 func init() {
@@ -39,9 +52,15 @@ func NewTrackerSoftDirty() (Tracker, error) {
 	if !procFileExists("/proc/self/clear_refs") {
 		return nil, fmt.Errorf("no platform support: /proc/pid/clear_refs missing")
 	}
-	return &TrackerSoftDirty{
-		regions: make(map[int][]*AddrRanges, 0),
-	}, nil
+	t := &TrackerSoftDirty{
+		regions:  make(map[int][]*AddrRanges),
+		accesses: make(map[int]map[uint64]map[uint64]uint64),
+	}
+	err := t.SetConfigJson(trackerSoftDirtyDefaults)
+	if err != nil {
+		return nil, fmt.Errorf("invalid softdirty default configuration")
+	}
+	return t, nil
 }
 
 func (t *TrackerSoftDirty) SetConfigJson(configJson string) error {
@@ -49,6 +68,7 @@ func (t *TrackerSoftDirty) SetConfigJson(configJson string) error {
 	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
 		return err
 	}
+	t.config = &config
 	return nil
 }
 
@@ -69,7 +89,7 @@ func (t *TrackerSoftDirty) AddPids(pids []int) {
 		if ar, err := p.AddressRanges(); err == nil {
 			// filter out single-page address ranges
 			ar = ar.Filter(func(r AddrRange) bool { return r.Length() > 1 })
-			ar = ar.SplitLength(256) // 256 * 4k pages = 1MB regions
+			ar = ar.SplitLength(t.config.PagesInRegion)
 			t.addRanges(ar)
 			continue
 		}
@@ -91,6 +111,118 @@ func (t *TrackerSoftDirty) removePid(pid int) {
 }
 
 func (t *TrackerSoftDirty) ResetCounters() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.accesses = make(map[int]map[uint64]map[uint64]uint64)
+}
+
+func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	tcs := &TrackerCounters{}
+	for pid, addrLenCount := range t.accesses {
+		for start, lenCount := range addrLenCount {
+			for length, count := range lenCount {
+				addrRange := AddrRanges{
+					pid: pid,
+					addrs: []AddrRange{
+						{
+							addr:   start,
+							length: length,
+						},
+					},
+				}
+				tc := TrackerCounter{
+					Accesses: count,
+					Reads:    0,
+					Writes:   count,
+					AR:       &addrRange,
+				}
+				*tcs = append(*tcs, tc)
+			}
+		}
+	}
+	return tcs
+}
+
+func (t *TrackerSoftDirty) Start() error {
+	if t.toSampler != nil {
+		return fmt.Errorf("sampler already running")
+	}
+	t.toSampler = make(chan byte, 1)
+	t.clearDirtyBits()
+	go t.sampler()
+	return nil
+}
+
+func (t *TrackerSoftDirty) Stop() {
+	if t.toSampler != nil {
+		t.toSampler <- 0
+	}
+}
+
+func (t *TrackerSoftDirty) sampler() {
+	ticker := time.NewTicker(time.Duration(t.config.AggregationUs) * time.Microsecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-t.toSampler:
+			close(t.toSampler)
+			t.toSampler = nil
+			return
+		case <-ticker.C:
+			t.countDirtyPages()
+			t.clearDirtyBits()
+		}
+	}
+}
+
+func (t *TrackerSoftDirty) countDirtyPages() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	pageAttrs := PagePresent | PageExclusive | PageDirty
+	for pid, allPidAddrRanges := range t.regions {
+		pmf, err := procPagemapOpen(pid)
+		if err != nil {
+			t.removePid(pid)
+			continue
+		}
+		for _, addrRanges := range allPidAddrRanges {
+			numberOfPagesWritten, err := addrRanges.PageCountMatching(pageAttrs, pmf,
+				func(x uint64) bool {
+					if t.config.SkipPageProb > 0 &&
+						rand.Intn(100000) < t.config.SkipPageProb {
+						return true
+					}
+					return false
+				})
+			if err != nil {
+				t.removePid(pid)
+				break
+			}
+			addrLenCount, ok := t.accesses[pid]
+			if !ok {
+				addrLenCount = make(map[uint64]map[uint64]uint64)
+				t.accesses[pid] = addrLenCount
+			}
+			addr := addrRanges.Ranges()[0].Addr()
+			lenCount, ok := addrLenCount[addr]
+			if !ok {
+				lenCount = make(map[uint64]uint64)
+				addrLenCount[addr] = lenCount
+			}
+			lengthPages := addrRanges.Ranges()[0].Length()
+			count, ok := lenCount[lengthPages]
+			if !ok {
+				count = 0
+			}
+			lenCount[lengthPages] = count + numberOfPagesWritten
+		}
+		pmf.Close()
+	}
+}
+
+func (t *TrackerSoftDirty) clearDirtyBits() {
 	for pid := range t.regions {
 		pidString := strconv.Itoa(pid)
 		path := "/proc/" + pidString + "/clear_refs"
@@ -100,40 +232,4 @@ func (t *TrackerSoftDirty) ResetCounters() {
 			t.removePid(pid)
 		}
 	}
-}
-
-func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
-	// Room for optimization:
-	// 1. We use only the number of pages per address range. This
-	//    could be done without building the list of pages.
-	// 2. We open and close /proc/pid/pagemap for each address range,
-	//    yet once would be enough.
-	tcs := &TrackerCounters{}
-	pageAttrs := PagePresent | PageExclusive | PageDirty
-	for pid, allPidAddrRanges := range t.regions {
-		for _, addrRanges := range allPidAddrRanges {
-			pageSet, err := addrRanges.PagesMatching(pageAttrs)
-			if err != nil {
-				t.removePid(pid)
-				break
-			}
-			numberOfPagesWritten := len(pageSet.Pages())
-			tc := TrackerCounter{
-				Accesses: numberOfPagesWritten,
-				Reads:    0,
-				Writes:   numberOfPagesWritten,
-				AR:       addrRanges,
-			}
-			*tcs = append(*tcs, tc)
-		}
-	}
-	return tcs
-}
-
-func (t *TrackerSoftDirty) Start() error {
-	t.ResetCounters()
-	return nil
-}
-
-func (t *TrackerSoftDirty) Stop() {
 }

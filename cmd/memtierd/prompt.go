@@ -226,7 +226,7 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 		p.output("invalid -attrs: %v\n", err)
 		return csOk
 	}
-	pp, err := ar.PagesMatching(pageAttributes)
+	pp, err := ar.PagesMatching(pageAttributes, nil)
 	if err != nil {
 		p.output("finding pages from address ranges failed: %v\n", err)
 	}

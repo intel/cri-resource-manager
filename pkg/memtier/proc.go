@@ -34,8 +34,24 @@ func procWrite(path string, data []byte) error {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
-// procPagemap returns pages of a process from address ranges
-func procPagemap(pid int, addressRanges []AddrRange, pageAttributes uint64) ([]Page, error) {
+// procPagemap returns pages of a process from address ranges.
+func procPagemapOpen(pid int) (*os.File, error) {
+	path := "/proc/" + strconv.Itoa(pid) + "/pagemap"
+	pageMap, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	return pageMap, nil
+}
+
+// pagemapPos is the file position of the pagemap file.
+var pagemapPos int64 = 0
+
+// procPagemapCb calls cb with page address for every matching page in
+// the address range.
+// If cb returns 0, procPagemapCb continues otherwise returns.
+// If skipRead returns true, skip reading and directly seek to next set of pages.
+func procPagemapCb(pageMap *os.File, addressRanges []AddrRange, pageAttributes uint64, cb func(uint64) int, skipRead func(uint64) bool) error {
 	pageMustBePresent := (pageAttributes&PagePresent == PagePresent)
 	pageMustBeExclusive := (pageAttributes&PageExclusive == PageExclusive)
 	pageMustBeDirty := (pageAttributes&PageDirty == PageDirty)
@@ -44,34 +60,49 @@ func procPagemap(pid int, addressRanges []AddrRange, pageAttributes uint64) ([]P
 	exclusiveBit := uint64(0x1) << 56
 	presentBit := uint64(0x1) << 63
 
-	pages := make([]Page, 0)
-	path := "/proc/" + strconv.Itoa(pid) + "/pagemap"
-	pageMap, err := os.OpenFile(path, os.O_RDONLY, 0)
-	if err != nil {
-		return nil, err
-	}
 	for _, addressRange := range addressRanges {
-		idx := int64(addressRange.addr / uint64(constPagesize) * 8)
-		_, err := pageMap.Seek(idx, io.SeekStart)
-		if err != nil {
-			// Maybe there was a race condition and the maps changed?
-			// log.Error("Failed to seek: %v\n", err)
-			continue
-		}
-		readBuf := make([]byte, 8*constPagesize) // read from pagemap, chunks of len(readBuf)
-		readData := readBuf[0:0]                 // valid data in readBuf
+		// Seek to pagemapOffset only on demand. This avoids
+		// unnecessary seeks in case of probabilistic/sampling
+		// read in skipRead().
+		pagemapOffset := int64(addressRange.addr / uint64(constPagesize) * 8)
+		// read /proc/pid/pagemap in the chunks of len(readBuf).
+		// The length of readBuf must be divisible by 16.
+		// Too short a readBuf slows down the execution due to
+		// many read()'s.
+		// Too long a readBuf makes the syscall return slowly.
+		// The magic value here is based on a performance test.
+		// (1k buffer performed better than 512B or 4k).
+		readBuf := make([]byte, 16*64)
+		readData := readBuf[0:0] // valid data in readBuf
 		for i := uint64(0); i < addressRange.length; i++ {
 			if len(readData) == 0 {
+				if skipRead != nil && skipRead(addressRange.addr+i*uint64(constPagesize)) {
+					pagemapOffset += int64(len(readBuf))
+					continue
+				}
+				// Seek if not already in the correct position.
+				if pagemapPos != pagemapOffset {
+					_, err := pageMap.Seek(pagemapOffset, io.SeekStart)
+					if err != nil {
+						// Maybe there was a race condition and the maps changed?
+						break
+					}
+					pagemapPos = pagemapOffset
+				}
+
+				// Read from the correct position.
 				unreadByteCount := 8 * int(addressRange.length-i)
 				fillBufUpTo := cap(readBuf)
 				if fillBufUpTo > unreadByteCount {
 					fillBufUpTo = unreadByteCount
 				}
-				_, err = io.ReadAtLeast(pageMap, readBuf, fillBufUpTo)
+				n, err := io.ReadAtLeast(pageMap, readBuf, fillBufUpTo)
 				if err != nil {
 					// cannot read address range
 					continue
 				}
+				pagemapPos += int64(n)
+				pagemapOffset += int64(n)
 				readData = readBuf[:fillBufUpTo]
 			}
 			bytes := readData[:8]
@@ -94,11 +125,13 @@ func procPagemap(pid int, addressRanges []AddrRange, pageAttributes uint64) ([]P
 				(!pageMustBeExclusive || exclusive) &&
 				(!pageMustBeDirty || softDirty) &&
 				(!pageMustNotBeDirty || !softDirty) {
-				pages = append(pages, Page{addr: addressRange.addr + i*uint64(constPagesize)})
+				if cb(addressRange.addr+i*uint64(constPagesize)) != 0 {
+					return nil
+				}
 			}
 		}
 	}
-	return pages, nil
+	return nil
 }
 
 // procMaps returns address ranges of a process

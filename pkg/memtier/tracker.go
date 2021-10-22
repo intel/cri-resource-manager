@@ -23,9 +23,9 @@ import (
 type TrackerCounters []TrackerCounter
 
 type TrackerCounter struct {
-	Accesses int
-	Reads    int
-	Writes   int
+	Accesses uint64
+	Reads    uint64
+	Writes   uint64
 	AR       *AddrRanges
 }
 
@@ -66,7 +66,8 @@ func NewTracker(name string) (Tracker, error) {
 
 func (tcs *TrackerCounters) SortByAccesses() {
 	sort.Slice(*tcs, func(i, j int) bool {
-		return (*tcs)[i].Accesses < (*tcs)[j].Accesses
+		return (*tcs)[i].Accesses < (*tcs)[j].Accesses ||
+			((*tcs)[i].Accesses == (*tcs)[j].Accesses && (*tcs)[i].AR.Ranges()[0].Addr() < (*tcs)[j].AR.Ranges()[0].Addr())
 	})
 }
 

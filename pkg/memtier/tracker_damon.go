@@ -203,7 +203,7 @@ func (t *TrackerDamon) GetCounters() *TrackerCounters {
 				},
 			}
 			tc := TrackerCounter{
-				Accesses: int(count),
+				Accesses: count,
 				Reads:    0,
 				Writes:   0,
 				AR:       &addrRange,
