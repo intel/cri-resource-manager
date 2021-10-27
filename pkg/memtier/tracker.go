@@ -29,6 +29,11 @@ type TrackerCounter struct {
 	AR       *AddrRanges
 }
 
+type RangeHeat struct {
+	Range AddrRange
+	Heat  uint64
+}
+
 type Tracker interface {
 	SetConfigJson(string) error // Set new configuration.
 	GetConfigJson() string      // Get current configuration.
@@ -68,7 +73,15 @@ func NewTracker(name string) (Tracker, error) {
 func (tcs *TrackerCounters) SortByAccesses() {
 	sort.Slice(*tcs, func(i, j int) bool {
 		return (*tcs)[i].Accesses < (*tcs)[j].Accesses ||
-			((*tcs)[i].Accesses == (*tcs)[j].Accesses && (*tcs)[i].AR.Ranges()[0].Addr() < (*tcs)[j].AR.Ranges()[0].Addr())
+			((*tcs)[i].Accesses == (*tcs)[j].Accesses && (*tcs)[i].Writes < (*tcs)[j].Writes) ||
+			((*tcs)[i].Accesses == (*tcs)[j].Accesses && (*tcs)[i].Writes < (*tcs)[j].Writes && (*tcs)[i].AR.Ranges()[0].Addr() < (*tcs)[j].AR.Ranges()[0].Addr())
+	})
+}
+
+func (tcs *TrackerCounters) SortByAddr() {
+	sort.Slice(*tcs, func(i, j int) bool {
+		return (*tcs)[i].AR.Ranges()[0].Addr() < (*tcs)[j].AR.Ranges()[0].Addr() ||
+			(*tcs)[i].AR.Ranges()[0].Addr() == (*tcs)[j].AR.Ranges()[0].Addr() && (*tcs)[i].AR.Ranges()[0].Length() < (*tcs)[j].AR.Ranges()[0].Length()
 	})
 }
 
@@ -79,4 +92,29 @@ func (tcs *TrackerCounters) String() string {
 			tc.Accesses, tc.Reads, tc.Writes, tc.AR))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (tcs *TrackerCounters) RangeHeat() []*RangeHeat {
+	tcs.SortByAddr()
+	rhs := []*RangeHeat{}
+	// TODO: this proto works currently only for disjoint tc.AR's
+	for _, tc := range *tcs {
+		heat := tc.Accesses + tc.Reads + tc.Writes
+		if len(tc.AR.Ranges()) != 1 {
+			// TODO: this proto works only for single-range counters
+			return nil
+		}
+		r := tc.AR.Ranges()[0]
+		if len(rhs) > 0 {
+			prevRh := rhs[len(rhs)-1]
+			if prevRh.Range.EndAddr() == r.Addr() &&
+				prevRh.Heat == heat {
+				// two ranges with the same heat: combine them
+				prevRh.Range = *NewAddrRange(prevRh.Range.Addr(), r.EndAddr())
+				continue
+			}
+		}
+		rhs = append(rhs, &RangeHeat{r, heat})
+	}
+	return rhs
 }

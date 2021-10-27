@@ -445,7 +445,8 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 	start := p.f.String("start", "", "start tracking PID[,PID...]")
 	reset := p.f.Bool("reset", false, "reset page access counters")
 	stop := p.f.Bool("stop", false, "stop tracker")
-	counters := p.f.Bool("counters", false, "read page access counters")
+	counters := p.f.Bool("counters", false, "print tracker raw counters")
+	heat := p.f.Bool("heat", false, "print address range heats")
 
 	if err := p.f.Parse(args); err != nil {
 		return csOk
@@ -510,6 +511,12 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 		}
 		tcs.SortByAccesses()
 		p.output(tcs.String() + "\n")
+	}
+	if *heat {
+		tcs := p.tracker.GetCounters()
+		for _, rh := range tcs.RangeHeat() {
+			p.output("%s %d\n", rh.Range, rh.Heat)
+		}
 	}
 	if *reset {
 		p.tracker.ResetCounters()

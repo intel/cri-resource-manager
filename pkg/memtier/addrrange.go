@@ -30,6 +30,10 @@ func (r *AddrRange) Addr() uint64 {
 	return r.addr
 }
 
+func (r *AddrRange) EndAddr() uint64 {
+	return r.addr + r.length*uint64(constPagesize)
+}
+
 func (r *AddrRange) Length() uint64 {
 	return r.length
 }
