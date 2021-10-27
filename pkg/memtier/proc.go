@@ -16,12 +16,102 @@ package memtier
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 )
+
+const (
+	// /proc/pid/pagemap bits
+	// from fs/proc/task_mmu.c
+	PMB_SOFT_DIRTY     = 55
+	PMB_MMAP_EXCLUSIVE = 56
+	PMB_UFFD_WP        = 57
+	PMB_FILE           = 61
+	PMB_SWAP           = 62
+	PMB_PRESENT        = 63
+	// corresponding bitmasks
+	PM_PFN            = (uint64(0x1) << 55) - 1
+	PM_SOFT_DIRTY     = uint64(0x1) << PMB_SOFT_DIRTY
+	PM_MMAP_EXCLUSIVE = uint64(0x1) << PMB_MMAP_EXCLUSIVE
+	PM_UFFD_WP        = uint64(0x1) << PMB_UFFD_WP
+	PM_FILE           = uint64(0x1) << PMB_FILE
+	PM_SWAP           = uint64(0x1) << PMB_SWAP
+	PM_PRESENT        = uint64(0x1) << PMB_PRESENT
+
+	// /proc/kpageflags bits
+	// from include/uapi/linux/kernel-page-flags.h
+	KPFB_LOCKED        = 0
+	KPFB_ERROR         = 1
+	KPFB_REFERENCED    = 2
+	KPFB_UPTODATE      = 3
+	KPFB_DIRTY         = 4
+	KPFB_LRU           = 5
+	KPFB_ACTIVE        = 6
+	KPFB_SLAB          = 7
+	KPFB_WRITEBACK     = 8
+	KPFB_RECLAIM       = 9
+	KPFB_BUDDY         = 10
+	KPFB_MMAP          = 11
+	KPFB_ANON          = 12
+	KPFB_SWAPCACHE     = 13
+	KPFB_SWAPBACKED    = 14
+	KPFB_COMPOUND_HEAD = 15
+	KPFB_COMPOUND_TAIL = 16
+	KPFB_HUGE          = 17
+	KPFB_UNEVICTABLE   = 18
+	KPFB_HWPOISON      = 19
+	KPFB_NOPAGE        = 20
+	KPFB_KSM           = 21
+	KPFB_THP           = 22
+	KPFB_OFFLINE       = 23
+	KPFB_ZERO_PAGE     = 24
+	KPFB_IDLE          = 25
+	KPFB_PGTABLE       = 26
+	KPF_LOCKED         = uint64(0x1) << 0
+	KPF_ERROR          = uint64(0x1) << 1
+	KPF_REFERENCED     = uint64(0x1) << 2
+	KPF_UPTODATE       = uint64(0x1) << 3
+	KPF_DIRTY          = uint64(0x1) << 4
+	KPF_LRU            = uint64(0x1) << 5
+	KPF_ACTIVE         = uint64(0x1) << 6
+	KPF_SLAB           = uint64(0x1) << 7
+	KPF_WRITEBACK      = uint64(0x1) << 8
+	KPF_RECLAIM        = uint64(0x1) << 9
+	KPF_BUDDY          = uint64(0x1) << 10
+	KPF_MMAP           = uint64(0x1) << 11
+	KPF_ANON           = uint64(0x1) << 12
+	KPF_SWAPCACHE      = uint64(0x1) << 13
+	KPF_SWAPBACKED     = uint64(0x1) << 14
+	KPF_COMPOUND_HEAD  = uint64(0x1) << 15
+	KPF_COMPOUND_TAIL  = uint64(0x1) << 16
+	KPF_HUGE           = uint64(0x1) << 17
+	KPF_UNEVICTABLE    = uint64(0x1) << 18
+	KPF_HWPOISON       = uint64(0x1) << 19
+	KPF_NOPAGE         = uint64(0x1) << 20
+	KPF_KSM            = uint64(0x1) << 21
+	KPF_THP            = uint64(0x1) << 22
+	KPF_OFFLINE        = uint64(0x1) << 23
+	KPF_ZERO_PAGE      = uint64(0x1) << 24
+	KPF_IDLE           = uint64(0x1) << 25
+	KPF_PGTABLE        = uint64(0x1) << 26
+)
+
+type procPagemapFile struct {
+	osFile *os.File
+	pos    int64
+}
+
+type procKpageflagsFile struct {
+	osFile *os.File
+}
+
+type procPageIdleBitmapFile struct {
+	osFile *os.File
+}
 
 func procFileExists(path string) bool {
 	if _, err := os.Stat(path); err == nil {
@@ -34,36 +124,164 @@ func procWrite(path string, data []byte) error {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
-// procPagemap returns pages of a process from address ranges.
-func procPagemapOpen(pid int) (*os.File, error) {
-	path := "/proc/" + strconv.Itoa(pid) + "/pagemap"
-	pageMap, err := os.OpenFile(path, os.O_RDONLY, 0)
+func procReadInt(path string) (int, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	if len(data) == 0 {
+		return 0, fmt.Errorf("read empty string, expected int from %q", path)
+	}
+	n, err := strconv.Atoi(string(data[:len(data)-1]))
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+func ProcKpageflagsOpen() (*procKpageflagsFile, error) {
+	path := "/proc/kpageflags"
+	osFile, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
-	return pageMap, nil
+	return &procKpageflagsFile{osFile}, nil
 }
 
-// pagemapPos is the file position of the pagemap file.
-var pagemapPos int64 = 0
+// ReadFlags returns 64-bit set of flags from /proc/kpageflags
+// for a page indexed by page frame number (PFN).
+func (f *procKpageflagsFile) ReadFlags(pfn uint64) (uint64, error) {
+	if _, err := f.osFile.Seek(int64(pfn*8), io.SeekStart); err != nil {
+		return 0, err
+	}
+	readBuf := make([]byte, 8)
+	nbytes, err := io.ReadAtLeast(f.osFile, readBuf, 8)
+	if err != nil {
+		return 0, err
+	}
+	if nbytes != 8 {
+		return 0, fmt.Errorf("reading 8 bytes from kpageflags failed, got %d bytes", nbytes)
+	}
+	flags := binary.LittleEndian.Uint64(readBuf)
+	return flags, nil
+}
 
-// procPagemapCb calls cb with page address for every matching page in
-// the address range.
-// If cb returns 0, procPagemapCb continues otherwise returns.
-// If skipRead returns true, skip reading and directly seek to next set of pages.
-func procPagemapCb(pageMap *os.File, addressRanges []AddrRange, pageAttributes uint64, cb func(uint64) int, skipRead func(uint64) bool) error {
-	pageMustBePresent := (pageAttributes&PagePresent == PagePresent)
-	pageMustBeExclusive := (pageAttributes&PageExclusive == PageExclusive)
-	pageMustBeDirty := (pageAttributes&PageDirty == PageDirty)
-	pageMustNotBeDirty := (pageAttributes&PageNotDirty == PageNotDirty)
-	softDirtyBit := uint64(0x1) << 55
-	exclusiveBit := uint64(0x1) << 56
-	presentBit := uint64(0x1) << 63
+func (f *procKpageflagsFile) Close() {
+	f.osFile.Close()
+}
+
+// ProcPageIdleBitmapOpen returns opened page_idle/bitmap file
+func ProcPageIdleBitmapOpen() (*procPageIdleBitmapFile, error) {
+	path := "/sys/kernel/mm/page_idle/bitmap"
+	osFile, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &procPageIdleBitmapFile{osFile}, nil
+}
+
+func (f *procPageIdleBitmapFile) Close() {
+	f.osFile.Close()
+	f.osFile = nil
+}
+
+func (f *procPageIdleBitmapFile) SetIdle(pfn uint64) error {
+	bits, err := f.ReadBits(pfn)
+	if err != nil {
+		return err
+	}
+	pfnBitOffset := pfn % 64
+	idleMask := uint64(0x1) << pfnBitOffset
+	f.WriteBits(pfn, bits|idleMask)
+	return nil
+}
+
+func (f *procPageIdleBitmapFile) WriteBits(pfn uint64, bits uint64) error {
+	pfnFileOffset := int64(pfn) / 64 * 8
+	if _, err := f.osFile.Seek(pfnFileOffset, io.SeekStart); err != nil {
+		return err
+	}
+
+	writeBuf := make([]byte, 8)
+	binary.LittleEndian.PutUint64(writeBuf, bits)
+	n, err := f.osFile.Write(writeBuf)
+	if err != nil {
+		return err
+	}
+	if n != 8 {
+		return fmt.Errorf("wrote %d instead of 8 bytes", n)
+	}
+	return nil
+}
+
+func (f *procPageIdleBitmapFile) ReadBits(pfn uint64) (uint64, error) {
+	pfnFileOffset := int64(pfn) / 64 * 8
+	if _, err := f.osFile.Seek(pfnFileOffset, io.SeekStart); err != nil {
+		return 0, err
+	}
+
+	readBuf := make([]byte, 8)
+	n, err := io.ReadAtLeast(f.osFile, readBuf, 8)
+	if err != nil {
+		return 0, err
+	}
+	if n != 8 {
+		return 0, fmt.Errorf("read %d instead of 8 bytes", n)
+	}
+
+	bits := binary.LittleEndian.Uint64(readBuf)
+	return bits, nil
+}
+
+func (f *procPageIdleBitmapFile) GetIdle(pfn uint64) (bool, error) {
+	pfnBitOffset := pfn % 64
+	bits, err := f.ReadBits(pfn)
+	if err != nil {
+		return false, err
+	}
+	pfnBitMask := (uint64(0x1) << pfnBitOffset)
+	return (bits & pfnBitMask) != 0, nil
+}
+
+// ProcPagemapOpen returns opened pagemap file for a process
+func ProcPagemapOpen(pid int) (*procPagemapFile, error) {
+	path := "/proc/" + strconv.Itoa(pid) + "/pagemap"
+	osFile, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &procPagemapFile{osFile, 0}, nil
+}
+
+func (f *procPagemapFile) Close() {
+	if f.osFile != nil {
+		f.osFile.Close()
+		f.osFile = nil
+	}
+}
+
+// ForEachPage calls handlePage with pagemap bytes and page's address for
+// every matching page in the address range.
+//
+// Parameters:
+// - addressRanges includes the address ranges from which pages
+//   are searched from.
+// - pageAttributes defines attributes that found pages must or must
+//   not have. Value 0 matches all pages.
+// - handlePage(pagemapBits, pageAddr) is called for
+//   matching pages. It returns an integer:
+//       0 (continue): ForEachPage continues reading the next page attributes.
+//       -1 (break):   ForEachPage returns immediately.
+//       n > 0 (skip): ForEachPage will skip reading next n pages.
+func (f *procPagemapFile) ForEachPage(addressRanges []AddrRange, pageAttributes uint64, handlePage func(uint64, uint64) int) error {
+	// Filter pages based on pagemap bits without calling handlePage.
+	// TODO: this is not complete!
+	pageMustBePresent := (pageAttributes&PMPresentSet == PMPresentSet)
+	pageMustBeExclusive := (pageAttributes&PMExclusiveSet == PMExclusiveSet)
+	pageMustBeDirty := (pageAttributes&PMDirtySet == PMDirtySet)
+	pageMustNotBeDirty := (pageAttributes&PMDirtyCleared == PMDirtyCleared)
 
 	for _, addressRange := range addressRanges {
-		// Seek to pagemapOffset only on demand. This avoids
-		// unnecessary seeks in case of probabilistic/sampling
-		// read in skipRead().
 		pagemapOffset := int64(addressRange.addr / uint64(constPagesize) * 8)
 		// read /proc/pid/pagemap in the chunks of len(readBuf).
 		// The length of readBuf must be divisible by 16.
@@ -74,60 +292,65 @@ func procPagemapCb(pageMap *os.File, addressRanges []AddrRange, pageAttributes u
 		// (1k buffer performed better than 512B or 4k).
 		readBuf := make([]byte, 16*64)
 		readData := readBuf[0:0] // valid data in readBuf
-		for i := uint64(0); i < addressRange.length; i++ {
+		for pageIndex := uint64(0); pageIndex < addressRange.length; pageIndex++ {
 			if len(readData) == 0 {
-				if skipRead != nil && skipRead(addressRange.addr+i*uint64(constPagesize)) {
-					pagemapOffset += int64(len(readBuf))
-					continue
-				}
 				// Seek if not already in the correct position.
-				if pagemapPos != pagemapOffset {
-					_, err := pageMap.Seek(pagemapOffset, io.SeekStart)
+				if f.pos != pagemapOffset {
+					_, err := f.osFile.Seek(pagemapOffset, io.SeekStart)
 					if err != nil {
 						// Maybe there was a race condition and the maps changed?
 						break
 					}
-					pagemapPos = pagemapOffset
+					f.pos = pagemapOffset
 				}
 
 				// Read from the correct position.
-				unreadByteCount := 8 * int(addressRange.length-i)
+				unreadByteCount := 8 * int(addressRange.length-pageIndex)
 				fillBufUpTo := cap(readBuf)
 				if fillBufUpTo > unreadByteCount {
 					fillBufUpTo = unreadByteCount
 				}
-				n, err := io.ReadAtLeast(pageMap, readBuf, fillBufUpTo)
+				nbytes, err := io.ReadAtLeast(f.osFile, readBuf, fillBufUpTo)
 				if err != nil {
 					// cannot read address range
 					continue
 				}
-				pagemapPos += int64(n)
-				pagemapOffset += int64(n)
+				f.pos += int64(nbytes)
+				pagemapOffset += int64(nbytes)
 				readData = readBuf[:fillBufUpTo]
 			}
 			bytes := readData[:8]
 			readData = readData[8:]
-			data := binary.LittleEndian.Uint64(bytes)
+			pagemapBits := binary.LittleEndian.Uint64(bytes)
 
-			// Check that the page is present (not swapped), exclusively
-			// mapped (not used by any other process), and it has the
-			// soft-dirty bit off.
-
-			// Note: there appears to be no way to see from the pagemap entry what the NUMA node is.
-			// We could map this back to the physical address ranges if needed. Currently this is handled
-			// in movePages() by calling move_pages() first with an empty node array.
-
-			present := (data&presentBit == presentBit)
-			exclusive := (data&exclusiveBit == exclusiveBit)
-			softDirty := (data&softDirtyBit == softDirtyBit)
+			present := (pagemapBits&PM_PRESENT == PM_PRESENT)
+			exclusive := (pagemapBits&PM_MMAP_EXCLUSIVE == PM_MMAP_EXCLUSIVE)
+			softDirty := (pagemapBits&PM_SOFT_DIRTY == PM_SOFT_DIRTY)
 
 			if (!pageMustBePresent || present) &&
 				(!pageMustBeExclusive || exclusive) &&
 				(!pageMustBeDirty || softDirty) &&
 				(!pageMustNotBeDirty || !softDirty) {
-				if cb(addressRange.addr+i*uint64(constPagesize)) != 0 {
+				n := handlePage(pagemapBits, addressRange.addr+pageIndex*uint64(constPagesize))
+				switch {
+				case n == 0:
+					continue
+				case n == -1:
 					return nil
+				case n > 0:
+					// Skip next n pages
+					pageIndex += uint64(n)
+					pagemapOffset += int64(n * 8)
+					// Consume read buffer
+					if len(readData) < n*8 {
+						readData = readData[n*8:]
+					} else {
+						readData = readData[0:0]
+					}
+				default:
+					return fmt.Errorf("page handler callback returned invalid value: %d\n", n)
 				}
+
 			}
 		}
 	}

@@ -32,26 +32,26 @@ func exit(format string, a ...interface{}) {
 
 func parseOptPages(pagesStr string) (uint64, error) {
 	if pagesStr == "" {
-		return (memtier.PagePresent |
-			memtier.PageExclusive |
-			memtier.PageDirty), nil
+		return (memtier.PMPresentSet |
+			memtier.PMExclusiveSet |
+			memtier.PMDirtySet), nil
 	}
 	var pageAttributes uint64 = 0
 	for _, pageAttrStr := range strings.Split(pagesStr, ",") {
 		switch pageAttrStr {
 		case "Present":
-			pageAttributes |= memtier.PagePresent
+			pageAttributes |= memtier.PMPresentSet
 		case "Exclusive":
-			pageAttributes |= memtier.PageExclusive
+			pageAttributes |= memtier.PMExclusiveSet
 		case "Dirty":
-			pageAttributes |= memtier.PageDirty
+			pageAttributes |= memtier.PMDirtySet
 		case "NotDirty":
-			pageAttributes |= memtier.PageNotDirty
+			pageAttributes |= memtier.PMDirtyCleared
 		default:
 			return 0, fmt.Errorf("invalid -page: %q", pageAttrStr)
 		}
-		if pageAttributes&memtier.PageDirty == memtier.PageDirty &&
-			pageAttributes&memtier.PageNotDirty == memtier.PageNotDirty {
+		if pageAttributes&memtier.PMDirtySet == memtier.PMDirtySet &&
+			pageAttributes&memtier.PMDirtyCleared == memtier.PMDirtyCleared {
 			return 0, fmt.Errorf("contradicting page requirements: Dirty,NotDirty")
 		}
 	}
@@ -62,13 +62,18 @@ func parseOptRanges(rangeStr string) []memtier.AddrRange {
 	addrRanges := []memtier.AddrRange{}
 	for _, startStopStr := range strings.Split(rangeStr, ",") {
 		startStopSlice := strings.Split(startStopStr, "-")
-		if len(startStopSlice) != 2 {
+		if len(startStopSlice) != 1 && len(startStopSlice) != 2 {
 			exit("invalid addresss range %q, expected STARTADDR-STOPADDR", startStopStr)
 		}
 		startAddr, err := strconv.ParseUint(startStopSlice[0], 16, 64)
 		if err != nil {
 			exit("invalid start address %q", startStopSlice[0])
 		}
+		if len(startStopSlice) == 1 {
+			addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, startAddr+uint64(os.Getpagesize())))
+			continue
+		}
+
 		stopAddr, err := strconv.ParseUint(startStopSlice[1], 16, 64)
 		if err != nil {
 			exit("invalid stop address %q", startStopSlice[1])
@@ -133,7 +138,7 @@ func main() {
 	fmt.Printf("using %d address ranges\n", len(ar.Ranges()))
 
 	// Find pages with wanted attributes from the address ranges
-	pgs, err := ar.PagesMatching(pageAttributes, nil)
+	pgs, err := ar.PagesMatching(pageAttributes)
 	fmt.Printf("found total %d pages\n", len(pgs.Pages()))
 	if *optMover == "" {
 		fmt.Printf("missing --mover, doing nothing\n")

@@ -19,11 +19,17 @@ import (
 )
 
 const (
-	// pageAttributes
-	PagePresent uint64 = 1 << iota
-	PageExclusive
-	PageDirty
-	PageNotDirty
+	// Requirements for pagemap bits
+	PMPresentSet uint64 = 1 << iota
+	PMPresentCleared
+	PMExclusiveSet
+	PMExclusiveCleared
+	PMFileSet
+	PMFileCleared
+	PMSwapSet
+	PMSwapCleared
+	PMDirtySet
+	PMDirtyCleared
 
 	// addressRangeAttributes
 	RangeIsAnonymous = 1 << iota

@@ -172,8 +172,14 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 func (p *Prompt) cmdPages(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	attrs := p.f.String("attrs", "", "include only <Exclusive,Dirty,NotDirty,InHeap,InAnonymous> pages")
-	ranges := p.f.String("ranges", "", "-ranges=START-STOP[,START-STOP...] include only given ranges")
+	ranges := p.f.String("ranges", "", "-ranges=START[-STOP][,START[-STOP]...] include only given ranges")
 	fromNode := p.f.Int("node", -1, "include only pages currently on NODE")
+	pr := p.f.Int("pr", -1, "-pr=NUM: print first NUM address ranges")
+	pm := p.f.Int("pm", -1, "-pm=NUM: print pagemap bits and PFNs of first NUM pages in selected ranges")
+	pk := p.f.Int("pk", -1, "-pk=PFN: print kpageflags of a page")
+	pi := p.f.Int("pi", -1, "-pi=PFN: print idle bit from /sys/kernel/mm/page_idle/bitmap")
+	si := p.f.Int("si", -1, "-si=PFN: set idle bit of a page")
+
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
@@ -190,12 +196,106 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 		}
 		return csOk
 	}
+	if *pi > -1 || *si > -1 {
+		bmFile, err := memtier.ProcPageIdleBitmapOpen()
+		if err != nil {
+			p.output("failed to open idle bitmap: %s\n", err)
+			return csOk
+		}
+		defer bmFile.Close()
+		if *pi > -1 {
+			isIdle, err := bmFile.GetIdle(uint64(*pi))
+			if err != nil {
+				p.output("failed to read idle bit: %s\n", err)
+				return csOk
+			}
+			p.output("PFN %d idle: %v\n", *pi, isIdle)
+		}
+		if *si > -1 {
+			err := bmFile.SetIdle(uint64(*si))
+			if err != nil {
+				p.output("failed to set idle bit: %s\n", err)
+				return csOk
+			}
+		}
+		return csOk
+	}
+
+	if *pk > -1 {
+		kpFile, err := memtier.ProcKpageflagsOpen()
+		if err != nil {
+			p.output("opening kpageflags failed: %w\n", err)
+			return csOk
+		}
+		flags, err := kpFile.ReadFlags(uint64(*pk))
+		if err != nil {
+			p.output("reading flags of PFN %d from kpageflags failed: %w\n", *pk, err)
+			return csOk
+		}
+		p.output(`LOCKED        %d
+ERROR         %d
+REFERENCED    %d
+UPTODATE      %d
+DIRTY         %d
+LRU           %d
+ACTIVE        %d
+SLAB          %d
+WRITEBACK     %d
+RECLAIM       %d
+BUDDY         %d
+MMAP          %d
+ANON          %d
+SWAPCACHE     %d
+SWAPBACKED    %d
+COMPOUND_HEAD %d
+COMPOUND_TAIL %d
+HUGE          %d
+UNEVICTABLE   %d
+HWPOISON      %d
+NOPAGE        %d
+KSM           %d
+THP           %d
+OFFLINE       %d
+ZERO_PAGE     %d
+IDLE          %d
+PGTABLE       %d
+`,
+			(flags>>memtier.KPFB_LOCKED)&1,
+			(flags>>memtier.KPFB_ERROR)&1,
+			(flags>>memtier.KPFB_REFERENCED)&1,
+			(flags>>memtier.KPFB_UPTODATE)&1,
+			(flags>>memtier.KPFB_DIRTY)&1,
+			(flags>>memtier.KPFB_LRU)&1,
+			(flags>>memtier.KPFB_ACTIVE)&1,
+			(flags>>memtier.KPFB_SLAB)&1,
+			(flags>>memtier.KPFB_WRITEBACK)&1,
+			(flags>>memtier.KPFB_RECLAIM)&1,
+			(flags>>memtier.KPFB_BUDDY)&1,
+			(flags>>memtier.KPFB_MMAP)&1,
+			(flags>>memtier.KPFB_ANON)&1,
+			(flags>>memtier.KPFB_SWAPCACHE)&1,
+			(flags>>memtier.KPFB_SWAPBACKED)&1,
+			(flags>>memtier.KPFB_COMPOUND_HEAD)&1,
+			(flags>>memtier.KPFB_COMPOUND_TAIL)&1,
+			(flags>>memtier.KPFB_HUGE)&1,
+			(flags>>memtier.KPFB_UNEVICTABLE)&1,
+			(flags>>memtier.KPFB_HWPOISON)&1,
+			(flags>>memtier.KPFB_NOPAGE)&1,
+			(flags>>memtier.KPFB_KSM)&1,
+			(flags>>memtier.KPFB_THP)&1,
+			(flags>>memtier.KPFB_OFFLINE)&1,
+			(flags>>memtier.KPFB_ZERO_PAGE)&1,
+			(flags>>memtier.KPFB_IDLE)&1,
+			(flags>>memtier.KPFB_PGTABLE)&1)
+
+		return csOk
+	}
 	// there are arguments, select new set of pages
 	if *pid <= 0 {
 		p.output("missing -pid=PID\n")
 		return csOk
 	}
-	p.output("selecting pages of pid %d\n", *pid)
+	p.output("searching for address ranges of pid %d\n", *pid)
 	process := memtier.NewProcess(*pid)
 	ar, err := process.AddressRanges()
 	if err != nil {
@@ -219,14 +319,51 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 		p.output("no address ranges from which to find pages\n")
 		return csOk
 	}
+	if *pm != -1 {
+		pmFile, err := memtier.ProcPagemapOpen(*pid)
+		if err != nil {
+			p.output("%w", err)
+			return csOk
+		}
+		defer pmFile.Close()
+		printed := 0
+		p.output("bits: softdirty, exclusive, uffd_wp, file, swap, present\n")
+		pmFile.ForEachPage(ar.Ranges(), 0,
+			func(pmBits, pageAddr uint64) int {
+				p.output("%x: bits: %d%d%d%d%d%d pfn: %d\n",
+					pageAddr,
+					(pmBits>>memtier.PMB_SOFT_DIRTY)&1,
+					(pmBits>>memtier.PMB_MMAP_EXCLUSIVE)&1,
+					(pmBits>>memtier.PMB_UFFD_WP)&1,
+					(pmBits>>memtier.PMB_FILE)&1,
+					(pmBits>>memtier.PMB_SWAP)&1,
+					(pmBits>>memtier.PMB_PRESENT)&1,
+					pmBits&memtier.PM_PFN)
+				printed += 1
+				if printed >= *pm {
+					return -1
+				}
+				return 0
+			})
+		return csOk
+	}
 	p.aranges = ar
 	p.output("aranges = <%d address ranges of pid %d>\n", len(ar.Ranges()), ar.Pid())
+	if *pr > -1 {
+		for n, r := range p.aranges.Ranges() {
+			if n >= *pr {
+				break
+			}
+			p.output("%s\n", r)
+		}
+		return csOk
+	}
 	pageAttributes, err := parseOptPages(*attrs)
 	if err != nil {
 		p.output("invalid -attrs: %v\n", err)
 		return csOk
 	}
-	pp, err := ar.PagesMatching(pageAttributes, nil)
+	pp, err := ar.PagesMatching(pageAttributes)
 	if err != nil {
 		p.output("finding pages from address ranges failed: %v\n", err)
 	}
@@ -304,6 +441,7 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 	ls := p.f.Bool("ls", false, "list available memory trackers")
 	create := p.f.String("create", "", "create new tracker NAME")
 	config := p.f.String("config", "", "configure tracker with JSON string")
+	configDump := p.f.Bool("config-dump", false, "dump current configuration")
 	start := p.f.String("start", "", "start tracking PID[,PID...]")
 	reset := p.f.Bool("reset", false, "reset page access counters")
 	stop := p.f.Bool("stop", false, "stop tracker")
@@ -356,6 +494,9 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 			return csOk
 		}
 		p.output("tracker started\n")
+	}
+	if *configDump {
+		p.output("%s\n", p.tracker.GetConfigJson())
 	}
 	if *counters {
 		tcs := p.tracker.GetCounters()

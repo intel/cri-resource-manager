@@ -24,74 +24,83 @@ import (
 	"time"
 )
 
-var aba [][]byte = [][]byte{} // array of byte arrays
+var ab [][]byte = [][]byte{} // array of byte arrays
 
-var baValue byte = 0
+var bValue byte = 0
 
-func baWriter(ba []byte, count int, interval int) {
+func bWriter(b []byte, count int, interval int) {
+	if count > len(b) {
+		count = len(b)
+	}
 	for {
 		if interval > 0 {
 			time.Sleep(time.Duration(interval) * time.Microsecond)
 		}
 		for i := 0; i < count; i++ {
-			ba[i] = baValue
+			b[i] = bValue
 		}
 	}
 }
 
-func baReader(ba []byte, count int, interval int) {
+func bReader(b []byte, count int, interval int) {
+	if count > len(b) {
+		count = len(b)
+	}
 	for {
 		if interval > 0 {
 			time.Sleep(time.Duration(interval) * time.Microsecond)
 		}
-		for i := 0; i < 0; i++ {
-			baValue += ba[i]
+		for i := 0; i < count; i++ {
+			bValue += b[i]
 		}
 	}
 }
 
-func baAddrRange(ba []byte, count int) string {
-	return fmt.Sprintf("%x - %x (%d bytes)",
-		&ba[0], &ba[count-1], count)
+func bAddrRange(b []byte, count int) string {
+	if count > len(b) {
+		count = len(b)
+	}
+	return fmt.Sprintf("%x-%x (%d bytes)",
+		&b[0], &b[count-1], count)
 }
 
 func main() {
 	fmt.Printf("memory exerciser\npid: %d\n", os.Getpid())
-	optBACount := flag.Int("bac", 1, "number of byte arrays")
-	optBASize := flag.Int("bas", 1024*1024, "size of each byte array [kB]")
-	optBAReaderCount := flag.Int("barc", 1, "number of byte arrays to be read")
-	optBAWriterCount := flag.Int("bawc", 1, "number of byte arrays to be written")
-	optBAReadSize := flag.Int("bars", 1024*1024, "size of read on each byte array [kB]")
-	optBAWriteSize := flag.Int("baws", 1024*1024, "size of write on each byte array [kB]")
-	optBAReadOffset := flag.Int("baro", 0, "offset of read on each byte array [kB]")
-	optBAWriteOffset := flag.Int("bawo", 0, "offset of read on each byte array [kB]")
-	optBAReadInterval := flag.Int("bari", 0, "read interval on each byte array [us]")
-	optBAWriteInterval := flag.Int("bawi", 0, "write interval on each byte array [us]")
+	optBCount := flag.Int("bc", 1, "number of byte arrays")
+	optBSize := flag.Int("bs", 1024*1024, "size of each byte array [kB]")
+	optBReaderCount := flag.Int("brc", 1, "number of byte arrays to be read")
+	optBWriterCount := flag.Int("bwc", 1, "number of byte arrays to be written")
+	optBReadSize := flag.Int("brs", 1024*1024, "size of read on each byte array [kB]")
+	optBWriteSize := flag.Int("bws", 1024*1024, "size of write on each byte array [kB]")
+	optBReadOffset := flag.Int("bro", 0, "offset of read on each byte array [kB]")
+	optBWriteOffset := flag.Int("bwo", 0, "offset of read on each byte array [kB]")
+	optBReadInterval := flag.Int("bri", 0, "read interval on each byte array [us]")
+	optBWriteInterval := flag.Int("bwi", 0, "write interval on each byte array [us]")
 	flag.Parse()
 
 	// create byte arrays
-	fmt.Printf("creating %d byte arrays\n", *optBACount)
-	for i := 0; i < *optBACount; i++ {
-		aba = append(aba, make([]byte, *optBASize*1024))
-		for j := 0; j < *optBASize*1024; j++ {
-			aba[i][j] = 0x01
+	fmt.Printf("creating %d byte arrays\n", *optBCount)
+	for i := 0; i < *optBCount; i++ {
+		ab = append(ab, make([]byte, *optBSize*1024))
+		for j := 0; j < *optBSize*1024; j++ {
+			ab[i][j] = 0x01
 		}
-		fmt.Printf("    array %d: %s\n", i, baAddrRange(aba[i], *optBASize*1024))
+		fmt.Printf("    array %d: %s\n", i, bAddrRange(ab[i], *optBSize*1024))
 	}
 
 	// create readers
 	fmt.Printf("creating memory readers and writers\n")
-	for i := 0; i < *optBAReaderCount; i++ {
-		go baReader(aba[i][*optBAReadOffset*1024:], *optBAReadSize*1024, *optBAReadInterval)
+	for i := 0; i < *optBReaderCount; i++ {
+		go bReader(ab[i][*optBReadOffset*1024:], *optBReadSize*1024, *optBReadInterval)
 		fmt.Printf("    reader %d: %s\n", i,
-			baAddrRange(aba[i][(*optBAReadOffset)*1024:], (*optBAReadSize)*1024))
+			bAddrRange(ab[i][(*optBReadOffset)*1024:], (*optBReadSize)*1024))
 	}
 
 	// create writers
-	for i := 0; i < *optBAWriterCount; i++ {
-		go baWriter(aba[i][*optBAWriteOffset*1024:], *optBAWriteSize*1024, *optBAWriteInterval)
+	for i := 0; i < *optBWriterCount; i++ {
+		go bWriter(ab[i][*optBWriteOffset*1024:], *optBWriteSize*1024, *optBWriteInterval)
 		fmt.Printf("    writer %d: %s\n", i,
-			baAddrRange(aba[i][(*optBAWriteOffset)*1024:], (*optBAWriteSize)*1024))
+			bAddrRange(ab[i][(*optBWriteOffset)*1024:], (*optBWriteSize)*1024))
 	}
 
 	// wait

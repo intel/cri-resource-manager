@@ -96,6 +96,16 @@ func (t *TrackerDamon) SetConfigJson(configJson string) error {
 	return nil
 }
 
+func (t *TrackerDamon) GetConfigJson() string {
+	if t.config == nil {
+		return ""
+	}
+	if configStr, err := json.Marshal(t.config); err == nil {
+		return string(configStr)
+	}
+	return ""
+}
+
 func (t *TrackerDamon) AddPids(pids []int) {
 	for _, pid := range pids {
 		t.pids = append(t.pids, pid)

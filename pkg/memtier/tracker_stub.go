@@ -29,6 +29,10 @@ func (t *TrackerStub) SetConfigJson(configJson string) error {
 	return nil
 }
 
+func (t *TrackerStub) GetConfigJson() string {
+	return ""
+}
+
 func (t *TrackerStub) AddPids(pids []int) {
 }
 

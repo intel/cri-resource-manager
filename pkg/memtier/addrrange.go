@@ -16,7 +16,6 @@ package memtier
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -100,48 +99,30 @@ func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
 }
 
 func (r AddrRange) String() string {
-	return fmt.Sprintf("%x-%x(%d)", r.addr, r.addr+(r.length*uint64(constPagesize)), r.length*uint64(constPagesize))
+	return fmt.Sprintf("%x-%x (%d bytes)", r.addr, r.addr+(r.length*uint64(constPagesize)), r.length*uint64(constPagesize))
 }
 
 // PagesMatching returns pages with pagetable attributes.
-func (ar *AddrRanges) PagesMatching(pageAttributes uint64, pageMap *os.File) (*Pages, error) {
-	if pageMap == nil {
-		pageMap, err := procPagemapOpen(ar.pid)
-		if err != nil {
-			return nil, err
-		}
-		defer pageMap.Close()
-	}
-	pp := &Pages{pid: ar.pid, pages: []Page{}}
-	err := procPagemapCb(pageMap, ar.Ranges(), pageAttributes,
-		func(addr uint64) int {
-			pp.pages = append(pp.pages, Page{addr: addr})
-			return 0
-		},
-		nil)
+func (ar *AddrRanges) PagesMatching(pageAttributes uint64) (*Pages, error) {
+	pmFile, err := ProcPagemapOpen(ar.pid)
 	if err != nil {
 		return nil, err
 	}
-	return pp, nil
-}
+	defer pmFile.Close()
 
-// PageCountMatching returns number of pages matching pagetable attributes.
-func (ar *AddrRanges) PageCountMatching(pageAttributes uint64, pageMap *os.File, skipRead func(uint64) bool) (uint64, error) {
-	if pageMap == nil {
-		pageMap, err := procPagemapOpen(ar.pid)
-		if err != nil {
-			return 0, err
-		}
-		defer pageMap.Close()
-	}
-	pageCount := uint64(0)
-	err := procPagemapCb(pageMap, ar.Ranges(), pageAttributes,
-		func(addr uint64) int {
-			pageCount += 1
+	pp := &Pages{pid: ar.pid, pages: []Page{}}
+
+	err = pmFile.ForEachPage(ar.Ranges(), pageAttributes,
+		func(pagemapBits, addr uint64) int {
+			pp.pages = append(pp.pages, Page{addr: addr})
 			return 0
-		},
-		skipRead)
-	return pageCount, err
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return pp, nil
 }
 
 func (ar *AddrRanges) Intersection(intRanges []AddrRange) {
@@ -159,7 +140,9 @@ func (ar *AddrRanges) Intersection(intRanges []AddrRange) {
 				if cutStop < stop {
 					stop = cutStop
 				}
-				newAddrs = append(newAddrs, *NewAddrRange(start, stop))
+				if stop-start > 0 {
+					newAddrs = append(newAddrs, *NewAddrRange(start, stop))
+				}
 			}
 		}
 	}

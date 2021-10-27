@@ -12,24 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The soft dirty tracker is capable of detecting memory writes.
-// https://www.kernel.org/doc/Documentation/vm/soft-dirty.txt
+// The idle page tracker uses /sys/kernel/mm/page_idle/bitmap
 
 package memtier
 
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 )
 
-type TrackerSoftDirtyConfig struct {
-	TrackReferenced bool   // Track /proc/kpageflags PKF_REFERENCED bit.
-	TrackSoftDirty  bool   // Track /proc/PID/pagemap PM_SOFT_DIRTY bit.
-	PagesInRegion   uint64 // size of a memory region in the
+type TrackerIdlePageConfig struct {
+	PagesInRegion uint64 // size of a memory region in the
 	// number of pages.
 	MaxCountPerRegion uint64 // 0: unlimited, increase counters by
 	// number of pages with tracked bits in
@@ -38,51 +33,46 @@ type TrackerSoftDirtyConfig struct {
 	// pages in the region.
 	AggregationUs   uint64 // interval in microseconds
 	RegionsUpdateUs uint64 // interval in microseconds
-	SkipPageProb    int    // Sampling premilles: 0: read all
-	// pages, 1000: skip next page with
-	// probability 1.0.
 }
 
-// TODO: Referenced tracking does not work properly.
-// TODO: if PFNs are tracked, refuse to start or disable if enabled
-// /proc/sys/kernel/numa_balancing
-const trackerSoftDirtyDefaults string = `{"AggregationUs":1000000,"PagesInRegion":512,"SkipPageProb":0,"TrackReferenced":false,"TrackSoftDirty":true,"MaxCountPerRegion":1}`
+const trackerIdlePageDefaults string = `{"AggregationUs":1000000,"PagesInRegion":512,"MaxCountPerRegion":1}`
 
-type accessCounter struct {
-	a uint64 // number of times pages getting accessed
-	w uint64 // number of times pages getting written
-}
-
-type TrackerSoftDirty struct {
+type TrackerIdlePage struct {
 	mutex   sync.Mutex
-	config  *TrackerSoftDirtyConfig
+	config  *TrackerIdlePageConfig
 	regions map[int][]*AddrRanges
-	// accesses maps pid -> startAddr -> lengthPages -> num of access & writes
+	pmAttrs uint64 // only pages with these pagemap attribute
+	// requirements are handled accesses maps pid
+	// -> startAddr -> lengthPages -> num of
+	// accesses
 	accesses  map[int]map[uint64]map[uint64]*accessCounter
 	toSampler chan byte
 }
 
 func init() {
-	TrackerRegister("softdirty", NewTrackerSoftDirty)
+	TrackerRegister("idlepage", NewTrackerIdlePage)
 }
 
-func NewTrackerSoftDirty() (Tracker, error) {
-	if !procFileExists("/proc/self/clear_refs") {
-		return nil, fmt.Errorf("no platform support: /proc/pid/clear_refs missing")
+func NewTrackerIdlePage() (Tracker, error) {
+	if bmFile, err := ProcPageIdleBitmapOpen(); err != nil {
+		return nil, fmt.Errorf("no idle page platform support: %s", err)
+	} else {
+		bmFile.Close()
 	}
-	t := &TrackerSoftDirty{
+	t := &TrackerIdlePage{
 		regions:  make(map[int][]*AddrRanges),
 		accesses: make(map[int]map[uint64]map[uint64]*accessCounter),
+		pmAttrs:  PMPresentSet | PMExclusiveSet,
 	}
-	err := t.SetConfigJson(trackerSoftDirtyDefaults)
+	err := t.SetConfigJson(trackerIdlePageDefaults)
 	if err != nil {
-		return nil, fmt.Errorf("invalid softdirty default configuration")
+		return nil, fmt.Errorf("invalid idlepage default configuration")
 	}
 	return t, nil
 }
 
-func (t *TrackerSoftDirty) SetConfigJson(configJson string) error {
-	config := TrackerSoftDirtyConfig{}
+func (t *TrackerIdlePage) SetConfigJson(configJson string) error {
+	config := TrackerIdlePageConfig{}
 	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
 		return err
 	}
@@ -90,7 +80,7 @@ func (t *TrackerSoftDirty) SetConfigJson(configJson string) error {
 	return nil
 }
 
-func (t *TrackerSoftDirty) GetConfigJson() string {
+func (t *TrackerIdlePage) GetConfigJson() string {
 	if t.config == nil {
 		return ""
 	}
@@ -100,7 +90,7 @@ func (t *TrackerSoftDirty) GetConfigJson() string {
 	return ""
 }
 
-func (t *TrackerSoftDirty) addRanges(ar *AddrRanges) {
+func (t *TrackerIdlePage) addRanges(ar *AddrRanges) {
 	pid := ar.Pid()
 	for _, r := range ar.Flatten() {
 		if regions, ok := t.regions[pid]; ok {
@@ -111,7 +101,7 @@ func (t *TrackerSoftDirty) addRanges(ar *AddrRanges) {
 	}
 }
 
-func (t *TrackerSoftDirty) AddPids(pids []int) {
+func (t *TrackerIdlePage) AddPids(pids []int) {
 	for _, pid := range pids {
 		p := NewProcess(pid)
 		if ar, err := p.AddressRanges(); err == nil {
@@ -124,7 +114,7 @@ func (t *TrackerSoftDirty) AddPids(pids []int) {
 	}
 }
 
-func (t *TrackerSoftDirty) RemovePids(pids []int) {
+func (t *TrackerIdlePage) RemovePids(pids []int) {
 	if pids == nil {
 		t.regions = make(map[int][]*AddrRanges, 0)
 		return
@@ -134,17 +124,17 @@ func (t *TrackerSoftDirty) RemovePids(pids []int) {
 	}
 }
 
-func (t *TrackerSoftDirty) removePid(pid int) {
+func (t *TrackerIdlePage) removePid(pid int) {
 	delete(t.regions, pid)
 }
 
-func (t *TrackerSoftDirty) ResetCounters() {
+func (t *TrackerIdlePage) ResetCounters() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.accesses = make(map[int]map[uint64]map[uint64]*accessCounter)
 }
 
-func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
+func (t *TrackerIdlePage) GetCounters() *TrackerCounters {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	tcs := &TrackerCounters{}
@@ -163,7 +153,7 @@ func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
 				tc := TrackerCounter{
 					Accesses: accessCounts.a,
 					Reads:    0,
-					Writes:   accessCounts.w,
+					Writes:   0,
 					AR:       &addrRange,
 				}
 				*tcs = append(*tcs, tc)
@@ -173,23 +163,26 @@ func (t *TrackerSoftDirty) GetCounters() *TrackerCounters {
 	return tcs
 }
 
-func (t *TrackerSoftDirty) Start() error {
+func (t *TrackerIdlePage) Start() error {
 	if t.toSampler != nil {
 		return fmt.Errorf("sampler already running")
 	}
+	if n, err := procReadInt("/proc/sys/kernel/numa_balancing"); err != nil || n != 0 {
+		return fmt.Errorf("/proc/sys/kernel/numa_balancing must be 0")
+	}
 	t.toSampler = make(chan byte, 1)
-	t.clearPageBits()
+	t.setIdleBits()
 	go t.sampler()
 	return nil
 }
 
-func (t *TrackerSoftDirty) Stop() {
+func (t *TrackerIdlePage) Stop() {
 	if t.toSampler != nil {
 		t.toSampler <- 0
 	}
 }
 
-func (t *TrackerSoftDirty) sampler() {
+func (t *TrackerIdlePage) sampler() {
 	ticker := time.NewTicker(time.Duration(t.config.AggregationUs) * time.Microsecond)
 	defer ticker.Stop()
 	for {
@@ -200,75 +193,57 @@ func (t *TrackerSoftDirty) sampler() {
 			return
 		case <-ticker.C:
 			t.countPages()
-			t.clearPageBits()
+			t.setIdleBits()
 		}
 	}
 }
 
-func (t *TrackerSoftDirty) countPages() {
+func (t *TrackerIdlePage) countPages() {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	pmAttrs := PMPresentSet | PMExclusiveSet
 
-	var kpfFile *procKpageflagsFile
-	var err error
-
-	trackSoftDirty := t.config.TrackSoftDirty
-	trackReferenced := t.config.TrackReferenced
 	maxCount := t.config.MaxCountPerRegion
-	skipPageProb := t.config.SkipPageProb
-
 	cntPagesAccessed := uint64(0)
-	cntPagesWritten := uint64(0)
 
-	if trackReferenced {
-		// Referenced bits are in /proc/kpageflags.
-		// Open the file already.
-		kpfFile, err = ProcKpageflagsOpen()
-		if err != nil {
-			return
-		}
-		defer kpfFile.Close()
+	// Referenced bits are in /proc/kpageflags.
+	// Open the file already.
+	kpfFile, err := ProcKpageflagsOpen()
+	if err != nil {
+		return
 	}
+	defer kpfFile.Close()
+
+	bmFile, err := ProcPageIdleBitmapOpen()
+	if err != nil {
+		return
+	}
+	defer bmFile.Close()
 
 	// pageHandler is called for all matching pages in the pagemap.
 	// It counts number of pages accessed and written in a region.
 	// The result is stored to cntPagesAccessed and cntPagesWritten.
 	pageHandler := func(pagemapBits uint64, pageAddr uint64) int {
-		if trackSoftDirty {
-			if pagemapBits&PM_SOFT_DIRTY == PM_SOFT_DIRTY {
-				cntPagesWritten += 1
-				if !trackReferenced {
-					cntPagesAccessed += 1
-				}
-			}
+		pfn := pagemapBits & PM_PFN
+		pageIdle, err := bmFile.GetIdle(pfn)
+		if err != nil {
+			return -1
 		}
-		if trackReferenced {
-			pfn := pagemapBits & PM_PFN
+		if !pageIdle {
 			flags, err := kpfFile.ReadFlags(pfn)
 			if err != nil {
 				return -1
 			}
-			if flags&KPF_REFERENCED == KPF_REFERENCED {
+			if ((flags>>KPFB_COMPOUND_HEAD)&1 == 0 &&
+				(flags>>KPFB_COMPOUND_TAIL)&1 == 0) ||
+				((flags>>KPFB_COMPOUND_HEAD)&1 == 1) {
+				// Compound tail pages never get idle bit,
+				// so read accesses only from idle bits of
+				// normal pages and heads of compound pages.
 				cntPagesAccessed += 1
 			}
 		}
-		// If we have exceeded the max count per region on the
-		// counters we are tracking, stop reading pages further.
-		if (!trackSoftDirty || cntPagesWritten > maxCount) &&
-			(!trackReferenced || cntPagesAccessed > maxCount) {
+		if cntPagesAccessed >= maxCount {
 			return -1
-		}
-		if skipPageProb > 0 {
-			// skip pages in sampling read
-			if skipPageProb >= 1000 {
-				return -1
-			}
-			n := 0
-			for rand.Intn(1000) < skipPageProb {
-				n += 1
-			}
-			return n
 		}
 		return 0
 	}
@@ -281,18 +256,14 @@ func (t *TrackerSoftDirty) countPages() {
 		}
 		for _, addrRanges := range allPidAddrRanges {
 			cntPagesAccessed = 0
-			cntPagesWritten = 0
 
-			err := pmFile.ForEachPage(addrRanges.Ranges(), pmAttrs, pageHandler)
+			err := pmFile.ForEachPage(addrRanges.Ranges(), t.pmAttrs, pageHandler)
 			if err != nil {
 				t.removePid(pid)
 				break
 			}
 			if cntPagesAccessed > maxCount {
 				cntPagesAccessed = maxCount
-			}
-			if cntPagesWritten > maxCount {
-				cntPagesWritten = maxCount
 			}
 			addrLenCounts, ok := t.accesses[pid]
 			if !ok {
@@ -312,28 +283,39 @@ func (t *TrackerSoftDirty) countPages() {
 				lenCounts[lengthPages] = counts
 			}
 			counts.a += cntPagesAccessed
-			counts.w += cntPagesWritten
 		}
 		pmFile.Close()
 	}
 }
 
-func (t *TrackerSoftDirty) clearPageBits() {
-	var err error
-	for pid := range t.regions {
-		pidString := strconv.Itoa(pid)
-		path := "/proc/" + pidString + "/clear_refs"
-		if t.config.TrackSoftDirty {
-			// fmt.Printf("4 -> clear_refs\n")
-			err = procWrite(path, []byte("4\n"))
+func (t *TrackerIdlePage) setIdleBits() {
+	bmFile, err := ProcPageIdleBitmapOpen()
+	if err != nil {
+		return
+	}
+	defer bmFile.Close()
+
+	pageHandler := func(pagemapBits uint64, pageAddr uint64) int {
+		pfn := pagemapBits & PM_PFN
+		if err := bmFile.SetIdle(pfn); err != nil {
+			return -1
 		}
-		if t.config.TrackReferenced && err == nil {
-			// fmt.Printf("1 -> clear_refs\n")
-			err = procWrite(path, []byte("1\n"))
-		}
+		return 0
+	}
+
+	for pid, allPidAddrRanges := range t.regions {
+		pmFile, err := ProcPagemapOpen(pid)
 		if err != nil {
-			// This process cannot be tracked anymore, remove it.
 			t.removePid(pid)
+			continue
 		}
+		for _, addrRanges := range allPidAddrRanges {
+			err := pmFile.ForEachPage(addrRanges.Ranges(), t.pmAttrs, pageHandler)
+			if err != nil {
+				t.removePid(pid)
+				break
+			}
+		}
+		pmFile.Close()
 	}
 }
