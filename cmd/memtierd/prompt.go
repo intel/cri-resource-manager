@@ -40,6 +40,7 @@ type Prompt struct {
 	pages   *memtier.Pages
 	aranges *memtier.AddrRanges
 	tracker memtier.Tracker
+	policy  memtier.Policy
 	cmds    map[string]Cmd
 	ps1     string
 	quit    bool
@@ -66,6 +67,7 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		"pages":   Cmd{"select pages, or print current pages", p.cmdPages},
 		"arange":  Cmd{"select/split/filter arange", p.cmdArange},
 		"mover":   Cmd{"move selected pages or manage mover", p.cmdMover},
+		"policy":  Cmd{"configure/start/stop policy", p.cmdPolicy},
 		"help":    Cmd{"print help", p.cmdHelp},
 	}
 	return &p
@@ -521,6 +523,57 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 	if *reset {
 		p.tracker.ResetCounters()
 		p.output("tracker counters reset\n")
+	}
+	return csOk
+}
+
+func (p *Prompt) cmdPolicy(args []string) commandStatus {
+	ls := p.f.Bool("ls", false, "list available policies")
+	create := p.f.String("create", "", "create new policy NAME")
+	config := p.f.String("config", "", "reconfigure policy with JSON string")
+	configDump := p.f.Bool("config-dump", false, "dump current config")
+	start := p.f.Bool("start", false, "start policy")
+	stop := p.f.Bool("stop", false, "stop policy")
+	if err := p.f.Parse(args); err != nil {
+		return csOk
+	}
+	if *ls {
+		p.output(strings.Join(memtier.PolicyList(), "\n") + "\n")
+		return csOk
+	}
+	if *create != "" {
+		policy, err := memtier.NewPolicy(*create)
+		if err != nil {
+			p.output("%s", err)
+			return csOk
+		}
+		p.policy = policy
+		p.output("policy created\n")
+	}
+	if p.policy == nil {
+		p.output("no policy, create one with -create NAME\n")
+		return csOk
+	}
+	if *config != "" {
+		err := p.policy.SetConfigJson(*config)
+		if err != nil {
+			p.output("config failed: %s\n", err)
+			return csOk
+		}
+	}
+	if *start {
+		err := p.policy.Start()
+		if err != nil {
+			p.output("start failed: %s\n", err)
+			return csOk
+		}
+	}
+	if *configDump {
+		p.output("%s\n", p.policy.GetConfigJson())
+	}
+	if *stop {
+		p.policy.Stop()
+		p.output("policy stopped\n")
 	}
 	return csOk
 }
