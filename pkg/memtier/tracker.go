@@ -30,6 +30,7 @@ type TrackerCounter struct {
 }
 
 type RangeHeat struct {
+	Pid   int
 	Range AddrRange
 	Heat  uint64
 }
@@ -80,8 +81,9 @@ func (tcs *TrackerCounters) SortByAccesses() {
 
 func (tcs *TrackerCounters) SortByAddr() {
 	sort.Slice(*tcs, func(i, j int) bool {
-		return (*tcs)[i].AR.Ranges()[0].Addr() < (*tcs)[j].AR.Ranges()[0].Addr() ||
-			(*tcs)[i].AR.Ranges()[0].Addr() == (*tcs)[j].AR.Ranges()[0].Addr() && (*tcs)[i].AR.Ranges()[0].Length() < (*tcs)[j].AR.Ranges()[0].Length()
+		return (*tcs)[i].AR.Pid() < (*tcs)[j].AR.Pid() ||
+			(*tcs)[i].AR.Pid() == (*tcs)[j].AR.Pid() && (*tcs)[i].AR.Ranges()[0].Addr() < (*tcs)[j].AR.Ranges()[0].Addr() ||
+			(*tcs)[i].AR.Pid() == (*tcs)[j].AR.Pid() && (*tcs)[i].AR.Ranges()[0].Addr() == (*tcs)[j].AR.Ranges()[0].Addr() && (*tcs)[i].AR.Ranges()[0].Length() < (*tcs)[j].AR.Ranges()[0].Length()
 	})
 }
 
@@ -92,6 +94,34 @@ func (tcs *TrackerCounters) String() string {
 			tc.Accesses, tc.Reads, tc.Writes, tc.AR))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (tcs *TrackerCounters) RegionsMerged() *TrackerCounters {
+	tcs.SortByAddr()
+	mergedTcs := &TrackerCounters{}
+	// TODO: this proto works currently only for disjoint tc.AR's
+	for _, tc := range *tcs {
+		if len(tc.AR.Ranges()) != 1 {
+			// TODO: this proto works only for single-range counters
+			return nil
+		}
+		r := tc.AR.Ranges()[0]
+		if len(*mergedTcs) > 0 {
+			prevTc := &(*mergedTcs)[len(*mergedTcs)-1]
+			if prevTc.AR.Pid() == tc.AR.Pid() &&
+				prevTc.AR.Ranges()[0].EndAddr() == r.Addr() {
+				prevTc.AR = &AddrRanges{
+					pid: prevTc.AR.Pid(),
+					addrs: []AddrRange{
+						*NewAddrRange(prevTc.AR.Ranges()[0].Addr(), r.EndAddr()),
+					},
+				}
+				continue
+			}
+		}
+		*mergedTcs = append(*mergedTcs, tc)
+	}
+	return mergedTcs
 }
 
 func (tcs *TrackerCounters) RangeHeat() []*RangeHeat {
@@ -114,7 +144,7 @@ func (tcs *TrackerCounters) RangeHeat() []*RangeHeat {
 				continue
 			}
 		}
-		rhs = append(rhs, &RangeHeat{r, heat})
+		rhs = append(rhs, &RangeHeat{tc.AR.Pid(), r, heat})
 	}
 	return rhs
 }

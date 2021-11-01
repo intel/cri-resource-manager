@@ -39,3 +39,11 @@ func (p *PolicyStub) Start() error {
 
 func (p *PolicyStub) Stop() {
 }
+
+func (p *PolicyStub) Mover() *Mover {
+	return nil
+}
+
+func (p *PolicyStub) Tracker() Tracker {
+	return nil
+}

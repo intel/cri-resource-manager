@@ -24,6 +24,9 @@ type Policy interface {
 	GetConfigJson() string      // Get current configuration.
 	Start() error
 	Stop()
+	// Mover and Tracker are mostly for debugging in interactive prompt...
+	Mover() *Mover
+	Tracker() Tracker
 }
 
 type PolicyCreator func() (Policy, error)

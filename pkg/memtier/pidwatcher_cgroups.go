@@ -72,7 +72,6 @@ func (w *CgroupPidWatcher) Stop() {
 func (w *CgroupPidWatcher) loop(singleshot bool) {
 	ticker := time.NewTicker(time.Duration(5) * time.Second)
 	defer ticker.Stop()
-	fmt.Printf("DELME: starting watch on cgroups\n")
 	for {
 		// Look for all pid files in the current cgroup hierarchy.
 		procPaths := map[string]setMemberType{}
@@ -112,7 +111,7 @@ func (w *CgroupPidWatcher) loop(singleshot bool) {
 			}
 		}
 
-		// If requested to stop, quit without informing listeners
+		// If requested to stop, quit without informing listeners.
 		if w.stop {
 			break
 		}
@@ -125,7 +124,7 @@ func (w *CgroupPidWatcher) loop(singleshot bool) {
 			w.listener.RemovePids(oldPids)
 		}
 
-		// If only one execution was requested, quit without waiting
+		// If only one execution was requested, quit without waiting.
 		if singleshot {
 			break
 		}
@@ -136,7 +135,6 @@ func (w *CgroupPidWatcher) loop(singleshot bool) {
 			continue
 		}
 	}
-	fmt.Printf("DELME: quitting watch on cgroups %q\n")
 }
 
 func readPids(path string) ([]int, error) {

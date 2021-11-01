@@ -561,6 +561,8 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 			return csOk
 		}
 	}
+	p.mover = p.policy.Mover()
+	p.tracker = p.policy.Tracker()
 	if *start {
 		err := p.policy.Start()
 		if err != nil {

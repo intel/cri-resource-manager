@@ -125,7 +125,10 @@ func (t *TrackerIdlePage) RemovePids(pids []int) {
 }
 
 func (t *TrackerIdlePage) removePid(pid int) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	delete(t.regions, pid)
+	delete(t.accesses, pid)
 }
 
 func (t *TrackerIdlePage) ResetCounters() {
