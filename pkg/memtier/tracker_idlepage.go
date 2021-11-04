@@ -31,11 +31,11 @@ type TrackerIdlePageConfig struct {
 	// whole region. 1: increase counters
 	// by at most 1 per tracked bits in
 	// pages in the region.
-	AggregationUs   uint64 // interval in microseconds
+	Interval        uint64 // interval in microseconds
 	RegionsUpdateUs uint64 // interval in microseconds
 }
 
-const trackerIdlePageDefaults string = `{"AggregationUs":1000000,"PagesInRegion":512,"MaxCountPerRegion":1}`
+const trackerIdlePageDefaults string = `{"Interval":5000000,"PagesInRegion":512,"MaxCountPerRegion":1}`
 
 type TrackerIdlePage struct {
 	mutex   sync.Mutex
@@ -186,7 +186,7 @@ func (t *TrackerIdlePage) Stop() {
 }
 
 func (t *TrackerIdlePage) sampler() {
-	ticker := time.NewTicker(time.Duration(t.config.AggregationUs) * time.Microsecond)
+	ticker := time.NewTicker(time.Duration(t.config.Interval) * time.Microsecond)
 	defer ticker.Stop()
 	for {
 		select {
@@ -215,12 +215,14 @@ func (t *TrackerIdlePage) countPages() {
 		return
 	}
 	defer kpfFile.Close()
+	kpfFile.SetReadahead(256)
 
 	bmFile, err := ProcPageIdleBitmapOpen()
 	if err != nil {
 		return
 	}
 	defer bmFile.Close()
+	bmFile.SetReadahead(8)
 
 	// pageHandler is called for all matching pages in the pagemap.
 	// It counts number of pages accessed and written in a region.
@@ -297,11 +299,20 @@ func (t *TrackerIdlePage) setIdleBits() {
 		return
 	}
 	defer bmFile.Close()
+	// Avoid making 1 seek + 1 write syscalls for each page that
+	// we mark idle by setting 64 pages idle on one round.
+	// alreadyIdle stores pages that have been already marked idle,
+	// so those can be skipped.
+	alreadyIdle := map[uint64]setMemberType{}
 
 	pageHandler := func(pagemapBits uint64, pageAddr uint64) int {
 		pfn := pagemapBits & PM_PFN
-		if err := bmFile.SetIdle(pfn); err != nil {
-			return -1
+		pfnFileOffset := pfn / 64 * 8
+		if _, ok := alreadyIdle[pfnFileOffset]; !ok {
+			if err := bmFile.SetIdleAll(pfn); err != nil {
+				return -1
+			}
+			alreadyIdle[pfnFileOffset] = setMember
 		}
 		return 0
 	}

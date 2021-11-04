@@ -84,6 +84,18 @@ func (m *Mover) SetConfig(config *MoverConfig) {
 	m.config = config
 }
 
+func (m *Mover) GetConfigJson() string {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if m.config == nil {
+		return ""
+	}
+	if configStr, err := json.Marshal(m.config); err == nil {
+		return string(configStr)
+	}
+	return ""
+}
+
 func (m *Mover) Start() error {
 	if m.config == nil {
 		if err := m.SetConfigJson(moverDefaults); err != nil {

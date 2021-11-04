@@ -116,6 +116,19 @@ func (p *PolicyAge) switchToTracker(newTracker Tracker) {
 }
 
 func (p *PolicyAge) GetConfigJson() string {
+	if p.config == nil {
+		return ""
+	}
+	pconfig := *p.config
+	if p.tracker != nil {
+		pconfig.TrackerConfig = p.tracker.GetConfigJson()
+	}
+	if p.mover != nil {
+		pconfig.MoverConfig = p.mover.GetConfigJson()
+	}
+	if configStr, err := json.Marshal(&pconfig); err == nil {
+		return string(configStr)
+	}
 	return ""
 }
 

@@ -106,11 +106,15 @@ type procPagemapFile struct {
 }
 
 type procKpageflagsFile struct {
-	osFile *os.File
+	osFile    *os.File
+	readahead int
+	readCache map[int64]uint64
 }
 
 type procPageIdleBitmapFile struct {
-	osFile *os.File
+	osFile    *os.File
+	readahead int
+	readCache map[int64]uint64
 }
 
 func procFileExists(path string) bool {
@@ -145,24 +149,47 @@ func ProcKpageflagsOpen() (*procKpageflagsFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &procKpageflagsFile{osFile}, nil
+	return &procKpageflagsFile{osFile, 0, nil}, nil
+}
+
+func (f *procKpageflagsFile) SetReadahead(pages int) {
+	f.readahead = pages
+	f.readCache = map[int64]uint64{}
 }
 
 // ReadFlags returns 64-bit set of flags from /proc/kpageflags
 // for a page indexed by page frame number (PFN).
 func (f *procKpageflagsFile) ReadFlags(pfn uint64) (uint64, error) {
-	if _, err := f.osFile.Seek(int64(pfn*8), io.SeekStart); err != nil {
+	kpfFileOffset := int64(pfn * 8)
+	if f.readCache != nil {
+		if flags, ok := f.readCache[kpfFileOffset]; ok {
+			return flags, nil
+		}
+	}
+	if _, err := f.osFile.Seek(kpfFileOffset, io.SeekStart); err != nil {
 		return 0, err
 	}
-	readBuf := make([]byte, 8)
-	nbytes, err := io.ReadAtLeast(f.osFile, readBuf, 8)
+	readBufSize := 8 * (f.readahead + 1)
+	readBuf := make([]byte, readBufSize)
+
+	nbytes, err := io.ReadAtLeast(f.osFile, readBuf, readBufSize)
 	if err != nil {
 		return 0, err
 	}
-	if nbytes != 8 {
-		return 0, fmt.Errorf("reading 8 bytes from kpageflags failed, got %d bytes", nbytes)
+	if nbytes != readBufSize {
+		return 0, fmt.Errorf("reading %d bytes from kpageflags failed, got %d bytes", readBufSize, nbytes)
 	}
 	flags := binary.LittleEndian.Uint64(readBuf)
+	if f.readCache != nil {
+		f.readCache[kpfFileOffset] = flags
+		readBuf = readBuf[8:]
+		for len(readBuf) > 0 {
+			kpfFileOffset += 8
+			flagsAhead := binary.LittleEndian.Uint64(readBuf[:8])
+			f.readCache[kpfFileOffset] = flagsAhead
+			readBuf = readBuf[8:]
+		}
+	}
 	return flags, nil
 }
 
@@ -177,7 +204,7 @@ func ProcPageIdleBitmapOpen() (*procPageIdleBitmapFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &procPageIdleBitmapFile{osFile}, nil
+	return &procPageIdleBitmapFile{osFile, 0, nil}, nil
 }
 
 func (f *procPageIdleBitmapFile) Close() {
@@ -185,15 +212,19 @@ func (f *procPageIdleBitmapFile) Close() {
 	f.osFile = nil
 }
 
+func (f *procPageIdleBitmapFile) SetReadahead(chunks int) {
+	f.readahead = chunks
+	f.readCache = map[int64]uint64{}
+}
+
 func (f *procPageIdleBitmapFile) SetIdle(pfn uint64) error {
-	bits, err := f.ReadBits(pfn)
-	if err != nil {
-		return err
-	}
 	pfnBitOffset := pfn % 64
 	idleMask := uint64(0x1) << pfnBitOffset
-	f.WriteBits(pfn, bits|idleMask)
-	return nil
+	return f.WriteBits(pfn, idleMask)
+}
+
+func (f *procPageIdleBitmapFile) SetIdleAll(pfn uint64) error {
+	return f.WriteBits(pfn, uint64(0xffffffffffffffff))
 }
 
 func (f *procPageIdleBitmapFile) WriteBits(pfn uint64, bits uint64) error {
@@ -216,20 +247,36 @@ func (f *procPageIdleBitmapFile) WriteBits(pfn uint64, bits uint64) error {
 
 func (f *procPageIdleBitmapFile) ReadBits(pfn uint64) (uint64, error) {
 	pfnFileOffset := int64(pfn) / 64 * 8
+	if f.readCache != nil {
+		if bits, ok := f.readCache[pfnFileOffset]; ok {
+			return bits, nil
+		}
+	}
 	if _, err := f.osFile.Seek(pfnFileOffset, io.SeekStart); err != nil {
 		return 0, err
 	}
 
-	readBuf := make([]byte, 8)
-	n, err := io.ReadAtLeast(f.osFile, readBuf, 8)
+	readBufSize := 8 * (f.readahead + 1)
+	readBuf := make([]byte, readBufSize)
+	n, err := io.ReadAtLeast(f.osFile, readBuf, readBufSize)
 	if err != nil {
 		return 0, err
 	}
-	if n != 8 {
-		return 0, fmt.Errorf("read %d instead of 8 bytes", n)
+	if n != readBufSize {
+		return 0, fmt.Errorf("read %d instead of expected %d bytes", n, readBufSize)
+	}
+	bits := binary.LittleEndian.Uint64(readBuf[:8])
+	if f.readCache != nil {
+		f.readCache[pfnFileOffset] = bits
+		readBuf = readBuf[8:]
+		for len(readBuf) > 0 {
+			pfnFileOffset += 8
+			bitsAhead := binary.LittleEndian.Uint64(readBuf[:8])
+			f.readCache[pfnFileOffset] = bitsAhead
+			readBuf = readBuf[8:]
+		}
 	}
 
-	bits := binary.LittleEndian.Uint64(readBuf)
 	return bits, nil
 }
 

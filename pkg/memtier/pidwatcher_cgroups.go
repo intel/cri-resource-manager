@@ -32,10 +32,6 @@ type CgroupPidWatcher struct {
 	stop         bool
 }
 
-type setMemberType struct{}
-
-var setMember = setMemberType{}
-
 func NewCgroupPidWatcher() (*CgroupPidWatcher, error) {
 	w := &CgroupPidWatcher{
 		cgroupPaths:  map[string]setMemberType{},
