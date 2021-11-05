@@ -761,6 +761,8 @@ bin/memtierd: $(wildcard cmd/memtierd/*.go) \
                 find $$dir -name \*.go; \
             done | sort | uniq)
 
+bin/meme: scripts/testing/meme.go
+	$(GO_BUILD) -o $@ $<
 #
 # rules to run go generators
 #

@@ -27,16 +27,48 @@ Example of a four-NUMA-node topology with:
 - 2 x 2G mem-only nodes
 
 ```
-topology='[{"cores": 2, "mem": "4G", "nodes": 2}, {"cores":0, "mem":"2G", "nodes": 2}]' distro=opensuse-tumbleweed vm=opensuse-4422 on_vm_online='exit' test/e2e/run.sh interactive
+topology='[{"cores": 2, "mem": "4G", "nodes": 2}, {"cores":0, "mem":"2G", "nodes": 2}]' distro=opensuse-tumbleweed vm=opensuse-4422 on_vm_online='interactive; exit' test/e2e/run.sh interactive
+```
+
+(See supported Linux distributions and other options with
+`test/e2e/run.sh help`.)
+
+If you wish to install packages from the host filesystem to the
+virtual machine, you can use `vm-put-pkg`. That works in the
+interactive prompt, and in the script in the `on_vm_online`
+(environment variable) hook. Example: if you wish to install a kernel
+package and reboot the virtual machine when becomes online, try above
+command with:
+
+```
+on_vm_online='vm-put-pkg kernel-default-5.15*rpm && vm-reboot && interactive; exit'
+```
+
+You can get help on all available commands in the interactive prompt
+and in the scripts:
+
+```
+test/e2e/run.sh help script all
 ```
 
 ### Install memtierd on the VM
 
-Use `govm ls` to find out the IP address of the virtual machine where to install `memtierd`
+Use `govm ls` to find out the IP address of the virtual machine where
+to install `memtierd`
 
 ```
 scp bin/memtierd opensuse@172.17.0.2:
 ssh opensuse@172.17.0.2 "sudo mv memtierd /usr/local/bin"
+```
+
+Optional: `meme` is a memory exerciser program, developed for
+`memtierd` testing and development. You can build and install it as
+follows:
+
+```
+make bin/meme
+scp bin/meme opensuse@172.17.0.2:
+ssh opensuse@172.17.0.2 "sudo mv meme /usr/local/bin"
 ```
 
 ## Use memtierd
@@ -46,7 +78,7 @@ ssh opensuse@172.17.0.2 "sudo mv memtierd /usr/local/bin"
    ssh opensuse@172.17.0.2
    ```
 
-   All commands below are executed on the VM.
+   Note: all commands below in this section are executed on the VM.
 
    You can use `numactl` to inspect the topology and free memory on each NUMA node
    ```
@@ -54,21 +86,48 @@ ssh opensuse@172.17.0.2 "sudo mv memtierd /usr/local/bin"
    sudo numactl -H
    ```
 
-2. Create a process that needs a lot of memory.
-   For instance, a python3 process that takes 2G.
+2. Create a process that uses a lot of memory.
+
+   If you installed `meme`, run `meme` (see `meme -h` for options).
+
+   As another example, you can create a `python3` process that has 2
+   GB of idle memory:
+
    ```
-   python3 -c 'x="x"*2*1024*1024*1024; input()' &
+   python3 -c 'x="x"*(2*1024*1024*1024); input()' &
    ```
 
-3. See the memory status of the process.
+3. Start memtierd with interactive prompt.
+
    ```
-   sudo memtierd --pid=$(pidof python3)
+   sudo memtierd --prompt
    ```
-   Move 100,000 pages from any NUMA node to node 2:
+
+   (Tip: install `rlwrap` and run `sudo rlwrap memtierd --prompt` to
+   enable convenient readline input with history.)
+
+   Run `help` in the `memtierd>` prompt to list commands. On each
+   command you can get more help with `COMMAND -h`, for instance
+   `pages -h`.
+
+   Example: manage memory locations using the `age` policy. The policy
+   moves pages to `IdleNUMA` if the pages have been idle for the last
+   `IdleDuration` seconds. And pages that have been active on every
+   tracker round for the last `ActiveDuration` seconds are moved to
+   `ActiveNUMA`. Those processes will be managed that are found in the
+   `Cgroups` list. (Processes in nested groups managed, too.)
+
    ```
-   sudo memtierd --pid=$(pidof python3) --move-to=2 --count=100000
+   memtierd> policy -create age -config {"Tracker":"idlepage","Interval":10,"IdleDuration":30,"IdleNUMA":1,"ActiveDuration":10,"ActiveNUMA":0,"Cgroups":["/sys/fs/cgroup/user.slice/mytest"]} -start
    ```
-   Move 100,000 pages from NUMA node 1 to node 3:
+
+   Policy uses `tracker` and `mover`. For testing and development,
+   those can be independently created, configured and used in the
+   prompt, too.
+
+   Example: select pages with `pages` and let `mover` work for 10
+   seconds moving them to NUMA node 1.
+
    ```
-   sudo memtierd --pid=$(pidof python3) --move-from=1 --move-to=3 --count=100000
+   ( echo pages -pid $(pidof meme); echo pages; echo mover -pages-to 1; sleep 10; echo pages ) | sudo ./memtierd -prompt
    ```
