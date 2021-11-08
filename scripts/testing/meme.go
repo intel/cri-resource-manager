@@ -28,31 +28,28 @@ var ab [][]byte = [][]byte{} // array of byte arrays
 
 var bValue byte = 0
 
-func bWriter(b []byte, count int, interval int) {
-	if count > len(b) {
-		count = len(b)
-	}
+func bExerciser(read, write bool, b []byte, offset int64, count int64, interval int64, offsetDelta int64, countDelta int64) {
+	round := int64(0)
 	for {
+		roundStartIndex := (offset + (offsetDelta * round)) % int64(len(b))
+		roundCount := count + (countDelta * round)
+		if roundCount+roundStartIndex > int64(len(b)) {
+			roundCount = int64(len(b)) - roundStartIndex
+		}
 		if interval > 0 {
 			time.Sleep(time.Duration(interval) * time.Microsecond)
 		}
-		for i := 0; i < count; i++ {
-			b[i] = bValue
+		if write {
+			for i := roundStartIndex; i < roundStartIndex+roundCount; i++ {
+				b[i] = bValue
+			}
 		}
-	}
-}
-
-func bReader(b []byte, count int, interval int) {
-	if count > len(b) {
-		count = len(b)
-	}
-	for {
-		if interval > 0 {
-			time.Sleep(time.Duration(interval) * time.Microsecond)
+		if read {
+			for i := roundStartIndex; i < roundStartIndex+roundCount; i++ {
+				bValue += b[i]
+			}
 		}
-		for i := 0; i < count; i++ {
-			bValue += b[i]
-		}
+		round += 1
 	}
 }
 
@@ -70,12 +67,16 @@ func main() {
 	optBSize := flag.Int("bs", 1024*1024, "size of each byte array [kB]")
 	optBReaderCount := flag.Int("brc", 1, "number of byte arrays to be read")
 	optBWriterCount := flag.Int("bwc", 1, "number of byte arrays to be written")
-	optBReadSize := flag.Int("brs", 1024*1024, "size of read on each byte array [kB]")
-	optBWriteSize := flag.Int("bws", 1024*1024, "size of write on each byte array [kB]")
-	optBReadOffset := flag.Int("bro", 0, "offset of read on each byte array [kB]")
-	optBWriteOffset := flag.Int("bwo", 0, "offset of read on each byte array [kB]")
-	optBReadInterval := flag.Int("bri", 0, "read interval on each byte array [us]")
-	optBWriteInterval := flag.Int("bwi", 0, "write interval on each byte array [us]")
+	optBReadSize := flag.Int64("brs", 1024*1024, "size of read on each byte array [kB]")
+	optBWriteSize := flag.Int64("bws", 1024*1024, "size of write on each byte array [kB]")
+	optBReadSizeDelta := flag.Int64("brsd", 1024*1024, "size change on each iteration [kB]")
+	optBWriteSizeDelta := flag.Int64("bwsd", 1024*1024, "size change on each iteration [kB]")
+	optBReadOffset := flag.Int64("bro", 0, "offset of read on each byte array [kB]")
+	optBWriteOffset := flag.Int64("bwo", 0, "offset of write on each byte array [kB]")
+	optBReadOffsetDelta := flag.Int64("brod", 0, "offset change on each iteration [kB]")
+	optBWriteOffsetDelta := flag.Int64("bwod", 0, "offset change on each iteration [kB]")
+	optBReadInterval := flag.Int64("bri", 0, "read interval on each byte array [us]")
+	optBWriteInterval := flag.Int64("bwi", 0, "write interval on each byte array [us]")
 	flag.Parse()
 
 	// create byte arrays
@@ -91,16 +92,16 @@ func main() {
 	// create readers
 	fmt.Printf("creating memory readers and writers\n")
 	for i := 0; i < *optBReaderCount; i++ {
-		go bReader(ab[i][*optBReadOffset*1024:], *optBReadSize*1024, *optBReadInterval)
+		go bExerciser(true, false, ab[i], *optBReadOffset*1024, *optBReadSize*1024, *optBReadInterval, *optBReadOffsetDelta*1024, *optBReadSizeDelta*1024)
 		fmt.Printf("    reader %d: %s\n", i,
-			bAddrRange(ab[i][(*optBReadOffset)*1024:], (*optBReadSize)*1024))
+			bAddrRange(ab[i][(*optBReadOffset)*1024:], int(*optBReadSize)*1024))
 	}
 
 	// create writers
 	for i := 0; i < *optBWriterCount; i++ {
-		go bWriter(ab[i][*optBWriteOffset*1024:], *optBWriteSize*1024, *optBWriteInterval)
+		go bExerciser(false, true, ab[i], *optBWriteOffset*1024, *optBWriteSize*1024, *optBWriteInterval, *optBWriteOffsetDelta*1024, *optBWriteSizeDelta*1024)
 		fmt.Printf("    writer %d: %s\n", i,
-			bAddrRange(ab[i][(*optBWriteOffset)*1024:], (*optBWriteSize)*1024))
+			bAddrRange(ab[i][(*optBWriteOffset)*1024:], int(*optBWriteSize)*1024))
 	}
 
 	// wait
