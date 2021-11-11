@@ -38,6 +38,17 @@ func (r *AddrRange) Length() uint64 {
 	return r.length
 }
 
+func NewAddrRanges(pid int, arParams ...AddrRange) *AddrRanges {
+	ar := &AddrRanges{
+		pid:   pid,
+		addrs: make([]AddrRange, 0, len(arParams)),
+	}
+	for _, r := range arParams {
+		ar.addrs = append(ar.addrs, r)
+	}
+	return ar
+}
+
 func (ar *AddrRanges) Pid() int {
 	return ar.pid
 }

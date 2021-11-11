@@ -81,10 +81,10 @@ func (p *PolicyAge) SetConfigJson(configJson string) error {
 		return fmt.Errorf("invalid interval: %d, > 0 expected", config.Interval)
 	}
 	if config.ActiveDuration < 0 {
-		return fmt.Errorf("invalid activeDuration: %d, >= 0 expected")
+		return fmt.Errorf("invalid activeDuration: %d, >= 0 expected", config.ActiveDuration)
 	}
 	if config.IdleDuration < 0 {
-		return fmt.Errorf("invalid idleDuration: %d, >= 0 expected")
+		return fmt.Errorf("invalid idleDuration: %d, >= 0 expected", config.IdleDuration)
 	}
 	if config.Tracker == "" {
 		return fmt.Errorf("tracker missing from the configuration")

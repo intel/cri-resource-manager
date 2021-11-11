@@ -225,7 +225,7 @@ func (t *TrackerDamon) GetCounters() *TrackerCounters {
 }
 
 func (t *TrackerDamon) perfReader() error {
-	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated", "--filter", "nr_accesses > 0")
+	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated")
 	errPipe, err := cmd.StderrPipe()
 	perfOutput := bufio.NewReader(errPipe)
 	if err != nil {
