@@ -128,22 +128,28 @@ func (h *Heatmap) UpdateFromCounters(tcs *TrackerCounters, timestamp int64) {
 }
 
 func (h *Heatmap) updateFromCounter(tc *TrackerCounter, timestamp int64) {
-	length := tc.AR.Ranges()[0].Length()
-	thr := HeatRange{
-		addr:     tc.AR.Ranges()[0].Addr(),
-		length:   length,
-		heat:     float64(tc.Accesses+tc.Reads+tc.Writes) / float64(length),
-		lastSeen: timestamp,
-	}
 	pid := tc.AR.Pid()
+	for _, ar := range tc.AR.Ranges() {
+		length := ar.Length()
+		thr := HeatRange{
+			addr:     ar.Addr(),
+			length:   length,
+			heat:     float64(tc.Accesses+tc.Reads+tc.Writes) / float64(length),
+			lastSeen: timestamp,
+		}
+		h.updateFromPidHeatRange(pid, &thr)
+	}
+}
+
+func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 	hrs, ok := h.pidHrs[pid]
 	if !ok {
 		hrs = &HeatRanges{}
 		h.pidHrs[pid] = hrs
 	}
-	overlappingRanges := hrs.Overlapping(&thr)
+	overlappingRanges := hrs.Overlapping(thr)
 	if len(*overlappingRanges) == 0 {
-		*hrs = append(*hrs, &thr)
+		*hrs = append(*hrs, thr)
 	}
 	for _, hr := range *overlappingRanges {
 		if hr.addr < thr.addr {
@@ -218,7 +224,7 @@ func (h *Heatmap) updateFromCounter(tc *TrackerCounter, timestamp int64) {
 }
 
 func (hrs *HeatRanges) Sort() {
-	sort.SliceStable(*hrs, func(i, j int) bool {
+	sort.Slice(*hrs, func(i, j int) bool {
 		return (*hrs)[i].addr < (*hrs)[i].addr
 	})
 }

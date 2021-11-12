@@ -17,12 +17,14 @@ package memtier
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 func TestUpdateCounters(t *testing.T) {
 	hm := NewCounterHeatmap()
+
 	PS := uint64(constPagesize)
-	tcs := TrackerCounters{
+	tcs0 := TrackerCounters{
 		// Memory regions have a hole.
 		// [100..150][150..200][200..250]<hole>[500..600]
 		TrackerCounter{
@@ -42,7 +44,7 @@ func TestUpdateCounters(t *testing.T) {
 		},
 	}
 	timestamp := int64(0)
-	hm.UpdateFromCounters(&tcs, timestamp)
+	hm.UpdateFromCounters(&tcs0, timestamp)
 
 	fmt.Println(hm.Dump())
 
@@ -84,9 +86,36 @@ func TestUpdateCounters(t *testing.T) {
 		t.Errorf("nil expected when requesting heat after the last range")
 	}
 
+	// heat on each region after first non-overlapping counters
 	hr0 := hm.HeatRangeAt(2000, 100*PS)
 	if hr0.heat != 0.0 {
 		t.Errorf("heat 0.0 expected at start address of the first range without accesses")
 	}
+	hr1 := hm.HeatRangeAt(2000, 150*PS)
+	if hr1.heat != 0.0 {
+		t.Errorf("heat 0.0 expected at start address of the second range without accesses")
+	}
+	hr2 := hm.HeatRangeAt(2000, 200*PS)
+	if hr2.heat != 0.02 {
+		t.Errorf("heat 0.02 expected at start address of the range with 1 access for in 50 pages")
+	}
+	hr3 := hm.HeatRangeAt(2000, 599*PS)
+	if hr3.heat != 1.0 {
+		t.Errorf("heat 1.0 expected at the last address of the range with 100 writes in 100 pages")
+	}
 
+	tcs1 := TrackerCounters{
+		// There are four ranges and a hole. Add a region that overlaps with three:
+		// now: [100..150][150..200][200..250]<hole>[500..600]
+		// add:                [180.....................580]
+		TrackerCounter{
+			AR: NewAddrRanges(2000,
+				AddrRange{180 * PS, 400}),
+		},
+	}
+
+	timestamp = 1 * int64(time.Second)
+	hm.UpdateFromCounters(&tcs1, timestamp)
+
+	fmt.Println(hm.Dump())
 }
