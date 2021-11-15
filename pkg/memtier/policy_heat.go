@@ -28,10 +28,10 @@ type PolicyHeatConfig struct {
 	Cgroups       []string // list of paths
 	Interval      int
 
-	// HeatNuma maps heat values into NUMA node lists where pages
-	// of each heat should be located. If a heat is missing, NUMA
-	// node is "don't care".
-	HeatNuma map[int][]int
+	// HeatNumas maps heat class values into NUMA node lists where
+	// pages of each heat class should be located. If a heat class
+	// is missing, the NUMA node is "don't care".
+	HeatNumas map[int][]int
 }
 
 const policyHeatDefaults string = `{"Tracker":"damon"}`
@@ -169,22 +169,6 @@ func (p *PolicyHeat) Start() error {
 	return nil
 }
 
-func (p *PolicyHeat) move(tcs *TrackerCounters, destNode Node) {
-	if p.mover.TaskCount() == 0 {
-		for _, tc := range *tcs {
-			ppages, err := tc.AR.PagesMatching(PMPresentSet | PMExclusiveSet)
-			if err != nil {
-				continue
-			}
-			ppages = ppages.NotOnNode(destNode)
-			if len(ppages.Pages()) > 100 {
-				task := NewMoverTask(ppages, destNode)
-				p.mover.AddTask(task)
-			}
-		}
-	}
-}
-
 func (p *PolicyHeat) loop() {
 	ticker := time.NewTicker(time.Duration(p.config.Interval) * time.Second)
 	defer ticker.Stop()
@@ -193,6 +177,9 @@ func (p *PolicyHeat) loop() {
 	for !quit {
 		timestamp := time.Now().UnixNano()
 		p.heatmap.UpdateFromCounters(p.tracker.GetCounters(), timestamp)
+		if p.mover.TaskCount() == 0 {
+			p.move(timestamp)
+		}
 		n += 1
 		select {
 		case <-p.chLoop:
@@ -206,4 +193,38 @@ func (p *PolicyHeat) loop() {
 	}
 	close(p.chLoop)
 	p.chLoop = nil
+}
+
+func (p *PolicyHeat) move(timestamp int64) {
+	for pid := range p.heatmap.Pids() {
+		p.heatmap.ForEachRange(pid, func(hr *HeatRange) int {
+			// TODO: config: is the information fresh enough for a decision?
+			if timestamp-hr.updated > 10*int64(time.Second) {
+				return 0
+			}
+			// TODO: config: has the range stable (old) enough?
+			if timestamp-hr.created < 20*int64(time.Second) {
+				return 0
+			}
+			heatClass := p.heatmap.HeatClass(hr)
+			numas, ok := p.config.HeatNumas[heatClass]
+			if !ok || len(numas) == 0 {
+				// No NUMAs for this heat class
+				return 0
+			}
+			// TODO: calculate numas in mems_allowed
+			destNode := Node(numas[0])
+			// TODO: check current NUMA nodes of the
+			// range, do not move if already there.
+			ar := NewAddrRanges(pid, hr.AddrRange())
+			ppages, err := ar.PagesMatching(PMPresentSet | PMExclusiveSet)
+			if err != nil {
+				return -1
+			}
+			ppages = ppages.NotOnNode(destNode)
+			task := NewMoverTask(ppages, destNode)
+			p.mover.AddTask(task)
+			return 0
+		})
+	}
 }

@@ -12,24 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Counters
-// round0: [--addrs-0--]  [addrs-1]
-// flat:   [           ][][       ]
-//         ^            ^ ^
-//          \-----------+-+---------addrs-0 only
-//                       \+---------noinfo
-//                         \--------addrs-1 only
-
-// round1:    [---addrs-2----]
-// flat:   [ ][        ][][ ][    ]
-//         ^  ^         ^ ^  ^
-//          \-+---------+-+--+------addrs-0 from round 0
-//             \--------+-----------addrs-0 round0 + addrs-2 round1
-//                       \----------addrs-2 round1
-
-// round2: [addrs-3][---addrs-4------]
-// flat:   [  ][   ][  ][][  ][      ]
-
 package memtier
 
 import (
@@ -45,16 +27,23 @@ import (
 type HeatmapConfig struct {
 	// HeatMax is the maximum heat of a range
 	HeatMax float64
-	// HeatDelta is the portion of the remaining heat in a region
-	// after one second of inactivity.
+	// HeatRetention is the portion of the remaining heat in a region
+	// after one second of complete inactivity.
 	// - 1.0: heat never cools down
 	// - 0.0: all heat cools down immediately
 	// - If you want that 5 % of the heat remains after 60 seconds of inactivity,
-	//   HeatDelta = 0.05 ** (1.0/60) = 0.9513
-	HeatDelta float64
+	//   HeatRetention = 0.05 ** (1.0/60) = 0.9513
+	HeatRetention float64
+	// HeatClasses is the number of discrete heat classes. The default is 10,
+	// which means that address ranges are classified:
+	// heat class 0: heat [HeatMax*0/10, HeatMax*1/10)
+	// heat class 1: heat [HeatMax*1/10, HeatMax*2/10)
+	// ...
+	// heat class 9: heat [HeatMax*9/10, HeatMax*10/10]
+	HeatClasses int
 }
 
-var HeatmapConfigDefaults string = `{"HeatMax":1.0,"HeatDelta": 0.9513}`
+var HeatmapConfigDefaults string = `{"HeatMax":1.0,"HeatRetention": 0.9513}`
 
 type Heatmap struct {
 	config *HeatmapConfig
@@ -67,10 +56,11 @@ type Heatmap struct {
 }
 
 type HeatRange struct {
-	addr   uint64
-	length uint64  // number of pages
-	heat   float64 // heat per page
-	seen   int64
+	addr    uint64
+	length  uint64  // number of pages
+	heat    float64 // heat per page
+	updated int64
+	created int64
 }
 
 type HeatRanges []*HeatRange
@@ -94,6 +84,14 @@ func (h *Heatmap) SetConfigJson(configJson string) error {
 	return nil
 }
 
+func (h *Heatmap) Pids() []int {
+	pids := make([]int, 0, len(h.pidHrs))
+	for pid := range h.pidHrs {
+		pids = append(pids, pid)
+	}
+	return pids
+}
+
 // Dump presents heatmap as a string that indicate heat of each range
 func (h *Heatmap) Dump() string {
 	lines := []string{}
@@ -111,11 +109,24 @@ func (h *Heatmap) Dump() string {
 }
 
 func (hr *HeatRange) String() string {
-	return fmt.Sprintf("{%x-%x,heat:%f,seen:%d}",
+	return fmt.Sprintf("{%x-%x(%d),%f,%d}",
 		hr.addr,
 		hr.addr+hr.length*uint64(constPagesize),
+		hr.length,
 		hr.heat,
-		hr.seen)
+		hr.updated)
+}
+
+func (hr *HeatRange) AddrRange() AddrRange {
+	return AddrRange{hr.addr, hr.length}
+}
+
+func (h *Heatmap) HeatClass(hr *HeatRange) int {
+	heatClass := int(float64(h.config.HeatClasses) * hr.heat / h.config.HeatMax)
+	if heatClass >= h.config.HeatClasses {
+		heatClass = h.config.HeatClasses - 1
+	}
+	return heatClass
 }
 
 func (h *Heatmap) UpdateFromCounters(tcs *TrackerCounters, timestamp int64) {
@@ -134,10 +145,11 @@ func (h *Heatmap) updateFromCounter(tc *TrackerCounter, timestamp int64) {
 	for _, ar := range tc.AR.Ranges() {
 		length := ar.Length()
 		thr := HeatRange{
-			addr:   ar.Addr(),
-			length: length,
-			heat:   float64(tc.Accesses+tc.Reads+tc.Writes) / float64(length),
-			seen:   timestamp,
+			addr:    ar.Addr(),
+			length:  length,
+			heat:    float64(tc.Accesses+tc.Reads+tc.Writes) / float64(length),
+			updated: timestamp,
+			created: timestamp,
 		}
 		if thr.heat > h.config.HeatMax {
 			thr.heat = h.config.HeatMax
@@ -162,10 +174,11 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			// |-newhr-|---hr---...
 			//         |---thr--...
 			newHr := HeatRange{
-				addr:   hr.addr,
-				length: (thr.addr - hr.addr) / uint64(constPagesize),
-				heat:   hr.heat,
-				seen:   hr.seen,
+				addr:    hr.addr,
+				length:  (thr.addr - hr.addr) / uint64(constPagesize),
+				heat:    hr.heat,
+				updated: hr.updated,
+				created: hr.created,
 			}
 			*hrs = append(*hrs, &newHr)
 			hr.addr = thr.addr
@@ -179,10 +192,11 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			// |-newhr-|---hr---...
 			//         |---thr--...
 			newHr := HeatRange{
-				addr:   thr.addr,
-				length: (hr.addr - thr.addr) / uint64(constPagesize),
-				heat:   thr.heat,
-				seen:   thr.seen,
+				addr:    thr.addr,
+				length:  (hr.addr - thr.addr) / uint64(constPagesize),
+				heat:    thr.heat,
+				updated: thr.updated,
+				created: thr.created,
 			}
 			*hrs = append(*hrs, &newHr)
 			thr.addr = hr.addr
@@ -203,17 +217,17 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			// |---hr----|-newhr-|
 			// |---thr---|
 			newHr := HeatRange{
-				addr:   thrEndAddr,
-				length: (hrEndAddr - thrEndAddr) / uint64(constPagesize),
-				heat:   hr.heat,
-				seen:   hr.seen,
+				addr:    thrEndAddr,
+				length:  (hrEndAddr - thrEndAddr) / uint64(constPagesize),
+				heat:    hr.heat,
+				updated: hr.updated,
 			}
 			*hrs = append(*hrs, &newHr)
 			hr.length -= newHr.length
 			hrEndAddr = thrEndAddr
 		}
 		// update hr heat
-		seconds := float64(thr.seen-hr.seen) / float64(time.Second)
+		seconds := float64(thr.updated-hr.updated) / float64(time.Second)
 		if seconds < 0.0 {
 			// There is something wrong with the
 			// timestamps: new heatrange looks older than
@@ -222,11 +236,11 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			// down".
 			seconds = 0.0
 		}
-		hr.heat = thr.heat + hr.heat*math.Pow(h.config.HeatDelta, seconds)
+		hr.heat = thr.heat + hr.heat*math.Pow(h.config.HeatRetention, seconds)
 		if hr.heat > h.config.HeatMax {
 			hr.heat = h.config.HeatMax
 		}
-		hr.seen = thr.seen
+		hr.updated = thr.updated
 		// now we have handled thr up to hr's end addr,
 		// |----hr----|
 		// |----thr-----------|
@@ -240,10 +254,11 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 	//                         |---thr---|
 	if thr.length > 0 {
 		newHr := HeatRange{
-			addr:   thr.addr,
-			length: thr.length,
-			heat:   thr.heat,
-			seen:   thr.seen,
+			addr:    thr.addr,
+			length:  thr.length,
+			heat:    thr.heat,
+			updated: thr.updated,
+			created: thr.created,
 		}
 		*hrs = append(*hrs, &newHr)
 	}
@@ -277,7 +292,7 @@ func (hrs *HeatRanges) Overlapping(hr0 *HeatRange) *HeatRanges {
 	return &subHeatRanges
 }
 
-// GetHeat returns the heat of a region
+// HeatRangeAt returns a HeatRange at address
 func (h *Heatmap) HeatRangeAt(pid int, addr uint64) *HeatRange {
 	hrs, ok := h.pidHrs[pid]
 	if !ok {
@@ -292,4 +307,26 @@ func (h *Heatmap) HeatRangeAt(pid int, addr uint64) *HeatRange {
 		return nil
 	}
 	return (*overlapping)[0]
+}
+
+// ForEachRange iterates over heatranges of a pid in ascending address order.
+// - handleRange(*HeatRange) is called for every range.
+//       0 (continue): ForEachRange continues iteration from the next range
+//       -1 (break):   ForEachRange returns immediately.
+func (h *Heatmap) ForEachRange(pid int, handleRange func(*HeatRange) int) {
+	hrs, ok := h.pidHrs[pid]
+	if !ok {
+		return
+	}
+	for _, hr := range *hrs {
+		next := handleRange(hr)
+		switch next {
+		case 0:
+			continue
+		case -1:
+			return
+		default:
+			panic(fmt.Sprintf("illegal heat range handler return value %d", next))
+		}
+	}
 }
