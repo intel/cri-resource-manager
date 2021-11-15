@@ -45,18 +45,16 @@ import (
 type HeatmapConfig struct {
 	// HeatMax is the maximum heat of a range
 	HeatMax float64
-	// HeatMaxInc is the maximum incremenent to the heat on one round
-	HeatMaxInc float64
 	// HeatDelta is the portion of the remaining heat in a region
 	// after one second of inactivity.
 	// - 1.0: heat never cools down
-	// - 0.0: all heat disappears to the next round
+	// - 0.0: all heat cools down immediately
 	// - If you want that 5 % of the heat remains after 60 seconds of inactivity,
 	//   HeatDelta = 0.05 ** (1.0/60) = 0.9513
 	HeatDelta float64
 }
 
-var HeatmapConfigDefaults string = `{"HeatMax":1.0,"HeatMaxInc":1.0,"HeatDelta": 0.9513}`
+var HeatmapConfigDefaults string = `{"HeatMax":1.0,"HeatDelta": 0.9513}`
 
 type Heatmap struct {
 	config *HeatmapConfig
@@ -69,10 +67,10 @@ type Heatmap struct {
 }
 
 type HeatRange struct {
-	addr     uint64
-	length   uint64  // number of pages
-	heat     float64 // heat per page
-	lastSeen int64
+	addr   uint64
+	length uint64  // number of pages
+	heat   float64 // heat per page
+	seen   int64
 }
 
 type HeatRanges []*HeatRange
@@ -106,14 +104,18 @@ func (h *Heatmap) Dump() string {
 	sort.Ints(pids)
 	for _, pid := range pids {
 		for _, hr := range *(h.pidHrs[pid]) {
-			lines = append(lines, fmt.Sprintf("%x-%x heat: %f seen: %d",
-				hr.addr,
-				hr.addr+hr.length*uint64(constPagesize),
-				hr.heat,
-				hr.lastSeen))
+			lines = append(lines, fmt.Sprintf("pid: %d: %s", pid, hr))
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (hr *HeatRange) String() string {
+	return fmt.Sprintf("{%x-%x,heat:%f,seen:%d}",
+		hr.addr,
+		hr.addr+hr.length*uint64(constPagesize),
+		hr.heat,
+		hr.seen)
 }
 
 func (h *Heatmap) UpdateFromCounters(tcs *TrackerCounters, timestamp int64) {
@@ -132,10 +134,13 @@ func (h *Heatmap) updateFromCounter(tc *TrackerCounter, timestamp int64) {
 	for _, ar := range tc.AR.Ranges() {
 		length := ar.Length()
 		thr := HeatRange{
-			addr:     ar.Addr(),
-			length:   length,
-			heat:     float64(tc.Accesses+tc.Reads+tc.Writes) / float64(length),
-			lastSeen: timestamp,
+			addr:   ar.Addr(),
+			length: length,
+			heat:   float64(tc.Accesses+tc.Reads+tc.Writes) / float64(length),
+			seen:   timestamp,
+		}
+		if thr.heat > h.config.HeatMax {
+			thr.heat = h.config.HeatMax
 		}
 		h.updateFromPidHeatRange(pid, &thr)
 	}
@@ -148,21 +153,19 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 		h.pidHrs[pid] = hrs
 	}
 	overlappingRanges := hrs.Overlapping(thr)
-	if len(*overlappingRanges) == 0 {
-		*hrs = append(*hrs, thr)
-	}
 	for _, hr := range *overlappingRanges {
 		if hr.addr < thr.addr {
 			// Case:
-			// |-------hr--------|
-			//         |---thr---|
+			// |-------hr-------...
+			//         |---thr--...
 			// Add newHr at hr start address, and move hr forward
-			// |-newhr-|---hr--...
+			// |-newhr-|---hr---...
+			//         |---thr--...
 			newHr := HeatRange{
-				addr:     hr.addr,
-				length:   (thr.addr - hr.addr) / uint64(constPagesize),
-				heat:     hr.heat,
-				lastSeen: hr.lastSeen,
+				addr:   hr.addr,
+				length: (thr.addr - hr.addr) / uint64(constPagesize),
+				heat:   hr.heat,
+				seen:   hr.seen,
 			}
 			*hrs = append(*hrs, &newHr)
 			hr.addr = thr.addr
@@ -170,20 +173,22 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 		}
 		if thr.addr < hr.addr {
 			// Case:
-			//         |-------hr------|
-			// |----------thr------|
+			//         |----hr--...
+			// |----------thr---...
 			// Add newHr at thr start address, move thr forward
-			// |-newhr-|---hr--...
+			// |-newhr-|---hr---...
+			//         |---thr--...
 			newHr := HeatRange{
-				addr:     thr.addr,
-				length:   (hr.addr - thr.addr) / uint64(constPagesize),
-				heat:     thr.heat,
-				lastSeen: thr.lastSeen,
+				addr:   thr.addr,
+				length: (hr.addr - thr.addr) / uint64(constPagesize),
+				heat:   thr.heat,
+				seen:   thr.seen,
 			}
 			*hrs = append(*hrs, &newHr)
 			thr.addr = hr.addr
 			thr.length -= newHr.length
 		}
+		// now thr.addr == hr.addr
 		hrEndAddr := hr.addr + hr.length*uint64(constPagesize)
 		thrEndAddr := thr.addr + thr.length*uint64(constPagesize)
 		endAddr := hrEndAddr
@@ -196,36 +201,58 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			// |---thr---|
 			// Add newHr at thr end address, cut hr length
 			// |---hr----|-newhr-|
+			// |---thr---|
 			newHr := HeatRange{
-				addr:     thrEndAddr,
-				length:   (hrEndAddr - thrEndAddr) / uint64(constPagesize),
-				heat:     hr.heat,
-				lastSeen: hr.lastSeen,
+				addr:   thrEndAddr,
+				length: (hrEndAddr - thrEndAddr) / uint64(constPagesize),
+				heat:   hr.heat,
+				seen:   hr.seen,
 			}
 			*hrs = append(*hrs, &newHr)
 			hr.length -= newHr.length
+			hrEndAddr = thrEndAddr
 		}
-		if thrEndAddr > hrEndAddr {
-			// Case:
-			// |---hr---|
-			// |--------thr------|
-			// move thr forward
-			// |---hr----|--thr--|
-			thr.addr = hrEndAddr
-			thr.length -= hr.length
-		}
-
 		// update hr heat
-		seconds := float64(hr.lastSeen) / float64(time.Second)
+		seconds := float64(thr.seen-hr.seen) / float64(time.Second)
+		if seconds < 0.0 {
+			// There is something wrong with the
+			// timestamps: new heatrange looks older than
+			// existing hr. Prevent a jump in heat that
+			// this might cause when calculating "cool
+			// down".
+			seconds = 0.0
+		}
 		hr.heat = thr.heat + hr.heat*math.Pow(h.config.HeatDelta, seconds)
-		hr.lastSeen = thr.lastSeen
+		if hr.heat > h.config.HeatMax {
+			hr.heat = h.config.HeatMax
+		}
+		hr.seen = thr.seen
+		// now we have handled thr up to hr's end addr,
+		// |----hr----|
+		// |----thr-----------|
+		// move remaining thr forward
+		//            |--thr--|
+		thr.length -= hr.length
+		thr.addr = hrEndAddr
+	}
+	// Case: there is still a remaining, non-overlapping part of thr
+	// --last-overlapping-hr---|
+	//                         |---thr---|
+	if thr.length > 0 {
+		newHr := HeatRange{
+			addr:   thr.addr,
+			length: thr.length,
+			heat:   thr.heat,
+			seen:   thr.seen,
+		}
+		*hrs = append(*hrs, &newHr)
 	}
 	hrs.Sort()
 }
 
 func (hrs *HeatRanges) Sort() {
 	sort.Slice(*hrs, func(i, j int) bool {
-		return (*hrs)[i].addr < (*hrs)[i].addr
+		return (*hrs)[i].addr < (*hrs)[j].addr
 	})
 }
 

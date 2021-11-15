@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-func TestUpdateCounters(t *testing.T) {
+func TestUpdateCountersBoundaryCheck(t *testing.T) {
 	hm := NewCounterHeatmap()
 
 	PS := uint64(constPagesize)
@@ -118,4 +118,210 @@ func TestUpdateCounters(t *testing.T) {
 	hm.UpdateFromCounters(&tcs1, timestamp)
 
 	fmt.Println(hm.Dump())
+}
+
+func TestUpdateCountersOverlappingRanges(t *testing.T) {
+	PS := uint64(constPagesize)
+	sec := int64(time.Second)
+
+	tcases := []struct {
+		name     string
+		config   string
+		orig     TrackerCounters
+		origT    int64
+		update   TrackerCounters
+		updateT  int64
+		addrHeat map[uint64]float64
+		addrSeen map[uint64]int64
+	}{
+		{
+			name:     "disjoint ranges",
+			orig:     TrackerCounters{{Accesses: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Accesses: 2, AR: NewAddrRanges(1000, AddrRange{10 * PS, 80})}},
+			addrHeat: map[uint64]float64{110 * PS: 0.02, 20 * PS: 0.025},
+			addrSeen: map[uint64]int64{110 * PS: 0, 20 * PS: sec},
+		},
+		{
+			name:     "touching ranges at orig start",
+			orig:     TrackerCounters{{Accesses: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Accesses: 2, AR: NewAddrRanges(1000, AddrRange{20 * PS, 80})}},
+			addrHeat: map[uint64]float64{100 * PS: 0.02, 99 * PS: 0.025},
+			addrSeen: map[uint64]int64{100 * PS: 0, 99 * PS: sec},
+		},
+		{
+			name:     "touching ranges at orig end",
+			orig:     TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Writes: 2, AR: NewAddrRanges(1000, AddrRange{150 * PS, 80})}},
+			addrHeat: map[uint64]float64{149 * PS: 0.02, 150 * PS: 0.025},
+			addrSeen: map[uint64]int64{149 * PS: 0, 150 * PS: sec},
+		},
+		{
+			name:     "total eclipse, no cool down",
+			config:   `{"HeatMax":1.0,"HeatDelta":1.0}`,
+			orig:     TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			addrHeat: map[uint64]float64{100 * PS: 0.04, 149 * PS: 0.04},
+			addrSeen: map[uint64]int64{100 * PS: sec, 149 * PS: sec},
+		},
+		{
+			name:     "total eclipse, total cool down",
+			config:   `{"HeatMax":1.0,"HeatDelta":0.0}`,
+			orig:     TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			addrHeat: map[uint64]float64{100 * PS: 0.02, 149 * PS: 0.02},
+		},
+		{
+			name:     "total eclipse, cool down to half in each second",
+			config:   `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig:     TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			addrHeat: map[uint64]float64{100 * PS: 0.03, 149 * PS: 0.03},
+		},
+		{
+			name:     "total eclipse, cool down to half in each second, hit max heat on both updates",
+			config:   `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig:     TrackerCounters{{Writes: 200, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Writes: 200, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			addrHeat: map[uint64]float64{100 * PS: 1.0, 149 * PS: 1.0},
+		},
+		{
+			name:     "total eclipse, cool down to half in each second, 2s update interval",
+			config:   `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig:     TrackerCounters{{Writes: 200, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			update:   TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			updateT:  2 * sec,
+			addrHeat: map[uint64]float64{100 * PS: 0.27, 149 * PS: 0.27},
+		},
+		{
+			name:     "overlap at start",
+			config:   `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig:     TrackerCounters{{Writes: 25, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			origT:    sec,
+			update:   TrackerCounters{{Writes: 25, AR: NewAddrRanges(1000, AddrRange{75 * PS, 50})}},
+			updateT:  2 * sec,
+			addrHeat: map[uint64]float64{75 * PS: 0.5, 100 * PS: 0.75, 125 * PS: 0.5},
+			addrSeen: map[uint64]int64{75 * PS: 2 * sec, 100 * PS: 2 * sec, 125 * PS: 1 * sec},
+		},
+		{
+			name:     "overlap at end",
+			config:   `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig:     TrackerCounters{{Writes: 25, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			origT:    sec,
+			update:   TrackerCounters{{Writes: 25, AR: NewAddrRanges(1000, AddrRange{125 * PS, 50})}},
+			updateT:  2 * sec,
+			addrHeat: map[uint64]float64{100 * PS: 0.5, 149 * PS: 0.75, 150 * PS: 0.5, 174 * PS: 0.5},
+			addrSeen: map[uint64]int64{100 * PS: sec, 124 * PS: sec, 125 * PS: 2 * sec, 150 * PS: 2 * sec, 174 * PS: 2 * sec},
+		},
+		{
+			name:     "overlap middle, total cool down",
+			config:   `{"HeatMax":1.0,"HeatDelta":0.0}`,
+			orig:     TrackerCounters{{Writes: 25, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			origT:    2 * sec,
+			update:   TrackerCounters{{Writes: 1, AR: NewAddrRanges(1000, AddrRange{110 * PS, 10})}},
+			updateT:  4 * sec,
+			addrHeat: map[uint64]float64{100 * PS: 0.5, 110 * PS: 0.1, 119 * PS: 0.1, 120 * PS: 0.5},
+			addrSeen: map[uint64]int64{100 * PS: 2 * sec, 110 * PS: 4 * sec, 119 * PS: 4 * sec, 120 * PS: 2 * sec},
+		},
+		{
+			name:     "overlap both sides, no cool down",
+			config:   `{"HeatMax":1.0,"HeatDelta":1.0}`,
+			orig:     TrackerCounters{{Writes: 25, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}},
+			origT:    1 * sec,
+			update:   TrackerCounters{{Writes: 20, AR: NewAddrRanges(1000, AddrRange{0 * PS, 200})}},
+			updateT:  3 * sec,
+			addrHeat: map[uint64]float64{0 * PS: 0.1, 99 * PS: 0.1, 100 * PS: 0.6, 149 * PS: 0.6, 150 * PS: 0.1, 199 * PS: 0.1},
+			addrSeen: map[uint64]int64{0 * PS: 3 * sec, 99 * PS: 3 * sec, 100 * PS: 3 * sec, 149 * PS: 3 * sec, 150 * PS: 3 * sec, 199 * PS: 3 * sec},
+		},
+		{
+			name:   "overlap contiguous multirange",
+			config: `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig: TrackerCounters{
+				{Writes: 1, AR: NewAddrRanges(1000, AddrRange{50 * PS, 50})},     // heat 0.02
+				{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 100})},   // heat 0.01
+				{Writes: 10, AR: NewAddrRanges(1000, AddrRange{200 * PS, 100})},  // heat 0.1
+				{Writes: 100, AR: NewAddrRanges(1000, AddrRange{300 * PS, 100})}, // heat 1.0
+				{Writes: 90, AR: NewAddrRanges(1000, AddrRange{400 * PS, 100})},  // heat 0.9
+			},
+			origT:    3 * sec,
+			update:   TrackerCounters{{Writes: 20, AR: NewAddrRanges(1000, AddrRange{150 * PS, 200})}}, // heat: 0.1
+			updateT:  4 * sec,
+			addrHeat: map[uint64]float64{50 * PS: 0.02, 100 * PS: 0.01, 150 * PS: 0.105, 200 * PS: 0.15, 300 * PS: 0.6, 350 * PS: 1.0, 400 * PS: 0.9},
+			addrSeen: map[uint64]int64{50 * PS: 3 * sec, 100 * PS: 3 * sec, 150 * PS: 4 * sec, 200 * PS: 4 * sec, 300 * PS: 4 * sec, 350 * PS: 3 * sec, 400 * PS: 3 * sec},
+		},
+		{
+			name:   "overlap non-contiguous multirange",
+			config: `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig: TrackerCounters{
+				{Writes: 0, AR: NewAddrRanges(1000, AddrRange{50 * PS, 50})},  // heat 0.00
+				{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}, // heat 0.02
+				// hole 150..200
+				{Writes: 40, AR: NewAddrRanges(1000, AddrRange{200 * PS, 50})}, // heat 0.8
+				// hole 250..300
+				{Writes: 4, AR: NewAddrRanges(1000, AddrRange{300 * PS, 40})}, // heat 0.1
+				// hole 340..400
+				{Writes: 90, AR: NewAddrRanges(1000, AddrRange{400 * PS, 100})}, // heat 0.9
+			},
+			origT:   3 * sec,
+			update:  TrackerCounters{{Writes: 20, AR: NewAddrRanges(1000, AddrRange{120 * PS, 200})}}, // heat: 0.1
+			updateT: 4 * sec,
+			addrHeat: map[uint64]float64{50 * PS: 0.00, 100 * PS: 0.02, 119 * PS: 0.02, 120 * PS: 0.11, 149 * PS: 0.11, 150 * PS: 0.1, 199 * PS: 0.1,
+				200 * PS: 0.5, 249 * PS: 0.5, 250 * PS: 0.1, 299 * PS: 0.1, 300 * PS: 0.15, 319 * PS: 0.15, 320 * PS: 0.1, 339 * PS: 0.1, 400 * PS: 0.9, 499 * PS: 0.9},
+			addrSeen: map[uint64]int64{50 * PS: 3 * sec, 100 * PS: 3 * sec, 119 * PS: 3 * sec, 120 * PS: 4 * sec, 149 * PS: 4 * sec, 150 * PS: 4 * sec, 199 * PS: 4 * sec,
+				200 * PS: 4 * sec, 249 * PS: 4 * sec, 250 * PS: 4 * sec, 299 * PS: 4 * sec, 300 * PS: 4 * sec, 319 * PS: 4 * sec, 320 * PS: 3 * sec, 339 * PS: 3 * sec, 400 * PS: 3 * sec, 499 * PS: 3 * sec},
+		},
+		{
+			name:   "overlapping counters on multirange",
+			config: `{"HeatMax":1.0,"HeatDelta":0.5}`,
+			orig: TrackerCounters{
+				{Writes: 0, AR: NewAddrRanges(1000, AddrRange{50 * PS, 50})},  // heat 0.00
+				{Writes: 1, AR: NewAddrRanges(1000, AddrRange{100 * PS, 50})}, // heat 0.02
+				// hole 150..200
+				{Writes: 40, AR: NewAddrRanges(1000, AddrRange{200 * PS, 50})}, // heat 0.8
+				// hole 250..300
+				{Writes: 4, AR: NewAddrRanges(1000, AddrRange{300 * PS, 40})}, // heat 0.1
+			},
+			origT: 3 * sec,
+			update: TrackerCounters{
+				{Writes: 0, AR: NewAddrRanges(1000, AddrRange{50 * PS, 100})},    // heat: 0.0
+				{Writes: 10, AR: NewAddrRanges(1000, AddrRange{120 * PS, 100})}}, // heat: 0.1
+			updateT:  4 * sec,
+			addrHeat: map[uint64]float64{50 * PS: 0.0, 100 * PS: 0.01, 120 * PS: 0.11, 150 * PS: 0.1, 199 * PS: 0.1, 200 * PS: 0.5, 219 * PS: 0.5},
+			addrSeen: map[uint64]int64{50 * PS: 4 * sec, 100 * PS: 4 * sec, 120 * PS: 4 * sec, 150 * PS: 4 * sec, 199 * PS: 4 * sec, 200 * PS: 4 * sec, 219 * PS: 4 * sec, 300 * PS: 3 * sec},
+		},
+	}
+	isEqualEnough := func(f, g float64) bool {
+		acceptableDelta := float64(0.000000000001)
+		return f+acceptableDelta > g && f-acceptableDelta < g
+	}
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			hm := NewCounterHeatmap()
+			if tc.config != "" {
+				hm.SetConfigJson(tc.config)
+			}
+			timestamp := int64(tc.origT)
+			hm.UpdateFromCounters(&tc.orig, timestamp)
+			// If updateT is not defined, the default interval between updates is 1 s
+			if tc.updateT == 0 {
+				timestamp += sec - tc.origT
+			} else {
+				timestamp += tc.updateT - tc.origT
+			}
+			hm.UpdateFromCounters(&tc.update, timestamp)
+			fmt.Printf("%s:\n%s\n\n", tc.name, hm.Dump())
+			for addr, expHeat := range tc.addrHeat {
+				obsHeat := hm.HeatRangeAt(1000, addr).heat
+				if !isEqualEnough(obsHeat, expHeat) {
+					t.Errorf("unexpected heat at %x: expected %f, observed %f", addr, expHeat, obsHeat)
+				}
+			}
+			for addr, expSeen := range tc.addrSeen {
+				obsSeen := hm.HeatRangeAt(1000, addr).seen
+				if obsSeen != expSeen {
+					fmt.Printf("%s:\n%s\n\n", tc.name, hm.Dump())
+					t.Errorf("unexpected seen at %x: expected %d, observed %d", addr, expSeen, obsSeen)
+				}
+			}
+		})
+	}
 }
