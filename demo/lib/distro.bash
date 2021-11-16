@@ -328,6 +328,15 @@ centos-8-install-crio-pre() {
     fi
 }
 
+centos-8-install-crio() {
+    if [ -n "$crio_src" ]; then
+	default-install-crio
+    else
+	distro-install-pkg cri-o
+	vm-command "systemctl enable crio"
+    fi
+}
+
 centos-8-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
 }
