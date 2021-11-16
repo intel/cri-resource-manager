@@ -44,6 +44,7 @@ type TrackerDamon struct {
 	damonDir          string
 	config            *TrackerDamonConfig
 	pids              []int
+	started           bool
 	perfReaderRunning bool
 	// accesses maps startAddr -> lengthPgs -> accessCount
 	accesses map[uint64]map[uint64]uint64
@@ -107,18 +108,34 @@ func (t *TrackerDamon) GetConfigJson() string {
 }
 
 func (t *TrackerDamon) AddPids(pids []int) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	fmt.Printf("TrackerDamon.AddPids(%v)\n", pids)
 	for _, pid := range pids {
 		t.pids = append(t.pids, pid)
+	}
+	if t.started {
+		t.applyMonitor("off")
+		t.applyTargetIds()
+		t.applyMonitor("on")
 	}
 }
 
 func (t *TrackerDamon) RemovePids(pids []int) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	fmt.Printf("TrackerDamon.RemovePids(%v)\n", pids)
 	if pids == nil {
 		t.pids = []int{}
 		return
 	}
 	for _, pid := range pids {
 		t.removePid(pid)
+	}
+	if t.started {
+		t.applyMonitor("off")
+		t.applyTargetIds()
+		t.applyMonitor("on")
 	}
 }
 
@@ -147,15 +164,7 @@ func (t *TrackerDamon) applyAttrs(config *TrackerDamonConfig) error {
 	return nil
 }
 
-func (t *TrackerDamon) Start() error {
-	// Reset configuration.
-	if t.config == nil {
-		if err := t.SetConfigJson(trackerDamonDefaults); err != nil {
-			return fmt.Errorf("start failed on default configuration error: %w", err)
-		}
-	}
-	t.applyAttrs(t.config)
-
+func (t *TrackerDamon) applyTargetIds() error {
 	// Refresh all pids to be monitored.
 	// Writing a non-existing pids to target_ids causes an error.
 	pids := make([]string, 0, len(t.pids))
@@ -169,25 +178,70 @@ func (t *TrackerDamon) Start() error {
 	}
 	pidsStr := strings.Join(pids, " ")
 	if err := procWrite(t.damonDir+"/target_ids", []byte(pidsStr)); err != nil {
+		return err
 	}
+	return nil
+}
+
+func (t *TrackerDamon) applyMonitor(value string) error {
+	if err := procWrite(t.damonDir+"/monitor_on", []byte(value)); err != nil {
+		return err
+	}
+	status, err := procRead(t.damonDir + "/monitor_on")
+	if err != nil {
+		return err
+	}
+	if status[:2] == value[:2] {
+		fmt.Printf("TrackerDamon.Start: monitoring is %q\n", value)
+	} else {
+		return fmt.Errorf("wrote %q %s/monitor_on, but value is %q", value, t.damonDir, status)
+	}
+	return nil
+}
+
+func (t *TrackerDamon) Start() error {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	// Reset configuration.
+	if t.config == nil {
+		if err := t.SetConfigJson(trackerDamonDefaults); err != nil {
+			return fmt.Errorf("start failed on default configuration error: %w", err)
+		}
+	}
+
+	t.applyMonitor("off")
+
+	t.applyAttrs(t.config)
+
+	t.applyTargetIds()
 
 	if t.config.Connection == "perf" && !t.perfReaderRunning {
 		t.perfReaderRunning = true
 		go t.perfReader()
 	}
 
+	// Even if damon start monitor fails, the tracker state is
+	// "started" from this point on. That is, removing bad pids
+	// and adding new pids will try restarting monitor.
+	t.started = true
+
 	// Start monitoring.
-	if len(pids) > 0 {
-		if err := procWrite(t.damonDir+"/monitor_on", []byte("on")); err != nil {
+	if len(t.pids) > 0 {
+		if err := t.applyMonitor("on"); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
 
 func (t *TrackerDamon) Stop() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	// Never mind about error: may cause "Operation not permitted"
 	// if monitoring was already off.
-	procWrite(t.damonDir+"/monitor_on", []byte("off"))
+	t.applyMonitor("off")
+	t.started = false
 }
 
 func (t *TrackerDamon) ResetCounters() {
@@ -231,6 +285,7 @@ func (t *TrackerDamon) perfReader() error {
 	if err != nil {
 		return fmt.Errorf("creating stderr pipe for perf failed: %w", err)
 	}
+	fmt.Printf("TrackerDamon.perfReader: launching perf...\n")
 	if err = cmd.Start(); err != nil {
 		return fmt.Errorf("starting perf failed: %w", err)
 	}
@@ -276,7 +331,7 @@ func (t *TrackerDamon) perfHandleLine(line string) error {
 			return fmt.Errorf("parse error on nrStr %q element %q line %q\n", nrStr, csLine[4], line)
 		}
 	}
-	// ?? How to avoid locking this often
+	// TODO: avoid locking this often
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	lengthPgs := uint64(int64(end-start) / constPagesize)

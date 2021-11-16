@@ -17,6 +17,7 @@ package memtier
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -34,7 +35,13 @@ type PolicyHeatConfig struct {
 	HeatNumas map[int][]int
 }
 
-const policyHeatDefaults string = `{"Tracker":"damon"}`
+const policyHeatDefaults string = `{
+        "Tracker":"damon",
+        "TrackerConfig":"{\"Connection\":\"perf\",\"SamplingUs\":1000,\"AggregationUs\":100000,\"RegionsUpdateUs\":5000000,\"MinTargetRegions\":1000,\"MaxTargetRegions\":100000}",
+        "HeatmapConfig":"{\"HeatMax\":1.0,\"HeatRetention\":0.9513,\"HeatClasses\":10}",
+        "MoverConfig":"{\"Interval\":10,\"Bandwidth\":100}",
+        "Interval":30
+}`
 
 type PolicyHeat struct {
 	config       *PolicyHeatConfig
@@ -133,6 +140,12 @@ func (p *PolicyHeat) Tracker() Tracker {
 	return p.tracker
 }
 
+func (p *PolicyHeat) Dump() string {
+	lines := []string{}
+	lines = append(lines, "heatmap:", p.heatmap.Dump())
+	return strings.Join(lines, "\n")
+}
+
 func (p *PolicyHeat) Stop() {
 	if p.cgPidWatcher != nil {
 		p.cgPidWatcher.Stop()
@@ -177,8 +190,9 @@ func (p *PolicyHeat) loop() {
 	for !quit {
 		timestamp := time.Now().UnixNano()
 		p.heatmap.UpdateFromCounters(p.tracker.GetCounters(), timestamp)
+		p.tracker.ResetCounters()
 		if p.mover.TaskCount() == 0 {
-			p.move(timestamp)
+			p.startMoves(timestamp)
 		}
 		n += 1
 		select {
@@ -195,7 +209,7 @@ func (p *PolicyHeat) loop() {
 	p.chLoop = nil
 }
 
-func (p *PolicyHeat) move(timestamp int64) {
+func (p *PolicyHeat) startMoves(timestamp int64) {
 	for pid := range p.heatmap.Pids() {
 		p.heatmap.ForEachRange(pid, func(hr *HeatRange) int {
 			// TODO: config: is the information fresh enough for a decision?

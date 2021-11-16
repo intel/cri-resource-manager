@@ -47,3 +47,7 @@ func (p *PolicyStub) Mover() *Mover {
 func (p *PolicyStub) Tracker() Tracker {
 	return nil
 }
+
+func (p *PolicyStub) Dump() string {
+	return ""
+}

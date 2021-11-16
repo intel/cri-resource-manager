@@ -128,6 +128,14 @@ func procWrite(path string, data []byte) error {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
+func procRead(path string) (string, error) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 func procReadInt(path string) (int, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {

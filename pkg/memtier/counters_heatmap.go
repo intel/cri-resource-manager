@@ -43,7 +43,7 @@ type HeatmapConfig struct {
 	HeatClasses int
 }
 
-var HeatmapConfigDefaults string = `{"HeatMax":1.0,"HeatRetention": 0.9513}`
+var HeatmapConfigDefaults string = `{"HeatMax":1.0,"HeatRetention":0.9513,"HeatClasses":10}`
 
 type Heatmap struct {
 	config *HeatmapConfig
@@ -59,8 +59,8 @@ type HeatRange struct {
 	addr    uint64
 	length  uint64  // number of pages
 	heat    float64 // heat per page
-	updated int64
 	created int64
+	updated int64
 }
 
 type HeatRanges []*HeatRange
@@ -95,25 +95,23 @@ func (h *Heatmap) Pids() []int {
 // Dump presents heatmap as a string that indicate heat of each range
 func (h *Heatmap) Dump() string {
 	lines := []string{}
-	pids := make([]int, 0, len(h.pidHrs))
-	for pid := range h.pidHrs {
-		pids = append(pids, pid)
-	}
+	pids := h.Pids()
 	sort.Ints(pids)
 	for _, pid := range pids {
-		for _, hr := range *(h.pidHrs[pid]) {
-			lines = append(lines, fmt.Sprintf("pid: %d: %s", pid, hr))
+		for n, hr := range *(h.pidHrs[pid]) {
+			lines = append(lines, fmt.Sprintf("pid: %d: %d %s (class %d)", pid, n, hr, h.HeatClass(hr)))
 		}
 	}
 	return strings.Join(lines, "\n")
 }
 
 func (hr *HeatRange) String() string {
-	return fmt.Sprintf("{%x-%x(%d),%f,%d}",
+	return fmt.Sprintf("{%x-%x(%d),%f,%d,%d}",
 		hr.addr,
 		hr.addr+hr.length*uint64(constPagesize),
 		hr.length,
 		hr.heat,
+		hr.created,
 		hr.updated)
 }
 
@@ -122,6 +120,9 @@ func (hr *HeatRange) AddrRange() AddrRange {
 }
 
 func (h *Heatmap) HeatClass(hr *HeatRange) int {
+	if h.config.HeatMax == 0 {
+		return 0
+	}
 	heatClass := int(float64(h.config.HeatClasses) * hr.heat / h.config.HeatMax)
 	if heatClass >= h.config.HeatClasses {
 		heatClass = h.config.HeatClasses - 1
@@ -148,8 +149,8 @@ func (h *Heatmap) updateFromCounter(tc *TrackerCounter, timestamp int64) {
 			addr:    ar.Addr(),
 			length:  length,
 			heat:    float64(tc.Accesses+tc.Reads+tc.Writes) / float64(length),
-			updated: timestamp,
 			created: timestamp,
+			updated: timestamp,
 		}
 		if thr.heat > h.config.HeatMax {
 			thr.heat = h.config.HeatMax
@@ -177,8 +178,8 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 				addr:    hr.addr,
 				length:  (thr.addr - hr.addr) / uint64(constPagesize),
 				heat:    hr.heat,
-				updated: hr.updated,
 				created: hr.created,
+				updated: hr.updated,
 			}
 			*hrs = append(*hrs, &newHr)
 			hr.addr = thr.addr
@@ -195,8 +196,8 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 				addr:    thr.addr,
 				length:  (hr.addr - thr.addr) / uint64(constPagesize),
 				heat:    thr.heat,
-				updated: thr.updated,
 				created: thr.created,
+				updated: thr.updated,
 			}
 			*hrs = append(*hrs, &newHr)
 			thr.addr = hr.addr
@@ -220,6 +221,7 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 				addr:    thrEndAddr,
 				length:  (hrEndAddr - thrEndAddr) / uint64(constPagesize),
 				heat:    hr.heat,
+				created: hr.created,
 				updated: hr.updated,
 			}
 			*hrs = append(*hrs, &newHr)
@@ -257,8 +259,8 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			addr:    thr.addr,
 			length:  thr.length,
 			heat:    thr.heat,
-			updated: thr.updated,
 			created: thr.created,
+			updated: thr.updated,
 		}
 		*hrs = append(*hrs, &newHr)
 	}

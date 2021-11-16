@@ -140,6 +140,11 @@ func (p *PolicyAge) Tracker() Tracker {
 	return p.tracker
 }
 
+func (p *PolicyAge) Dump() string {
+	// TODO: describe policy state
+	return ""
+}
+
 func (p *PolicyAge) Stop() {
 	if p.cgPidWatcher != nil {
 		p.cgPidWatcher.Stop()
