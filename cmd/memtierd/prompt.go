@@ -20,6 +20,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
+	"log"
+	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,14 +64,14 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		mover: memtier.NewMover(),
 	}
 	p.cmds = map[string]Cmd{
-		"q":       Cmd{"quit interactive prompt", p.cmdQuit},
-		"tracker": Cmd{"track memory accesses and manage trackers", p.cmdTracker},
-		"stats":   Cmd{"print statistics", p.cmdStats},
-		"pages":   Cmd{"select pages, or print current pages", p.cmdPages},
-		"arange":  Cmd{"select/split/filter arange", p.cmdArange},
-		"mover":   Cmd{"move selected pages or manage mover", p.cmdMover},
-		"policy":  Cmd{"configure/start/stop policy", p.cmdPolicy},
-		"help":    Cmd{"print help", p.cmdHelp},
+		"q":       Cmd{"quit interactive prompt.", p.cmdQuit},
+		"tracker": Cmd{"manage tracker, track memory accesses.", p.cmdTracker},
+		"stats":   Cmd{"print statistics.", p.cmdStats},
+		"pages":   Cmd{"select pages, print selected page nodes and flags.", p.cmdPages},
+		"arange":  Cmd{"select/split/filter address ranges.", p.cmdArange},
+		"mover":   Cmd{"manage mover, move selected pages.", p.cmdMover},
+		"policy":  Cmd{"manage policy, start/stop memory tiering.", p.cmdPolicy},
+		"help":    Cmd{"print help.", p.cmdHelp},
 	}
 	return &p
 }
@@ -82,6 +85,8 @@ func (p *Prompt) output(format string, a ...interface{}) {
 }
 
 func (p *Prompt) interact() {
+	logger := log.New(p.w, "", 0)
+	memtier.SetLogger(logger)
 	for !p.quit {
 		p.output(p.ps1)
 		rawcmd, err := p.r.ReadString(byte('\n'))
@@ -89,15 +94,58 @@ func (p *Prompt) interact() {
 			p.output("quit: %s\n", err)
 			break
 		}
+		// If command has "|", run the left-hand-side of the
+		// pipe in a shell and pipe the output of the
+		// right-hand-side cmd<Function> call to it.
+		origOutputWriter := p.w
+		pipeCmd := ""
+		pipeIndex := strings.Index(rawcmd, "|")
+		if pipeIndex > -1 {
+			pipeCmd = rawcmd[pipeIndex+1:]
+			rawcmd = rawcmd[:pipeIndex]
+		}
 		cmdSlice := strings.Split(strings.TrimSpace(rawcmd), " ")
 		if len(cmdSlice) == 0 {
 			continue
 		}
 		p.f = flag.NewFlagSet(cmdSlice[0], flag.ContinueOnError)
 		if cmd, ok := p.cmds[cmdSlice[0]]; ok {
+			// If there is a pipe, redirect p.output()
+			// (that is, p.w) and logger output to the pipe
+			// before calling cmd<Function>.
+			var pipeProcess *exec.Cmd = nil
+			var pipeInput io.WriteCloser = nil
+			if pipeCmd != "" {
+				pipeProcess = exec.Command("sh", "-c", pipeCmd)
+				pipeInput, err = pipeProcess.StdinPipe()
+				if err != nil {
+					p.output("failed to create pipe for command %q", pipeCmd)
+					continue
+				}
+				pipeProcess.Stdout = origOutputWriter
+				pipeProcess.Stderr = origOutputWriter
+				err := pipeProcess.Start()
+				if err != nil {
+					p.w = origOutputWriter
+					p.output("failed to start: sh -c %q: %s", pipeCmd, err)
+					pipeInput.Close()
+					continue
+				}
+				p.w = bufio.NewWriter(pipeInput)
+				logger.SetOutput(p.w)
+			}
+			// Call cmd<Function>
 			cmd.Run(cmdSlice[1:])
+			// Wait for pipe process to exit and restore redirect.
+			if pipeCmd != "" {
+				p.w.Flush()
+				pipeInput.Close()
+				pipeProcess.Wait()
+				p.w = origOutputWriter
+				logger.SetOutput(origOutputWriter)
+			}
 		} else if len(cmdSlice[0]) > 0 {
-			p.output("unknown command\n")
+			p.output("unknown command %q\n", cmdSlice[0])
 		}
 	}
 	p.output("quit.\n")
@@ -126,9 +174,14 @@ func sortedNodeKeys(m map[memtier.Node]uint) []memtier.Node {
 }
 
 func (p *Prompt) cmdHelp(args []string) commandStatus {
+	p.output("Available commands:\n")
 	for _, name := range sortedStringKeys(p.cmds) {
-		p.output("%-12s %s\n", name, p.cmds[name].description)
+		p.output("        %-12s %s\n", name, p.cmds[name].description)
 	}
+	p.output("Syntax:\n")
+	p.output("        <command> -h show help on command options.\n")
+	p.output("        <command> | <shell-command>\n")
+	p.output("                     pipe command output to shell-command.\n")
 	return csOk
 }
 
