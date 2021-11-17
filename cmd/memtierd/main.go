@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -84,7 +85,7 @@ func parseOptRanges(rangeStr string) []memtier.AddrRange {
 }
 
 func main() {
-
+	memtier.SetLogger(log.New(os.Stderr, "", 0))
 	optPrompt := flag.Bool("prompt", false, "launch interactive prompt (ignore other parameters)")
 	optPid := flag.Int("pid", 0, "-pid=PID operate on this process")
 	optPages := flag.String("pages", "", "-pages=[Exclusive,Dirty,NotDirty,InHeap,InAnonymous]")

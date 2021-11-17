@@ -45,7 +45,7 @@ const policyHeatDefaults string = `{
 
 type PolicyHeat struct {
 	config       *PolicyHeatConfig
-	cgPidWatcher *CgroupPidWatcher
+	cgPidWatcher *PidWatcherCgroup
 	chLoop       chan interface{} // for communication to the main loop of the policy
 	tracker      Tracker
 	heatmap      *Heatmap
@@ -62,7 +62,7 @@ func NewPolicyHeat() (Policy, error) {
 		heatmap: NewCounterHeatmap(),
 		mover:   NewMover(),
 	}
-	if p.cgPidWatcher, err = NewCgroupPidWatcher(); err != nil {
+	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
 		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
 	}
 
@@ -156,6 +156,7 @@ func (p *PolicyHeat) Stop() {
 	if p.chLoop != nil {
 		p.chLoop <- struct{}{}
 	}
+	log.Debugf("PolicyHeat: offline\n")
 }
 
 func (p *PolicyHeat) Start() error {
@@ -171,14 +172,19 @@ func (p *PolicyHeat) Start() error {
 	if len(p.config.Cgroups) == 0 {
 		return fmt.Errorf("policy has nothing to watch")
 	}
-	p.tracker.Start()
+	if err := p.tracker.Start(); err != nil {
+		return fmt.Errorf("tracker start error: %w", err)
+	}
 	p.chLoop = make(chan interface{})
 	p.cgPidWatcher.SetSources(p.config.Cgroups)
 	if len(p.config.Cgroups) > 0 {
 		p.cgPidWatcher.Start(p.tracker)
 	}
-	p.mover.Start()
+	if err := p.mover.Start(); err != nil {
+		return fmt.Errorf("mover start error: %w", err)
+	}
 	go p.loop()
+	log.Debugf("PolicyHeat: online\n")
 	return nil
 }
 
@@ -189,8 +195,10 @@ func (p *PolicyHeat) loop() {
 	n := uint64(0)
 	for !quit {
 		timestamp := time.Now().UnixNano()
-		p.heatmap.UpdateFromCounters(p.tracker.GetCounters(), timestamp)
+		newCounters := p.tracker.GetCounters()
 		p.tracker.ResetCounters()
+		log.Debugf("PolicyHeat: updating heatmap with %d address ranges\n", len(*newCounters))
+		p.heatmap.UpdateFromCounters(newCounters, timestamp)
 		if p.mover.TaskCount() == 0 {
 			p.startMoves(timestamp)
 		}

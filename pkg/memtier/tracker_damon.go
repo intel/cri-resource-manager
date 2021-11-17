@@ -110,7 +110,7 @@ func (t *TrackerDamon) GetConfigJson() string {
 func (t *TrackerDamon) AddPids(pids []int) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	fmt.Printf("TrackerDamon.AddPids(%v)\n", pids)
+	log.Debugf("TrackerDamon: AddPids(%v)\n", pids)
 	for _, pid := range pids {
 		t.pids = append(t.pids, pid)
 	}
@@ -124,7 +124,7 @@ func (t *TrackerDamon) AddPids(pids []int) {
 func (t *TrackerDamon) RemovePids(pids []int) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	fmt.Printf("TrackerDamon.RemovePids(%v)\n", pids)
+	log.Debugf("TrackerDamon: RemovePids(%v)\n", pids)
 	if pids == nil {
 		t.pids = []int{}
 		return
@@ -192,7 +192,7 @@ func (t *TrackerDamon) applyMonitor(value string) error {
 		return err
 	}
 	if status[:2] == value[:2] {
-		fmt.Printf("TrackerDamon.Start: monitoring is %q\n", value)
+		log.Debugf("TrackerDamon.Start: monitoring is %q\n", value)
 	} else {
 		return fmt.Errorf("wrote %q %s/monitor_on, but value is %q", value, t.damonDir, status)
 	}
@@ -231,7 +231,7 @@ func (t *TrackerDamon) Start() error {
 			return err
 		}
 	}
-
+	log.Debugf("TrackerDamon: online\n")
 	return nil
 }
 
@@ -241,6 +241,7 @@ func (t *TrackerDamon) Stop() {
 	// Never mind about error: may cause "Operation not permitted"
 	// if monitoring was already off.
 	t.applyMonitor("off")
+	log.Debugf("TrackerDamon: offline\n")
 	t.started = false
 }
 
@@ -285,7 +286,7 @@ func (t *TrackerDamon) perfReader() error {
 	if err != nil {
 		return fmt.Errorf("creating stderr pipe for perf failed: %w", err)
 	}
-	fmt.Printf("TrackerDamon.perfReader: launching perf...\n")
+	log.Debugf("TrackerDamon: launching perf...\n")
 	if err = cmd.Start(); err != nil {
 		return fmt.Errorf("starting perf failed: %w", err)
 	}
@@ -297,7 +298,7 @@ func (t *TrackerDamon) perfReader() error {
 		t.perfHandleLine(line)
 	}
 	cmd.Wait()
-	fmt.Printf("perfReader quitting\n")
+	log.Debugf("TrackerDamon: perfReader quitting\n")
 	return nil
 }
 

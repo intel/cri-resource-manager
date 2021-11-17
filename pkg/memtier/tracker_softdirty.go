@@ -180,6 +180,7 @@ func (t *TrackerSoftDirty) Start() error {
 	t.toSampler = make(chan byte, 1)
 	t.clearPageBits()
 	go t.sampler()
+	log.Debugf("TrackerSoftDirty: online\n")
 	return nil
 }
 
@@ -187,6 +188,7 @@ func (t *TrackerSoftDirty) Stop() {
 	if t.toSampler != nil {
 		t.toSampler <- 0
 	}
+	log.Debugf("TrackerSoftDirty: offline\n")
 }
 
 func (t *TrackerSoftDirty) sampler() {
@@ -324,11 +326,9 @@ func (t *TrackerSoftDirty) clearPageBits() {
 		pidString := strconv.Itoa(pid)
 		path := "/proc/" + pidString + "/clear_refs"
 		if t.config.TrackSoftDirty {
-			// fmt.Printf("4 -> clear_refs\n")
 			err = procWrite(path, []byte("4\n"))
 		}
 		if t.config.TrackReferenced && err == nil {
-			// fmt.Printf("1 -> clear_refs\n")
 			err = procWrite(path, []byte("1\n"))
 		}
 		if err != nil {

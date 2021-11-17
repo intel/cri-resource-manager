@@ -36,7 +36,7 @@ const policyAgeDefaults string = `{"Tracker":"idlepage","Interval":5,"ActiveDura
 
 type PolicyAge struct {
 	config       *PolicyAgeConfig
-	cgPidWatcher *CgroupPidWatcher
+	cgPidWatcher *PidWatcherCgroup
 	cgLoop       chan interface{}
 	tracker      Tracker
 	palt         *pidAddrLenTc // pid - address - length - memory trackercounter's age
@@ -61,7 +61,7 @@ func NewPolicyAge() (Policy, error) {
 	p := &PolicyAge{
 		mover: NewMover(),
 	}
-	if p.cgPidWatcher, err = NewCgroupPidWatcher(); err != nil {
+	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
 		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
 	}
 
@@ -155,6 +155,7 @@ func (p *PolicyAge) Stop() {
 	if p.cgLoop != nil {
 		p.cgLoop <- struct{}{}
 	}
+	log.Debugf("PolicyAge: offline\n")
 }
 
 func (p *PolicyAge) Start() error {
@@ -178,6 +179,7 @@ func (p *PolicyAge) Start() error {
 	}
 	p.mover.Start()
 	go p.loop()
+	log.Debugf("PolicyAge: online\n")
 	return nil
 }
 
@@ -307,7 +309,7 @@ func (p *PolicyAge) loop() {
 			// Moving idle pages is enabled.
 			itcs := p.idleCounters(timestamp).RegionsMerged()
 			for _, tc := range *itcs {
-				fmt.Printf("%d sec idle: %s\n", p.config.IdleDuration, tc.AR.Ranges()[0])
+				log.Debugf("%d sec idle: %s\n", p.config.IdleDuration, tc.AR.Ranges()[0])
 			}
 			// TODO: skip already moved regions
 			p.move(itcs, Node(p.config.IdleNUMA))
@@ -317,7 +319,7 @@ func (p *PolicyAge) loop() {
 			// Moving active pages is enabled.
 			atcs := p.activeCounters().RegionsMerged()
 			for _, tc := range *atcs {
-				fmt.Printf("%d sec active: %s\n", p.config.ActiveDuration, tc.AR.Ranges()[0])
+				log.Debugf("%d sec active: %s\n", p.config.ActiveDuration, tc.AR.Ranges()[0])
 			}
 			// TODO: skip already moved regions
 			p.move(atcs, Node(p.config.ActiveNUMA))

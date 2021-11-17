@@ -176,6 +176,7 @@ func (t *TrackerIdlePage) Start() error {
 	t.toSampler = make(chan byte, 1)
 	t.setIdleBits()
 	go t.sampler()
+	log.Debugf("TrackerIdlePage: online\n")
 	return nil
 }
 
@@ -183,6 +184,7 @@ func (t *TrackerIdlePage) Stop() {
 	if t.toSampler != nil {
 		t.toSampler <- 0
 	}
+	log.Debugf("TrackerIdlePage: offline\n")
 }
 
 func (t *TrackerIdlePage) sampler() {

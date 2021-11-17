@@ -25,47 +25,48 @@ import (
 	"time"
 )
 
-type CgroupPidWatcher struct {
+type PidWatcherCgroup struct {
 	cgroupPaths  map[string]setMemberType
 	pidsReported map[int]setMemberType
 	listener     PidListener
 	stop         bool
 }
 
-func NewCgroupPidWatcher() (*CgroupPidWatcher, error) {
-	w := &CgroupPidWatcher{
+func NewPidWatcherCgroup() (*PidWatcherCgroup, error) {
+	w := &PidWatcherCgroup{
 		cgroupPaths:  map[string]setMemberType{},
 		pidsReported: map[int]setMemberType{},
 	}
 	return w, nil
 }
 
-func (w *CgroupPidWatcher) SetSources(sources []string) {
+func (w *PidWatcherCgroup) SetSources(sources []string) {
 	w.cgroupPaths = map[string]setMemberType{}
 	for _, cgroupPath := range sources {
 		w.cgroupPaths[cgroupPath] = setMember
 	}
 }
 
-func (w *CgroupPidWatcher) Poll(l PidListener) error {
+func (w *PidWatcherCgroup) Poll(l PidListener) error {
 	w.listener = l
 	w.stop = false
 	w.loop(true)
 	return nil
 }
 
-func (w *CgroupPidWatcher) Start(l PidListener) error {
+func (w *PidWatcherCgroup) Start(l PidListener) error {
 	w.listener = l
 	w.stop = false
 	go w.loop(false)
+	log.Debugf("PidWatcherCgroup: online\n")
 	return nil
 }
 
-func (w *CgroupPidWatcher) Stop() {
+func (w *PidWatcherCgroup) Stop() {
 	w.stop = true
 }
 
-func (w *CgroupPidWatcher) loop(singleshot bool) {
+func (w *PidWatcherCgroup) loop(singleshot bool) {
 	ticker := time.NewTicker(time.Duration(5) * time.Second)
 	defer ticker.Stop()
 	for {
@@ -131,6 +132,7 @@ func (w *CgroupPidWatcher) loop(singleshot bool) {
 			continue
 		}
 	}
+	log.Debugf("PidWatcherCgroup: offline\n")
 }
 
 func readPids(path string) ([]int, error) {
