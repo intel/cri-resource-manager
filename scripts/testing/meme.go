@@ -33,11 +33,14 @@ func bExerciser(read, write bool, b []byte, offset int64, count int64, interval 
 	for {
 		roundStartIndex := (offset + (offsetDelta * round)) % int64(len(b))
 		roundCount := count + (countDelta * round)
-		if roundCount+roundStartIndex > int64(len(b)) {
+		if roundCount+roundStartIndex >= int64(len(b)) {
 			roundCount = int64(len(b)) - roundStartIndex
 		}
 		if interval > 0 {
 			time.Sleep(time.Duration(interval) * time.Microsecond)
+			if interval >= 1000000 {
+				fmt.Printf("    - round: %d, read: %v, write %v, range %x-%x\n", round, read, write, &b[roundStartIndex], &b[roundStartIndex+roundCount])
+			}
 		}
 		if write {
 			for i := roundStartIndex; i < roundStartIndex+roundCount; i++ {
@@ -63,14 +66,15 @@ func bAddrRange(b []byte, count int) string {
 
 func main() {
 	fmt.Printf("memory exerciser\npid: %d\n", os.Getpid())
+	optTTL := flag.Int("ttl", -1, "do not wait for keypress, terminate after given time (seconds)")
 	optBCount := flag.Int("bc", 1, "number of byte arrays")
 	optBSize := flag.Int("bs", 1024*1024, "size of each byte array [kB]")
 	optBReaderCount := flag.Int("brc", 1, "number of byte arrays to be read")
 	optBWriterCount := flag.Int("bwc", 1, "number of byte arrays to be written")
 	optBReadSize := flag.Int64("brs", 1024*1024, "size of read on each byte array [kB]")
 	optBWriteSize := flag.Int64("bws", 1024*1024, "size of write on each byte array [kB]")
-	optBReadSizeDelta := flag.Int64("brsd", 1024*1024, "size change on each iteration [kB]")
-	optBWriteSizeDelta := flag.Int64("bwsd", 1024*1024, "size change on each iteration [kB]")
+	optBReadSizeDelta := flag.Int64("brsd", 0, "size change on each iteration [kB]")
+	optBWriteSizeDelta := flag.Int64("bwsd", 0, "size change on each iteration [kB]")
 	optBReadOffset := flag.Int64("bro", 0, "offset of read on each byte array [kB]")
 	optBWriteOffset := flag.Int64("bwo", 0, "offset of write on each byte array [kB]")
 	optBReadOffsetDelta := flag.Int64("brod", 0, "offset change on each iteration [kB]")
@@ -105,6 +109,10 @@ func main() {
 	}
 
 	// wait
-	fmt.Printf("press enter to exit...")
-	bufio.NewReader(os.Stdin).ReadString('\n')
+	if *optTTL == -1 {
+		fmt.Printf("press enter to exit...")
+		bufio.NewReader(os.Stdin).ReadString('\n')
+	} else {
+		time.Sleep(time.Duration(*optTTL) * time.Second)
+	}
 }
