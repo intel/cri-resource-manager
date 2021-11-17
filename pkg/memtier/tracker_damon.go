@@ -280,7 +280,7 @@ func (t *TrackerDamon) GetCounters() *TrackerCounters {
 }
 
 func (t *TrackerDamon) perfReader() error {
-	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated")
+	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated", "--filter", "nr_accesses > 0")
 	errPipe, err := cmd.StderrPipe()
 	perfOutput := bufio.NewReader(errPipe)
 	if err != nil {
@@ -295,7 +295,9 @@ func (t *TrackerDamon) perfReader() error {
 		if err != nil || line == "" {
 			break
 		}
-		t.perfHandleLine(line)
+		if err := t.perfHandleLine(line); err != nil {
+			log.Debugf("perf parse error: %s", err)
+		}
 	}
 	cmd.Wait()
 	log.Debugf("TrackerDamon: perfReader quitting\n")
@@ -309,27 +311,33 @@ func (t *TrackerDamon) perfHandleLine(line string) error {
 	// TODO: how to convert target_id to pid?
 	csLine := strings.Split(line, ", ")
 	if len(csLine) < 4 {
-		return fmt.Errorf("invalid bad line %q", csLine)
+		return fmt.Errorf("bad line %q", csLine)
 	}
 	startStr := csLine[2][7:]
 	endStr := csLine[3][5:]
 	nrStr := ""
+	// strip ")\n" from the end of nrStr or endStr
 	if len(csLine) == 5 {
 		nrStr = csLine[4][13 : len(csLine[4])-2]
+	} else {
+		endStr = endStr[:len(endStr)-2]
 	}
 	start, err := strconv.Atoi(startStr)
 	if err != nil {
-		return fmt.Errorf("parse error on startStr %q element %q line %q\n", startStr, csLine[2], line)
+		return fmt.Errorf("parse error on startStr %q element %q line %q", startStr, csLine[2], line)
 	}
 	end, err := strconv.Atoi(endStr)
 	if err != nil {
-		return fmt.Errorf("parse error on endStr %q element %q line %q\n", endStr, csLine[3], line)
+		return fmt.Errorf("parse error on endStr %q element %q line %q", endStr, csLine[3], line)
+	}
+	if start >= end {
+		return fmt.Errorf("parse error: start >= end (%d >= %d) line %q", start, end, line)
 	}
 	nr := 0
 	if len(nrStr) > 0 {
 		nr, err = strconv.Atoi(nrStr)
 		if err != nil {
-			return fmt.Errorf("parse error on nrStr %q element %q line %q\n", nrStr, csLine[4], line)
+			return fmt.Errorf("parse error on nrStr %q element %q line %q", nrStr, csLine[4], line)
 		}
 	}
 	// TODO: avoid locking this often
