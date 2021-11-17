@@ -762,7 +762,7 @@ bin/memtierd: $(wildcard cmd/memtierd/*.go) \
             done | sort | uniq)
 
 bin/meme: scripts/testing/meme.go
-	$(GO_BUILD) -o $@ $<
+	$(GO_BUILD) $(GCFLAGS) -o $@ $<
 #
 # rules to run go generators
 #
