@@ -712,7 +712,7 @@ vm-install-cri() {
 
 vm-install-containernetworking() {
     vm-install-golang
-    vm-command "go get -d github.com/containernetworking/plugins"
+    vm-command "GO111MODULE=off go get -d github.com/containernetworking/plugins"
     CNI_PLUGINS_SOURCE_DIR="$(awk '/package.*plugins/{print $NF}' <<< "$COMMAND_OUTPUT")"
     [ -n "$CNI_PLUGINS_SOURCE_DIR" ] || {
         command-error "downloading containernetworking plugins failed"
