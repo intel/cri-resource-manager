@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
@@ -285,6 +286,21 @@ func (p *policy) Introspect(state *introspect.State) {
 		assignments[a.ContainerID] = a
 	}
 	state.Assignments = assignments
+}
+
+// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+func (p *policy) DescribeMetrics() []*prometheus.Desc {
+	return nil
+}
+
+// PollMetrics provides policy metrics for monitoring.
+func (p *policy) PollMetrics() policyapi.Metrics {
+	return nil
+}
+
+// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+func (p *policy) CollectMetrics(policyapi.Metrics) ([]prometheus.Metric, error) {
+	return nil, nil
 }
 
 // ExportResourceData provides resource data to export for the container.

@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -212,6 +213,21 @@ func (p *staticplus) ExportResourceData(c cache.Container) map[string]string {
 // Introspect provides data for external introspection.
 func (p *staticplus) Introspect(*introspect.State) {
 	return
+}
+
+// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+func (p *staticplus) DescribeMetrics() []*prometheus.Desc {
+	return nil
+}
+
+// PollMetrics provides policy metrics for monitoring.
+func (p *staticplus) PollMetrics() policy.Metrics {
+	return nil
+}
+
+// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+func (p *staticplus) CollectMetrics(policy.Metrics) ([]prometheus.Metric, error) {
+	return nil, nil
 }
 
 // policyError creates a formatted policy-specific error.

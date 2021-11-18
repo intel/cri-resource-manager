@@ -20,6 +20,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -103,6 +104,21 @@ func (n *none) ExportResourceData(c cache.Container) map[string]string {
 // Introspect provides data for external introspection.
 func (n *none) Introspect(*introspect.State) {
 	return
+}
+
+// PollMetrics provides policy metrics for monitoring.
+func (p *none) PollMetrics() policy.Metrics {
+	return nil
+}
+
+// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+func (p *none) DescribeMetrics() []*prometheus.Desc {
+	return nil
+}
+
+// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+func (p *none) CollectMetrics(policy.Metrics) ([]prometheus.Metric, error) {
+	return nil, nil
 }
 
 // Register us as a policy implementation.
