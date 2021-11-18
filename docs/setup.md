@@ -36,7 +36,7 @@ tiering support.
 
 **NOTE**: Currently, the available policies are a work in progress.
 
-### Setting up kubelet to use CRI Resource Manager as the runtime
+## Setting up kubelet to use CRI Resource Manager as the runtime
 
 To let CRI Resource Manager act as a proxy between kubelet and the CRI
 runtime, you need to configure kubelet to connect to CRI Resource Manager
