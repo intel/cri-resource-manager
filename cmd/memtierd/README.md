@@ -131,3 +131,31 @@ ssh opensuse@172.17.0.2 "sudo mv meme /usr/local/bin"
    ```
    ( echo pages -pid $(pidof meme); echo pages; echo mover -pages-to 1; sleep 10; echo pages ) | sudo ./memtierd -prompt
    ```
+
+## Policy: Heat
+
+The heat policy feeds tracker addresses and counter values into a
+heatmap, and moves pages based on their heat.
+
+The heatmap quantifies heats of address ranges (heats values [0.0,
+`HeatMax`]) into `HeatClasses` classes. The heat classes are named 0,
+1, ..., `HeatClasses`-1. `HeatRetention` is the portion of the heat
+that retains in the map after one second of inactivity.
+
+The policy parameter `HeatNumas` maps heat classes into sets of NUMA
+nodes. A page that belongs to a class should be moved into any NUMA
+node in this class. If there is no NUMA node set a heat class, a page
+in that heat class will not be moved.
+
+Example where pages are divided into heat classes 0, 1, 2 and 3, and a
+page in a class is moved to corresponding NUMA node.
+
+```
+memtierd> policy -create heat -config {"Tracker":"idlepage","HeatmapConfig":"{\"HeatMax\":0.01,\"HeatRetention\":0.95,\"HeatClasses\":4}","MoverConfig":"{\"Interval\":10,\"Bandwidth\":100}","Cgroups":["/sys/fs/cgroup/foobar"],"Interval":5,"HeatNumas":{"0":[0],"1":[1],"2":[2],"3":[3]}} -start
+```
+
+You can track process memory consumption on each NUMA node by watching
+
+```
+while true; do clear; awk 'BEGIN{RS=" ";FS="="}/N[0-9]+/{mem[$1]+=$2}END{for(node in mem){print node" "mem[node]*4/1024" M"}}' < /proc/$(pidof MYPROCESS)/numa_maps; sleep 2; done
+```
