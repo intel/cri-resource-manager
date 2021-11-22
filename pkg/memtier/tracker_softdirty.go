@@ -36,7 +36,7 @@ type TrackerSoftDirtyConfig struct {
 	// whole region. 1: increase counters
 	// by at most 1 per tracked bits in
 	// pages in the region.
-	AggregationUs   uint64 // interval in microseconds
+	Interval        uint64 // interval in microseconds
 	RegionsUpdateUs uint64 // interval in microseconds
 	SkipPageProb    int    // Sampling premilles: 0: read all
 	// pages, 1000: skip next page with
@@ -46,7 +46,7 @@ type TrackerSoftDirtyConfig struct {
 // TODO: Referenced tracking does not work properly.
 // TODO: if PFNs are tracked, refuse to start or disable if enabled
 // /proc/sys/kernel/numa_balancing
-const trackerSoftDirtyDefaults string = `{"AggregationUs":1000000,"PagesInRegion":512,"SkipPageProb":0,"TrackReferenced":false,"TrackSoftDirty":true,"MaxCountPerRegion":1}`
+const trackerSoftDirtyDefaults string = `{"Interval":1000000,"PagesInRegion":512,"SkipPageProb":0,"TrackReferenced":false,"TrackSoftDirty":true,"MaxCountPerRegion":1}`
 
 type accessCounter struct {
 	a uint64 // number of times pages getting accessed
@@ -180,7 +180,6 @@ func (t *TrackerSoftDirty) Start() error {
 	t.toSampler = make(chan byte, 1)
 	t.clearPageBits()
 	go t.sampler()
-	log.Debugf("TrackerSoftDirty: online\n")
 	return nil
 }
 
@@ -188,11 +187,12 @@ func (t *TrackerSoftDirty) Stop() {
 	if t.toSampler != nil {
 		t.toSampler <- 0
 	}
-	log.Debugf("TrackerSoftDirty: offline\n")
 }
 
 func (t *TrackerSoftDirty) sampler() {
-	ticker := time.NewTicker(time.Duration(t.config.AggregationUs) * time.Microsecond)
+	log.Debugf("TrackerSoftDirty: online\n")
+	defer log.Debugf("TrackerSoftDirty: offline\n")
+	ticker := time.NewTicker(time.Duration(t.config.Interval) * time.Microsecond)
 	defer ticker.Stop()
 	for {
 		select {

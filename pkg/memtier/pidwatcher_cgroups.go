@@ -58,7 +58,6 @@ func (w *PidWatcherCgroup) Start(l PidListener) error {
 	w.listener = l
 	w.stop = false
 	go w.loop(false)
-	log.Debugf("PidWatcherCgroup: online\n")
 	return nil
 }
 
@@ -67,6 +66,8 @@ func (w *PidWatcherCgroup) Stop() {
 }
 
 func (w *PidWatcherCgroup) loop(singleshot bool) {
+	log.Debugf("PidWatcherCgroup: online\n")
+	defer log.Debugf("PidWatcherCgroup: offline\n")
 	ticker := time.NewTicker(time.Duration(5) * time.Second)
 	defer ticker.Stop()
 	for {
@@ -132,7 +133,6 @@ func (w *PidWatcherCgroup) loop(singleshot bool) {
 			continue
 		}
 	}
-	log.Debugf("PidWatcherCgroup: offline\n")
 }
 
 func readPids(path string) ([]int, error) {

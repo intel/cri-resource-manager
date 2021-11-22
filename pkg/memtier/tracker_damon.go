@@ -231,7 +231,6 @@ func (t *TrackerDamon) Start() error {
 			return err
 		}
 	}
-	log.Debugf("TrackerDamon: online\n")
 	return nil
 }
 
@@ -241,7 +240,6 @@ func (t *TrackerDamon) Stop() {
 	// Never mind about error: may cause "Operation not permitted"
 	// if monitoring was already off.
 	t.applyMonitor("off")
-	log.Debugf("TrackerDamon: offline\n")
 	t.started = false
 }
 
@@ -280,6 +278,8 @@ func (t *TrackerDamon) GetCounters() *TrackerCounters {
 }
 
 func (t *TrackerDamon) perfReader() error {
+	log.Debugf("TrackerDamon: online\n")
+	defer log.Debugf("TrackerDamon: offline\n")
 	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated", "--filter", "nr_accesses > 0")
 	errPipe, err := cmd.StderrPipe()
 	perfOutput := bufio.NewReader(errPipe)

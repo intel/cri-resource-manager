@@ -155,7 +155,6 @@ func (p *PolicyAge) Stop() {
 	if p.cgLoop != nil {
 		p.cgLoop <- struct{}{}
 	}
-	log.Debugf("PolicyAge: offline\n")
 }
 
 func (p *PolicyAge) Start() error {
@@ -179,7 +178,6 @@ func (p *PolicyAge) Start() error {
 	}
 	p.mover.Start()
 	go p.loop()
-	log.Debugf("PolicyAge: online\n")
 	return nil
 }
 
@@ -292,6 +290,8 @@ func (p *PolicyAge) move(tcs *TrackerCounters, destNode Node) {
 }
 
 func (p *PolicyAge) loop() {
+	log.Debugf("PolicyAge: online\n")
+	defer log.Debugf("PolicyAge: offline\n")
 	ticker := time.NewTicker(time.Duration(p.config.Interval) * time.Second)
 	defer ticker.Stop()
 

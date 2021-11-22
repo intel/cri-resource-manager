@@ -156,7 +156,6 @@ func (p *PolicyHeat) Stop() {
 	if p.chLoop != nil {
 		p.chLoop <- struct{}{}
 	}
-	log.Debugf("PolicyHeat: offline\n")
 }
 
 func (p *PolicyHeat) Start() error {
@@ -184,11 +183,12 @@ func (p *PolicyHeat) Start() error {
 		return fmt.Errorf("mover start error: %w", err)
 	}
 	go p.loop()
-	log.Debugf("PolicyHeat: online\n")
 	return nil
 }
 
 func (p *PolicyHeat) loop() {
+	log.Debugf("PolicyHeat: online\n")
+	defer log.Debugf("PolicyHeat: offline\n")
 	ticker := time.NewTicker(time.Duration(p.config.Interval) * time.Second)
 	defer ticker.Stop()
 	quit := false
