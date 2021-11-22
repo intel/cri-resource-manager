@@ -136,8 +136,11 @@ func (m *Mover) Tasks() []*MoverTask {
 
 func (m *Mover) AddTask(task *MoverTask) {
 	m.mutex.Lock()
-	defer m.mutex.Unlock()
 	m.tasks = append(m.tasks, task)
+	// m.mutex must be unlocked before using the channel,
+	// otherwise taskHandler may never read the channel
+	// because it is waiting for the lock.
+	m.mutex.Unlock()
 	m.toTaskHandler <- thContinue
 }
 
