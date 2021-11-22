@@ -203,12 +203,14 @@ host-create-vm() {
 }
 
 host-wait-vm-ssh-server() {
-    VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
-    while [ "x$VM_IP" == "x" ]; do
-        host-command "${GOVM} start \"$VM_NAME\""
-        sleep 5
+    if [ -z "$VM_IP" ]; then
         VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
-    done
+        while [ "x$VM_IP" == "x" ]; do
+            host-command "${GOVM} start \"$VM_NAME\""
+            sleep 5
+            VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
+        done
+    fi
     echo "# VM SSH server  : ssh $VM_SSH_USER@$VM_IP"
 
     if [ -d "$HOME/vms/data/$VM_NAME" ]; then
