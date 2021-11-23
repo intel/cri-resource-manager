@@ -16,7 +16,6 @@ package procstats
 
 import (
 	"io/ioutil"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,16 +45,16 @@ var (
 
 // GetCPUTimeStat calculates CPU usage by using the CPU time statistics from /proc/stat
 func (t *CPUTimeStat) GetCPUTimeStat() error {
-	lines, err := readLines(procStat)
-	if err != nil {
-		return err
-	}
 	// /proc/stat looks like this:
 	// cpuid: user, nice, system, idle, iowait, irq, softirq
 	// cpu  130216 19944 162525 1491240 3784 24749 17773 0 0 0
 	// cpu0 40321 11452 49784 403099 2615 6076 6748 0 0 0
 	// cpu1 26585 2425 36639 151166 404 2533 3541 0 0 0
 	// ...
+	stats, err := ioutil.ReadFile(procStat)
+	if err != nil {
+		return err
+	}
 	t.Lock()
 	defer t.Unlock()
 	sys, err := sysfs.DiscoverSystem()
@@ -63,12 +62,13 @@ func (t *CPUTimeStat) GetCPUTimeStat() error {
 		return err
 	}
 	cpuCount := len(sys.CPUIDs())
-	for index, line := range lines {
+	for index, line := range strings.Split(string(stats), "\n") {
 		if index > cpuCount {
 			break
 		}
 		split := strings.Split(line, " ")
-		if matched, _ := regexp.MatchString("cpu+\\d", split[0]); matched {
+
+		if strings.HasPrefix(split[0], "cpu") && split[0] != "cpu" {
 			i, err := strconv.Atoi(split[0][3:])
 			if err != nil {
 				log.Error("Fail to get CPU index.")
@@ -108,20 +108,4 @@ func (t *CPUTimeStat) GetCPUTimeStat() error {
 	}
 	t.IsGetCPUUsageBegin = true
 	return nil
-}
-
-func readLines(filePath string) ([]string, error) {
-	f, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-	data := string(f)
-	rawLines := strings.Split(data, "\n")
-	lines := make([]string, 0)
-	for _, rawLine := range rawLines {
-		if len(strings.TrimSpace(rawLine)) > 0 {
-			lines = append(lines, rawLine)
-		}
-	}
-	return lines, nil
 }

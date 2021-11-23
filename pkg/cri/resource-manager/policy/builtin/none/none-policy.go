@@ -116,7 +116,7 @@ func (p *none) DescribeMetrics() []*prometheus.Desc {
 	return nil
 }
 
-// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
 func (p *none) CollectMetrics(policy.Metrics) ([]prometheus.Metric, error) {
 	return nil, nil
 }
