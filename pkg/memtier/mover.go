@@ -220,7 +220,6 @@ func (m *Mover) handleTask(task *MoverTask) taskStatus {
 	if len(task.pages.Offset(count).Pages()) > 0 {
 		return tsContinue
 	}
-	log.Debugf("mover task finished %s\n", task)
 	return tsDone
 }
 

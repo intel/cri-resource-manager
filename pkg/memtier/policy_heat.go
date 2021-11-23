@@ -218,6 +218,7 @@ func (p *PolicyHeat) loop() {
 }
 
 func (p *PolicyHeat) startMoves(timestamp int64) {
+	moverTasks := 0
 	for _, pid := range p.heatmap.Pids() {
 		p.heatmap.ForEachRange(pid, func(hr *HeatRange) int {
 			// TODO: config: is the information fresh enough for a decision?
@@ -238,16 +239,22 @@ func (p *PolicyHeat) startMoves(timestamp int64) {
 			destNode := Node(numas[0])
 			// TODO: check current NUMA nodes of the
 			// range, do not move if already there.
-			log.Debugf("create mover task for pid %d, %s\n", pid, hr.AddrRange())
 			ar := NewAddrRanges(pid, hr.AddrRange())
 			ppages, err := ar.PagesMatching(PMPresentSet | PMExclusiveSet)
 			if err != nil {
 				return -1
 			}
 			ppages = ppages.NotOnNode(destNode)
+			if len(ppages.pages) == 0 {
+				return 0
+			}
+			moverTasks += 1
 			task := NewMoverTask(ppages, destNode)
 			p.mover.AddTask(task)
 			return 0
 		})
+	}
+	if moverTasks > 0 {
+		log.Debugf("created %d mover tasks\n", moverTasks)
 	}
 }

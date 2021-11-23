@@ -46,8 +46,9 @@ type TrackerDamon struct {
 	pids              []int
 	started           bool
 	perfReaderRunning bool
-	// accesses maps startAddr -> lengthPgs -> accessCount
-	accesses map[uint64]map[uint64]uint64
+	// accesses maps pid -> startAddr -> lengthPgs -> accessCount
+	accesses   map[int64]map[uint64]map[uint64]uint64
+	lostEvents uint
 }
 
 func init() {
@@ -57,7 +58,7 @@ func init() {
 func NewTrackerDamon() (Tracker, error) {
 	t := TrackerDamon{
 		damonDir: "/sys/kernel/debug/damon",
-		accesses: make(map[uint64]map[uint64]uint64),
+		accesses: make(map[int64]map[uint64]map[uint64]uint64),
 	}
 
 	if !procFileExists(t.damonDir) {
@@ -247,31 +248,45 @@ func (t *TrackerDamon) ResetCounters() {
 	// TODO: lock!? so that perfReader wouldn't need lock on every line?
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	t.accesses = make(map[uint64]map[uint64]uint64)
+	if t.lostEvents > 0 {
+		log.Debugf("TrackerDamon: ResetCounters: events lost %d\n", t.lostEvents)
+	}
+	t.accesses = make(map[int64]map[uint64]map[uint64]uint64)
+	t.lostEvents = 0
 }
 
 func (t *TrackerDamon) GetCounters() *TrackerCounters {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	tcs := &TrackerCounters{}
-	for start, lengthCount := range t.accesses {
-		for length, count := range lengthCount {
-			addrRange := AddrRanges{
-				pid: 0, // FIXME: this is bad
-				addrs: []AddrRange{
-					{
-						addr:   start,
-						length: length,
+	for targetId, startLengthCount := range t.accesses {
+		pid := 0
+		if len(t.pids) > 0 {
+			// TODO: a proper targetId-to-pid detection.
+			// pid should be based on targetId.
+			var _ = targetId // unused, but
+			pid = t.pids[0]
+		}
+
+		for start, lengthCount := range startLengthCount {
+			for length, count := range lengthCount {
+				addrRange := AddrRanges{
+					pid: pid,
+					addrs: []AddrRange{
+						{
+							addr:   start,
+							length: length,
+						},
 					},
-				},
+				}
+				tc := TrackerCounter{
+					Accesses: count,
+					Reads:    0,
+					Writes:   0,
+					AR:       &addrRange,
+				}
+				*tcs = append(*tcs, tc)
 			}
-			tc := TrackerCounter{
-				Accesses: count,
-				Reads:    0,
-				Writes:   0,
-				AR:       &addrRange,
-			}
-			*tcs = append(*tcs, tc)
 		}
 	}
 	return tcs
@@ -280,6 +295,15 @@ func (t *TrackerDamon) GetCounters() *TrackerCounters {
 func (t *TrackerDamon) perfReader() error {
 	log.Debugf("TrackerDamon: online\n")
 	defer log.Debugf("TrackerDamon: offline\n")
+	// Tracing without filtering produces many "LOST n events!" lines
+	// and a lot of information that we might not even need:
+	// ranges were sampling didn't find any accesses.
+	//
+	// Currently we handle only lines where sampling found accesses.
+	// TODO: If we keep it like this, our heatmap should have
+	// cool-down for regions where we don't get any reports but that
+	// are still in process's address space. Now those regions are
+	// considered possibly free()'d by tracked process.
 	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated", "--filter", "nr_accesses > 0")
 	errPipe, err := cmd.StderrPipe()
 	perfOutput := bufio.NewReader(errPipe)
@@ -305,13 +329,31 @@ func (t *TrackerDamon) perfReader() error {
 }
 
 func (t *TrackerDamon) perfHandleLine(line string) error {
-	// Parse line. Example of perf damon:damon_aggregated output line:
+	// Parse line. Example of perf damon:damon_aggregated output lines:
 	// 12400.049 kdamond.0/30572 damon:damon_aggregated(target_id: -121171723722880, nr_regions: 13, start: 139995295608832, end: 139995297484800, nr_accesses: 1)
-
-	// TODO: how to convert target_id to pid?
+	// 12400.049 kdamond.0/30572 damon:damon_aggregated(target_id: -121171723722880, nr_regions: 13, start: 139995295608832, end: 139995297484800)
+	// LOST 123 events!
+	if strings.HasPrefix(line, "LOST ") {
+		lostEventsStr := strings.Split(line, " ")[1]
+		lostEvents, err := strconv.ParseUint(lostEventsStr, 10, 0)
+		if err != nil {
+			return fmt.Errorf("parse error on lost event count %q line: %s", lostEventsStr, line)
+		}
+		t.lostEvents += uint(lostEvents)
+		return nil
+	}
 	csLine := strings.Split(line, ", ")
 	if len(csLine) < 4 {
 		return fmt.Errorf("bad line %q", csLine)
+	}
+	targetIdStrSlice := strings.SplitAfterN(csLine[0], "target_id: ", 2)
+	if len(targetIdStrSlice) != 2 {
+		return fmt.Errorf("target_id not found from %q", csLine[0])
+	}
+	targetIdStr := targetIdStrSlice[1]
+	targetId, err := strconv.ParseInt(targetIdStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse error on targetIdStr %q line %q", targetIdStr, line)
 	}
 	startStr := csLine[2][7:]
 	endStr := csLine[3][5:]
@@ -343,11 +385,16 @@ func (t *TrackerDamon) perfHandleLine(line string) error {
 	// TODO: avoid locking this often
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
+	startLengthCount, ok := t.accesses[targetId]
+	if !ok {
+		startLengthCount = make(map[uint64]map[uint64]uint64)
+		t.accesses[targetId] = startLengthCount
+	}
 	lengthPgs := uint64(int64(end-start) / constPagesize)
-	lengthCount, ok := t.accesses[uint64(start)]
+	lengthCount, ok := startLengthCount[uint64(start)]
 	if !ok {
 		lengthCount = make(map[uint64]uint64)
-		t.accesses[uint64(start)] = lengthCount
+		startLengthCount[uint64(start)] = lengthCount
 	}
 	if count, ok := lengthCount[lengthPgs]; ok {
 		lengthCount[lengthPgs] = count + uint64(nr)
