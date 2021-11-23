@@ -559,6 +559,10 @@ opensuse-image-url() {
     echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
 }
 
+opensuse-15_3-image-url() {
+    echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.3/images/openSUSE-Leap-15.3.x86_64-1.0.1-NoCloud-Build2.14.qcow2"
+}
+
 opensuse-tumbleweed-image-url() {
     echo "https://ftp.uni-erlangen.de/opensuse/tumbleweed/appliances/openSUSE-Tumbleweed-JeOS.x86_64-OpenStack-Cloud.qcow2"
 }
@@ -772,6 +776,16 @@ opensuse-install-kernel-dev() {
 opensuse-bootstrap-commands-pre() {
     cat <<EOF
 sed -e '/Signature checking/a gpgcheck = off' -i /etc/zypp/zypp.conf
+EOF
+}
+
+opensuse-15_3-bootstrap-commands-pre() {
+    # BROKEN: cloud-init enabling hack below does not work now
+    # because this script gets executed only if cloud-init works.
+    # Adding ConfigDrive like below is needed for cloud-init to work.
+    cat <<EOF
+sed -e '/Signature checking/a gpgcheck = off' -i /etc/zypp/zypp.conf
+sed -e 's/datasource_list: \[ NoCloud None \]/datasource_list: [ ConfigDrive NoCloud None ]/g' -i /etc/cloud/cloud.cfg
 EOF
 }
 
