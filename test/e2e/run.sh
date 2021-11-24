@@ -115,6 +115,10 @@ usage() {
     echo "             The default is \"cri-resmgr|containerd\"."
     echo "    crio_version: Version of cri-o to try to pull in, if cri-o is"
     echo "                  not being installed from sources."
+    echo "    setup_proxies: Setup proxies even if not using govm based VM."
+    echo "                   This is only needed if you have set VM_IP and want"
+    echo "                   the proxy information set in the target host. By default"
+    echo "                   the proxies are not set if VM_IP is set."
     echo ""
     echo "  Test input VARs:"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
@@ -1199,6 +1203,10 @@ host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri"
 
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
+else
+    if [ "$setup_proxies" == "1" ]; then
+	vm-setup-proxies
+    fi
 fi
 
 is-hooked "on_vm_online" && run-hook "on_vm_online"

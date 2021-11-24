@@ -516,11 +516,16 @@ vm-reboot() { # script API
     host-wait-vm-ssh-server
 }
 
+vm-setup-proxies() {
+    distro-setup-proxies
+}
+
 vm-networking() {
     vm-command-q "touch /etc/hosts; grep -q \$(hostname) /etc/hosts" || {
         vm-command "echo \"$VM_IP \$(hostname)\" >>/etc/hosts"
     }
-    distro-setup-proxies
+
+    vm-setup-proxies
 }
 
 vm-install-cri-resmgr() {
