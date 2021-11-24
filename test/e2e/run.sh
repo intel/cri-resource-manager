@@ -71,6 +71,8 @@ usage() {
     echo "             The default is 0."
     echo "             Set containerd_src/crio_src/runc_src to install a local build."
     echo "    reinstall_k8s: if 1, destroy existing k8s cluster and create a new one."
+    echo "    reinstall_bootstrap: if 1, run the bootstrap and proxy setup commands."
+    echo "                         Only available if VM_IP is set when calling the script."
     echo "    reinstall_all: if 1, set all above reinstall_* options to 1."
     echo "    omit_cri_resmgr: if 1, omit checking/installing/starting cri-resmgr."
     echo "    omit_agent: if 1, omit checking/installing/starting cri-resmgr-agent."
@@ -1077,6 +1079,9 @@ if [ "$reinstall_k8s" == "1" ]; then
     reinstall_kubectl=1
     reinstall_kubelet=1
 fi
+if [ "$reinstall_bootstrap" == "1" ]; then
+    setup_proxies=1
+fi
 omit_agent=${omit_agent:-0}
 omit_cri_resmgr=${omit_cri_resmgr:-0}
 py_consts="${py_consts:-''}"
@@ -1206,6 +1211,10 @@ if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
 else
     if [ "$setup_proxies" == "1" ]; then
 	vm-setup-proxies
+    fi
+
+    if [ "$reinstall_bootstrap" == "1" ]; then
+	vm-bootstrap
     fi
 fi
 

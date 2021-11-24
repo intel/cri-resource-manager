@@ -30,6 +30,12 @@ vms:
         grep -E -v '^ *$'
 }
 
+vm-bootstrap() {
+    distro-bootstrap-commands | vm-pipe-to-file "./e2e-bootstrap.sh"
+    vm-command "sh ./e2e-bootstrap.sh"
+    host-wait-vm-ssh-server
+}
+
 vm-image-url() {
     distro-image-url
 }
