@@ -133,7 +133,7 @@ type Backend interface {
 	DescribeMetrics() []*prometheus.Desc
 	// PollMetrics provides policy metrics for monitoring.
 	PollMetrics() Metrics
-	// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+	// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
 	CollectMetrics(Metrics) ([]prometheus.Metric, error)
 }
 
@@ -432,7 +432,7 @@ func (p *policy) DescribeMetrics() []*prometheus.Desc {
 	return nil
 }
 
-// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
 func (p *policy) CollectMetrics(m Metrics) ([]prometheus.Metric, error) {
 	if !p.Bypassed() {
 		return p.active.CollectMetrics(m)

@@ -262,7 +262,7 @@ func (p *stp) PollMetrics() policy.Metrics {
 	return nil
 }
 
-// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
 func (p *stp) CollectMetrics(policy.Metrics) ([]prometheus.Metric, error) {
 	return nil, nil
 }

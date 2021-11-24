@@ -130,7 +130,7 @@ func (p *podpools) PollMetrics() policy.Metrics {
 	return policyMetrics
 }
 
-// CollectMetrics generates prometheus metrics from cached/polled policys-specific metrics data.
+// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
 func (p *podpools) CollectMetrics(m policy.Metrics) ([]prometheus.Metric, error) {
 	metrics, ok := m.(*Metrics)
 	if !ok {
