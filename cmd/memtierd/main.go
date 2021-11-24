@@ -34,8 +34,7 @@ func exit(format string, a ...interface{}) {
 func parseOptPages(pagesStr string) (uint64, error) {
 	if pagesStr == "" {
 		return (memtier.PMPresentSet |
-			memtier.PMExclusiveSet |
-			memtier.PMDirtySet), nil
+			memtier.PMExclusiveSet), nil
 	}
 	var pageAttributes uint64 = 0
 	for _, pageAttrStr := range strings.Split(pagesStr, ",") {
