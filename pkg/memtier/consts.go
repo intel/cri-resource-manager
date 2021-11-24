@@ -41,3 +41,4 @@ const (
 )
 
 var constPagesize int64 = int64(os.Getpagesize())
+var constUPagesize uint64 = uint64(constPagesize)

@@ -108,7 +108,7 @@ func (h *Heatmap) Dump() string {
 func (hr *HeatRange) String() string {
 	return fmt.Sprintf("{%x-%x(%d),%f,%d,%d}",
 		hr.addr,
-		hr.addr+hr.length*uint64(constPagesize),
+		hr.addr+hr.length*constUPagesize,
 		hr.length,
 		hr.heat,
 		hr.created,
@@ -176,7 +176,7 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			//         |---thr--...
 			newHr := HeatRange{
 				addr:    hr.addr,
-				length:  (thr.addr - hr.addr) / uint64(constPagesize),
+				length:  (thr.addr - hr.addr) / constUPagesize,
 				heat:    hr.heat,
 				created: hr.created,
 				updated: hr.updated,
@@ -194,7 +194,7 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			//         |---thr--...
 			newHr := HeatRange{
 				addr:    thr.addr,
-				length:  (hr.addr - thr.addr) / uint64(constPagesize),
+				length:  (hr.addr - thr.addr) / constUPagesize,
 				heat:    thr.heat,
 				created: thr.created,
 				updated: thr.updated,
@@ -204,8 +204,8 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			thr.length -= newHr.length
 		}
 		// now thr.addr == hr.addr
-		hrEndAddr := hr.addr + hr.length*uint64(constPagesize)
-		thrEndAddr := thr.addr + thr.length*uint64(constPagesize)
+		hrEndAddr := hr.addr + hr.length*constUPagesize
+		thrEndAddr := thr.addr + thr.length*constUPagesize
 		endAddr := hrEndAddr
 		if endAddr > thrEndAddr {
 			endAddr = thrEndAddr
@@ -219,7 +219,7 @@ func (h *Heatmap) updateFromPidHeatRange(pid int, thr *HeatRange) {
 			// |---thr---|
 			newHr := HeatRange{
 				addr:    thrEndAddr,
-				length:  (hrEndAddr - thrEndAddr) / uint64(constPagesize),
+				length:  (hrEndAddr - thrEndAddr) / constUPagesize,
 				heat:    hr.heat,
 				created: hr.created,
 				updated: hr.updated,
@@ -277,12 +277,12 @@ func (hrs *HeatRanges) Overlapping(hr0 *HeatRange) *HeatRanges {
 	// Optimize: bisect would be faster way to find the first overlapping hr
 	first := 0
 	for _, hr := range *hrs {
-		if hr.addr+hr.length*uint64(constPagesize) > hr0.addr {
+		if hr.addr+hr.length*constUPagesize > hr0.addr {
 			break
 		}
 		first++
 	}
-	hr0EndAddr := hr0.addr + hr0.length*uint64(constPagesize)
+	hr0EndAddr := hr0.addr + hr0.length*constUPagesize
 	count := 0
 	for _, hr := range (*hrs)[first:] {
 		if hr0EndAddr <= hr.addr {

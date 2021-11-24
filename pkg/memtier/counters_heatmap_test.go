@@ -23,7 +23,7 @@ import (
 func TestUpdateCountersBoundaryCheck(t *testing.T) {
 	hm := NewCounterHeatmap()
 
-	PS := uint64(constPagesize)
+	PS := constUPagesize
 	tcs0 := TrackerCounters{
 		// Memory regions have a hole.
 		// [100..150][150..200][200..250]<hole>[500..600]
@@ -121,7 +121,7 @@ func TestUpdateCountersBoundaryCheck(t *testing.T) {
 }
 
 func TestUpdateCountersOverlappingRanges(t *testing.T) {
-	PS := uint64(constPagesize)
+	PS := constUPagesize
 	sec := int64(time.Second)
 
 	tcases := []struct {

@@ -337,7 +337,7 @@ func (f *procPagemapFile) ForEachPage(addressRanges []AddrRange, pageAttributes 
 	pageMustNotBeDirty := (pageAttributes&PMDirtyCleared == PMDirtyCleared)
 
 	for _, addressRange := range addressRanges {
-		pagemapOffset := int64(addressRange.addr / uint64(constPagesize) * 8)
+		pagemapOffset := int64(addressRange.addr / constUPagesize * 8)
 		// read /proc/pid/pagemap in the chunks of len(readBuf).
 		// The length of readBuf must be divisible by 16.
 		// Too short a readBuf slows down the execution due to
@@ -386,7 +386,7 @@ func (f *procPagemapFile) ForEachPage(addressRanges []AddrRange, pageAttributes 
 				(!pageMustBeExclusive || exclusive) &&
 				(!pageMustBeDirty || softDirty) &&
 				(!pageMustNotBeDirty || !softDirty) {
-				n := handlePage(pagemapBits, addressRange.addr+pageIndex*uint64(constPagesize))
+				n := handlePage(pagemapBits, addressRange.addr+pageIndex*constUPagesize)
 				switch {
 				case n == 0:
 					continue
@@ -454,7 +454,7 @@ func procMaps(pid int) ([]AddrRange, error) {
 				continue
 			}
 			rangeLength := endAddr - startAddr
-			allAddressRanges[startAddr] = AddrRange{startAddr, rangeLength / uint64(constPagesize)}
+			allAddressRanges[startAddr] = AddrRange{startAddr, rangeLength / constUPagesize}
 		}
 	}
 

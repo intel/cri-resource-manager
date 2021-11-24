@@ -67,13 +67,13 @@ func (pp *Pages) MoveTo(node Node, count int) (int, error) {
 	sysRet, status, err := movePagesSyscall(pp.pid, uCount, pages, nodes, flags)
 	destNodeCount := 0
 	otherNodeCount := 0
-	errCount := 0
+	statusErrorCounts := make(map[int]int)
 	if sysRet == 0 {
 		for _, node := range status {
 			if node == intNode {
 				destNodeCount += 1
 			} else if node < 0 {
-				errCount += 1
+				statusErrorCounts[-node] += 1
 			} else {
 				otherNodeCount += 1
 			}
@@ -88,7 +88,7 @@ func (pp *Pages) MoveTo(node Node, count int) (int, error) {
 			reqCount:       int(count),
 			destNodeCount:  destNodeCount,
 			otherNodeCount: otherNodeCount,
-			errCount:       errCount,
+			errorCounts:    statusErrorCounts,
 		})
 	}
 	return destNodeCount, err

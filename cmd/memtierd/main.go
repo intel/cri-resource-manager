@@ -172,8 +172,6 @@ func main() {
 		}
 		prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
 		prompt.interact()
-		fmt.Printf(memtier.Stats().Dump() + "\n")
-
 	} else {
 		exit("invalid --mover, expected \"oneshot\" or MoverConfig JSON")
 	}

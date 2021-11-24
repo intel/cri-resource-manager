@@ -40,12 +40,12 @@ type TrackerDamonConfig struct {
 const trackerDamonDefaults string = "{\"Connection\":\"perf\"}"
 
 type TrackerDamon struct {
-	mutex             sync.Mutex
-	damonDir          string
-	config            *TrackerDamonConfig
-	pids              []int
-	started           bool
-	perfReaderRunning bool
+	mutex        sync.Mutex
+	damonDir     string
+	config       *TrackerDamonConfig
+	pids         []int
+	started      bool
+	toPerfReader chan byte
 	// accesses maps pid -> startAddr -> lengthPgs -> accessCount
 	accesses   map[int64]map[uint64]map[uint64]uint64
 	lostEvents uint
@@ -64,7 +64,6 @@ func NewTrackerDamon() (Tracker, error) {
 	if !procFileExists(t.damonDir) {
 		return nil, fmt.Errorf("no platform support: %q missing", t.damonDir)
 	}
-	t.Stop()
 	return &t, nil
 }
 
@@ -216,15 +215,15 @@ func (t *TrackerDamon) Start() error {
 
 	t.applyTargetIds()
 
-	if t.config.Connection == "perf" && !t.perfReaderRunning {
-		t.perfReaderRunning = true
-		go t.perfReader()
-	}
-
 	// Even if damon start monitor fails, the tracker state is
 	// "started" from this point on. That is, removing bad pids
 	// and adding new pids will try restarting monitor.
 	t.started = true
+
+	if t.config.Connection == "perf" && t.toPerfReader == nil {
+		t.toPerfReader = make(chan byte, 1)
+		go t.perfReader()
+	}
 
 	// Start monitoring.
 	if len(t.pids) > 0 {
@@ -242,6 +241,9 @@ func (t *TrackerDamon) Stop() {
 	// if monitoring was already off.
 	t.applyMonitor("off")
 	t.started = false
+	if t.toPerfReader != nil {
+		t.toPerfReader <- 0
+	}
 }
 
 func (t *TrackerDamon) ResetCounters() {
@@ -314,17 +316,40 @@ func (t *TrackerDamon) perfReader() error {
 	if err = cmd.Start(); err != nil {
 		return fmt.Errorf("starting perf failed: %w", err)
 	}
-	for {
-		line, err := perfOutput.ReadString('\n')
-		if err != nil || line == "" {
-			break
+	perfLines := make(chan string, 1024)
+	go func() {
+		for true {
+			line, err := perfOutput.ReadString('\n')
+			if err != nil || line == "" {
+				break
+			}
+			perfLines <- line
 		}
-		if err := t.perfHandleLine(line); err != nil {
-			log.Debugf("perf parse error: %s", err)
+		if t.toPerfReader != nil {
+			t.toPerfReader <- 0
+		}
+	}()
+	quit := false
+	for !quit {
+		select {
+		case line := <-perfLines:
+			if line == "" {
+				quit = true
+			}
+			if err := t.perfHandleLine(line); err != nil {
+				log.Debugf("TrackerDamon: perf parse error: %s\n", err)
+			}
+		case <-t.toPerfReader:
+			close(t.toPerfReader)
+			t.toPerfReader = nil
+			if err := cmd.Process.Kill(); err != nil {
+				log.Debugf("TrackerDamon: perf kill error: %s\n", err)
+			}
+			perfLines <- ""
+			quit = true
 		}
 	}
 	cmd.Wait()
-	log.Debugf("TrackerDamon: perfReader quitting\n")
 	return nil
 }
 

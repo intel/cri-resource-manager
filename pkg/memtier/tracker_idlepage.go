@@ -102,6 +102,7 @@ func (t *TrackerIdlePage) addRanges(ar *AddrRanges) {
 }
 
 func (t *TrackerIdlePage) AddPids(pids []int) {
+	log.Debugf("TrackerIdlePage: AddPids(%v)\n", pids)
 	for _, pid := range pids {
 		p := NewProcess(pid)
 		if ar, err := p.AddressRanges(); err == nil {
@@ -115,6 +116,7 @@ func (t *TrackerIdlePage) AddPids(pids []int) {
 }
 
 func (t *TrackerIdlePage) RemovePids(pids []int) {
+	log.Debugf("TrackerIdlePage: RemovePids(%v)\n", pids)
 	if pids == nil {
 		t.regions = make(map[int][]*AddrRanges, 0)
 		return

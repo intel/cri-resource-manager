@@ -23,7 +23,7 @@ func NewAddrRange(startAddr, stopAddr uint64) *AddrRange {
 	if stopAddr < startAddr {
 		startAddr, stopAddr = stopAddr, startAddr
 	}
-	return &AddrRange{addr: startAddr, length: (stopAddr - startAddr) / uint64(constPagesize)}
+	return &AddrRange{addr: startAddr, length: (stopAddr - startAddr) / constUPagesize}
 }
 
 func (r *AddrRange) Addr() uint64 {
@@ -31,7 +31,7 @@ func (r *AddrRange) Addr() uint64 {
 }
 
 func (r *AddrRange) EndAddr() uint64 {
-	return r.addr + r.length*uint64(constPagesize)
+	return r.addr + r.length*constUPagesize
 }
 
 func (r *AddrRange) Length() uint64 {
@@ -104,7 +104,7 @@ func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
 		for length > maxLength {
 			newAr.addrs = append(newAr.addrs, AddrRange{addr, maxLength})
 			length -= maxLength
-			addr += maxLength * uint64(constPagesize)
+			addr += maxLength * constUPagesize
 		}
 		if length > 0 {
 			newAr.addrs = append(newAr.addrs, AddrRange{addr, length})
@@ -114,7 +114,7 @@ func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
 }
 
 func (r AddrRange) String() string {
-	return fmt.Sprintf("%x-%x (%d bytes)", r.addr, r.addr+(r.length*uint64(constPagesize)), r.length*uint64(constPagesize))
+	return fmt.Sprintf("%x-%x (%d bytes)", r.addr, r.addr+(r.length*constUPagesize), r.length*constUPagesize)
 }
 
 // PagesMatching returns pages with pagetable attributes.
@@ -145,13 +145,13 @@ func (ar *AddrRanges) Intersection(intRanges []AddrRange) {
 	for _, oldRange := range ar.addrs {
 		for _, cutRange := range intRanges {
 			start := oldRange.addr
-			stop := oldRange.addr + oldRange.length*uint64(constPagesize)
+			stop := oldRange.addr + oldRange.length*constUPagesize
 			if cutRange.addr >= oldRange.addr &&
 				cutRange.addr <= stop {
 				if cutRange.addr > start {
 					start = cutRange.addr
 				}
-				cutStop := cutRange.addr + cutRange.length*uint64(constPagesize)
+				cutStop := cutRange.addr + cutRange.length*constUPagesize
 				if cutStop < stop {
 					stop = cutStop
 				}

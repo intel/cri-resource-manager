@@ -112,6 +112,7 @@ func (t *TrackerSoftDirty) addRanges(ar *AddrRanges) {
 }
 
 func (t *TrackerSoftDirty) AddPids(pids []int) {
+	log.Debugf("TrackerSoftDirty: AddPids(%v)\n", pids)
 	for _, pid := range pids {
 		p := NewProcess(pid)
 		if ar, err := p.AddressRanges(); err == nil {
@@ -125,6 +126,7 @@ func (t *TrackerSoftDirty) AddPids(pids []int) {
 }
 
 func (t *TrackerSoftDirty) RemovePids(pids []int) {
+	log.Debugf("TrackerSoftDirty: RemovePids(%v)\n", pids)
 	if pids == nil {
 		t.regions = make(map[int][]*AddrRanges, 0)
 		return
