@@ -19,6 +19,16 @@ import (
 	"strings"
 )
 
+type AddrRanges struct {
+	pid   int
+	addrs []AddrRange
+}
+
+type AddrRange struct {
+	addr   uint64
+	length uint64
+}
+
 func NewAddrRange(startAddr, stopAddr uint64) *AddrRange {
 	if stopAddr < startAddr {
 		startAddr, stopAddr = stopAddr, startAddr

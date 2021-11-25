@@ -14,27 +14,4 @@
 
 package memtier
 
-type Process struct {
-	pid int
-}
-
-type AddrRanges struct {
-	pid   int
-	addrs []AddrRange
-}
-
-type AddrRange struct {
-	addr   uint64
-	length uint64
-}
-
-type Pages struct {
-	pid   int
-	pages []Page
-}
-
 type Node int
-
-type Page struct {
-	addr uint64
-}

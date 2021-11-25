@@ -14,6 +14,10 @@
 
 package memtier
 
+type Process struct {
+	pid int
+}
+
 func NewProcess(pid int) *Process {
 	return &Process{pid}
 }

@@ -14,6 +14,15 @@
 
 package memtier
 
+type Pages struct {
+	pid   int
+	pages []Page
+}
+
+type Page struct {
+	addr uint64
+}
+
 func (p Page) Addr() uint64 {
 	return p.addr
 }
