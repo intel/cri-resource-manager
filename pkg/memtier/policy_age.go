@@ -155,6 +155,9 @@ func (p *PolicyAge) Stop() {
 	if p.cgLoop != nil {
 		p.cgLoop <- struct{}{}
 	}
+	if p.mover != nil {
+		p.mover.Stop()
+	}
 }
 
 func (p *PolicyAge) Start() error {

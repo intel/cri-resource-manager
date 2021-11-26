@@ -156,6 +156,9 @@ func (p *PolicyHeat) Stop() {
 	if p.chLoop != nil {
 		p.chLoop <- struct{}{}
 	}
+	if p.mover != nil {
+		p.mover.Stop()
+	}
 }
 
 func (p *PolicyHeat) Start() error {

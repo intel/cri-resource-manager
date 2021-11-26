@@ -85,7 +85,7 @@ func (p *Prompt) output(format string, a ...interface{}) {
 }
 
 func (p *Prompt) interact() {
-	logger := log.New(p.w, "", 0)
+	logger := log.New(p.w, "", log.Ltime|log.Lmicroseconds)
 	memtier.SetLogger(logger)
 	for !p.quit {
 		p.output(p.ps1)
@@ -433,6 +433,8 @@ PGTABLE       %d
 func (p *Prompt) cmdMover(args []string) commandStatus {
 	config := p.f.String("config", "", "reconfigure mover with JSON string")
 	pagesTo := p.f.Int("pages-to", -1, "move pages to NODE int")
+	start := p.f.Bool("start", false, "start mover")
+	stop := p.f.Bool("stop", false, "stop mover")
 	pause := p.f.Bool("pause", false, "pause moving")
 	cont := p.f.Bool("continue", false, "continue moving")
 	tasks := p.f.Bool("tasks", false, "print current tasks")
@@ -458,6 +460,12 @@ func (p *Prompt) cmdMover(args []string) commandStatus {
 		toNode := memtier.Node(*pagesTo)
 		task := memtier.NewMoverTask(p.pages, toNode)
 		p.mover.AddTask(task)
+	}
+	if *stop {
+		p.mover.Stop()
+	}
+	if *start {
+		p.mover.Start()
 	}
 	if *pause {
 		p.mover.Pause()

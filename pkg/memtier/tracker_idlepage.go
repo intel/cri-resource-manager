@@ -31,11 +31,11 @@ type TrackerIdlePageConfig struct {
 	// whole region. 1: increase counters
 	// by at most 1 per tracked bits in
 	// pages in the region.
-	Interval        uint64 // interval in microseconds
-	RegionsUpdateUs uint64 // interval in microseconds
+	IntervalMs      uint64 // interval in milliseconds
+	RegionsUpdateMs uint64 // interval in milliseconds
 }
 
-const trackerIdlePageDefaults string = `{"Interval":5000000,"PagesInRegion":512,"MaxCountPerRegion":1}`
+const trackerIdlePageDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"IntervalMs":5000,"RegionsUpdateMs":10000}`
 
 type TrackerIdlePage struct {
 	mutex   sync.Mutex
@@ -190,7 +190,7 @@ func (t *TrackerIdlePage) Stop() {
 }
 
 func (t *TrackerIdlePage) sampler() {
-	ticker := time.NewTicker(time.Duration(t.config.Interval) * time.Microsecond)
+	ticker := time.NewTicker(time.Duration(t.config.IntervalMs) * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {

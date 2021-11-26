@@ -9,11 +9,11 @@ import (
 
 type MoverConfig struct {
 	// process/container mem access prices per NUMA node
-	Interval  int // in ms
-	Bandwidth int // in MB/s
+	IntervalMs int // in ms
+	Bandwidth  int // in MB/s
 }
 
-const moverDefaults string = "{\"interval\":10,\"bandwidth\":100}"
+const moverDefaults string = "{\"IntervalMs\":10,\"Bandwidth\":100}"
 
 type MoverTask struct {
 	pages  *Pages
@@ -111,6 +111,12 @@ func (m *Mover) Start() error {
 	return nil
 }
 
+func (m *Mover) Stop() {
+	if m.toTaskHandler != nil {
+		m.toTaskHandler <- thQuit
+	}
+}
+
 func (m *Mover) Pause() {
 	if m.toTaskHandler != nil {
 		m.toTaskHandler <- thPause
@@ -154,6 +160,12 @@ func (m *Mover) RemoveTask(taskId int) {
 }
 
 func (m *Mover) taskHandler() {
+	log.Debugf("Mover: online\n")
+	defer func() {
+		close(m.toTaskHandler)
+		m.toTaskHandler = nil
+		log.Debugf("Mover: offline\n")
+	}()
 	for {
 		// blocking channel read when there are no tasks
 		cmd := <-m.toTaskHandler
@@ -186,7 +198,7 @@ func (m *Mover) taskHandler() {
 					break busyloop
 				}
 			default:
-				time.Sleep(time.Duration(m.config.Interval) * time.Millisecond)
+				time.Sleep(time.Duration(m.config.IntervalMs) * time.Millisecond)
 			}
 		}
 	}
@@ -209,7 +221,7 @@ func (m *Mover) handleTask(task *MoverTask) taskStatus {
 	// bandwidth is MB/s => bandwith * 1024 is kB/s
 	// constPagesize is 4096 kB/page
 	// count is ([kB/s] / [kB/page] = [page/s]) * ([ms] / 1000 [ms/s] == [s]) = [page]
-	count := (m.config.Bandwidth * 1024 * 1024 / int(constPagesize)) * m.config.Interval / 1000
+	count := (m.config.Bandwidth * 1024 * 1024 / int(constPagesize)) * m.config.IntervalMs / 1000
 	if count == 0 {
 		return tsBlocked
 	}

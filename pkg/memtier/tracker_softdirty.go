@@ -27,26 +27,26 @@ import (
 )
 
 type TrackerSoftDirtyConfig struct {
-	TrackReferenced bool   // Track /proc/kpageflags PKF_REFERENCED bit.
-	TrackSoftDirty  bool   // Track /proc/PID/pagemap PM_SOFT_DIRTY bit.
-	PagesInRegion   uint64 // size of a memory region in the
+	PagesInRegion uint64 // size of a memory region in the
 	// number of pages.
 	MaxCountPerRegion uint64 // 0: unlimited, increase counters by
 	// number of pages with tracked bits in
 	// whole region. 1: increase counters
 	// by at most 1 per tracked bits in
 	// pages in the region.
-	Interval        uint64 // interval in microseconds
-	RegionsUpdateUs uint64 // interval in microseconds
+	IntervalMs      uint64 // interval in milliseconds
+	RegionsUpdateMs uint64 // interval in milliseconds
 	SkipPageProb    int    // Sampling premilles: 0: read all
 	// pages, 1000: skip next page with
 	// probability 1.0.
+	TrackSoftDirty  bool // Track /proc/PID/pagemap PM_SOFT_DIRTY bit.
+	TrackReferenced bool // Track /proc/kpageflags PKF_REFERENCED bit.
 }
 
 // TODO: Referenced tracking does not work properly.
 // TODO: if PFNs are tracked, refuse to start or disable if enabled
 // /proc/sys/kernel/numa_balancing
-const trackerSoftDirtyDefaults string = `{"Interval":1000000,"PagesInRegion":512,"SkipPageProb":0,"TrackReferenced":false,"TrackSoftDirty":true,"MaxCountPerRegion":1}`
+const trackerSoftDirtyDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"IntervalMs":5000,"RegionsUpdateMs":10000,"SkipPageProb":0,"TrackSoftDirty":true,"TrackReferenced":false}`
 
 type accessCounter struct {
 	a uint64 // number of times pages getting accessed
@@ -194,7 +194,7 @@ func (t *TrackerSoftDirty) Stop() {
 func (t *TrackerSoftDirty) sampler() {
 	log.Debugf("TrackerSoftDirty: online\n")
 	defer log.Debugf("TrackerSoftDirty: offline\n")
-	ticker := time.NewTicker(time.Duration(t.config.Interval) * time.Microsecond)
+	ticker := time.NewTicker(time.Duration(t.config.IntervalMs) * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
@@ -242,9 +242,6 @@ func (t *TrackerSoftDirty) countPages() {
 		if trackSoftDirty {
 			if pagemapBits&PM_SOFT_DIRTY == PM_SOFT_DIRTY {
 				cntPagesWritten += 1
-				if !trackReferenced {
-					cntPagesAccessed += 1
-				}
 			}
 		}
 		if trackReferenced {
