@@ -225,6 +225,10 @@ func (t *TrackerSoftDirty) countPages() {
 	cntPagesAccessed := uint64(0)
 	cntPagesWritten := uint64(0)
 
+	totAccessed := uint64(0)
+	totWritten := uint64(0)
+	totScanned := uint64(0)
+
 	if trackReferenced {
 		// Referenced bits are in /proc/kpageflags.
 		// Open the file already.
@@ -239,6 +243,7 @@ func (t *TrackerSoftDirty) countPages() {
 	// It counts number of pages accessed and written in a region.
 	// The result is stored to cntPagesAccessed and cntPagesWritten.
 	pageHandler := func(pagemapBits uint64, pageAddr uint64) int {
+		totScanned += 1
 		if trackSoftDirty {
 			if pagemapBits&PM_SOFT_DIRTY == PM_SOFT_DIRTY {
 				cntPagesWritten += 1
@@ -274,7 +279,11 @@ func (t *TrackerSoftDirty) countPages() {
 		return 0
 	}
 
+	scanStartTime := time.Now().UnixNano()
 	for pid, allPidAddrRanges := range t.regions {
+		totScanned = 0
+		totAccessed = 0
+		totWritten = 0
 		pmFile, err := ProcPagemapOpen(pid)
 		if err != nil {
 			t.removePid(pid)
@@ -314,8 +323,19 @@ func (t *TrackerSoftDirty) countPages() {
 			}
 			counts.a += cntPagesAccessed
 			counts.w += cntPagesWritten
+			totAccessed += cntPagesAccessed
+			totWritten += cntPagesWritten
 		}
 		pmFile.Close()
+		scanEndTime := time.Now().UnixNano()
+		stats.Store(StatsPageScan{
+			pid:      pid,
+			scanned:  totScanned,
+			accessed: totAccessed,
+			written:  totWritten,
+			timeUs:   (scanEndTime - scanStartTime) / int64(time.Microsecond),
+		})
+		scanStartTime = scanEndTime
 	}
 }
 

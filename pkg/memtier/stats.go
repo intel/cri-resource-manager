@@ -9,6 +9,7 @@ import (
 
 type Stats struct {
 	pidMoves map[int]*StatsPidMoved
+	pidScans map[int]*StatsPidScanned
 }
 
 type MapIntUint64 map[int]uint64
@@ -24,6 +25,14 @@ type StatsPidMoved struct {
 	lastMove          StatsMoved
 }
 
+type StatsPidScanned struct {
+	sumTimeUs   uint64
+	sumScanned  uint64
+	sumAccessed uint64
+	sumWritten  uint64
+	count       uint64
+}
+
 type StatsMoved struct {
 	pid            int
 	sysRet         uint
@@ -35,11 +44,20 @@ type StatsMoved struct {
 	errorCounts    map[int]int
 }
 
+type StatsPageScan struct {
+	pid      int
+	timeUs   int64
+	scanned  uint64
+	accessed uint64
+	written  uint64
+}
+
 var stats *Stats = newStats()
 
 func newStats() *Stats {
 	return &Stats{
 		pidMoves: make(map[int]*StatsPidMoved),
+		pidScans: make(map[int]*StatsPidScanned),
 	}
 }
 
@@ -48,6 +66,10 @@ func newStatsPidMoved() *StatsPidMoved {
 		sumDestNodePages: make(MapIntUint64),
 		sumErrorCounts:   make(map[int]uint64),
 	}
+}
+
+func newStatsPidScanned() *StatsPidScanned {
+	return &StatsPidScanned{}
 }
 
 func GetStats() *Stats {
@@ -75,6 +97,17 @@ func (s *Stats) Store(entry interface{}) {
 			spm.lastMoveWithError = v
 		}
 		spm.lastMove = v
+	case StatsPageScan:
+		sps, ok := s.pidScans[v.pid]
+		if !ok {
+			sps = newStatsPidScanned()
+			s.pidScans[v.pid] = sps
+		}
+		sps.count += 1
+		sps.sumTimeUs += uint64(v.timeUs)
+		sps.sumScanned += v.scanned
+		sps.sumAccessed += v.accessed
+		sps.sumWritten += v.written
 	}
 }
 
@@ -128,6 +161,18 @@ func (s *Stats) Summarize() string {
 					errno, syscall.Errno(errno), spm.sumErrorCounts[errno], spm.sumErrorCounts[errno]*constUPagesize/(1024*1024)))
 		}
 		lines[errorSumIndex] = fmt.Sprintf("    errors: %d pages (%d MB)", errorPages, errorPages*constUPagesize/(1024*1024))
+	}
+
+	for pid, sps := range s.pidScans {
+		lines = append(lines,
+			fmt.Sprintf("memory scans on pid: %d", pid),
+			fmt.Sprintf("    scans: %d", sps.count),
+			fmt.Sprintf("    scan time: %d ms (%d ms/scan)",
+				sps.sumTimeUs/1000,
+				sps.sumTimeUs/1000/sps.count),
+			fmt.Sprintf("    scanned: %d pages (%d pages/scan)", sps.sumScanned, sps.sumScanned/sps.count),
+			fmt.Sprintf("    accessed: %d pages (%d pages/scan)", sps.sumAccessed, sps.sumAccessed/sps.count),
+			fmt.Sprintf("    written: %d pages (%d pages/scan)", sps.sumWritten, sps.sumWritten/sps.count))
 	}
 	return strings.Join(lines, "\n")
 }
