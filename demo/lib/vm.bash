@@ -33,7 +33,7 @@ vms:
 vm-bootstrap() {
     distro-bootstrap-commands | vm-pipe-to-file "./e2e-bootstrap.sh"
     vm-command "sh ./e2e-bootstrap.sh"
-    host-wait-vm-ssh-server
+    host-wait-vm-ssh-server --timeout 600
 }
 
 vm-image-url() {

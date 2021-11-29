@@ -202,7 +202,30 @@ host-create-vm() {
     host-wait-cloud-init
 }
 
+get-ssh-timeout() {
+    echo $((`date +%s` + $1))
+}
+
 host-wait-vm-ssh-server() {
+    timeout=`get-ssh-timeout 120`
+
+    while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
+        case "$1" in
+            --timeout)
+                timeout=`get-ssh-timeout $2`
+                shift; shift
+                ;;
+            *)
+                invalid="${invalid}${invalid:+,}\"$1\""
+                shift
+                ;;
+        esac
+    done
+    if [ -n "$invalid" ]; then
+        error "invalid options: $invalid"
+        return 1
+    fi
+
     if [ -z "$VM_IP" ]; then
         VM_IP=$(${GOVM} ls | awk "/$VM_NAME/{print \$4}")
         while [ "x$VM_IP" == "x" ]; do
@@ -221,20 +244,23 @@ host-wait-vm-ssh-server() {
     fi
 
     ssh-keygen -f "$HOME/.ssh/known_hosts" -R "$VM_IP" >/dev/null 2>&1
-    retries=60
-    retries_left=$retries
+
+    print_info=1
+
     while ! $SSH ${VM_SSH_USER}@${VM_IP} -o ConnectTimeout=2 true 2>/dev/null; do
-        if [ "$retries" == "$retries_left" ]; then
+	CURR_TIME=`date +%s`
+	if [ $CURR_TIME -gt $timeout ]; then
+            error "timeout"
+	fi
+
+	if [ "$print_info" == 1 ]; then
             echo -n "Waiting for VM SSH server to respond..."
-        fi
+	    print_info=0
+	fi
         sleep 2
         echo -n "."
-        retries_left=$(( $retries_left - 1 ))
-        if [ "$retries_left" == "0" ]; then
-            error "timeout"
-        fi
     done
-    [ "$retries" == "$retries_left" ] || echo ""
+    echo ""
 }
 
 host-wait-cloud-init() {
