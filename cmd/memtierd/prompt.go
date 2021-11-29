@@ -72,6 +72,7 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		"mover":   Cmd{"manage mover, move selected pages.", p.cmdMover},
 		"policy":  Cmd{"manage policy, start/stop memory tiering.", p.cmdPolicy},
 		"help":    Cmd{"print help.", p.cmdHelp},
+		"nop":     Cmd{"no operation.", p.cmdNop},
 	}
 	return &p
 }
@@ -107,6 +108,9 @@ func (p *Prompt) interact() {
 		cmdSlice := strings.Split(strings.TrimSpace(rawcmd), " ")
 		if len(cmdSlice) == 0 {
 			continue
+		}
+		if cmdSlice[0] == "" {
+			cmdSlice[0] = "nop"
 		}
 		p.f = flag.NewFlagSet(cmdSlice[0], flag.ContinueOnError)
 		if cmd, ok := p.cmds[cmdSlice[0]]; ok {
@@ -173,6 +177,10 @@ func sortedNodeKeys(m map[memtier.Node]uint) []memtier.Node {
 	return nodes
 }
 
+func (p *Prompt) cmdNop(args []string) commandStatus {
+	return csOk
+}
+
 func (p *Prompt) cmdHelp(args []string) commandStatus {
 	p.output("Available commands:\n")
 	for _, name := range sortedStringKeys(p.cmds) {
@@ -180,7 +188,7 @@ func (p *Prompt) cmdHelp(args []string) commandStatus {
 	}
 	p.output("Syntax:\n")
 	p.output("        <command> -h show help on command options.\n")
-	p.output("        <command> | <shell-command>\n")
+	p.output("        [command] | <shell-command>\n")
 	p.output("                     pipe command output to shell-command.\n")
 	return csOk
 }
