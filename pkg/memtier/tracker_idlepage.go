@@ -212,6 +212,9 @@ func (t *TrackerIdlePage) countPages() {
 	maxCount := t.config.MaxCountPerRegion
 	cntPagesAccessed := uint64(0)
 
+	totAccessed := uint64(0)
+	totScanned := uint64(0)
+
 	// Referenced bits are in /proc/kpageflags.
 	// Open the file already.
 	kpfFile, err := ProcKpageflagsOpen()
@@ -257,7 +260,10 @@ func (t *TrackerIdlePage) countPages() {
 		return 0
 	}
 
+	scanStartTime := time.Now().UnixNano()
 	for pid, allPidAddrRanges := range t.regions {
+		totScanned = 0
+		totAccessed = 0
 		pmFile, err := ProcPagemapOpen(pid)
 		if err != nil {
 			t.removePid(pid)
@@ -292,8 +298,18 @@ func (t *TrackerIdlePage) countPages() {
 				lenCounts[lengthPages] = counts
 			}
 			counts.a += cntPagesAccessed
+			totAccessed += cntPagesAccessed
 		}
 		pmFile.Close()
+		scanEndTime := time.Now().UnixNano()
+		stats.Store(StatsPageScan{
+			pid:      pid,
+			scanned:  totScanned,
+			accessed: totAccessed,
+			written:  0,
+			timeUs:   (scanEndTime - scanStartTime) / int64(time.Microsecond),
+		})
+		scanStartTime = scanEndTime
 	}
 }
 

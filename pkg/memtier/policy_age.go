@@ -27,9 +27,9 @@ type PolicyAgeConfig struct {
 	Cgroups        []string // list of paths
 	Interval       int      // how often tracker counters are read
 	IdleDuration   int      // if 0, skip moving idle pages
-	IdleNUMA       int
+	IdleNUMAs      []int
 	ActiveDuration int // if 0, skip moving active pages
-	ActiveNUMA     int
+	ActiveNUMAs    []int
 }
 
 const policyAgeDefaults string = `{"Tracker":"idlepage","Interval":5,"ActiveDuration":10,"IdleDuration":30}`
@@ -315,7 +315,8 @@ func (p *PolicyAge) loop() {
 				log.Debugf("%d sec idle: %s\n", p.config.IdleDuration, tc.AR.Ranges()[0])
 			}
 			// TODO: skip already moved regions
-			p.move(itcs, Node(p.config.IdleNUMA))
+			// TODO: mask & choose valid NUMA node
+			p.move(itcs, Node(p.config.IdleNUMAs[0]))
 
 		}
 		if p.config.ActiveDuration > 0 {
@@ -325,7 +326,8 @@ func (p *PolicyAge) loop() {
 				log.Debugf("%d sec active: %s\n", p.config.ActiveDuration, tc.AR.Ranges()[0])
 			}
 			// TODO: skip already moved regions
-			p.move(atcs, Node(p.config.ActiveNUMA))
+			// TODO: mask & choose valid NUMA node
+			p.move(atcs, Node(p.config.ActiveNUMAs[0]))
 		}
 		n += 1
 		select {

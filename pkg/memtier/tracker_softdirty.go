@@ -39,14 +39,13 @@ type TrackerSoftDirtyConfig struct {
 	SkipPageProb    int    // Sampling premilles: 0: read all
 	// pages, 1000: skip next page with
 	// probability 1.0.
-	TrackSoftDirty  bool // Track /proc/PID/pagemap PM_SOFT_DIRTY bit.
 	TrackReferenced bool // Track /proc/kpageflags PKF_REFERENCED bit.
 }
 
 // TODO: Referenced tracking does not work properly.
 // TODO: if PFNs are tracked, refuse to start or disable if enabled
 // /proc/sys/kernel/numa_balancing
-const trackerSoftDirtyDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"IntervalMs":5000,"RegionsUpdateMs":10000,"SkipPageProb":0,"TrackSoftDirty":true,"TrackReferenced":false}`
+const trackerSoftDirtyDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"IntervalMs":5000,"RegionsUpdateMs":10000,"SkipPageProb":0,"TrackReferenced":false}`
 
 type accessCounter struct {
 	a uint64 // number of times pages getting accessed
@@ -217,7 +216,6 @@ func (t *TrackerSoftDirty) countPages() {
 	var kpfFile *procKpageflagsFile
 	var err error
 
-	trackSoftDirty := t.config.TrackSoftDirty
 	trackReferenced := t.config.TrackReferenced
 	maxCount := t.config.MaxCountPerRegion
 	skipPageProb := t.config.SkipPageProb
@@ -244,10 +242,8 @@ func (t *TrackerSoftDirty) countPages() {
 	// The result is stored to cntPagesAccessed and cntPagesWritten.
 	pageHandler := func(pagemapBits uint64, pageAddr uint64) int {
 		totScanned += 1
-		if trackSoftDirty {
-			if pagemapBits&PM_SOFT_DIRTY == PM_SOFT_DIRTY {
-				cntPagesWritten += 1
-			}
+		if pagemapBits&PM_SOFT_DIRTY == PM_SOFT_DIRTY {
+			cntPagesWritten += 1
 		}
 		if trackReferenced {
 			pfn := pagemapBits & PM_PFN
@@ -261,7 +257,7 @@ func (t *TrackerSoftDirty) countPages() {
 		}
 		// If we have exceeded the max count per region on the
 		// counters we are tracking, stop reading pages further.
-		if (!trackSoftDirty || cntPagesWritten > maxCount) &&
+		if (cntPagesWritten > maxCount) &&
 			(!trackReferenced || cntPagesAccessed > maxCount) {
 			return -1
 		}
@@ -344,9 +340,7 @@ func (t *TrackerSoftDirty) clearPageBits() {
 	for pid := range t.regions {
 		pidString := strconv.Itoa(pid)
 		path := "/proc/" + pidString + "/clear_refs"
-		if t.config.TrackSoftDirty {
-			err = procWrite(path, []byte("4\n"))
-		}
+		err = procWrite(path, []byte("4\n"))
 		if t.config.TrackReferenced && err == nil {
 			err = procWrite(path, []byte("1\n"))
 		}

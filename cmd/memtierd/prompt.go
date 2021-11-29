@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os/exec"
 	"sort"
@@ -605,6 +606,7 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	create := p.f.String("create", "", "create new policy NAME")
 	config := p.f.String("config", "", "reconfigure policy with JSON string")
 	configDump := p.f.Bool("config-dump", false, "dump current config")
+	configFile := p.f.String("config-file", "", "reconfigure policy with JSON FILE")
 	dump := p.f.Bool("dump", false, "dump policy state")
 	start := p.f.Bool("start", false, "start policy")
 	stop := p.f.Bool("stop", false, "stop policy")
@@ -627,6 +629,18 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	if p.policy == nil {
 		p.output("no policy, create one with -create NAME\n")
 		return csOk
+	}
+	if *configFile != "" {
+		configJson, err := ioutil.ReadFile(*configFile)
+		if err != nil {
+			p.output("reading file %q failed: %s", *configFile, err)
+			return csOk
+		}
+		err = p.policy.SetConfigJson(string(configJson))
+		if err != nil {
+			p.output("config failed: %s\n", err)
+			return csOk
+		}
 	}
 	if *config != "" {
 		err := p.policy.SetConfigJson(*config)
