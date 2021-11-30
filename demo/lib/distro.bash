@@ -413,13 +413,17 @@ fedora-install-golang() {
     from-tarball-install-golang
 }
 
-fedora-install-crio-pre() {
+fedora-install-crio-version() {
     distro-install-pkg runc conmon
     vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
 
     if [ -z "$crio_src" ]; then
-        vm-command "dnf -y module enable cri-o:${crio_version:-1.21}"
+        vm-command "dnf -y module enable cri-o:${crio_version:-$1}"
     fi
+}
+
+fedora-install-crio-pre() {
+    fedora-install-crio-version 1.21
 }
 
 fedora-install-crio() {
@@ -494,6 +498,14 @@ if grep -q NAME=Fedora /etc/os-release; then
 fi
 EOF
     fi
+}
+
+fedora-33-image-url() {
+    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
+}
+
+fedora-33-install-crio-pre() {
+    fedora-install-crio-version 1.20
 }
 
 ###########################################################################
