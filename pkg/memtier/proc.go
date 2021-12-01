@@ -101,8 +101,9 @@ const (
 )
 
 type procPagemapFile struct {
-	osFile *os.File
-	pos    int64
+	osFile    *os.File
+	readahead int
+	pos       int64
 }
 
 type procKpageflagsFile struct {
@@ -305,7 +306,12 @@ func ProcPagemapOpen(pid int) (*procPagemapFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &procPagemapFile{osFile, 0}, nil
+	// The magic default readahead (63 pages in addition to the
+	// page that is requested, resulting in 64 pages in total) is
+	// based on a performance test on a vm. 1k buffer (16 B/page *
+	// 64 pages) performed better than 512B or 4k).
+	defaultReadahead := 63
+	return &procPagemapFile{osFile, defaultReadahead, 0}, nil
 }
 
 func (f *procPagemapFile) Close() {
@@ -313,6 +319,10 @@ func (f *procPagemapFile) Close() {
 		f.osFile.Close()
 		f.osFile = nil
 	}
+}
+
+func (f *procPagemapFile) SetReadahead(pages int) {
+	f.readahead = pages
 }
 
 // ForEachPage calls handlePage with pagemap bytes and page's address for
@@ -343,9 +353,7 @@ func (f *procPagemapFile) ForEachPage(addressRanges []AddrRange, pageAttributes 
 		// Too short a readBuf slows down the execution due to
 		// many read()'s.
 		// Too long a readBuf makes the syscall return slowly.
-		// The magic value here is based on a performance test.
-		// (1k buffer performed better than 512B or 4k).
-		readBuf := make([]byte, 16*64)
+		readBuf := make([]byte, 16*(1+f.readahead))
 		readData := readBuf[0:0] // valid data in readBuf
 		for pageIndex := uint64(0); pageIndex < addressRange.length; pageIndex++ {
 			if len(readData) == 0 {

@@ -34,11 +34,20 @@ type TrackerSoftDirtyConfig struct {
 	// whole region. 1: increase counters
 	// by at most 1 per tracked bits in
 	// pages in the region.
-	IntervalMs      uint64 // interval in milliseconds
-	RegionsUpdateMs uint64 // interval in milliseconds
-	SkipPageProb    int    // Sampling premilles: 0: read all
-	// pages, 1000: skip next page with
-	// probability 1.0.
+	// IntervalMs defines page scan interval in milliseconds.
+	IntervalMs uint64
+	// RegionsUpdateMs defines process memory region update
+	// interval in milliseconds.
+	RegionsUpdateMs uint64
+	// SkipPageProb enables sampling instead of reading through
+	// pages in a region.
+	// 0: read all pages,
+	// 1000: skip next page with probability 1.0.
+	SkipPageProb int
+	// PagemapReadahead optimizes performance for the platform, if
+	// 0 (undefined) use a default, if -1, disable readahead.
+	PagemapReadahead int
+	// EXPERIMENTAL (does not work):
 	TrackReferenced bool // Track /proc/kpageflags PKF_REFERENCED bit.
 }
 
@@ -284,6 +293,12 @@ func (t *TrackerSoftDirty) countPages() {
 		if err != nil {
 			t.removePid(pid)
 			continue
+		}
+		if t.config.PagemapReadahead > 0 {
+			pmFile.SetReadahead(t.config.PagemapReadahead)
+		}
+		if t.config.PagemapReadahead == -1 {
+			pmFile.SetReadahead(0)
 		}
 		for _, addrRanges := range allPidAddrRanges {
 			cntPagesAccessed = 0
