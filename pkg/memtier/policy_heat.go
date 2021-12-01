@@ -36,8 +36,7 @@ type PolicyHeatConfig struct {
 }
 
 const policyHeatDefaults string = `{
-        "Tracker":"damon",
-        "TrackerConfig":"{\"Connection\":\"perf\",\"SamplingUs\":1000,\"AggregationUs\":100000,\"RegionsUpdateUs\":5000000,\"MinTargetRegions\":1000,\"MaxTargetRegions\":100000}",
+        "Tracker":"softdirty",
         "HeatmapConfig":"{\"HeatMax\":1.0,\"HeatRetention\":0.9513,\"HeatClasses\":10}",
         "MoverConfig":"{\"Interval\":10,\"Bandwidth\":100}",
         "Interval":30
