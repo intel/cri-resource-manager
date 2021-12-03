@@ -21,9 +21,17 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
 )
+
+type DeltaCycle struct {
+	delta   int
+	cycleNs time.Duration
+	nextNs  time.Duration
+}
 
 var ab [][]byte = [][]byte{} // array of byte arrays
 
@@ -57,12 +65,78 @@ func bExerciser(read, write bool, b []byte, offset int64, count int64, interval 
 	}
 }
 
+func bReallocators(bSize int64, deltaCycles []DeltaCycle) {
+	nowNs := time.Duration(time.Now().UnixNano())
+	// Calculate next (dc.nextNs) wake up times for all deltas.
+	for i, dc := range deltaCycles {
+		deltaCycles[i].nextNs = nowNs + dc.cycleNs
+	}
+	for {
+		nowNs := time.Duration(time.Now().UnixNano())
+		minNextNs := nowNs + time.Duration(24*time.Hour)
+		for _, dc := range deltaCycles {
+			if dc.nextNs < minNextNs {
+				minNextNs = dc.nextNs
+			}
+		}
+		time.Sleep(minNextNs - nowNs)
+		nowNs = minNextNs
+		for i, dc := range deltaCycles {
+			if nowNs >= dc.nextNs {
+				deltaCycles[i].nextNs += dc.cycleNs
+				fmt.Printf("    allocate %d arrays (every %d s)\n", dc.delta, dc.cycleNs/1000/1000/1000)
+				if dc.delta > 0 {
+					for n := 0; n < dc.delta; n++ {
+						allocateBArray(bSize)
+					}
+				} else {
+					for n := 0; n > dc.delta; n-- {
+						freeBArray()
+					}
+				}
+			}
+		}
+	}
+}
+
 func bAddrRange(b []byte, count int) string {
 	if count > len(b) {
 		count = len(b)
 	}
 	return fmt.Sprintf("%x-%x (%d bytes)",
 		&b[0], &b[count-1], count)
+}
+
+func numNs(arg, s string) time.Duration {
+	factor := time.Duration(1)
+	suffixLen := 0
+	switch {
+	case strings.HasSuffix(s, "ns"):
+		factor = 1
+		suffixLen = 2
+	case strings.HasSuffix(s, "us"):
+		factor = 1000
+		suffixLen = 2
+	case strings.HasSuffix(s, "ms"):
+		factor = 1000 * 1000
+		suffixLen = 2
+	case strings.HasSuffix(s, "s"):
+		factor = 1000 * 1000 * 1000
+		suffixLen = 1
+	case strings.HasSuffix(s, "m"):
+		factor = 1000 * 1000 * 1000 * 60
+		suffixLen = 1
+	case strings.HasSuffix(s, "h"):
+		factor = 1000 * 1000 * 1000 * 60 * 60
+		suffixLen = 1
+	}
+	numpart := s[0 : len(s)-suffixLen]
+	n, err := strconv.ParseInt(numpart, 10, 0)
+	if err != nil {
+		fmt.Printf("syntax error in %s %q: expected [1-9][0-9]*(ns|us|ms|s|m|h)?\n", arg, s)
+		os.Exit(1)
+	}
+	return time.Duration(n) * factor
 }
 
 func numBytes(arg, s string) int64 {
@@ -80,16 +154,38 @@ func numBytes(arg, s string) int64 {
 	}
 	n, err := strconv.ParseInt(numpart, 10, 0)
 	if err != nil {
-		fmt.Printf("syntax error in %s %q: expected [1-9][0-9]*[kMG]?\n")
+		fmt.Printf("syntax error in %s %q: expected [1-9][0-9]*[kMG]?\n", arg, s)
 		os.Exit(1)
 	}
 	return n * factor
+}
+
+func allocateBArray(bSize int64) {
+	i := len(ab)
+	ab = append(ab, make([]byte, bSize))
+	for j := int64(0); j < bSize; j++ {
+		ab[i][j] = 0x01
+	}
+	fmt.Printf("    array %d: %s\n", i, bAddrRange(ab[i], int(bSize)))
+	// TODO: start exercisers on the new array.
+}
+
+func freeBArray() {
+	if len(ab) > 0 {
+		i := len(ab) - 1
+		fmt.Printf("    free array %d: %s\n", i, bAddrRange(ab[i], len(ab[i])))
+		// TODO: stop/quit exercisers on the array being freed.
+		ab[i] = []byte{}
+		ab = ab[:i]
+		runtime.GC()
+	}
 }
 
 func main() {
 	fmt.Printf("memory exerciser\npid: %d\n", os.Getpid())
 	optTTL := flag.Int("ttl", -1, "do not wait for keypress, terminate after given time (seconds)")
 	optBCount := flag.Int("bc", 1, "number of byte arrays")
+	optBCountDelta := flag.String("bcd", "", "count delta: DELTA/T[,DELTA/T...], \"1/20s,-6/2m\": add 1 every 20 s, delete 6 every 2 minutes")
 	optBSize := flag.String("bs", "1G", "size of each byte array [k, M or G]")
 	optBReaderCount := flag.Int("brc", 1, "number of byte arrays to be read")
 	optBWriterCount := flag.Int("bwc", 1, "number of byte arrays to be written")
@@ -120,11 +216,29 @@ func main() {
 	// create byte arrays
 	fmt.Printf("creating %d byte arrays\n", *optBCount)
 	for i := 0; i < *optBCount; i++ {
-		ab = append(ab, make([]byte, bSize))
-		for j := int64(0); j < bSize; j++ {
-			ab[i][j] = 0x01
+		allocateBArray(bSize)
+	}
+
+	// create byte array reallocators
+	if *optBCountDelta != "" {
+		deltaCyclesSpec := *optBCountDelta
+		deltaCycles := []DeltaCycle{}
+		for _, deltaCycleSpec := range strings.Split(deltaCyclesSpec, ",") {
+			deltaCycle := strings.Split(deltaCycleSpec, "/")
+			if len(deltaCycle) != 2 {
+				fmt.Printf("syntax error in %q (%q): expected DELTA/TIME\n", deltaCyclesSpec, deltaCycleSpec)
+				os.Exit(1)
+			}
+			delta, err := strconv.Atoi(deltaCycle[0])
+			if err != nil {
+				fmt.Printf("bad delta in %q (%q): expected INT\n", deltaCyclesSpec, deltaCycle[0])
+				os.Exit(1)
+			}
+			cycle := numNs("-bcd", deltaCycle[1])
+			deltaCycles = append(deltaCycles, DeltaCycle{delta, cycle, 0})
 		}
-		fmt.Printf("    array %d: %s\n", i, bAddrRange(ab[i], int(bSize)))
+		fmt.Printf("creating byte array reallocators\n")
+		go bReallocators(bSize, deltaCycles)
 	}
 
 	// create readers
