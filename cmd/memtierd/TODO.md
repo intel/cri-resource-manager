@@ -6,6 +6,46 @@ Features
 
 - trackers: Re-read process address ranges.
 
+- heatmap classification: increase configurability in heat
+  classification:
+  - absolute class sizes. Example:
+    classSize: {4: "12 GB", 3: "8 GB", ...}
+  - relative class sizes. for instance, 80 % of free memory on NUMA
+    nodes that are (Mems_)allowed for the class. Example:
+    classSize: {4: "80 %", 2: "10 %", ...}
+
+  Alternative interpretations for class sizes:
+
+  1. classSize limits the number of pages in a class. In this case
+     classes can be filled up in different orders:
+
+     1.1 Put a page to the hightest class that has room for
+         it. Implementation example: sort by heat. Starting from the
+         hottest page, put pages to classes starting from the highest
+         class as long as there is room. This keeps all pages in best
+         possible memory, even if they were cold. (Every class
+         possibly except for the lowest class should have defined
+         size, otherwise a class with undefined size is either left
+         empty or turns into a black hole that sucks all remaining
+         pages.) Best performance with the cost of other workloads.
+
+     1.2 Put a page to its own class or lower if there is no
+         room. Implementation example: sort by heat. Starting from the
+         hottest page, calculate class corresponding to the heat of a
+         page, and put the page to that class or the first class below
+         it that has room. (Undefined class size is not a problem in
+         this case.) Limited performance.
+
+     Real implementations would only set heat watermarks for every
+     class to be efficient.
+
+  2. classSize limits the size of memory used on allowed target nodes
+     of the class. If the memory capacity for the class is already
+     used on target nodes, do not move pages to that node until free
+     capacity becomes available. (If this kind of knob would be
+     needed, maybe it should be named numaSize rather than class
+     size.)
+
 - tracker_damon: merging heatmap regions is needed to prevent data
   structure growth. Maybe merging should be done together with "cool
   down / clean up" update on regions that have not been seen for a
