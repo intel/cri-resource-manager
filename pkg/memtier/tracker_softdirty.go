@@ -108,13 +108,19 @@ func (t *TrackerSoftDirty) GetConfigJson() string {
 	return ""
 }
 
-func (t *TrackerSoftDirty) addRanges(ar *AddrRanges) {
-	pid := ar.Pid()
-	for _, r := range ar.Flatten() {
-		if regions, ok := t.regions[pid]; ok {
-			t.regions[pid] = append(regions, r)
-		} else {
-			t.regions[pid] = []*AddrRanges{r}
+func (t *TrackerSoftDirty) addRanges(pid int) {
+	delete(t.regions, pid)
+	p := NewProcess(pid)
+	if ar, err := p.AddressRanges(); err == nil {
+		// filter out single-page address ranges
+		ar = ar.Filter(func(r AddrRange) bool { return r.Length() > 1 })
+		ar = ar.SplitLength(t.config.PagesInRegion)
+		for _, r := range ar.Flatten() {
+			if regions, ok := t.regions[pid]; ok {
+				t.regions[pid] = append(regions, r)
+			} else {
+				t.regions[pid] = []*AddrRanges{r}
+			}
 		}
 	}
 }
@@ -122,14 +128,7 @@ func (t *TrackerSoftDirty) addRanges(ar *AddrRanges) {
 func (t *TrackerSoftDirty) AddPids(pids []int) {
 	log.Debugf("TrackerSoftDirty: AddPids(%v)\n", pids)
 	for _, pid := range pids {
-		p := NewProcess(pid)
-		if ar, err := p.AddressRanges(); err == nil {
-			// filter out single-page address ranges
-			ar = ar.Filter(func(r AddrRange) bool { return r.Length() > 1 })
-			ar = ar.SplitLength(t.config.PagesInRegion)
-			t.addRanges(ar)
-			continue
-		}
+		t.addRanges(pid)
 	}
 }
 
@@ -204,6 +203,7 @@ func (t *TrackerSoftDirty) sampler() {
 	defer log.Debugf("TrackerSoftDirty: offline\n")
 	ticker := time.NewTicker(time.Duration(t.config.IntervalMs) * time.Millisecond)
 	defer ticker.Stop()
+	lastRegionsUpdateNs := time.Now().UnixNano()
 	for {
 		select {
 		case <-t.toSampler:
@@ -211,6 +211,13 @@ func (t *TrackerSoftDirty) sampler() {
 			t.toSampler = nil
 			return
 		case <-ticker.C:
+			currentNs := time.Now().UnixNano()
+			if time.Duration(currentNs-lastRegionsUpdateNs) >= time.Duration(t.config.RegionsUpdateMs)*time.Millisecond {
+				for pid, _ := range t.regions {
+					t.addRanges(pid)
+				}
+				lastRegionsUpdateNs = currentNs
+			}
 			t.countPages()
 			t.clearPageBits()
 		}
