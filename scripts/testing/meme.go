@@ -33,23 +33,45 @@ type DeltaCycle struct {
 	nextNs  time.Duration
 }
 
-var ab [][]byte = [][]byte{} // array of byte arrays
+type BArray struct {
+	readers int
+	writers int
+	b       []byte
+}
+
+var bas []*BArray = []*BArray{} // array of byte arrays
 
 var bValue byte = 0
 
-func bExerciser(read, write bool, b []byte, offset int64, count int64, interval int64, offsetDelta int64, countDelta int64) {
+var readers, writers []func()
+
+var bReaderCount int
+var bReadSize int64
+var bReadSizeDelta int64
+var bReadOffset int64
+var bReadOffsetDelta int64
+var bReadInterval time.Duration
+
+var bWriterCount int
+var bWriteSize int64
+var bWriteSizeDelta int64
+var bWriteOffset int64
+var bWriteOffsetDelta int64
+var bWriteInterval time.Duration
+
+func bExerciser(read, write bool, ba *BArray, offset int64, count int64, interval time.Duration, offsetDelta int64, countDelta int64) {
+	fmt.Printf("    exerciser start: r=%t w=%t %s\n", read, write, bAddrRange(ba.b[bReadOffset:], int(bReadSize)))
 	round := int64(0)
-	for {
+	b := ba.b
+	defer func() {
+		fmt.Printf("    exerciser stop: read=%t write=%t %s\n", read, write, bAddrRange(ba.b[bReadOffset:], int(bReadSize)))
+		runtime.GC()
+	}()
+	for ba.readers > 0 || ba.writers > 0 {
 		roundStartIndex := (offset + (offsetDelta * round)) % int64(len(b))
 		roundCount := count + (countDelta * round)
 		if roundCount+roundStartIndex >= int64(len(b)) {
 			roundCount = int64(len(b)) - roundStartIndex
-		}
-		if interval > 0 {
-			time.Sleep(time.Duration(interval) * time.Microsecond)
-			if interval >= 1000000 {
-				fmt.Printf("    - round: %d, read: %v, write %v, range %x-%x\n", round, read, write, &b[roundStartIndex], &b[roundStartIndex+roundCount])
-			}
 		}
 		if write {
 			for i := roundStartIndex; i < roundStartIndex+roundCount; i++ {
@@ -59,6 +81,12 @@ func bExerciser(read, write bool, b []byte, offset int64, count int64, interval 
 		if read {
 			for i := roundStartIndex; i < roundStartIndex+roundCount; i++ {
 				bValue += b[i]
+			}
+		}
+		if interval > 0 {
+			time.Sleep(interval)
+			if interval >= 1000000 {
+				fmt.Printf("    - round: %d, read=%v, write=%v, range %x-%x\n", round, read, write, &b[roundStartIndex], &b[roundStartIndex+roundCount-1])
 			}
 		}
 		round += 1
@@ -161,22 +189,37 @@ func numBytes(arg, s string) int64 {
 }
 
 func allocateBArray(bSize int64) {
-	i := len(ab)
-	ab = append(ab, make([]byte, bSize))
-	for j := int64(0); j < bSize; j++ {
-		ab[i][j] = 0x01
+	ba := &BArray{
+		b: make([]byte, bSize),
 	}
-	fmt.Printf("    array %d: %s\n", i, bAddrRange(ab[i], int(bSize)))
-	// TODO: start exercisers on the new array.
+	bas = append(bas, ba)
+	for j := int64(0); j < bSize; j++ {
+		ba.b[j] = 0x01
+	}
+	fmt.Printf("    array: %s\n", bAddrRange(ba.b, int(bSize)))
+	// create reader
+	if bReaderCount > 0 {
+		ba.readers = 1
+		bReaderCount--
+		go bExerciser(true, false, ba, bReadOffset, bReadSize, bReadInterval, bReadOffsetDelta, bReadSizeDelta)
+	}
+	// create writers
+	if bWriterCount > 0 {
+		ba.writers = 1
+		bWriterCount--
+		go bExerciser(false, true, ba, bWriteOffset, bWriteSize, bWriteInterval, bWriteOffsetDelta, bWriteSizeDelta)
+	}
 }
 
 func freeBArray() {
-	if len(ab) > 0 {
-		i := len(ab) - 1
-		fmt.Printf("    free array %d: %s\n", i, bAddrRange(ab[i], len(ab[i])))
-		// TODO: stop/quit exercisers on the array being freed.
-		ab[i] = []byte{}
-		ab = ab[:i]
+	if len(bas) > 0 {
+		i := len(bas) - 1
+		fmt.Printf("    free array %d: %s\n", i, bAddrRange(bas[i].b, len(bas[i].b)))
+		bReaderCount += bas[i].readers
+		bas[i].readers = 0
+		bWriterCount += bas[i].writers
+		bas[i].writers = 0
+		bas = bas[:i]
 		runtime.GC()
 	}
 }
@@ -185,7 +228,7 @@ func main() {
 	fmt.Printf("memory exerciser\npid: %d\n", os.Getpid())
 	optTTL := flag.Int("ttl", -1, "do not wait for keypress, terminate after given time (seconds)")
 	optBCount := flag.Int("bc", 1, "number of byte arrays")
-	optBCountDelta := flag.String("bcd", "", "count delta: DELTA/T[,DELTA/T...], \"1/20s,-6/2m\": add 1 every 20 s, delete 6 every 2 minutes")
+	optBCountDelta := flag.String("bcd", "", "array count delta: DELTA/T[,DELTA/T...], \"1/20s,-6/2m\": add 1 array every 20 s, delete 6 arrays every 2 minutes")
 	optBSize := flag.String("bs", "1G", "size of each byte array [k, M or G]")
 	optBReaderCount := flag.Int("brc", 1, "number of byte arrays to be read")
 	optBWriterCount := flag.Int("bwc", 1, "number of byte arrays to be written")
@@ -197,21 +240,25 @@ func main() {
 	optBWriteOffset := flag.String("bwo", "0M", "offset of write on each byte array")
 	optBReadOffsetDelta := flag.String("brod", "0k", "offset change on each iteration")
 	optBWriteOffsetDelta := flag.String("bwod", "0k", "offset change on each iteration")
-	optBReadInterval := flag.Int64("bri", 0, "read interval on each byte array [us]")
-	optBWriteInterval := flag.Int64("bwi", 0, "write interval on each byte array [us]")
+	optBReadInterval := flag.String("bri", "0", "read interval on each byte array, T(ns|us|ms|s|m|h)")
+	optBWriteInterval := flag.String("bwi", "0", "write interval on each byte array")
 	flag.Parse()
 
 	bSize := numBytes("-bs", *optBSize)
 
-	bReadSize := numBytes("-brs", *optBReadSize)
-	bReadSizeDelta := numBytes("-brsd", *optBReadSizeDelta)
-	bReadOffset := numBytes("-bro", *optBReadOffset)
-	bReadOffsetDelta := numBytes("-brod", *optBReadOffsetDelta)
+	bReaderCount = *optBReaderCount
+	bReadSize = numBytes("-brs", *optBReadSize)
+	bReadSizeDelta = numBytes("-brsd", *optBReadSizeDelta)
+	bReadOffset = numBytes("-bro", *optBReadOffset)
+	bReadOffsetDelta = numBytes("-brod", *optBReadOffsetDelta)
+	bReadInterval = numNs("-bri", *optBReadInterval)
 
-	bWriteSize := numBytes("-bws", *optBWriteSize)
-	bWriteSizeDelta := numBytes("-bwsd", *optBWriteSizeDelta)
-	bWriteOffset := numBytes("-bwo", *optBWriteOffset)
-	bWriteOffsetDelta := numBytes("-bwod", *optBWriteOffsetDelta)
+	bWriterCount = *optBWriterCount
+	bWriteSize = numBytes("-bws", *optBWriteSize)
+	bWriteSizeDelta = numBytes("-bwsd", *optBWriteSizeDelta)
+	bWriteOffset = numBytes("-bwo", *optBWriteOffset)
+	bWriteOffsetDelta = numBytes("-bwod", *optBWriteOffsetDelta)
+	bWriteInterval = numNs("-bwi", *optBWriteInterval)
 
 	// create byte arrays
 	fmt.Printf("creating %d byte arrays\n", *optBCount)
@@ -239,21 +286,6 @@ func main() {
 		}
 		fmt.Printf("creating byte array reallocators\n")
 		go bReallocators(bSize, deltaCycles)
-	}
-
-	// create readers
-	fmt.Printf("creating memory readers and writers\n")
-	for i := 0; i < *optBReaderCount; i++ {
-		go bExerciser(true, false, ab[i], bReadOffset, bReadSize, *optBReadInterval, bReadOffsetDelta, bReadSizeDelta)
-		fmt.Printf("    reader %d: %s\n", i,
-			bAddrRange(ab[i][bReadOffset:], int(bReadSize)))
-	}
-
-	// create writers
-	for i := 0; i < *optBWriterCount; i++ {
-		go bExerciser(false, true, ab[i], bWriteOffset, bWriteSize, *optBWriteInterval, bWriteOffsetDelta, bWriteSizeDelta)
-		fmt.Printf("    writer %d: %s\n", i,
-			bAddrRange(ab[i][bWriteOffset:], int(bWriteSize)))
 	}
 
 	// wait
