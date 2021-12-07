@@ -170,9 +170,9 @@ func (s *Stats) Summarize() string {
 			fmt.Sprintf("    scan time: %d ms (%d ms/scan)",
 				sps.sumTimeUs/1000,
 				sps.sumTimeUs/1000/sps.count),
-			fmt.Sprintf("    scanned: %d pages (%d pages/scan)", sps.sumScanned, sps.sumScanned/sps.count),
-			fmt.Sprintf("    accessed: %d pages (%d pages/scan)", sps.sumAccessed, sps.sumAccessed/sps.count),
-			fmt.Sprintf("    written: %d pages (%d pages/scan)", sps.sumWritten, sps.sumWritten/sps.count))
+			fmt.Sprintf("    scanned: %d pages (%d pages/scan, %d MB/scan)", sps.sumScanned, sps.sumScanned/sps.count, sps.sumScanned*constUPagesize/sps.count/1024/1024),
+			fmt.Sprintf("    accessed: %d pages (%d pages/scan, %d MB/scan)", sps.sumAccessed, sps.sumAccessed/sps.count, sps.sumAccessed*constUPagesize/sps.count/1024/1024),
+			fmt.Sprintf("    written: %d pages (%d pages/scan, %d MB/scan)", sps.sumWritten, sps.sumWritten/sps.count, sps.sumWritten*constUPagesize/sps.count/1024/1024))
 	}
 	return strings.Join(lines, "\n")
 }
