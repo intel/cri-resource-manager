@@ -60,11 +60,14 @@ var bWriteOffsetDelta int64
 var bWriteInterval time.Duration
 
 func bExerciser(read, write bool, ba *BArray, offset int64, count int64, interval time.Duration, offsetDelta int64, countDelta int64) {
-	fmt.Printf("    exerciser start: r=%t w=%t %s\n", read, write, bAddrRange(ba.b[bReadOffset:], int(bReadSize)))
-	round := int64(0)
 	b := ba.b
+	if count >= int64(len(b[offset:])) {
+		count = int64(len(b[offset:])) - 1
+	}
+	fmt.Printf("    exerciser start: r=%t w=%t %s\n", read, write, bAddrRange(ba.b[offset:], int(count)))
+	round := int64(0)
 	defer func() {
-		fmt.Printf("    exerciser stop: read=%t write=%t %s\n", read, write, bAddrRange(ba.b[bReadOffset:], int(bReadSize)))
+		fmt.Printf("    exerciser stop: read=%t write=%t %s\n", read, write, bAddrRange(ba.b[offset:], int(count)))
 		runtime.GC()
 	}()
 	for ba.readers > 0 || ba.writers > 0 {
@@ -290,7 +293,7 @@ func main() {
 
 	// wait
 	if *optTTL == -1 {
-		fmt.Printf("press enter to exit...")
+		fmt.Printf("press enter to exit...\n")
 		bufio.NewReader(os.Stdin).ReadString('\n')
 	} else {
 		time.Sleep(time.Duration(*optTTL) * time.Second)
