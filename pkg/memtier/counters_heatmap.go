@@ -106,13 +106,13 @@ func (h *Heatmap) Dump() string {
 }
 
 func (hr *HeatRange) String() string {
-	return fmt.Sprintf("{%x-%x(%d),%f,%d,%d}",
+	return fmt.Sprintf("{%x-%x(%d),%f,%d,%.6fs}",
 		hr.addr,
 		hr.addr+hr.length*constUPagesize,
 		hr.length,
 		hr.heat,
 		hr.created,
-		hr.updated)
+		float64(hr.updated-hr.created)/float64(time.Second))
 }
 
 func (hr *HeatRange) AddrRange() AddrRange {

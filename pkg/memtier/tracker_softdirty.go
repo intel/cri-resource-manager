@@ -27,22 +27,27 @@ import (
 )
 
 type TrackerSoftDirtyConfig struct {
-	PagesInRegion uint64 // size of a memory region in the
-	// number of pages.
-	MaxCountPerRegion uint64 // 0: unlimited, increase counters by
-	// number of pages with tracked bits in
-	// whole region. 1: increase counters
-	// by at most 1 per tracked bits in
-	// pages in the region.
-	// IntervalMs defines page scan interval in milliseconds.
-	IntervalMs uint64
+	// PagesInRegion is the number of pages in every address range
+	// that is being watched and moved from a NUMA node to another.
+	PagesInRegion uint64
+	// MaxCountPerRegion is the maximum number of pages that are
+	// reported to be written. When the maximum number is reached
+	// during scanning a region, the rest of the pages in the
+	// region are skipped. Value 0 means unlimited (that is, the
+	// maximum number will be at most the same as PagesInRegion).
+	MaxCountPerRegion uint64
+	// ScanIntervalMs defines page scan interval in milliseconds.
+	ScanIntervalMs uint64
 	// RegionsUpdateMs defines process memory region update
-	// interval in milliseconds.
+	// interval in milliseconds. Regions are updated just before
+	// scanning pages if the interval has passed. Value 0 means
+	// that regions are updated before every scan.
 	RegionsUpdateMs uint64
 	// SkipPageProb enables sampling instead of reading through
-	// pages in a region.
-	// 0: read all pages,
-	// 1000: skip next page with probability 1.0.
+	// pages in a region. Value 0 reads all pages as far as
+	// MaxCountPerRegion is not reached. Value 1000 skips the next
+	// page with probability 1.0, resulting in reading only the
+	// first pages of every address range.
 	SkipPageProb int
 	// PagemapReadahead optimizes performance for the platform, if
 	// 0 (undefined) use a default, if -1, disable readahead.
@@ -54,7 +59,7 @@ type TrackerSoftDirtyConfig struct {
 // TODO: Referenced tracking does not work properly.
 // TODO: if PFNs are tracked, refuse to start or disable if enabled
 // /proc/sys/kernel/numa_balancing
-const trackerSoftDirtyDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"IntervalMs":5000,"RegionsUpdateMs":10000,"SkipPageProb":0,"TrackReferenced":false}`
+const trackerSoftDirtyDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"ScanIntervalMs":5000,"RegionsUpdateMs":10000}`
 
 type accessCounter struct {
 	a uint64 // number of times pages getting accessed
@@ -201,7 +206,7 @@ func (t *TrackerSoftDirty) Stop() {
 func (t *TrackerSoftDirty) sampler() {
 	log.Debugf("TrackerSoftDirty: online\n")
 	defer log.Debugf("TrackerSoftDirty: offline\n")
-	ticker := time.NewTicker(time.Duration(t.config.IntervalMs) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(t.config.ScanIntervalMs) * time.Millisecond)
 	defer ticker.Stop()
 	lastRegionsUpdateNs := time.Now().UnixNano()
 	for {
@@ -234,6 +239,9 @@ func (t *TrackerSoftDirty) countPages() {
 
 	trackReferenced := t.config.TrackReferenced
 	maxCount := t.config.MaxCountPerRegion
+	if maxCount == 0 {
+		maxCount = t.config.PagesInRegion
+	}
 	skipPageProb := t.config.SkipPageProb
 
 	cntPagesAccessed := uint64(0)

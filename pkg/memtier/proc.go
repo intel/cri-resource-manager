@@ -158,12 +158,16 @@ func ProcKpageflagsOpen() (*procKpageflagsFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &procKpageflagsFile{osFile, 0, nil}, nil
+	return &procKpageflagsFile{osFile, 256, map[int64]uint64{}}, nil
 }
 
 func (f *procKpageflagsFile) SetReadahead(pages int) {
 	f.readahead = pages
-	f.readCache = map[int64]uint64{}
+	if pages > 0 {
+		f.readCache = map[int64]uint64{}
+	} else {
+		f.readCache = nil
+	}
 }
 
 // ReadFlags returns 64-bit set of flags from /proc/kpageflags
@@ -213,7 +217,7 @@ func ProcPageIdleBitmapOpen() (*procPageIdleBitmapFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &procPageIdleBitmapFile{osFile, 0, nil}, nil
+	return &procPageIdleBitmapFile{osFile, 8, map[int64]uint64{}}, nil
 }
 
 func (f *procPageIdleBitmapFile) Close() {
@@ -223,7 +227,11 @@ func (f *procPageIdleBitmapFile) Close() {
 
 func (f *procPageIdleBitmapFile) SetReadahead(chunks int) {
 	f.readahead = chunks
-	f.readCache = map[int64]uint64{}
+	if chunks > 0 {
+		f.readCache = map[int64]uint64{}
+	} else {
+		f.readCache = nil
+	}
 }
 
 func (f *procPageIdleBitmapFile) SetIdle(pfn uint64) error {

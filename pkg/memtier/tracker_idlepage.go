@@ -24,18 +24,37 @@ import (
 )
 
 type TrackerIdlePageConfig struct {
-	PagesInRegion uint64 // size of a memory region in the
-	// number of pages.
-	MaxCountPerRegion uint64 // 0: unlimited, increase counters by
-	// number of pages with tracked bits in
-	// whole region. 1: increase counters
-	// by at most 1 per tracked bits in
-	// pages in the region.
-	IntervalMs      uint64 // interval in milliseconds
-	RegionsUpdateMs uint64 // interval in milliseconds
+	// PagesInRegion is the number of pages in every address range
+	// that is being watched and moved from a NUMA node to another.
+	PagesInRegion uint64
+	// MaxCountPerRegion is the maximum number of pages that are
+	// reported to be accessed. When the maximum number is reached
+	// during scanning a region, the rest of the pages in the
+	// region are skipped. Value 0 means unlimited (that is, the
+	// maximum number will be at most the same as PagesInRegion).
+	MaxCountPerRegion uint64
+	// ScanIntervalMs defines page scan interval in milliseconds.
+	ScanIntervalMs uint64
+	// RegionsUpdateMs defines process memory region update
+	// interval in milliseconds. Regions are updated just before
+	// scanning pages if the interval has passed. Value 0 means
+	// that regions are updated before every scan.
+	RegionsUpdateMs uint64
+	// PagemapReadahead is the number of pages to be read ahead
+	// from /proc/PID/pagemap. Every page information is 16 B. If
+	// 0 (undefined) use a default, if -1, disable readahead.
+	PagemapReadahead int
+	// KpageflagsReadahead is the number of pages to be read ahead
+	// from /proc/kpageflags. Every page information is 16 B. If 0
+	// (undefined) use a default, if -1, disable readahead.
+	KpageflagsReadahead int
+	// BitmapReadahead is the number of chunks of 64 pages to be
+	// read ahead from /sys/kernel/mm/page_idle/bitmap. If 0
+	// (undefined) use a default, if -1, disable readahead.
+	BitmapReadahead int
 }
 
-const trackerIdlePageDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"IntervalMs":5000,"RegionsUpdateMs":10000}`
+const trackerIdlePageDefaults string = `{"PagesInRegion":512,"MaxCountPerRegion":1,"ScanIntervalMs":5000,"RegionsUpdateMs":10000}`
 
 type TrackerIdlePage struct {
 	mutex   sync.Mutex
@@ -90,13 +109,19 @@ func (t *TrackerIdlePage) GetConfigJson() string {
 	return ""
 }
 
-func (t *TrackerIdlePage) addRanges(ar *AddrRanges) {
-	pid := ar.Pid()
-	for _, r := range ar.Flatten() {
-		if regions, ok := t.regions[pid]; ok {
-			t.regions[pid] = append(regions, r)
-		} else {
-			t.regions[pid] = []*AddrRanges{r}
+func (t *TrackerIdlePage) addRanges(pid int) {
+	delete(t.regions, pid)
+	p := NewProcess(pid)
+	if ar, err := p.AddressRanges(); err == nil {
+		// filter out single-page address ranges
+		ar = ar.Filter(func(r AddrRange) bool { return r.Length() > 1 })
+		ar = ar.SplitLength(t.config.PagesInRegion)
+		for _, r := range ar.Flatten() {
+			if regions, ok := t.regions[pid]; ok {
+				t.regions[pid] = append(regions, r)
+			} else {
+				t.regions[pid] = []*AddrRanges{r}
+			}
 		}
 	}
 }
@@ -104,14 +129,7 @@ func (t *TrackerIdlePage) addRanges(ar *AddrRanges) {
 func (t *TrackerIdlePage) AddPids(pids []int) {
 	log.Debugf("TrackerIdlePage: AddPids(%v)\n", pids)
 	for _, pid := range pids {
-		p := NewProcess(pid)
-		if ar, err := p.AddressRanges(); err == nil {
-			// filter out single-page address ranges
-			ar = ar.Filter(func(r AddrRange) bool { return r.Length() > 1 })
-			ar = ar.SplitLength(t.config.PagesInRegion)
-			t.addRanges(ar)
-			continue
-		}
+		t.addRanges(pid)
 	}
 }
 
@@ -178,7 +196,6 @@ func (t *TrackerIdlePage) Start() error {
 	t.toSampler = make(chan byte, 1)
 	t.setIdleBits()
 	go t.sampler()
-	log.Debugf("TrackerIdlePage: online\n")
 	return nil
 }
 
@@ -186,12 +203,14 @@ func (t *TrackerIdlePage) Stop() {
 	if t.toSampler != nil {
 		t.toSampler <- 0
 	}
-	log.Debugf("TrackerIdlePage: offline\n")
 }
 
 func (t *TrackerIdlePage) sampler() {
-	ticker := time.NewTicker(time.Duration(t.config.IntervalMs) * time.Millisecond)
+	log.Debugf("TrackerIdlePage: online\n")
+	defer log.Debugf("TrackerIdlePage: offline\n")
+	ticker := time.NewTicker(time.Duration(t.config.ScanIntervalMs) * time.Millisecond)
 	defer ticker.Stop()
+	lastRegionsUpdateNs := time.Now().UnixNano()
 	for {
 		select {
 		case <-t.toSampler:
@@ -199,6 +218,13 @@ func (t *TrackerIdlePage) sampler() {
 			t.toSampler = nil
 			return
 		case <-ticker.C:
+			currentNs := time.Now().UnixNano()
+			if time.Duration(currentNs-lastRegionsUpdateNs) >= time.Duration(t.config.RegionsUpdateMs)*time.Millisecond {
+				for pid, _ := range t.regions {
+					t.addRanges(pid)
+				}
+				lastRegionsUpdateNs = currentNs
+			}
 			t.countPages()
 			t.setIdleBits()
 		}
@@ -210,31 +236,43 @@ func (t *TrackerIdlePage) countPages() {
 	defer t.mutex.Unlock()
 
 	maxCount := t.config.MaxCountPerRegion
+	if maxCount == 0 {
+		maxCount = t.config.PagesInRegion
+	}
 	cntPagesAccessed := uint64(0)
 
 	totAccessed := uint64(0)
 	totScanned := uint64(0)
 
-	// Referenced bits are in /proc/kpageflags.
-	// Open the file already.
 	kpfFile, err := ProcKpageflagsOpen()
 	if err != nil {
 		return
 	}
 	defer kpfFile.Close()
-	kpfFile.SetReadahead(256)
+	if t.config.KpageflagsReadahead > 0 {
+		kpfFile.SetReadahead(t.config.KpageflagsReadahead)
+	}
+	if t.config.KpageflagsReadahead == -1 {
+		kpfFile.SetReadahead(0)
+	}
 
 	bmFile, err := ProcPageIdleBitmapOpen()
 	if err != nil {
 		return
 	}
 	defer bmFile.Close()
-	bmFile.SetReadahead(8)
+	if t.config.BitmapReadahead > 0 {
+		bmFile.SetReadahead(t.config.BitmapReadahead)
+	}
+	if t.config.BitmapReadahead == -1 {
+		bmFile.SetReadahead(0)
+	}
 
 	// pageHandler is called for all matching pages in the pagemap.
 	// It counts number of pages accessed and written in a region.
 	// The result is stored to cntPagesAccessed and cntPagesWritten.
 	pageHandler := func(pagemapBits uint64, pageAddr uint64) int {
+		totScanned += 1
 		pfn := pagemapBits & PM_PFN
 		pageIdle, err := bmFile.GetIdle(pfn)
 		if err != nil {
@@ -268,6 +306,12 @@ func (t *TrackerIdlePage) countPages() {
 		if err != nil {
 			t.removePid(pid)
 			continue
+		}
+		if t.config.PagemapReadahead > 0 {
+			pmFile.SetReadahead(t.config.PagemapReadahead)
+		}
+		if t.config.PagemapReadahead == -1 {
+			pmFile.SetReadahead(0)
 		}
 		for _, addrRanges := range allPidAddrRanges {
 			cntPagesAccessed = 0
