@@ -608,6 +608,17 @@ opensuse-pkg-type() {
     echo "rpm"
 }
 
+opensuse-set-kernel-cmdline() {
+    local e2e_defaults="$*"
+    vm-command "mkdir -p /etc/default; touch /etc/default/grub; sed -i '/e2e:opensuse-set-kernel-cmdline/d' /etc/default/grub"
+    vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\" # by e2e:opensuse-set-kernel-cmdline' >> /etc/default/grub" || {
+        command-error "writing new command line parameters failed"
+    }
+    vm-command "grub2-mkconfig -o /boot/grub2/grub.cfg" || {
+        command-error "updating grub failed"
+    }
+}
+
 opensuse-setup-oneshot() {
     # Remove bad version of containerd if it is already installed,
     # otherwise valid version of the package will not be installed.
