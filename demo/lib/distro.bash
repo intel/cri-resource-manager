@@ -352,7 +352,7 @@ centos-install-golang() {
 }
 
 fedora-image-url() {
-    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
+    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/35/Cloud/x86_64/images/Fedora-Cloud-Base-35-1.2.x86_64.qcow2"
 }
 
 fedora-ssh-user() {
@@ -413,13 +413,17 @@ fedora-install-golang() {
     from-tarball-install-golang
 }
 
-fedora-install-crio-pre() {
+fedora-install-crio-version() {
     distro-install-pkg runc conmon
     vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
 
     if [ -z "$crio_src" ]; then
-        vm-command "dnf -y module enable cri-o:${crio_version:-1.20}"
+        vm-command "dnf -y module enable cri-o:${crio_version:-$1}"
     fi
+}
+
+fedora-install-crio-pre() {
+    fedora-install-crio-version 1.21
 }
 
 fedora-install-crio() {
@@ -427,6 +431,8 @@ fedora-install-crio() {
         default-install-crio
     else
         distro-install-pkg cri-o
+        vm-command "systemctl enable --now crio" ||
+            command-error "failed to enable cri-o"
     fi
 }
 
@@ -467,7 +473,7 @@ EOF
     else
         k8sverparam=""
     fi
-    distro-install-pkg tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
+    distro-install-pkg iproute-tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
 }
@@ -492,6 +498,14 @@ if grep -q NAME=Fedora /etc/os-release; then
 fi
 EOF
     fi
+}
+
+fedora-33-image-url() {
+    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
+}
+
+fedora-33-install-crio-pre() {
+    fedora-install-crio-version 1.20
 }
 
 ###########################################################################
