@@ -17,7 +17,7 @@ spec:
     command:
       - sh
       - -c
-      - echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
+      - ${WORK}echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
     $(if [ -n "${CPUREQ}" ]; then echo "
     resources:
       requests:
