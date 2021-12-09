@@ -478,8 +478,9 @@ EOF
         command-error "failed to enable kubelet"
 }
 
-fedora-bootstrap-commands-pre() {
+fedora-bootstrap-commands-post() {
     cat <<EOF
+reboot_needed=0
 mkdir -p /etc/sudoers.d
 echo 'Defaults !requiretty' > /etc/sudoers.d/10-norequiretty
 
@@ -493,11 +494,29 @@ EOF
 if grep -q NAME=Fedora /etc/os-release; then
     if ! grep -q systemd.unified_cgroup_hierarchy=0 /proc/cmdline; then
         sudo grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0"
-        shutdown -r now
+        reboot_needed=1
     fi
 fi
 EOF
     fi
+
+    # Using swapoff is not enough as we also need to disable the swap from systemd
+    # and then reboot the VM
+    cat <<EOF
+if swapon --show | grep -q partition; then
+    sed -E -i '/^\\/.*[[:space:]]swap[[:space:]].*\$/d' /etc/fstab
+    systemctl --type swap
+    for swp in \`systemctl --type swap | awk '/\\.swap/ { print \$1 }'\`; do systemctl stop "\$swp"; systemctl mask "\$swp"; done
+    swapoff --all
+    reboot_needed=1
+fi
+EOF
+
+    cat <<EOF
+if [ "\$reboot_needed" == "1" ]; then
+   shutdown -r now
+fi
+EOF
 }
 
 fedora-33-image-url() {
@@ -820,7 +839,7 @@ rpm-refresh-pkg-db() {
 
 default-bootstrap-commands() {
     cat <<EOF
-touch /etc/modules-load.d/k8s.conf
+rm -f /etc/modules-load.d/k8s.conf; touch /etc/modules-load.d/k8s.conf
 modprobe bridge && echo bridge >> /etc/modules-load.d/k8s.conf || :
 modprobe nf-tables-bridge && echo nf-tables-bridge >> /etc/modules-load.d/k8s.conf || :
 modprobe br_netfilter && echo br_netfilter >> /etc/modules-load.d/k8s.conf || :

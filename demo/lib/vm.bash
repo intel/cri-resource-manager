@@ -30,6 +30,12 @@ vms:
         grep -E -v '^ *$'
 }
 
+vm-bootstrap() {
+    distro-bootstrap-commands | vm-pipe-to-file "./e2e-bootstrap.sh"
+    vm-command "sh ./e2e-bootstrap.sh"
+    host-wait-vm-ssh-server --timeout 600
+}
+
 vm-image-url() {
     distro-image-url
 }
@@ -516,11 +522,16 @@ vm-reboot() { # script API
     host-wait-vm-ssh-server
 }
 
+vm-setup-proxies() {
+    distro-setup-proxies
+}
+
 vm-networking() {
     vm-command-q "touch /etc/hosts; grep -q \$(hostname) /etc/hosts" || {
         vm-command "echo \"$VM_IP \$(hostname)\" >>/etc/hosts"
     }
-    distro-setup-proxies
+
+    vm-setup-proxies
 }
 
 vm-install-cri-resmgr() {

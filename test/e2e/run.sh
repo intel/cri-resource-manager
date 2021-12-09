@@ -71,6 +71,8 @@ usage() {
     echo "             The default is 0."
     echo "             Set containerd_src/crio_src/runc_src to install a local build."
     echo "    reinstall_k8s: if 1, destroy existing k8s cluster and create a new one."
+    echo "    reinstall_bootstrap: if 1, run the bootstrap and proxy setup commands."
+    echo "                         Only available if VM_IP is set when calling the script."
     echo "    reinstall_all: if 1, set all above reinstall_* options to 1."
     echo "    omit_cri_resmgr: if 1, omit checking/installing/starting cri-resmgr."
     echo "    omit_agent: if 1, omit checking/installing/starting cri-resmgr-agent."
@@ -115,6 +117,10 @@ usage() {
     echo "             The default is \"cri-resmgr|containerd\"."
     echo "    crio_version: Version of cri-o to try to pull in, if cri-o is"
     echo "                  not being installed from sources."
+    echo "    setup_proxies: Setup proxies even if not using govm based VM."
+    echo "                   This is only needed if you have set VM_IP and want"
+    echo "                   the proxy information set in the target host. By default"
+    echo "                   the proxies are not set if VM_IP is set."
     echo ""
     echo "  Test input VARs:"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
@@ -1073,6 +1079,9 @@ if [ "$reinstall_k8s" == "1" ]; then
     reinstall_kubectl=1
     reinstall_kubelet=1
 fi
+if [ "$reinstall_bootstrap" == "1" ]; then
+    setup_proxies=1
+fi
 omit_agent=${omit_agent:-0}
 omit_cri_resmgr=${omit_cri_resmgr:-0}
 py_consts="${py_consts:-''}"
@@ -1199,6 +1208,14 @@ host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri"
 
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
+else
+    if [ "$setup_proxies" == "1" ]; then
+	vm-setup-proxies
+    fi
+
+    if [ "$reinstall_bootstrap" == "1" ]; then
+	vm-bootstrap
+    fi
 fi
 
 is-hooked "on_vm_online" && run-hook "on_vm_online"
