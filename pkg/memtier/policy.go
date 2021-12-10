@@ -19,6 +19,11 @@ import (
 	"sort"
 )
 
+type PolicyConfig struct {
+	Name   string
+	Config string
+}
+
 type Policy interface {
 	SetConfigJson(string) error // Set new configuration.
 	GetConfigJson() string      // Get current configuration.

@@ -22,13 +22,17 @@ import (
 )
 
 type PolicyHeatConfig struct {
-	Tracker       string
-	TrackerConfig string
-	HeatmapConfig string
-	MoverConfig   string
-	Cgroups       []string // list of paths
-	Interval      int
-
+	Tracker TrackerConfig
+	Heatmap HeatmapConfig
+	Mover   MoverConfig
+	// Cgroups is a list of cgroup paths in the filesystem. The
+	// policy manages processes in listed cgroups and recursively
+	// in their subgroups.
+	Cgroups []string
+	// IntervalMs is the length of the period in milliseconds
+	// in which new heats are calculated for pages based on gathered
+	// tracker values, and page move tasks are triggered.
+	IntervalMs int
 	// HeatNumas maps heat class values into NUMA node lists where
 	// pages of each heat class should be located. If a heat class
 	// is missing, the NUMA node is "don't care".
@@ -36,10 +40,10 @@ type PolicyHeatConfig struct {
 }
 
 const policyHeatDefaults string = `{
-        "Tracker":"softdirty",
-        "HeatmapConfig":"{\"HeatMax\":1.0,\"HeatRetention\":0.9513,\"HeatClasses\":10}",
-        "MoverConfig":"{\"Interval\":10,\"Bandwidth\":100}",
-        "Interval":30
+        "Tracker":{"Name":"softdirty"},
+        "HeatmapConfig":{"HeatMax":1.0,"HeatRetention":0.9513,"HeatClasses":10},
+        "MoverConfig":{"IntervalMs":10,"Bandwidth":100},
+        "IntervalMs":5000
 }`
 
 type PolicyHeat struct {
@@ -73,37 +77,38 @@ func NewPolicyHeat() (Policy, error) {
 }
 
 func (p *PolicyHeat) SetConfigJson(configJson string) error {
-	config := PolicyHeatConfig{}
-	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+	config := &PolicyHeatConfig{}
+	if err := unmarshal(configJson, config); err != nil {
 		return err
 	}
-	if config.Interval <= 0 {
-		return fmt.Errorf("invalid interval: %d, > 0 expected", config.Interval)
+	return p.SetConfig(config)
+}
+
+func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
+	if config.IntervalMs <= 0 {
+		return fmt.Errorf("invalid heat policy IntervalMs: %d, > 0 expected", config.IntervalMs)
 	}
-	if config.Tracker == "" {
-		return fmt.Errorf("tracker missing from the configuration")
+	if config.Tracker.Name == "" {
+		return fmt.Errorf("tracker name missing from the heat policy configuration")
 	}
-	newTracker, err := NewTracker(config.Tracker)
+	newTracker, err := NewTracker(config.Tracker.Name)
 	if err != nil {
 		return err
 	}
-	if config.TrackerConfig != "" {
-		if err = newTracker.SetConfigJson(config.TrackerConfig); err != nil {
-			return fmt.Errorf("configuring tracker %q failed: %s", config.Tracker, err)
+	if config.Tracker.Config != "" {
+		if err = newTracker.SetConfigJson(config.Tracker.Config); err != nil {
+			return fmt.Errorf("configuring tracker %q for the heat policy failed: %s", config.Tracker.Name, err)
 		}
 	}
-	if config.HeatmapConfig != "" {
-		if err = p.heatmap.SetConfigJson(config.HeatmapConfig); err != nil {
-			return fmt.Errorf("configuring heatmap failed: %s", err)
-		}
+	err = p.heatmap.SetConfig(&config.Heatmap)
+	if err != nil {
+		return fmt.Errorf("heatmap configuration error: %s", err)
 	}
-	if config.MoverConfig != "" {
-		if err = p.mover.SetConfigJson(config.MoverConfig); err != nil {
-			return fmt.Errorf("configuring mover failed: %s", err)
-		}
+	if err = p.mover.SetConfig(&config.Mover); err != nil {
+		return fmt.Errorf("configuring mover failed: %s", err)
 	}
 	p.switchToTracker(newTracker)
-	p.config = &config
+	p.config = config
 	return nil
 }
 
@@ -120,10 +125,7 @@ func (p *PolicyHeat) GetConfigJson() string {
 	}
 	pconfig := *p.config
 	if p.tracker != nil {
-		pconfig.TrackerConfig = p.tracker.GetConfigJson()
-	}
-	if p.mover != nil {
-		pconfig.MoverConfig = p.mover.GetConfigJson()
+		pconfig.Tracker.Config = p.tracker.GetConfigJson()
 	}
 	if configStr, err := json.Marshal(&pconfig); err == nil {
 		return string(configStr)
@@ -191,7 +193,7 @@ func (p *PolicyHeat) Start() error {
 func (p *PolicyHeat) loop() {
 	log.Debugf("PolicyHeat: online\n")
 	defer log.Debugf("PolicyHeat: offline\n")
-	ticker := time.NewTicker(time.Duration(p.config.Interval) * time.Second)
+	ticker := time.NewTicker(time.Duration(p.config.IntervalMs) * time.Millisecond)
 	defer ticker.Stop()
 	quit := false
 	n := uint64(0)

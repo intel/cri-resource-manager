@@ -91,11 +91,11 @@ func NewTrackerIdlePage() (Tracker, error) {
 }
 
 func (t *TrackerIdlePage) SetConfigJson(configJson string) error {
-	config := TrackerIdlePageConfig{}
-	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+	config := &TrackerIdlePageConfig{}
+	if err := unmarshal(configJson, config); err != nil {
 		return err
 	}
-	t.config = &config
+	t.config = config
 	return nil
 }
 

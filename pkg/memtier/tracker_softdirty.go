@@ -95,11 +95,11 @@ func NewTrackerSoftDirty() (Tracker, error) {
 }
 
 func (t *TrackerSoftDirty) SetConfigJson(configJson string) error {
-	config := TrackerSoftDirtyConfig{}
-	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+	config := &TrackerSoftDirtyConfig{}
+	if err := unmarshal(configJson, config); err != nil {
 		return err
 	}
-	t.config = &config
+	t.config = config
 	return nil
 }
 

@@ -29,11 +29,26 @@ import (
 )
 
 type TrackerDamonConfig struct {
-	Connection       string
-	SamplingUs       uint64 // interval in microseconds
-	AggregationUs    uint64 // interval in microseconds
-	RegionsUpdateUs  uint64 // interval in microseconds
+	// Connection specifies how to connect to the damon. "perf"
+	// connects by tracing damon:aggregated using perf. Options
+	// can be appended to the perf trace command. For example,
+	// trace only address ranges where accesses have been detected
+	// by adding a filter: "perf --filter nr_accesses>0".
+	Connection string
+	// SamplingUs is the sampling interval in debugfs/damon attrs
+	// (microseconds).
+	SamplingUs uint64
+	// AggregationUs is the aggregation interval in debugfs/damon
+	// attrs (microseconds).
+	AggregationUs uint64
+	// RegionsUpdateUs is the regions update interval in
+	// debugfs/damon attrs (microseconds).
+	RegionsUpdateUs uint64
+	// MinTargetRegions is the minimum number of monitoring target
+	// regions in debugfs/damon attrs.
 	MinTargetRegions uint64
+	// MaxTargetRegions is the maximum number of monitoring target
+	// regions in debugfs/damon attrs.
 	MaxTargetRegions uint64
 }
 
@@ -68,12 +83,12 @@ func NewTrackerDamon() (Tracker, error) {
 }
 
 func (t *TrackerDamon) SetConfigJson(configJson string) error {
-	config := TrackerDamonConfig{}
-	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+	config := &TrackerDamonConfig{}
+	if err := unmarshal(configJson, config); err != nil {
 		return err
 	}
-	if config.Connection != "perf" {
-		return fmt.Errorf("invalid damon connection %q, supported: perf", config.Connection)
+	if !strings.HasPrefix(config.Connection, "perf") {
+		return fmt.Errorf("invalid damon connection %q, supported: \"perf [options]\"", config.Connection)
 	}
 	if config.SamplingUs == 0 {
 		config.SamplingUs = 1000 // sampling interval, 1 ms
@@ -90,10 +105,10 @@ func (t *TrackerDamon) SetConfigJson(configJson string) error {
 	if config.MaxTargetRegions == 0 {
 		config.MaxTargetRegions = 1000
 	}
-	if err := t.applyAttrs(&config); err != nil {
+	if err := t.applyAttrs(config); err != nil {
 		return err
 	}
-	t.config = &config
+	t.config = config
 	return nil
 }
 
@@ -220,7 +235,7 @@ func (t *TrackerDamon) Start() error {
 	// and adding new pids will try restarting monitor.
 	t.started = true
 
-	if t.config.Connection == "perf" && t.toPerfReader == nil {
+	if strings.HasPrefix(t.config.Connection, "perf") && t.toPerfReader == nil {
 		t.toPerfReader = make(chan byte, 1)
 		go t.perfReader()
 	}
@@ -306,7 +321,10 @@ func (t *TrackerDamon) perfReader() error {
 	// cool-down for regions where we don't get any reports but that
 	// are still in process's address space. Now those regions are
 	// considered possibly free()'d by tracked process.
-	cmd := exec.Command("perf", "trace", "-e", "damon:damon_aggregated", "--filter", "nr_accesses > 0")
+	perfTraceArgs := []string{"trace", "-e", "damon:damon_aggregated"}
+	perfExtraArgs := strings.Split(t.config.Connection, " ")[1:]
+	perfArgs := append(perfTraceArgs, perfExtraArgs...)
+	cmd := exec.Command("perf", perfArgs...)
 	errPipe, err := cmd.StderrPipe()
 	perfOutput := bufio.NewReader(errPipe)
 	if err != nil {

@@ -8,9 +8,11 @@ import (
 )
 
 type MoverConfig struct {
-	// process/container mem access prices per NUMA node
-	IntervalMs int // in ms
-	Bandwidth  int // in MB/s
+	// IntervalMs is the minimum interval between subsequent moves
+	// in milliseconds
+	IntervalMs int
+	// Bandwidth is the maximum memory bandwidth in MB/s
+	Bandwidth int
 }
 
 const moverDefaults string = "{\"IntervalMs\":10,\"Bandwidth\":100}"
@@ -71,17 +73,17 @@ func (mt *MoverTask) String() string {
 
 func (m *Mover) SetConfigJson(configJson string) error {
 	var config MoverConfig
-	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+	if err := unmarshal(configJson, &config); err != nil {
 		return err
 	}
-	m.SetConfig(&config)
-	return nil
+	return m.SetConfig(&config)
 }
 
-func (m *Mover) SetConfig(config *MoverConfig) {
+func (m *Mover) SetConfig(config *MoverConfig) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.config = config
+	return nil
 }
 
 func (m *Mover) GetConfigJson() string {

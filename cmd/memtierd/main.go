@@ -18,165 +18,80 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
-	"strconv"
-	"strings"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/intel/cri-resource-manager/pkg/memtier"
 )
+
+type Config struct {
+	Policy memtier.PolicyConfig
+}
 
 func exit(format string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, fmt.Sprintf("memtierd: "+format+"\n", a...))
 	os.Exit(1)
 }
 
-func parseOptPages(pagesStr string) (uint64, error) {
-	if pagesStr == "" {
-		return (memtier.PMPresentSet |
-			memtier.PMExclusiveSet), nil
+func policyFromConfigFile(filename string) memtier.Policy {
+	configBytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		exit("%s", err)
 	}
-	var pageAttributes uint64 = 0
-	for _, pageAttrStr := range strings.Split(pagesStr, ",") {
-		switch pageAttrStr {
-		case "Present":
-			pageAttributes |= memtier.PMPresentSet
-		case "Exclusive":
-			pageAttributes |= memtier.PMExclusiveSet
-		case "Dirty":
-			pageAttributes |= memtier.PMDirtySet
-		case "NotDirty":
-			pageAttributes |= memtier.PMDirtyCleared
-		default:
-			return 0, fmt.Errorf("invalid -page: %q", pageAttrStr)
-		}
-		if pageAttributes&memtier.PMDirtySet == memtier.PMDirtySet &&
-			pageAttributes&memtier.PMDirtyCleared == memtier.PMDirtyCleared {
-			return 0, fmt.Errorf("contradicting page requirements: Dirty,NotDirty")
-		}
+	var config Config
+	err = yaml.Unmarshal(configBytes, &config)
+	if err != nil {
+		exit("error in %q: %s", filename, err)
 	}
-	return pageAttributes, nil
-}
 
-func parseOptRanges(rangeStr string) []memtier.AddrRange {
-	addrRanges := []memtier.AddrRange{}
-	for _, startStopStr := range strings.Split(rangeStr, ",") {
-		startStopSlice := strings.Split(startStopStr, "-")
-		if len(startStopSlice) != 1 && len(startStopSlice) != 2 {
-			exit("invalid addresss range %q, expected STARTADDR-STOPADDR", startStopStr)
-		}
-		startAddr, err := strconv.ParseUint(startStopSlice[0], 16, 64)
-		if err != nil {
-			exit("invalid start address %q", startStopSlice[0])
-		}
-		if len(startStopSlice) == 1 {
-			addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, startAddr+uint64(os.Getpagesize())))
-			continue
-		}
-
-		stopAddr, err := strconv.ParseUint(startStopSlice[1], 16, 64)
-		if err != nil {
-			exit("invalid stop address %q", startStopSlice[1])
-		}
-		addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, stopAddr))
+	policy, err := memtier.NewPolicy(config.Policy.Name)
+	if err != nil {
+		exit("%s", err)
 	}
-	return addrRanges
+
+	err = policy.SetConfigJson(config.Policy.Config)
+	if err != nil {
+		exit("%s", err)
+	}
+
+	return policy
 }
 
 func main() {
 	memtier.SetLogger(log.New(os.Stderr, "", 0))
 	optPrompt := flag.Bool("prompt", false, "launch interactive prompt (ignore other parameters)")
-	optPid := flag.Int("pid", 0, "-pid=PID operate on this process")
-	optPages := flag.String("pages", "", "-pages=[Exclusive,Dirty,NotDirty,InHeap,InAnonymous]")
-	optMover := flag.String("mover", "oneshot", "-mover=<oneshot|{'Interval':100,'Bandwidth':20}>")
-	optRanges := flag.String("ranges", "", "-ranges=START-STOP[,START-STOP...] include only given ranges")
-	optMoveFrom := flag.Int("move-from", -1, "-move-from=NUMA source memory node")
-	optMoveTo := flag.Int("move-to", -1, "-move-to=NUMA target memory node")
-	optCount := flag.Int("count", 100, "-count=PAGECOUNT number of pages to move at a time")
+	optConfig := flag.String("config", "", "launch non-interactive mode with config file")
+	optConfigDumpJson := flag.Bool("config-dump-json", false, "dump effective configuration in JSON")
 
 	flag.Parse()
 
 	if *optPrompt {
 		prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
-		prompt.interact()
+		prompt.Interact()
 		return
 	}
 
-	// Get pages of a PID
-	if *optPid == 0 {
-		exit("missing -pid=PID")
-	}
-
-	// Parse -pages=...
-	pageAttributes, err := parseOptPages(*optPages)
-	if err != nil {
-		exit(fmt.Sprintf("invalid -pages: %v", err))
-	}
-
-	// Parse -ranges=...
-	selectedRanges := []memtier.AddrRange{}
-	if *optRanges != "" {
-		selectedRanges = parseOptRanges(*optRanges)
-	}
-
-	p := memtier.NewProcess(*optPid)
-	ar, err := p.AddressRanges()
-	if err != nil {
-		exit("error reading address ranges of process %d: %v", *optPid, err)
-	}
-	if ar == nil {
-		exit("address ranges not found for process %d", *optPid)
-	}
-
-	fmt.Printf("found %d address ranges\n", len(ar.Ranges()))
-	if err != nil {
-		exit("%v", err)
-	}
-	if len(selectedRanges) > 0 {
-		ar.Intersection(selectedRanges)
-	}
-	fmt.Printf("using %d address ranges\n", len(ar.Ranges()))
-
-	// Find pages with wanted attributes from the address ranges
-	pgs, err := ar.PagesMatching(pageAttributes)
-	fmt.Printf("found total %d pages\n", len(pgs.Pages()))
-	if *optMover == "" {
-		fmt.Printf("missing --mover, doing nothing\n")
-	} else if *optMover == "oneshot" {
-		// Move pages if --move-to is given
-		if *optMoveTo != -1 {
-			if *optMoveFrom == -1 {
-				// source node not defined, move from any
-				// other node to dstNode
-				dstNode := memtier.Node(*optMoveTo)
-				pgs.NotOnNode(dstNode).MoveTo(dstNode, *optCount)
-			} else {
-				srcNode := memtier.Node(*optMoveFrom)
-				dstNode := memtier.Node(*optMoveTo)
-				pgs.OnNode(srcNode).MoveTo(dstNode, *optCount)
-			}
-		} else {
-			fmt.Printf("oneshot: nothing to do without --move-to\n")
-		}
-	} else if strings.HasPrefix(*optMover, "{") {
-		mover := memtier.NewMover()
-		if err := mover.SetConfigJson(*optMover); err != nil {
-			exit("invalid mover configuration: %v", err)
-		}
-		mover.Start()
-		if *optMoveTo != -1 {
-			mover.AddTask(memtier.NewMoverTask(pgs, memtier.Node(*optMoveTo)))
-		} else {
-			fmt.Printf("mover: nothing to do without --move-to\n")
-		}
-		prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
-		prompt.interact()
+	var policy memtier.Policy
+	if *optConfig != "" {
+		policy = policyFromConfigFile(*optConfig)
 	} else {
-		exit("invalid --mover, expected \"oneshot\" or MoverConfig JSON")
+		exit("missing -prompt or -config")
 	}
 
-	// Print node/page status
-	for node, pageCount := range pgs.NodePageCount() {
-		fmt.Printf("pages found in node %d: %d\n", node, pageCount)
+	if *optConfigDumpJson {
+		fmt.Printf("%s\n", policy.GetConfigJson())
+		os.Exit(0)
 	}
+
+	if policy != nil {
+		if err := policy.Start(); err != nil {
+			exit("error in starting policy: %s", err)
+		}
+	}
+	prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
+	prompt.policy = policy
+	prompt.Interact()
 }

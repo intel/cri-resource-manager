@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -86,7 +87,7 @@ func (p *Prompt) output(format string, a ...interface{}) {
 	p.w.Flush()
 }
 
-func (p *Prompt) interact() {
+func (p *Prompt) Interact() {
 	logger := log.New(p.w, "", log.Ltime|log.Lmicroseconds)
 	memtier.SetLogger(logger)
 	for !p.quit {
@@ -678,4 +679,56 @@ func (p *Prompt) cmdQuit(args []string) commandStatus {
 	}
 	p.quit = true
 	return csOk
+}
+
+func parseOptPages(pagesStr string) (uint64, error) {
+	if pagesStr == "" {
+		return (memtier.PMPresentSet |
+			memtier.PMExclusiveSet), nil
+	}
+	var pageAttributes uint64 = 0
+	for _, pageAttrStr := range strings.Split(pagesStr, ",") {
+		switch pageAttrStr {
+		case "Present":
+			pageAttributes |= memtier.PMPresentSet
+		case "Exclusive":
+			pageAttributes |= memtier.PMExclusiveSet
+		case "Dirty":
+			pageAttributes |= memtier.PMDirtySet
+		case "NotDirty":
+			pageAttributes |= memtier.PMDirtyCleared
+		default:
+			return 0, fmt.Errorf("invalid -page: %q", pageAttrStr)
+		}
+		if pageAttributes&memtier.PMDirtySet == memtier.PMDirtySet &&
+			pageAttributes&memtier.PMDirtyCleared == memtier.PMDirtyCleared {
+			return 0, fmt.Errorf("contradicting page requirements: Dirty,NotDirty")
+		}
+	}
+	return pageAttributes, nil
+}
+
+func parseOptRanges(rangeStr string) []memtier.AddrRange {
+	addrRanges := []memtier.AddrRange{}
+	for _, startStopStr := range strings.Split(rangeStr, ",") {
+		startStopSlice := strings.Split(startStopStr, "-")
+		if len(startStopSlice) != 1 && len(startStopSlice) != 2 {
+			exit("invalid addresss range %q, expected STARTADDR-STOPADDR", startStopStr)
+		}
+		startAddr, err := strconv.ParseUint(startStopSlice[0], 16, 64)
+		if err != nil {
+			exit("invalid start address %q", startStopSlice[0])
+		}
+		if len(startStopSlice) == 1 {
+			addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, startAddr+uint64(os.Getpagesize())))
+			continue
+		}
+
+		stopAddr, err := strconv.ParseUint(startStopSlice[1], 16, 64)
+		if err != nil {
+			exit("invalid stop address %q", startStopSlice[1])
+		}
+		addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, stopAddr))
+	}
+	return addrRanges
 }

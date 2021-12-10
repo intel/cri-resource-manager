@@ -76,11 +76,15 @@ func NewCounterHeatmap() *Heatmap {
 }
 
 func (h *Heatmap) SetConfigJson(configJson string) error {
-	config := HeatmapConfig{}
-	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+	config := &HeatmapConfig{}
+	if err := json.Unmarshal([]byte(configJson), config); err != nil {
 		return err
 	}
-	h.config = &config
+	return h.SetConfig(config)
+}
+
+func (h *Heatmap) SetConfig(config *HeatmapConfig) error {
+	h.config = config
 	return nil
 }
 

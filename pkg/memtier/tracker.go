@@ -20,6 +20,11 @@ import (
 	"strings"
 )
 
+type TrackerConfig struct {
+	Name   string
+	Config string
+}
+
 type TrackerCounters []TrackerCounter
 
 type TrackerCounter struct {

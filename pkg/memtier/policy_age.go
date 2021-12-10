@@ -21,18 +21,34 @@ import (
 )
 
 type PolicyAgeConfig struct {
-	Tracker        string
-	TrackerConfig  string
-	MoverConfig    string
-	Cgroups        []string // list of paths
-	Interval       int      // how often tracker counters are read
-	IdleDuration   int      // if 0, skip moving idle pages
-	IdleNUMAs      []int
-	ActiveDuration int // if 0, skip moving active pages
-	ActiveNUMAs    []int
+	Tracker TrackerConfig
+	Mover   MoverConfig
+	// Cgroups is a list of cgroup paths in the filesystem. The
+	// policy manages processes in listed cgroups and recursively
+	// in their subgroups.
+	Cgroups []string
+	// IntervalMs is the length of the period in milliseconds
+	// in which new ages are calculated based on gathered
+	// tracker values, and page move tasks are triggered.
+	IntervalMs int
+	// IdleDurationMs is the number of milliseconds. If a tracker
+	// has not seen activity in a set of pages during this time,
+	// the pages are considered idle and good to move to IdleNumas.
+	IdleDurationMs int
+	// IdleNumas is the list of NUMA nodes where idle pages should
+	// be located or moved to.
+	IdleNumas []int
+	// ActiveDurationMs is the number of milliseconds. If a
+	// tracker has seen a set of pages being active on every check
+	// during this time, the pages are considered active and good
+	// to move to ActiveNumas.
+	ActiveDurationMs int
+	// ActiveNumas is the list of NUMA nodes where active pages
+	// should be located or moved to.
+	ActiveNumas []int
 }
 
-const policyAgeDefaults string = `{"Tracker":"idlepage","Interval":5,"ActiveDuration":10,"IdleDuration":30}`
+const policyAgeDefaults string = `{"Tracker":{"Name":"idlepage"},"IntervalMs":5000,"ActiveDurationMs":10000,"IdleDurationMs":30000}`
 
 type PolicyAge struct {
 	config       *PolicyAgeConfig
@@ -73,38 +89,40 @@ func NewPolicyAge() (Policy, error) {
 }
 
 func (p *PolicyAge) SetConfigJson(configJson string) error {
-	config := PolicyAgeConfig{}
-	if err := json.Unmarshal([]byte(configJson), &config); err != nil {
+	config := &PolicyAgeConfig{}
+	if err := unmarshal(configJson, config); err != nil {
 		return err
 	}
-	if config.Interval <= 0 {
-		return fmt.Errorf("invalid interval: %d, > 0 expected", config.Interval)
+	return p.SetConfig(config)
+}
+
+func (p *PolicyAge) SetConfig(config *PolicyAgeConfig) error {
+	if config.IntervalMs <= 0 {
+		return fmt.Errorf("invalid age policy IntervalMs: %d, > 0 expected", config.IntervalMs)
 	}
-	if config.ActiveDuration < 0 {
-		return fmt.Errorf("invalid activeDuration: %d, >= 0 expected", config.ActiveDuration)
+	if config.ActiveDurationMs < 0 {
+		return fmt.Errorf("invalid age policy ActiveDurationMs: %d, >= 0 expected", config.ActiveDurationMs)
 	}
-	if config.IdleDuration < 0 {
-		return fmt.Errorf("invalid idleDuration: %d, >= 0 expected", config.IdleDuration)
+	if config.IdleDurationMs < 0 {
+		return fmt.Errorf("invalid age policy IdleDurationMs: %d, >= 0 expected", config.IdleDurationMs)
 	}
-	if config.Tracker == "" {
-		return fmt.Errorf("tracker missing from the configuration")
+	if config.Tracker.Name == "" {
+		return fmt.Errorf("tracker name missing from the age policy configuration")
 	}
-	newTracker, err := NewTracker(config.Tracker)
+	newTracker, err := NewTracker(config.Tracker.Name)
 	if err != nil {
 		return err
 	}
-	if config.TrackerConfig != "" {
-		if err = newTracker.SetConfigJson(config.TrackerConfig); err != nil {
-			return fmt.Errorf("configuring tracker %q failed: %s", config.Tracker, err)
+	if config.Tracker.Config != "" {
+		if err = newTracker.SetConfigJson(config.Tracker.Config); err != nil {
+			return fmt.Errorf("configuring tracker %q for the age policy failed: %s", config.Tracker.Name, err)
 		}
 	}
-	if config.MoverConfig != "" {
-		if err = p.mover.SetConfigJson(config.MoverConfig); err != nil {
-			return fmt.Errorf("configuring mover failed: %s", err)
-		}
+	if err = p.mover.SetConfig(&config.Mover); err != nil {
+		return fmt.Errorf("configuring mover failed: %s", err)
 	}
 	p.switchToTracker(newTracker)
-	p.config = &config
+	p.config = config
 	return nil
 }
 
@@ -121,10 +139,7 @@ func (p *PolicyAge) GetConfigJson() string {
 	}
 	pconfig := *p.config
 	if p.tracker != nil {
-		pconfig.TrackerConfig = p.tracker.GetConfigJson()
-	}
-	if p.mover != nil {
-		pconfig.MoverConfig = p.mover.GetConfigJson()
+		pconfig.Tracker.Config = p.tracker.GetConfigJson()
 	}
 	if configStr, err := json.Marshal(&pconfig); err == nil {
 		return string(configStr)
@@ -224,7 +239,7 @@ func (p *PolicyAge) updateCounter(tc *TrackerCounter, timestamp int64) {
 }
 
 func (p *PolicyAge) deleteDeadCounters(timestamp int64) {
-	aliveThreshold := timestamp - int64(2*time.Duration(p.config.Interval)*time.Second)
+	aliveThreshold := timestamp - int64(2*time.Duration(p.config.IntervalMs)*time.Millisecond)
 	for pid, alt := range *p.palt {
 		for addr, lt := range alt {
 			for length, tcage := range lt {
@@ -244,7 +259,7 @@ func (p *PolicyAge) deleteDeadCounters(timestamp int64) {
 
 func (p *PolicyAge) activeCounters() *TrackerCounters {
 	tcs := &TrackerCounters{}
-	activeRounds := int(p.config.ActiveDuration / p.config.Interval)
+	activeRounds := int(p.config.ActiveDurationMs / p.config.IntervalMs)
 	activeRoundMask := uint64(0x1)
 	for i := 0; i < activeRounds; i++ {
 		activeRoundMask = (activeRoundMask << 1) | 1
@@ -263,7 +278,7 @@ func (p *PolicyAge) activeCounters() *TrackerCounters {
 
 func (p *PolicyAge) idleCounters(timestamp int64) *TrackerCounters {
 	tcs := &TrackerCounters{}
-	idleThreshold := timestamp - int64(time.Duration(p.config.IdleDuration)*time.Second)
+	idleThreshold := timestamp - int64(time.Duration(p.config.IdleDurationMs)*time.Millisecond)
 	for _, alt := range *p.palt {
 		for _, lt := range alt {
 			for _, tcage := range lt {
@@ -295,7 +310,7 @@ func (p *PolicyAge) move(tcs *TrackerCounters, destNode Node) {
 func (p *PolicyAge) loop() {
 	log.Debugf("PolicyAge: online\n")
 	defer log.Debugf("PolicyAge: offline\n")
-	ticker := time.NewTicker(time.Duration(p.config.Interval) * time.Second)
+	ticker := time.NewTicker(time.Duration(p.config.IntervalMs) * time.Millisecond)
 	defer ticker.Stop()
 
 	p.palt = &pidAddrLenTc{}
@@ -308,26 +323,26 @@ func (p *PolicyAge) loop() {
 			p.updateCounter(&tc, timestamp)
 		}
 		p.deleteDeadCounters(timestamp)
-		if p.config.IdleDuration > 0 {
+		if p.config.IdleDurationMs > 0 && len(p.config.IdleNumas) > 0 {
 			// Moving idle pages is enabled.
 			itcs := p.idleCounters(timestamp).RegionsMerged()
 			for _, tc := range *itcs {
-				log.Debugf("%d sec idle: %s\n", p.config.IdleDuration, tc.AR.Ranges()[0])
+				log.Debugf("%d ms idle: %s\n", p.config.IdleDurationMs, tc.AR.Ranges()[0])
 			}
 			// TODO: skip already moved regions
 			// TODO: mask & choose valid NUMA node
-			p.move(itcs, Node(p.config.IdleNUMAs[0]))
+			p.move(itcs, Node(p.config.IdleNumas[0]))
 
 		}
-		if p.config.ActiveDuration > 0 {
+		if p.config.ActiveDurationMs > 0 && len(p.config.ActiveNumas) > 0 {
 			// Moving active pages is enabled.
 			atcs := p.activeCounters().RegionsMerged()
 			for _, tc := range *atcs {
-				log.Debugf("%d sec active: %s\n", p.config.ActiveDuration, tc.AR.Ranges()[0])
+				log.Debugf("%d ms active: %s\n", p.config.ActiveDurationMs, tc.AR.Ranges()[0])
 			}
 			// TODO: skip already moved regions
 			// TODO: mask & choose valid NUMA node
-			p.move(atcs, Node(p.config.ActiveNUMAs[0]))
+			p.move(atcs, Node(p.config.ActiveNumas[0]))
 		}
 		n += 1
 		select {

@@ -1,0 +1,76 @@
+policy:
+  name: heat
+  config: |
+    # IntervalMs is the length of the period in milliseconds
+    # in which new heats are calculated for pages based on gathered
+    # tracker values, and page move tasks are triggered.
+    intervalms: 10000
+    # Cgroups is a list of cgroup paths in the filesystem. The
+    # policy manages processes in listed cgroups and recursively
+    # in their subgroups.
+    cgroups:
+      - /sys/fs/cgroup/foobar
+    # HeatNumas maps heat class values into NUMA node lists where
+    # pages of each heat class should be located. If a heat class
+    # is missing, the NUMA node is "don't care".
+    heatnumas:
+      0: [2, 3]
+      3: [0, 1]
+    heatmap:
+      # HeatMax is the maximum heat of a range
+      heatmax: 0.01
+      # HeatRetention is the portion of the remaining heat in a region
+      # after one second of complete inactivity.
+      # - 1.0: heat never cools down
+      # - 0.0: all heat cools down immediately
+      # - If you want that 5 % of the heat remains after 60 seconds of inactivity,
+      #   HeatRetention = 0.05 ** (1.0/60) = 0.9513
+      heatretention: 0.8
+      # HeatClasses is the number of discrete heat classes. The default is 10,
+      # which means that address ranges are classified:
+      # heat class 0: heat [HeatMax*0/10, HeatMax*1/10)
+      # heat class 1: heat [HeatMax*1/10, HeatMax*2/10)
+      # ...
+      # heat class 9: heat [HeatMax*9/10, HeatMax*10/10]
+      heatclasses: 4
+
+    # Memory tracker configuration for the heat policy
+    tracker:
+      name: idlepage
+      config: |
+        # PagesInRegion is the number of pages in every address range
+        # that is being watched and moved from a NUMA node to another.
+        pagesinregion: 256
+        # MaxCountPerRegion is the maximum number of pages that are
+        # reported to be accessed. When the maximum number is reached
+        # during scanning a region, the rest of the pages in the
+        # region are skipped. Value 0 means unlimited (that is, the
+        # maximum number will be at most the same as PagesInRegion).
+        maxcountperregion: 0
+        # ScanIntervalMs defines page scan interval in milliseconds.
+        scanintervalms: 5000
+        # RegionsUpdateMs defines process memory region update
+        # interval in milliseconds. Regions are updated just before
+        # scanning pages if the interval has passed. Value 0 means
+        # that regions are updated before every scan.
+        regionsupdatems: 0
+        # PagemapReadahead is the number of pages to be read ahead
+        # from /proc/PID/pagemap. Every page information is 16 B. If
+        # 0 (undefined) use a default, if -1, disable readahead.
+        pagemapreadahead: 0
+        # KpageflagsReadahead is the number of pages to be read ahead
+        # from /proc/kpageflags. Every page information is 16 B. If 0
+        # (undefined) use a default, if -1, disable readahead.
+        kpageflagsreadahead: 0
+        # BitmapReadahead is the number of chunks of 64 pages to be
+        # read ahead from /sys/kernel/mm/page_idle/bitmap. If 0
+        # (undefined) use a default, if -1, disable readahead.
+        bitmapreadahead: 0
+
+    # Low-level page mover configuration
+    mover:
+      # IntervalMs is the minimum interval between subsequent moves
+      # in milliseconds.
+      intervalms: 20
+      # Bandwidth is the maximum memory bandwidth in MB/s
+      bandwidth: 200
