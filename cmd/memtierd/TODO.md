@@ -4,7 +4,15 @@ Features
 - running cost analysis utility: calculate CPU and memory consumption
   of running memtierd with different parameters.
 
-- trackers: Re-read process address ranges.
+- policy-tracker-interface: enable policy to receive event when new
+  tracker values are available. Yet it may be sometimes useful to
+  gather and aggregate tracker data from several rounds, some policies
+  can be simpler to configure if they act only when new tracker data
+  has become available. In practice this interval would be the same as
+  tracker scan interval + scan time (idlepage, softdirty) or
+  aggregation interval + time until the last entry from the dump is
+  received (damon), yet the last one item can be difficult to
+  identify.
 
 - heatmap classification: increase configurability in heat
   classification:
@@ -74,6 +82,8 @@ Optimizations
 
 Done
 ----
+
+- trackers: Re-read process address ranges.
 
 - meme: Add options to dynamically change the size of exercised
   address ranges.
