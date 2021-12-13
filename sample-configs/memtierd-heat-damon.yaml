@@ -18,14 +18,14 @@ policy:
       3: [0, 1]
     heatmap:
       # HeatMax is the maximum heat of a range
-      heatmax: 0.01
+      heatmax: 0.001
       # HeatRetention is the portion of the remaining heat in a region
       # after one second of complete inactivity.
       # - 1.0: heat never cools down
       # - 0.0: all heat cools down immediately
       # - If you want that 5 % of the heat remains after 60 seconds of inactivity,
       #   HeatRetention = 0.05 ** (1.0/60) = 0.9513
-      heatretention: 0.8
+      heatretention: 0.99
       # HeatClasses is the number of discrete heat classes. The default is 10,
       # which means that address ranges are classified:
       # heat class 0: heat [HeatMax*0/10, HeatMax*1/10)
@@ -55,10 +55,10 @@ policy:
         regionsupdateus: 5000000
         # MinTargetRegions is the minimum number of monitoring target
         # regions in debugfs/damon attrs.
-        mintargetregions: 100
+        mintargetregions: 1000
         # MaxTargetRegions is the maximum number of monitoring target
         # regions in debugfs/damon attrs.
-        maxtargetregions: 5000
+        maxtargetregions: 20000
 
     # Low-level page mover configuration
     mover:
