@@ -141,10 +141,20 @@ func (p *PolicyHeat) Tracker() Tracker {
 	return p.tracker
 }
 
-func (p *PolicyHeat) Dump() string {
-	lines := []string{}
-	lines = append(lines, "heatmap:", p.heatmap.Dump())
-	return strings.Join(lines, "\n")
+func (p *PolicyHeat) Dump(args []string) string {
+	dumpHelp := "dump <heatmap|heatgram>"
+	if len(args) == 0 {
+		return dumpHelp
+	}
+	if args[0] == "heatmap" {
+		lines := []string{}
+		lines = append(lines, "heatmap:", p.heatmap.Dump())
+		return strings.Join(lines, "\n")
+	}
+	if args[0] == "heatgram" {
+		return "not implemented yet: histogram of heat values"
+	}
+	return dumpHelp
 }
 
 func (p *PolicyHeat) Stop() {

@@ -155,7 +155,7 @@ func (p *PolicyAge) Tracker() Tracker {
 	return p.tracker
 }
 
-func (p *PolicyAge) Dump() string {
+func (p *PolicyAge) Dump(args []string) string {
 	// TODO: describe policy state
 	return ""
 }

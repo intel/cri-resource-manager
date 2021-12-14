@@ -48,6 +48,6 @@ func (p *PolicyStub) Tracker() Tracker {
 	return nil
 }
 
-func (p *PolicyStub) Dump() string {
+func (p *PolicyStub) Dump(args []string) string {
 	return ""
 }

@@ -608,7 +608,7 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	config := p.f.String("config", "", "reconfigure policy with JSON string")
 	configDump := p.f.Bool("config-dump", false, "dump current config")
 	configFile := p.f.String("config-file", "", "reconfigure policy with JSON FILE")
-	dump := p.f.Bool("dump", false, "dump policy state")
+	dump := p.f.String("dump", "", "dump policy state")
 	start := p.f.Bool("start", false, "start policy")
 	stop := p.f.Bool("stop", false, "stop policy")
 	if err := p.f.Parse(args); err != nil {
@@ -666,8 +666,8 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 		p.policy.Stop()
 		p.output("policy stopped\n")
 	}
-	if *dump {
-		p.output(p.policy.Dump())
+	if *dump != "" {
+		p.output(p.policy.Dump([]string{*dump}))
 		p.output("\n")
 	}
 	return csOk

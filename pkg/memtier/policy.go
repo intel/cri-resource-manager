@@ -32,7 +32,7 @@ type Policy interface {
 	// Mover and Tracker are mostly for debugging in interactive prompt...
 	Mover() *Mover
 	Tracker() Tracker
-	Dump() string
+	Dump(args []string) string
 }
 
 type PolicyCreator func() (Policy, error)
