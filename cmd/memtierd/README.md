@@ -1,4 +1,19 @@
-# memtierd - utility / daemon for moving memory between NUMA nodes
+# memtierd - daemon for moving memory between NUMA nodes
+
+Memtierd is a userspace daemon that moves memory pages between NUMA
+nodes. It supports both promotion and demotion of pages, that is,
+moving active pages to low-latency memory, and moving idle pages away
+from low-latency memory to free it for better use.
+
+Memtierd includes configurable alternative memory trackers and
+policies. A tracker counts accesses of memory pages, while a policy
+classifies the pages based on the counts: is a page active, idle, or
+somewhere between.
+
+The granularity of memtierd trackers and classifications is
+configurable, and often significantly larger than a single page. For
+simplicity, this document talks about "pages", but most often this
+means an address range that contains one or more pages.
 
 ## Build
 
@@ -6,9 +21,87 @@
 make bin/memtierd
 ```
 
+## Usage
+
+Memtierd starts in an automatic mode with a configuration file, or
+in a command mode with interactive prompt.
+
+### Automatic mode
+
+In the automatic mode memtierd configures a policy that starts
+managing pages. Memtierd enters to the automatic mode when launched
+with a configuration file that includes policy and tracker parameters:
+
+```
+memtierd -config FILE
+```
+
+See configuration samples below.
+
+- [memtierd-heat-damon.yaml](../../sample-configs/memtierd-heat-damon.yaml)
+  configures the heat policy to use the damon tracker.
+
+- [memtierd-heat-idlepage.yaml](../../sample-configs/memtierd-heat-idlepage.yaml)
+  configures the heat policy to use the idlepage tracker.
+
+- [memtierd-age-softdirty.yaml](../../sample-configs/memtierd-age-softdirty.yaml)
+  configures the age policy to use the softdirty tracker.
+
+Policies are described in the [Policies](#policies) section.
+
+### Command mode
+
+In the command mode memtierd reads user commands from the standard
+input and prints results to the standard output. Memtierd enters to
+the command mode when launched with `-prompt`. The command mode prints
+help on available commands with `help`, and on parameters of a command
+with `COMMAND -h`:
+
+```
+memtierd -prompt
+memtierd> help
+memtierd> pages -h
+```
+
+If a command includes a pipe (`|`), the right-hand-side of the first
+pipe will be run in a shell, and the output of the left-hand-side of
+the pipe will be piped to the shell command:
+
+```
+memtierd> stats | grep accessed
+```
+
+Example: Start moving all pages of the `meme` process to NUMA
+node 1. After 10 seconds print statistics and quit:
+
+```
+( echo "pages -pid $(pidof meme)"; echo "mover -pages-to 1"; sleep 10; echo "stats"; echo "q" ) | memtierd -prompt
+```
+
+Example: Use idlepage tracker to track the memory of the `meme`
+process. After 10 seconds print detected accesses and statistics:
+
+```
+( echo "tracker -create idlepage -start $(pidof meme)"; sleep 10; echo "tracker -counters"; echo "stats" ) | ./memtierd -prompt
+```
+
+> Tip: install `rlwrap` and run `sudo rlwrap memtierd --prompt` to
+> enable convenient readline input with history.
+
 ## Test environment
 
-### Install e2e test framework dependencies
+This section describes how to use CRI Resource manager's e2e test
+framework in creating a virtual machine (VM) for testing. The test
+framework allows specifying hardware topology, including the number of
+CPUs and amount of memory in each NUMA nodes, and choosing Linux
+distribution to be installed on the VM.
+
+The e2e test framework uses
+[govm](https://github.com/govm-project/govm) that runs Qemu VMs in
+docker containers.
+
+### Install e2e test framework dependencies on host
+
 1. docker
 2. govm
 
@@ -20,29 +113,18 @@ make bin/memtierd
    GO111MODULE=off go get -d github.com/govm-project/govm && cd $GOPATH/src/github.com/govm-project/govm && go mod tidy && go mod download && go install && cd .. && docker build govm -f govm/Dockerfile -t govm/govm:latest
    ```
 
-### Create a virtual machine with the topology of your interest
+### Create a VM with the topology of your interest
 
 Example of a four-NUMA-node topology with:
-- 2 x 4 CPU / 4G nodes
-- 2 x 2G mem-only nodes
+- 2 NUMA nodes with 4 CPUs / 4G memory on each node
+- 2 NUMA nodes with 0 CPUs / 2G memory on each node
 
 ```
 topology='[{"cores": 2, "mem": "4G", "nodes": 2}, {"cores":0, "mem":"2G", "nodes": 2}]' distro=opensuse-tumbleweed vm=opensuse-4422 on_vm_online='interactive; exit' test/e2e/run.sh interactive
 ```
 
-(See supported Linux distributions and other options with
-`test/e2e/run.sh help`.)
-
-If you wish to install packages from the host filesystem to the
-virtual machine, you can use `vm-put-pkg`. That works in the
-interactive prompt, and in the script in the `on_vm_online`
-(environment variable) hook. Example: if you wish to install a kernel
-package and reboot the virtual machine when becomes online, try above
-command with:
-
-```
-on_vm_online='vm-put-pkg kernel-default-5.15*rpm && vm-reboot && interactive; exit'
-```
+See supported Linux distributions and other options with
+`test/e2e/run.sh help`.
 
 You can get help on all available commands in the interactive prompt
 and in the scripts:
@@ -51,9 +133,22 @@ and in the scripts:
 test/e2e/run.sh help script all
 ```
 
+> Tip: installing a custom kernel to the VM
+>
+> If you wish to install packages from the host filesystem to the VM,
+> you can use `vm-put-pkg`. This works both manually in the interactive
+> prompt, and in scripts in the `on_vm_online` environment variable.
+>
+> Example: Install a kernel package, reboot the VM and start the
+> interactive prompt once the VM has rebooted. Finally exit the test
+> framework when the user quits the interactive prompt.
+> ```
+> on_vm_online='vm-put-pkg kernel-default-5.15*rpm && vm-reboot && interactive; exit'
+> ```
+
 ### Install memtierd on the VM
 
-Use `govm ls` to find out the IP address of the virtual machine where
+Use `govm ls` on the host to find out the IP address of the VM where
 to install `memtierd`
 
 ```
@@ -71,7 +166,7 @@ scp bin/meme opensuse@172.17.0.2:
 ssh opensuse@172.17.0.2 "sudo mv meme /usr/local/bin"
 ```
 
-## Use memtierd
+### Use memtierd in the VM
 
 1. Login to the VM (use `govm ls` to find the IP address of the correct VM):
    ```
@@ -88,70 +183,73 @@ ssh opensuse@172.17.0.2 "sudo mv meme /usr/local/bin"
 
 2. Create a process that uses a lot of memory.
 
-   If you installed `meme`, run `meme` (see `meme -h` for options).
-
-   As another example, you can create a `python3` process that has 2
-   GB of idle memory:
-
-   ```
-   python3 -c 'x="x"*(2*1024*1024*1024); input()' &
-   ```
-
-3. Start memtierd with interactive prompt.
+   Example: with the following command `meme` allocates 1 GB of
+   memory. The first 128M is only read, next 128M is read and written,
+   the next 128M is only written, and the remaining 640M is idle:
 
    ```
-   sudo memtierd --prompt
+   meme -bs 1G -brs 256M -bws 256M -bwo 128M
    ```
 
-   (Tip: install `rlwrap` and run `sudo rlwrap memtierd --prompt` to
-   enable convenient readline input with history.)
+   See `meme -h` for more options.
 
-   Run `help` in the `memtierd>` prompt to list commands. On each
-   command you can get more help with `COMMAND -h`, for instance
-   `pages -h`.
+3. Start memtierd
 
-   Example: manage memory locations using the `age` policy. The policy
-   moves pages to `IdleNUMA` if the pages have been idle for the last
-   `IdleDuration` seconds. And pages that have been active on every
-   tracker round for the last `ActiveDuration` seconds are moved to
-   `ActiveNUMA`. Those processes will be managed that are found in the
-   `Cgroups` list. (Processes in nested groups managed, too.)
+   Command mode
 
    ```
-   memtierd> policy -create age -config {"Tracker":"idlepage","Interval":10,"IdleDuration":30,"IdleNUMA":1,"ActiveDuration":10,"ActiveNUMA":0,"Cgroups":["/sys/fs/cgroup/user.slice/mytest"]} -start
+   sudo memtierd -prompt
    ```
 
-   Policy uses `tracker` and `mover`. For testing and development,
-   those can be independently created, configured and used in the
-   prompt, too.
-
-   Example: select pages with `pages` and let `mover` work for 10
-   seconds moving them to NUMA node 1.
+   Automatic mode
 
    ```
-   ( echo pages -pid $(pidof meme); echo pages; echo mover -pages-to 1; sleep 10; echo pages ) | sudo ./memtierd -prompt
+   sudo memtierd -config FILE
    ```
 
-## Policy: Heat
+## Policies
 
-The heat policy feeds tracker addresses and counter values into a
-heatmap, and moves pages based on their heat.
+Memtierd implements two policies: age and heat. These policies have
+different ways of interpreting memory tracker counters as page
+activity. They both move pages based on their interpretations.
 
-The heatmap quantifies heats of address ranges (heats values [0.0,
-`HeatMax`]) into `HeatClasses` classes. The heat classes are named 0,
-1, ..., `HeatClasses`-1. `HeatRetention` is the portion of the heat
+### The age policy
+
+The age policy keeps record on two times:
+
+1. Idle time: how long a time a page has been completely idle.
+
+2. Active time: how long a time a page has been active every time when
+   checked.
+
+If the idle time exceeds `IdleDurationMs` in the policy configuration,
+the page is moved a node in `IdleNumas` (demotion). If the active time
+exceeds `ActiveDurationMs`, the page is moved to a node in
+`ActiveNumas` (promotion). Demotion and promotion is disabled if the
+corresponding duration equals 0, or if the list of nodes is empty.
+
+### The heat policy
+
+The heat policy stores tracker counters into a heatmap, and moves
+pages based on their heat.
+
+The heatmap quantifies heats of pages (heats values from 0.0 to
+`HeatMax`) into classes. The number of classes is specified with
+`HeatClasses`. The heat classes are named 0, 1, ..., `HeatClasses`-1,
+the last being the hottest. `HeatRetention` is the portion of the heat
 that retains in the map after one second of inactivity.
 
 The policy parameter `HeatNumas` maps heat classes into sets of NUMA
 nodes. A page that belongs to a class should be moved into any NUMA
-node in this class. If there is no NUMA node set a heat class, a page
-in that heat class will not be moved.
+node associated with this class. If a heat class is missing from the
+`HeatNumas` map, a page in that heat class will not be moved.
 
-Example where pages are divided into heat classes 0, 1, 2 and 3, and a
-page in a class is moved to corresponding NUMA node.
+Example: divide pages into four heat classes: 0, 1, 2 and 3. Move
+hottest pages (class 3) to nodes 0 or 1, and coldest pages (class 0)
+to 2 or 3, and leave intermediate pages unmoved.
 
 ```
-memtierd> policy -create heat -config {"Tracker":"idlepage","HeatmapConfig":"{\"HeatMax\":0.01,\"HeatRetention\":0.95,\"HeatClasses\":4}","MoverConfig":"{\"Interval\":10,\"Bandwidth\":100}","Cgroups":["/sys/fs/cgroup/foobar"],"Interval":5,"HeatNumas":{"0":[0],"1":[1],"2":[2],"3":[3]}} -start
+memtierd> policy -create heat -config {"Tracker":{"Name":"idlepage","Config":"{\"PagesInRegion\":256,\"MaxCountPerRegion\":0,\"ScanIntervalMs\":5000,\"RegionsUpdateMs\":0,\"PagemapReadahead\":0,\"KpageflagsReadahead\":0,\"BitmapReadahead\":0}"},"Heatmap":{"HeatMax":0.01,"HeatRetention":0.8,"HeatClasses":4},"Mover":{"IntervalMs":20,"Bandwidth":200},"Cgroups":["/sys/fs/cgroup/foobar"],"IntervalMs":10000,"HeatNumas":{"0":[2,3],"3":[0,1]}}
 ```
 
 You can track process memory consumption on each NUMA node by watching
