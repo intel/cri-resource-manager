@@ -39,13 +39,6 @@ type PolicyHeatConfig struct {
 	HeatNumas map[int][]int
 }
 
-const policyHeatDefaults string = `{
-        "Tracker":{"Name":"softdirty"},
-        "HeatmapConfig":{"HeatMax":1.0,"HeatRetention":0.9513,"HeatClasses":10},
-        "MoverConfig":{"IntervalMs":10,"Bandwidth":100},
-        "IntervalMs":5000
-}`
-
 type PolicyHeat struct {
 	config       *PolicyHeatConfig
 	cgPidWatcher *PidWatcherCgroup
@@ -67,11 +60,6 @@ func NewPolicyHeat() (Policy, error) {
 	}
 	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
 		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
-	}
-
-	err = p.SetConfigJson(policyHeatDefaults)
-	if err != nil {
-		return nil, fmt.Errorf("default configuration error: %s", err)
 	}
 	return p, nil
 }

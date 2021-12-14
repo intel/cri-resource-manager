@@ -48,8 +48,6 @@ type PolicyAgeConfig struct {
 	ActiveNumas []int
 }
 
-const policyAgeDefaults string = `{"Tracker":{"Name":"idlepage"},"IntervalMs":5000,"ActiveDurationMs":10000,"IdleDurationMs":30000}`
-
 type PolicyAge struct {
 	config       *PolicyAgeConfig
 	cgPidWatcher *PidWatcherCgroup
@@ -79,11 +77,6 @@ func NewPolicyAge() (Policy, error) {
 	}
 	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
 		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
-	}
-
-	err = p.SetConfigJson(policyAgeDefaults)
-	if err != nil {
-		return nil, fmt.Errorf("default configuration error: %s", err)
 	}
 	return p, nil
 }
