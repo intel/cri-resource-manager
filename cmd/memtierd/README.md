@@ -272,7 +272,7 @@ activity on every scan in the past 10 seconds. In both cases pages are
 moved.
 
 ```
-{"Tracker":{"Name":"softdirty","Config":"{\"PagesInRegion\":256,\"MaxCountPerRegion\":1,\"ScanIntervalMs\":4000,\"RegionsUpdateMs\":0,\"SkipPageProb\":0,\"PagemapReadahead\":0}","Mover":{"IntervalMs":20,"Bandwidth":200},"Cgroups":["/sys/fs/cgroup/foobar"],"IntervalMs":5000,"IdleDurationMs":15000,"IdleNumas":[2,3],"ActiveDurationMs":10000,"ActiveNumas":[0,1]}
+memtierd> policy -create age -config {"Tracker":{"Name":"softdirty","Config":"{\"PagesInRegion\":256,\"MaxCountPerRegion\":1,\"ScanIntervalMs\":4000,\"RegionsUpdateMs\":0,\"SkipPageProb\":0,\"PagemapReadahead\":0}"},"Mover":{"IntervalMs":20,"Bandwidth":200},"Cgroups":["/sys/fs/cgroup/foobar"],"IntervalMs":5000,"IdleDurationMs":15000,"IdleNumas":[2,3],"ActiveDurationMs":10000,"ActiveNumas":[0,1]} -start
 ```
 
 Currently the age policy works with idlepage and softdirty trackers,
