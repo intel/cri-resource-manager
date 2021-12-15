@@ -351,7 +351,13 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 	if request.CPUType() == cpuReserved || container.GetNamespace() == kubernetes.NamespaceSystem {
 		pool = p.root
 	} else {
-		affinity := p.calculatePoolAffinities(request.GetContainer())
+		affinity, err := p.calculatePoolAffinities(request.GetContainer())
+
+		if err != nil {
+			log.Error("failed to calculate affinity for container %s: %v",
+				container.PrettyName(), err)
+		}
+
 		scores, pools := p.sortPoolsByScore(request, affinity)
 
 		if log.DebugEnabled() {
@@ -773,11 +779,16 @@ func (p *policy) addImplicitAffinities() error {
 }
 
 // Calculate pool affinities for the given container.
-func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int32 {
+func (p *policy) calculatePoolAffinities(container cache.Container) (map[int]int32, error) {
 	log.Debug("=> calculating pool affinities...")
 
+	affinities, err := p.calculateContainerAffinity(container)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make(map[int]int32, len(p.nodes))
-	for id, w := range p.calculateContainerAffinity(container) {
+	for id, w := range affinities {
 		grant, ok := p.allocations.grants[id]
 		if !ok {
 			continue
@@ -788,14 +799,17 @@ func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int3
 		// TODO: calculate affinity for memory here too?
 	}
 
-	return result
+	return result, nil
 }
 
 // Calculate affinity of this container (against all other containers).
-func (p *policy) calculateContainerAffinity(container cache.Container) map[string]int32 {
+func (p *policy) calculateContainerAffinity(container cache.Container) (map[string]int32, error) {
 	log.Debug("* calculating affinity for container %s...", container.PrettyName())
 
-	ca := container.GetAffinity()
+	ca, err := container.GetAffinity()
+	if err != nil {
+		return nil, err
+	}
 
 	result := make(map[string]int32)
 	for _, a := range ca {
@@ -809,7 +823,7 @@ func (p *policy) calculateContainerAffinity(container cache.Container) map[strin
 
 	log.Debug("  => affinity: %v", result)
 
-	return result
+	return result, nil
 }
 
 func (p *policy) filterInsufficientResources(req Request, originals []Node) []Node {

@@ -466,8 +466,8 @@ func (m *mockContainer) UpdateCriCreateRequest(*cri.CreateContainerRequest) erro
 func (m *mockContainer) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error) {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetAffinity() []*cache.Affinity {
-	return nil
+func (m *mockContainer) GetAffinity() ([]*cache.Affinity, error) {
+	return nil, nil
 }
 func (m *mockContainer) SetRDTClass(string) {
 	panic("unimplemented")
@@ -631,7 +631,7 @@ func (m *mockPod) GetCgroupParentDir() string {
 func (m *mockPod) GetPodResourceRequirements() cache.PodResourceRequirements {
 	panic("unimplemented")
 }
-func (m *mockPod) GetContainerAffinity(string) []*cache.Affinity {
+func (m *mockPod) GetContainerAffinity(string) ([]*cache.Affinity, error) {
 	panic("unimplemented")
 }
 func (m *mockPod) ScopeExpression() *resmgr.Expression {
