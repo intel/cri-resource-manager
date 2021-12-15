@@ -354,7 +354,7 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 		affinity, err := p.calculatePoolAffinities(request.GetContainer())
 
 		if err != nil {
-			log.Error("failed to calculate affinity for container %s: %v",
+			return nil, policyError("failed to calculate affinity for container %s: %v",
 				container.PrettyName(), err)
 		}
 
