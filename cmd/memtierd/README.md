@@ -207,11 +207,48 @@ ssh opensuse@172.17.0.2 "sudo mv meme /usr/local/bin"
    sudo memtierd -config FILE
    ```
 
+4. Observe how process's memory is managed.
+
+   - `/proc/PID/numa_maps` includes the number of process's memory pages on each NUMA node.
+
+   - `/sys/fs/cgroup/.../memory.numa_stat` includes the number of
+     bytes of memory of all processes in a cgroup (in cgroup v2).
+
+     > Tip: `awk` spells for parsing and summarizing the files above:
+     > ```
+     > # Total memory of MYPROCESS (note: assuming page size of 4 kB)
+     > awk 'BEGIN{RS=" ";FS="="}/N[0-9]+/{mem[$1]+=$2}END{for(node in mem){print node" "mem[node]*4/1024" M"}}' < /proc/$(pidof MYPROCESS)/numa_maps
+     >
+     > # Anonymous memory of all processes in a cgroup
+     > awk 'BEGIN{RS=" ";FS="="}/N[0-9]+/{mem[$1]+=$2}END{for(node in mem){print node" "mem[node]/1024/1024" M"}}' <(grep ^anon /sys/fs/cgroup/.../memory.numa_stat)
+     > ```
+
+  - The `stats` command in the `memtierd` prompt reports memory
+    scanning times and summarizes amount of memory moved to each
+    node.
+
+    ```
+    memtierd> stats
+    move_pages on pid: 13788
+        calls: 488
+        requested: 499712 pages (1952 MB)
+        on target: 498848 pages (1948 MB)
+            to node 0: 149664 pages (584 MB)
+            to node 2: 349184 pages (1364 MB)
+        errors: 0 pages (0 MB)
+    memory scans on pid: 13788
+        scans: 8
+        scan time: 1066 ms (133 ms/scan)
+        scanned: 13633878 pages (1704234 pages/scan, 6657 MB/scan)
+        accessed: 0 pages (0 pages/scan, 0 MB/scan)
+        written: 3297476 pages (412184 pages/scan, 1610 MB/scan)
+    ```
+
 ## Policies
 
 Memtierd implements two policies: age and heat. These policies have
 different ways of interpreting memory tracker counters as page
-activity. They both move pages based on their interpretations.
+activity.
 
 ### The age policy
 
@@ -225,8 +262,21 @@ The age policy keeps record on two times:
 If the idle time exceeds `IdleDurationMs` in the policy configuration,
 the page is moved a node in `IdleNumas` (demotion). If the active time
 exceeds `ActiveDurationMs`, the page is moved to a node in
-`ActiveNumas` (promotion). Demotion and promotion is disabled if the
-corresponding duration equals 0, or if the list of nodes is empty.
+`ActiveNumas` (promotion). Demotion and promotion are disabled if the
+corresponding duration equals 0, or if the list of corresponding nodes
+is empty.
+
+Example: a page is idle if a tracker has not seen activity in the past
+15 seconds. On the other hand, a page is active if tracker has seen
+activity on every scan in the past 10 seconds. In both cases pages are
+moved.
+
+```
+{"Tracker":{"Name":"softdirty","Config":"{\"PagesInRegion\":256,\"MaxCountPerRegion\":1,\"ScanIntervalMs\":4000,\"RegionsUpdateMs\":0,\"SkipPageProb\":0,\"PagemapReadahead\":0}","Mover":{"IntervalMs":20,"Bandwidth":200},"Cgroups":["/sys/fs/cgroup/foobar"],"IntervalMs":5000,"IdleDurationMs":15000,"IdleNumas":[2,3],"ActiveDurationMs":10000,"ActiveNumas":[0,1]}
+```
+
+Currently the age policy works with idlepage and softdirty trackers,
+but not with the damon tracker.
 
 ### The heat policy
 
@@ -252,8 +302,27 @@ to 2 or 3, and leave intermediate pages unmoved.
 memtierd> policy -create heat -config {"Tracker":{"Name":"idlepage","Config":"{\"PagesInRegion\":256,\"MaxCountPerRegion\":0,\"ScanIntervalMs\":5000,\"RegionsUpdateMs\":0,\"PagemapReadahead\":0,\"KpageflagsReadahead\":0,\"BitmapReadahead\":0}"},"Heatmap":{"HeatMax":0.01,"HeatRetention":0.8,"HeatClasses":4},"Mover":{"IntervalMs":20,"Bandwidth":200},"Cgroups":["/sys/fs/cgroup/foobar"],"IntervalMs":10000,"HeatNumas":{"0":[2,3],"3":[0,1]}}
 ```
 
-You can track process memory consumption on each NUMA node by watching
+The heat policy works with all trackers.
 
-```
-while true; do clear; awk 'BEGIN{RS=" ";FS="="}/N[0-9]+/{mem[$1]+=$2}END{for(node in mem){print node" "mem[node]*4/1024" M"}}' < /proc/$(pidof MYPROCESS)/numa_maps; sleep 2; done
-```
+## Trackers
+
+Trackers track memory activity of a set of processes. List of
+trackers, what they detect and their dependencies.
+
+- damon:
+  - Detects reads and writes.
+  - Kernel configuration: `DAMON`, `DAMON_DBGFS` (in 5.15 and later)
+  - Userspace interface:
+    - `/sys/kernel/debug/damon`
+    - The `perf` tool.
+- idlepage:
+  - Detects reads and writes.
+  - Kernel configuration: `IDLE_PAGE_TRACKING`
+  - Userspace interface:
+    - `/sys/kernel/mm/page_idle/bitmap`
+- softdirty:
+  - Detect only writes.
+  - Kernel configuration: `MEM_SOFT_DIRTY`
+  - Userspace interface:
+    - `/proc/PID/clear_refs`
+    - `/proc/PID/pagemap`
