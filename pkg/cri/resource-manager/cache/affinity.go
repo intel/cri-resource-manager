@@ -16,6 +16,7 @@ package cache
 
 import (
 	"fmt"
+
 	"sigs.k8s.io/yaml"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
@@ -120,7 +121,7 @@ func (a *Affinity) String() string {
 // Try to parse affinities in simplified notation from the given annotation value.
 func (pca *podContainerAffinity) parseSimple(pod *pod, value string, weight int32) bool {
 	parsed := simpleAffinity{}
-	if err := yaml.Unmarshal([]byte(value), &parsed); err != nil {
+	if err := yaml.UnmarshalStrict([]byte(value), &parsed); err != nil {
 		return false
 	}
 
@@ -185,7 +186,7 @@ func (pca *podContainerAffinity) parseSimple(pod *pod, value string, weight int3
 // Try to parse affinities in full notation from the given annotation value.
 func (pca *podContainerAffinity) parseFull(pod *pod, value string, weight int32) error {
 	parsed := podContainerAffinity{}
-	if err := yaml.Unmarshal([]byte(value), &parsed); err != nil {
+	if err := yaml.UnmarshalStrict([]byte(value), &parsed); err != nil {
 		return cacheError("failed to parse affinity annotation '%s': %v", value, err)
 	}
 

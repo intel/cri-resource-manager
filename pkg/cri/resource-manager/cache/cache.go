@@ -161,7 +161,7 @@ type Pod interface {
 	// webhook was found.
 	GetPodResourceRequirements() PodResourceRequirements
 	// GetContainerAffinity returns the affinity expressions for the named container.
-	GetContainerAffinity(string) []*Affinity
+	GetContainerAffinity(string) ([]*Affinity, error)
 	// ScopeExpression returns an affinity expression for defining this pod as the scope.
 	ScopeExpression() *resmgr.Expression
 
@@ -348,7 +348,7 @@ type Container interface {
 	SetCpusetMems(string)
 
 	// GetAffinity returns the annotated affinity expressions for this container.
-	GetAffinity() []*Affinity
+	GetAffinity() ([]*Affinity, error)
 
 	// GetCgroupDir returns the relative path of the cgroup directory for the container.
 	GetCgroupDir() string

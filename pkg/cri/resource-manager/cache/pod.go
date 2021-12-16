@@ -372,35 +372,37 @@ func (p *pod) GetQOSClass() v1.PodQOSClass {
 }
 
 // GetContainerAffinity returns the annotated affinity for the named container.
-func (p *pod) GetContainerAffinity(name string) []*Affinity {
+func (p *pod) GetContainerAffinity(name string) ([]*Affinity, error) {
 	if p.Affinity != nil {
-		return (*p.Affinity)[name]
+		return (*p.Affinity)[name], nil
 	}
 
-	p.Affinity = &podContainerAffinity{}
+	affinity := &podContainerAffinity{}
 
 	value, ok := p.GetResmgrAnnotation(keyAffinity)
 	if ok {
 		weight := DefaultWeight
-		if !p.Affinity.parseSimple(p, value, weight) {
-			if err := p.Affinity.parseFull(p, value, weight); err != nil {
+		if !affinity.parseSimple(p, value, weight) {
+			if err := affinity.parseFull(p, value, weight); err != nil {
 				p.cache.Error("%v", err)
+				return nil, err
 			}
 		}
 	}
 	value, ok = p.GetResmgrAnnotation(keyAntiAffinity)
 	if ok {
 		weight := -DefaultWeight
-		if !p.Affinity.parseSimple(p, value, weight) {
-			if err := p.Affinity.parseFull(p, value, weight); err != nil {
+		if !affinity.parseSimple(p, value, weight) {
+			if err := affinity.parseFull(p, value, weight); err != nil {
 				p.cache.Error("%v", err)
+				return nil, err
 			}
 		}
 	}
 
 	if p.cache.DebugEnabled() {
 		p.cache.Debug("Pod container affinity for %s:", p.GetName())
-		for id, ca := range *p.Affinity {
+		for id, ca := range *affinity {
 			p.cache.Debug("  - container %s:", id)
 			for _, a := range ca {
 				p.cache.Debug("    * %s", a.String())
@@ -408,7 +410,9 @@ func (p *pod) GetContainerAffinity(name string) []*Affinity {
 		}
 	}
 
-	return (*p.Affinity)[name]
+	p.Affinity = affinity
+
+	return (*p.Affinity)[name], nil
 }
 
 // ScopeExpression returns an affinity expression for defining this pod as the scope.
