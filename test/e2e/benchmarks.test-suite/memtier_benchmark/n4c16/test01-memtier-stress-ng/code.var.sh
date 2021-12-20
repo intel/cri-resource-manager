@@ -35,6 +35,14 @@ BM_MEMTIER="memtier-benchmark --server=redis-service --authenticate=$REDIS_PASS"
 # Clean up
 vm-command "kubectl delete jobs --all --now; kubectl delete deployment redis; kubectl delete service redis-service; kubectl delete secret redis; kubectl delete pods --all --now; true"
 
+# redis pod creation might fail with this error
+#    Warning FailedCreatePodContainer 5s (x4 over 45s) kubelet unable to ensure pod container exists: failed to create container for [kubepods burstable podfbd7f451-4b49-4deb-8b49-40ea97685afa] : error while starting unit "kubepods-burstable-podfbd7f451_4b49_4deb_8b49_40ea97685afa.slice" with properties [{Name:Description Value:"libcontainer container kubepods-burstable-podfbd7f451_4b49_4deb_8b49_40ea97685afa.slice"} {Name:Wants Value:["kubepods-burstable.slice"]} {Name:MemoryAccounting Value:true} {Name:CPUAccounting Value:true} {Name:IOAccounting Value:true} {Name:TasksAccounting Value:true} {Name:DefaultDependencies Value:false}]: dbus: connection closed by user
+# Currently only solution seems to be to restart dbus and kubelet so do it here
+# See also this link for more details
+#    https://bugzilla.redhat.com/show_bug.cgi?id=1634092
+vm-command "systemctl restart dbus"
+vm-command "systemctl restart kubelet"
+
 # Setup Redis
 wait="" create redis-secret
 CPU=4 MEM=32G CPULIM=8 MEMLIM=64G NAME=redis wait="Available" create redis
