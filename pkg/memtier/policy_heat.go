@@ -37,6 +37,14 @@ type PolicyHeatConfig struct {
 	// pages of each heat class should be located. If a heat class
 	// is missing, the NUMA node is "don't care".
 	HeatNumas map[int][]int
+	// NumaSize sets the amount of memory that is usable on each
+	// NUMA node. If a node is missing from the map, it's memory
+	// use is not limited. The size is expressed in syntax:
+	// <NUM>(k|M|G|%). If all the memory in a heat class exceeds
+	// NumaSize of the NUMA nodes of that heat, the remaining
+	// pages are moved to NUMA nodes of lower heats if there is
+	// free capacity.
+	NumaSize map[int]string
 }
 
 type PolicyHeat struct {
@@ -46,6 +54,8 @@ type PolicyHeat struct {
 	tracker      Tracker
 	heatmap      *Heatmap
 	mover        *Mover
+	numaFree     map[int]int // free space for pages on each NUMA node
+	numaSize     map[int]int // total capacity (in pages) on each NUMA node
 }
 
 func init() {
@@ -55,8 +65,10 @@ func init() {
 func NewPolicyHeat() (Policy, error) {
 	var err error
 	p := &PolicyHeat{
-		heatmap: NewCounterHeatmap(),
-		mover:   NewMover(),
+		heatmap:  NewCounterHeatmap(),
+		mover:    NewMover(),
+		numaFree: make(map[int]int),
+		numaSize: make(map[int]int),
 	}
 	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
 		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
@@ -88,6 +100,15 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 			return fmt.Errorf("configuring tracker %q for the heat policy failed: %s", config.Tracker.Name, err)
 		}
 	}
+	newNumaFree := make(map[int]int)
+	newNumaSize := make(map[int]int)
+	for numa, sizeString := range config.NumaSize {
+		sizeBytes, err := ParseBytes(sizeString)
+		if err != nil {
+			return fmt.Errorf("NumaSize[%d]: %s", numa, err)
+		}
+		newNumaSize[numa] = int(sizeBytes / constPagesize)
+	}
 	err = p.heatmap.SetConfig(&config.Heatmap)
 	if err != nil {
 		return fmt.Errorf("heatmap configuration error: %s", err)
@@ -96,6 +117,8 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 		return fmt.Errorf("configuring mover failed: %s", err)
 	}
 	p.switchToTracker(newTracker)
+	p.numaFree = newNumaFree
+	p.numaSize = newNumaSize
 	p.config = config
 	return nil
 }
@@ -220,6 +243,29 @@ func (p *PolicyHeat) loop() {
 }
 
 func (p *PolicyHeat) startMoves(timestamp int64) {
+	if len(p.numaSize) == 0 {
+		p.startMovesNoLimits(timestamp)
+	} else {
+		p.startMovesFillFastFree(timestamp)
+	}
+}
+
+func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
+	for _, pid := range p.heatmap.Pids() {
+		hrHotToCold := p.heatmap.Sorted(pid, func(hr0, hr1 *HeatRange) bool {
+			if hr0.heat > hr1.heat ||
+				(hr0.heat == hr1.heat && hr0.addr < hr1.addr) {
+				return true
+			}
+			return false
+		})
+		for _, hr := range hrHotToCold {
+			fmt.Printf("heat: %.6f\n", hr.heat)
+		}
+	}
+}
+
+func (p *PolicyHeat) startMovesNoLimits(timestamp int64) {
 	moverTasks := 0
 	for _, pid := range p.heatmap.Pids() {
 		p.heatmap.ForEachRange(pid, func(hr *HeatRange) int {

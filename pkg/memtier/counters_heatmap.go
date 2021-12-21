@@ -336,3 +336,16 @@ func (h *Heatmap) ForEachRange(pid int, handleRange func(*HeatRange) int) {
 		}
 	}
 }
+
+func (h *Heatmap) Sorted(pid int, cmp func(*HeatRange, *HeatRange) bool) HeatRanges {
+	hrs, ok := h.pidHrs[pid]
+	if !ok || len(*hrs) == 0 {
+		return HeatRanges{}
+	}
+	retval := make(HeatRanges, len(*hrs))
+	copy(retval, *hrs)
+	sort.Slice(retval, func(hri0, hri1 int) bool {
+		return cmp(retval[hri0], retval[hri1])
+	})
+	return retval
+}
