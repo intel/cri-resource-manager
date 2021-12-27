@@ -2,7 +2,6 @@
 GO_URLDIR=https://golang.org/dl
 GO_VERSION=1.16.8
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
-CNI_SUBNET=10.217.0.0/16
 
 ###########################################################################
 
@@ -39,6 +38,7 @@ distro-restart-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
 distro-install-kernel-dev() { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
+distro-k8s-cni-subnet()     { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
 
@@ -941,7 +941,15 @@ default-install-utils() {
 }
 
 default-k8s-cni() {
-    echo cilium
+    echo ${k8scni:-cilium}
+}
+
+default-k8s-cni-subnet() {
+    if [ "$(distro-k8s-cni)" == "flannel" ]; then
+        echo 10.244.0.0/16
+    else
+        echo 10.217.0.0/16
+    fi
 }
 
 default-install-runc() {
@@ -1084,3 +1092,5 @@ EOF
             command-error "failed to copy $dir.orig to $dir"
     fi
 }
+
+CNI_SUBNET=$(distro-k8s-cni-subnet)
