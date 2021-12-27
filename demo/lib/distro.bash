@@ -352,7 +352,15 @@ centos-install-golang() {
 }
 
 fedora-image-url() {
-    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/35/Cloud/x86_64/images/Fedora-Cloud-Base-35-1.2.x86_64.qcow2"
+    echo "https://mirrors.xtom.de/fedora/releases/35/Cloud/x86_64/images/Fedora-Cloud-Base-35-1.2.x86_64.qcow2"
+}
+
+fedora-34-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/34/Cloud/x86_64/images/Fedora-Cloud-Base-34-1.2.x86_64.qcow2"
+}
+
+fedora-33-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
 }
 
 fedora-ssh-user() {
@@ -517,10 +525,6 @@ if [ "\$reboot_needed" == "1" ]; then
    shutdown -r now
 fi
 EOF
-}
-
-fedora-33-image-url() {
-    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
 }
 
 fedora-33-install-crio-pre() {
