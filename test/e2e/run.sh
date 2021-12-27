@@ -92,6 +92,8 @@ usage() {
     echo "             mode if a verification fails: on_verify_fail=interactive"
     echo "    on_verify, on_create, on_launch: code to be executed every time"
     echo "             after verify/create/launch function"
+    echo "    on_{cri,runc,k8s}_install: code to be executed right after installing"
+    echo "             these components."
     echo ""
     echo "  VM configuration VARs: (effective when vm is not already configured)"
     echo "    topology: JSON to override NUMA node list used in tests."
@@ -1231,6 +1233,7 @@ fi
 
 if [ "$reinstall_containerd" == "1" ] || [ "$reinstall_crio" == "1" ] || ! vm-command-q "( type -p containerd || type -p crio ) >/dev/null"; then
     vm-install-cri
+    is-hooked on_cri_install && run-hook on_cri_install
 fi
 
 # runc is installed as a dependency of containerd and crio.
@@ -1239,10 +1242,12 @@ fi
 # a custom locally built runc may be overridden from packages.
 if [ "$reinstall_runc" == "1" ] || ! vm-command-q "type -p runc >/dev/null"; then
     vm-install-runc
+    is-hooked on_runc_install && run-hook on_runc_install
 fi
 
 if [ "$reinstall_k8s" == "1" ] || ! vm-command-q "type -p kubelet >/dev/null"; then
     vm-install-k8s
+    is-hooked on_k8s_install && run-hook on_k8s_install
 fi
 
 if [ "$reinstall_cri_resmgr" == "1" ]; then

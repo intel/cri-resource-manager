@@ -776,6 +776,83 @@ vm-install-dlv() {
     vm-command "echo 'substitute-path:' > \"\$HOME/.config/dlv/config.yml.d/00-substitute-path\""
 }
 
+vm-install-glibc() { # script API
+    # Usage: vm-install-glibc [VERSION]
+    #
+    # If glibc_src=/host/path/to/glibc is set, install a glibc that is
+    # built and installed on host using configure --prefix $glibc_src.
+    # If glibc_src is not set, download, build and install a glibc on vm.
+    # In both cases glibc is installed to /opt/glibc/VERSION on vm.
+    #
+    # vm-set-glibc wraps selected binaries to use an installed glibc.
+    #
+    # Example: install a glibc from host and use it with two binaries.
+    #   glibc_src=/host/glibc/install/prefix vm-install-glibc host-2.34
+    #   vm-set-glibc host-2.34 /usr/bin/containerd /usr/local/bin/cri-resmgr
+    #
+    # Example: download, build and install glibc 2.32 on vm:
+    #   vm-install-glibc 2.32
+    #   vm-set-glibc 2.32 /usr/bin/containerd /usr/local/bin/cri-resmgr
+    local glibc_ver="${1:-host}"
+    local vm_glibc_dir="/opt/glibc/${glibc_ver}"
+    if [ -n "$glibc_src" ] && [ -d "$glibc_src" ]; then
+        vm-command "mkdir -p $vm_glibc_dir"
+        ( cd "$glibc_src" && tar cz . ) | vm-pipe-to-file "$vm_glibc_dir/glibc-$glibc_ver.tar.gz" ||
+            error "failed to package glibc from '$glibc_src'"
+        vm-command "cd $vm_glibc_dir && tar xf glibc-$glibc_ver.tar.gz && rm -f glibc-$glibc_ver.tar.gz" ||
+            command-error "failed to extract glibc-$glibc_ver.tar.gz"
+        return 0
+    fi
+    if [[ "$glibc_ver" == "host"* ]]; then
+        error "vm-install-glibc: invalid glibc_src='$glibc_src' when installing glibc from host"
+    fi
+    local vm_glibc_src="$vm_glibc_dir/src/glibc-${glibc_ver}"
+    local vm_glibc_build="$vm_glibc_dir/src/build"
+    local vm_glibc_install="$vm_glibc_dir"
+    vm-install-pkg make bison flex gcc
+    vm-command "mkdir -p $vm_glibc_src; cd $vm_glibc_src; curl -L --remote-name-all https://ftp.gnu.org/gnu/glibc/glibc-${glibc_ver}.tar.gz" ||
+        command-error "failed to download glibc"
+    vm-command "mkdir -p $vm_glibc_src; cd $vm_glibc_src/..; tar xzf $vm_glibc_src/glibc-${glibc_ver}.tar.gz" ||
+        command-error "failed to extract glibc"
+    vm-command "mkdir -p $vm_glibc_build; cd $vm_glibc_build && $vm_glibc_src/configure --prefix=$vm_glibc_install" ||
+        command-error "failed to configure glibc"
+    vm-command "cd $vm_glibc_build && make -j 4 >make.output.txt 2>&1 || ( tail make.output.txt; exit 1 )" ||
+        command-error "failed to build glibc, see $vm_glibc_build/make.output.txt"
+    vm-command "cd $vm_glibc_build && make install" ||
+        command-error "failed to install glibc"
+}
+
+vm-set-glibc() { # script API
+    # Usage: vm-set-glibc VERSION BIN [BIN...]
+    #
+    # Wrap binaries to use glibc VERSION.
+    #
+    # Note glibc VERSION must be installed first.
+    # See vm-install-glibc.
+    local glibc_ver="$1"
+    local vm_glibc_dir="/opt/glibc/${glibc_ver}"
+    local vm_glibc_install="$vm_glibc_dir"
+    local vm_glibc_ld="$vm_glibc_install/lib/ld-linux-x86-64.so.2"
+    shift
+    if [ -z "$glibc_ver" ]; then
+        error "vm-switch-glibc: missing glibc version to switch to"
+    fi
+    vm-command "[ -x $vm_glibc_ld ]" ||
+        command-error "cannot find loader $vm_glibc_ld"
+    local vm_bin
+    for vm_bin in "$@"; do
+        vm-command "[ -x $vm_bin ]" ||
+            command-error "cannot find binary to be wrapped: $vm_bin"
+        vm-command "( [ \"\$(dd bs=1 count=3 skip=1 if=$vm_bin)\" == \"ELF\" ] && mv $vm_bin ${vm_bin}.bin ) || [ -f $vm_bin.bin ]" ||
+            command-error "failed to rename binary"
+        vm-pipe-to-file "$vm_bin" <<EOF
+#!/bin/bash
+LD_LIBRARY_PATH=$vm_glibc_install/lib:\$LD_LIBRARY_PATH exec $vm_glibc_ld ${vm_bin}.bin "\$@"
+EOF
+        vm-command "chmod a+rx $vm_bin"
+    done
+}
+
 vm-dlv-add-src() {
     local host_src_dir="$1"
     [ -d "$host_src_dir" ] || error "vm-dlv-add-src: invalid source directory \"$host_src_dir\", existing go project directory expected"
