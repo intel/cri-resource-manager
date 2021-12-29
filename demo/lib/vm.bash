@@ -699,24 +699,32 @@ vm-install-runc() {
 }
 
 vm-install-cri() {
+    local vm_cri_dir="/usr/bin"
     distro-install-"$VM_CRI"
     distro-config-"$VM_CRI"
     if [ "$VM_CRI" == "containerd" ]; then
         if [ -n "$containerd_src" ]; then
             vm-command "systemctl stop containerd"
+            vm-command 'command -v containerd'
+            if [ -n "$COMMAND_OUTPUT" ] && [ "x$COMMAND_STATUS" == "x0" ]; then
+                vm_cri_dir="${COMMAND_OUTPUT%/*}"
+            fi
             for f in ctr containerd containerd-stress containerd-shim containerd-shim-runc-v1 containerd-shim-runc-v2; do
-                vm-put-file "$containerd_src/bin/$f" "/usr/bin/$f"
+                vm-put-file "$containerd_src/bin/$f" "$vm_cri_dir/$f"
             done
-            vm-command "systemctl start containerd"
+            vm-command "systemctl enable --now containerd"
         fi
     elif [ "$VM_CRI" == "crio" ]; then
         if [ -n "$crio_src" ]; then
             vm-command "systemctl stop crio"
+            vm-command 'command -v crio'
+            if [ -n "$COMMAND_OUTPUT" ] && [ "x$COMMAND_STATUS" == "x0" ]; then
+                vm_cri_dir="${COMMAND_OUTPUT%/*}"
+            fi
             for f in crio crio-status pinns; do
-                vm-put-file "$crio_src/bin/$f" "/usr/bin/$f"
+                vm-put-file "$crio_src/bin/$f" "$vm_cri_dir/$f"
             done
-            vm-command "systemctl enable crio"
-            vm-command "systemctl start crio"
+            vm-command "systemctl enable --now crio"
         fi
     fi
 }
