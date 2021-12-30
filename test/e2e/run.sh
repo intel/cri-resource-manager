@@ -128,6 +128,9 @@ usage() {
     echo "             command line when launched"
     echo "    cri_resmgr_agent_extra_args: arguments to be added on"
     echo "              cri-resmgr-agent command line when launched"
+    echo "    use_host_images: if \"1\", export images from the host docker"
+    echo "              to vm whenever they are available."
+    echo "              The default is 0: always pull images from repositories to vm."
     echo "    vm_files: \"serialized\" associative array of files to be created on vm"
     echo "             associative array syntax:"
     echo "             vm_files['/path/file']=file:/path/on/host"
@@ -905,15 +908,19 @@ create() { # script API
         fi
         for image in $images; do
             if ! [[ " ${pulled_images_on_vm[*]} " == *" ${image} "* ]]; then
-                vm-command "crictl -i unix://${k8scri_sock} pull \"$image\"" || {
-                    errormsg="pulling image \"$image\" for \"$OUTPUT_DIR/$NAME.yaml\" failed."
-                    if is-hooked on_create_fail; then
-                        echo "$errormsg"
-                        run-hook on_create_fail
-                    else
-                        command-error "$errormsg"
-                    fi
-                }
+                if [ "$use_host_images" == "1" ] && vm-put-docker-image "$image"; then
+                    : # no need to pull the image to vm, it is now imported.
+                else
+                    vm-command "crictl -i unix://${k8scri_sock} pull \"$image\"" || {
+                        errormsg="pulling image \"$image\" for \"$OUTPUT_DIR/$NAME.yaml\" failed."
+                        if is-hooked on_create_fail; then
+                            echo "$errormsg"
+                            run-hook on_create_fail
+                        else
+                            command-error "$errormsg"
+                        fi
+                    }
+                fi
                 pulled_images_on_vm+=("$image")
             fi
         done
@@ -1084,6 +1091,7 @@ if [ "$reinstall_bootstrap" == "1" ]; then
 fi
 omit_agent=${omit_agent:-0}
 omit_cri_resmgr=${omit_cri_resmgr:-0}
+use_host_images=${use_host_images:-0}
 py_consts="${py_consts:-''}"
 topology=${topology:-'[
     {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
