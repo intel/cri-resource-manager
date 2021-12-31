@@ -422,8 +422,15 @@ fedora-install-crio-version() {
     fi
 }
 
+fedora-install-containernetworking-plugins() {
+    distro-install-pkg containernetworking-plugins
+    vm-command "[ -x /opt/cni/bin/loopback ] || { mkdir -p /opt/cni/bin; mount --bind /usr/libexec/cni /opt/cni/bin; }"
+    vm-command "grep /usr/libexec/cni /etc/fstab || echo /usr/libexec/cni /opt/cni/bin none defaults,bind,nofail 0 0 >> /etc/fstab"
+}
+
 fedora-install-crio-pre() {
     fedora-install-crio-version 1.21
+    fedora-install-containernetworking-plugins
 }
 
 fedora-install-crio() {
@@ -438,17 +445,7 @@ fedora-install-crio() {
 
 fedora-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
-}
-
-fedora-install-containerd-post() {
-    distro-install-pkg containernetworking-plugins
-}
-
-fedora-config-containerd-post() {
-    if [ "$VM_DISTRO" = "fedora" ]; then
-        vm-command "mkdir -p /opt/cni/bin && mount --bind /usr/libexec/cni /opt/cni/bin"
-        vm-command "echo /usr/libexec/cni /opt/cni/bin none defaults,bind,nofail 0 0 >> /etc/fstab"
-    fi
+    fedora-install-containernetworking-plugins
 }
 
 fedora-install-k8s() {
