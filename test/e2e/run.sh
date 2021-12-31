@@ -517,7 +517,7 @@ launch() { # script API
             vm-command "cat $(basename "$cri_resmgr_cfg")"
             if [[ "$k8scri" == cri-resmgr* ]]; then
                 # launch cri-resmgr as the top element in the k8s container runtime stack
-                cri_resmgr_mode="-relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket $cri_sock -image-socket $cri_sock"
+                cri_resmgr_mode="-relay-socket ${cri_resmgr_sock} -runtime-socket $cri_sock -image-socket $cri_sock"
             else
                 # launch cri-resmgr as an NRI plugin to running container runtime
                 cri_resmgr_mode="-use-nri-plugin"
@@ -529,7 +529,7 @@ launch() { # script API
             vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
                 command-error "launching cri-resmgr failed with FATAL ERROR"
             }
-            vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
+            vm-command "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1 || {
                 echo "cri-resmgr last output line:"
                 vm-command-q "tail -n 1 cri-resmgr.output.txt"
                 command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
@@ -546,7 +546,7 @@ launch() { # script API
             sleep 2 >/dev/null 2>&1
             vm-command "grep 'FATAL ERROR' cri-resmgr-agent.output.txt" >/dev/null 2>&1 &&
                 command-error "launching cri-resmgr-agent failed with FATAL ERROR"
-            vm-command "pidof cri-resmgr-agent" >/dev/null 2>&1 ||
+            vm-command "fuser ${cri_resmgr_agent_sock}" >/dev/null 2>&1 ||
                 command-error "launching cri-resmgr-agent failed, cannot find cri-resmgr-agent PID"
             ;;
 
@@ -588,10 +588,10 @@ terminate() { # script API
     local target="$1"
     case $target in
         "cri-resmgr")
-            vm-command "kill -9 \$(pidof cri-resmgr) 2>/dev/null"
+            vm-command "fuser --kill ${cri_resmgr_pidfile} 2>/dev/null"
             ;;
         "cri-resmgr-agent")
-            vm-command "kill -9 \$(pidof cri-resmgr-agent) 2>/dev/null"
+            vm-command "fuser --kill ${cri_resmgr_agent_sock} 2>/dev/null"
             ;;
         "cri-resmgr-webhook")
             vm-command "kubectl delete -f webhook/mutating-webhook-config.yaml; kubectl delete -f webhook/webhook-deployment.yaml"
@@ -1009,14 +1009,17 @@ user_script_file=$2
 distro=${distro:=$DEFAULT_DISTRO}
 k8s=${k8s:=}
 k8scri=${k8scri:="cri-resmgr|containerd"}
+cri_resmgr_pidfile="/var/run/cri-resmgr*.pid"
+cri_resmgr_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+cri_resmgr_agent_sock="/var/run/cri-resmgr/cri-resmgr-agent.sock"
 case "${k8scri}" in
     "cri-resmgr|containerd")
-        k8scri_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+        k8scri_sock="${cri_resmgr_sock}"
         cri_sock="/var/run/containerd/containerd.sock"
         cri=containerd
         ;;
     "cri-resmgr|crio")
-        k8scri_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+        k8scri_sock="${cri_resmgr_sock}"
         cri_sock="/var/run/crio/crio.sock"
         cri=crio
         ;;
@@ -1322,7 +1325,7 @@ fi
 
 # Start cri-resmgr if not already running
 if [ "$omit_cri_resmgr" != "1" ]; then
-    if ! vm-command-q "pidof cri-resmgr" >/dev/null; then
+    if ! vm-command-q "fuser ${cri_resmgr_pidfile}" >/dev/null; then
         screen-launch-cri-resmgr
     fi
     if [ -n "$crirm_src" ]; then
@@ -1345,7 +1348,7 @@ fi
 
 # Start cri-resmgr-agent if not already running
 if [ "$omit_agent" != "1" ]; then
-    if ! vm-command-q "pidof cri-resmgr-agent" >/dev/null; then
+    if ! vm-command-q "fuser ${cri_resmgr_agent_sock}" >/dev/null; then
         screen-launch-cri-resmgr-agent
     fi
 fi
