@@ -116,6 +116,8 @@ usage() {
     echo "             \"crio\"                  cri-o, no cri-resmgr."
     echo "             \"crio&cri-resmgr\"       cri-o, cri-resmgr is an NRI plugin."
     echo "             The default is \"cri-resmgr|containerd\"."
+    echo "    k8scni:  The container network interface plugin to install. Options are:"
+    echo "             \"cilium\" (the default), \"flannel\", \"weavenet\"."
     echo "    crio_version: Version of cri-o to try to pull in, if cri-o is"
     echo "                  not being installed from sources."
     echo "    setup_proxies: Setup proxies even if not using govm based VM."
@@ -1067,6 +1069,7 @@ cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
 cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
 cleanup=${cleanup:-0}
 reinstall_all=${reinstall_all:-0}
+reinstall_bootstrap=${reinstall_bootstrap:-0}
 reinstall_containerd=${reinstall_containerd:-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr:-0}
 reinstall_cri_resmgr_agent=${reinstall_cri_resmgr_agent:-0}

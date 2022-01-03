@@ -795,6 +795,9 @@ vm-install-k8s() {
 }
 
 vm-create-singlenode-cluster() {
+    if ! [ "$(type -t vm-install-cni-$(distro-k8s-cni))" == "function" ]; then
+        error "invalid CNI: $(distro-k8s-cni)"
+    fi
     vm-create-cluster
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
     vm-install-cni-"$(distro-k8s-cni)"
@@ -828,6 +831,13 @@ vm-install-cni-weavenet() {
     vm-command "kubectl apply -f \"https://cloud.weave.works/k8s/net?k8s-version=\$(kubectl version | base64 | tr -d '\n')\""
     if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/weave-net"; then
         command-error "installing weavenet CNI to Kubernetes failed/timed out"
+    fi
+}
+
+vm-install-cni-flannel() {
+    vm-command "kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"
+    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/kube-flannel-ds"; then
+        command-error "installing flannel CNI to Kubernetes failed/timed out"
     fi
 }
 
