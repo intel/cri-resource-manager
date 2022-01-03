@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
+	"github.com/intel/cri-resource-manager/pkg/pidfile"
 )
 
 // Options captures our command line parameters.
@@ -29,6 +30,7 @@ type options struct {
 	RelayDir            string
 	AgentSocket         string
 	ConfigSocket        string
+	PidFile             string
 	ResctrlPath         string
 	FallbackConfig      string
 	ForceConfig         string
@@ -58,7 +60,8 @@ func init() {
 		"local socket of the cri-resmgr agent to connect")
 	flag.StringVar(&opt.ConfigSocket, "config-socket", sockets.ResourceManagerConfig,
 		"Unix domain socket path where the resource manager listens for cri-resmgr-agent")
-
+	flag.StringVar(&opt.PidFile, "pid-file", pidfile.GetPath(),
+		"PID file to write daemon PID to")
 	flag.StringVar(&opt.FallbackConfig, "fallback-config", "",
 		"Fallback configuration to use unless/until one is available from the cache or agent.")
 	flag.StringVar(&opt.ForceConfig, "force-config", "",
