@@ -819,9 +819,8 @@ vm-destroy-cluster() {
 }
 
 vm-install-cni-cilium() {
-    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.9/install/kubernetes/quick-install.yaml"
-    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
-        command-error "installing cilium CNI to Kubernetes timed out"
+    if ! vm-command "curl -L --remote-name-all https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz && tar xzvfC cilium-linux-amd64.tar.gz /usr/local/bin && cilium install && rm -f cilium-linux-amd64.tar.gz"; then
+        command-error "installing cilium CNI to Kubernetes failed"
     fi
 }
 
