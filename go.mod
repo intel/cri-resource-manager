@@ -19,6 +19,7 @@ require (
 	github.com/prometheus/common v0.30.0
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd
+	github.com/stretchr/testify v1.7.0 // indirect
 	go.opencensus.io v0.22.4
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/sys v0.0.0-20210903071746-97244b99971b
