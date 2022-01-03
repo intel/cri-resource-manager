@@ -593,6 +593,10 @@ sles-install-utils() {
 }
 
 opensuse-image-url() {
+    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.3/appliances/openSUSE-Leap-15.3-JeOS.x86_64-15.3-OpenStack-Cloud-Current.qcow2"
+}
+
+opensuse-15_2-image-url() {
     echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
 }
 
@@ -600,8 +604,8 @@ opensuse-tumbleweed-image-url() {
     echo "https://ftp.uni-erlangen.de/opensuse/tumbleweed/appliances/openSUSE-Tumbleweed-JeOS.x86_64-OpenStack-Cloud.qcow2"
 }
 
-opensuse-tumbleweed-install-utils() {
-    distro-install-pkg psmisc
+opensuse-install-utils() {
+    distro-install-pkg psmisc sysvinit-tools
 }
 
 opensuse-ssh-user() {
@@ -652,7 +656,10 @@ opensuse-install-pkg() {
             break
         fi
     done
-    vm-command "$ZYPPER install $opts $*" ||
+    # In OpenSUSE 15.2 zypper exits with status 106 if already installed,
+    # in 15.3 the exit status is 0. Do not consider "already installed"
+    # as an error.
+    vm-command "$ZYPPER install $opts $*" || [ "$COMMAND_STATUS" == "106" ] ||
         command-error "failed to install $*"
 }
 
