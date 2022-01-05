@@ -36,6 +36,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/visualizer"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/pidfile"
 
 	policyCollector "github.com/intel/cri-resource-manager/pkg/policycollector"
 	"github.com/intel/cri-resource-manager/pkg/utils"
@@ -118,6 +119,10 @@ func NewResourceManager() (ResourceManager, error) {
 	}
 
 	if err := m.setupRelay(); err != nil {
+		pid, _ := pidfile.OwnerPid()
+		if pid > 0 {
+			m.Error("looks like we're already running as pid %d...", pid)
+		}
 		return nil, err
 	}
 
@@ -163,6 +168,13 @@ func (m *resmgr) Start() error {
 
 	if err := m.relay.Start(); err != nil {
 		return resmgrError("failed to start CRI relay: %v", err)
+	}
+
+	if err := pidfile.Remove(); err != nil {
+		return resmgrError("failed to remove stale/old PID file: %v", err)
+	}
+	if err := pidfile.Write(); err != nil {
+		return resmgrError("failed to write PID file: %v", err)
 	}
 
 	if opt.ForceConfig == "" {
