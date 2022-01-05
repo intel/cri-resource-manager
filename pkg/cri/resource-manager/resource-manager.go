@@ -253,7 +253,7 @@ func (m *resmgr) resetCachedPolicy() int {
 	m.Info("resetting active policy stored in cache...")
 	defer logger.Flush()
 
-	if utils.ServerActiveAt(opt.RelaySocket) {
+	if ls, err := utils.IsListeningSocket(opt.RelaySocket); ls || err != nil {
 		m.Error("refusing to reset, looks like an instance of %q is active at socket %q...",
 			filepath.Base(os.Args[0]), opt.RelaySocket)
 		return 1
@@ -271,7 +271,7 @@ func (m *resmgr) resetCachedConfig() int {
 	m.Info("resetting cached configuration...")
 	defer logger.Flush()
 
-	if utils.ServerActiveAt(opt.RelaySocket) {
+	if ls, err := utils.IsListeningSocket(opt.RelaySocket); ls || err != nil {
 		m.Error("refusing to reset, looks like an instance of %q is active at socket %q...",
 			filepath.Base(os.Args[0]), opt.RelaySocket)
 		return 1

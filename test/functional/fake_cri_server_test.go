@@ -61,8 +61,8 @@ func newFakeCriServer(t *testing.T, socket string, fakeHandlers map[string]inter
 
 	lis, err := net.Listen("unix", socket)
 	if err != nil {
-		if utils.ServerActiveAt(socket) {
-			t.Fatalf("failed to create fake server: socket %s already in use", socket)
+		if ls, err := utils.IsListeningSocket(socket); ls || err != nil {
+			t.Fatalf("failed to create fake server: socket %s already exists", socket)
 		}
 		os.Remove(socket)
 		lis, err = net.Listen("unix", socket)
