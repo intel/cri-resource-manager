@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+
+"""go-mod-tree - inspect go module import hierarchy
+
+Usage: go mod graph | go-mod-tree [options]
+
+Options:
+  -h, --help                    print help.
+
+  Input:
+  -g, --graph FILE              read graph from FILE instead of stdin.
+
+  Dependency tree selection: (MODULEs are regular expressions)
+  -r, --reverse                 print reverse tree: from importees to importers.
+  -f, --from MODULE             print tree starting from matching MODULEs.
+  -t, --to MODULE               print tree with only branches that end to
+                                matching MODULEs.
+  -x, --exclude MODULE          exclude matching MODULEs from the graph.
+  -s, --shortest-path MODULE    print only a shortest path to matching MODULEs.
+  -d, --depth DEPTH             limit printed tree to DEPTH.
+
+  Output format:
+  -H <L|D|I|R>                  hide from line format:
+                                  L: line number
+                                  D: depth
+                                  I: indentation
+                                  R: reference to already printed line
+  -I STRING                     indentation by repeating STRING
+
+Examples:
+  - Print full import graph as a tree:
+    go mod graph | go-mod-tree
+
+  - Print which of the direct dependencies lead to importing x/net:
+    go mod graph | go-mod-tree --to golang.org/x/net --depth 1
+
+  - Print modules directly imported by different versions of x/net:
+    go mod graph | go-mod-tree --from golang.org/x/net --depth 1
+
+  - Print modules that directly depend on any version of x/net:
+    go mod graph | go-mod-tree --reverse --from golang.org/x/net --depth 1
+
+  - Print shortest import paths to 2010-2019 versions of x/net:
+    go mod graph | go-mod-tree --shortest-path .*/x/net@.*201[0-9].*
+
+  - Print full reverse import tree from a specific x/net version:
+    go mod graph | go-mod-tree --reverse --from .*20190311183353-d8887717615a
+"""
+
+import getopt
+import re
+import sys
+
+g_command = "go-mod-tree"
+
+opt_fmt = "%(prefix)s%(indent)s%(node)s %(ref)s\n"
+opt_indent = ":   "
+opt_reverse = False
+opt_graph = "-"
+opt_shortest_path = None
+opt_from = None
+opt_to = None
+opt_exclude = None
+opt_depth = float("inf")
+opt_hide = ""
+
+def error(msg, exit_status=1):
+    """print error message and exit"""
+    if msg:
+        sys.stderr.write("%s: %s\n" % (g_command, msg))
+    if exit_status != None:
+        sys.exit(1)
+
+def output(msg):
+    try:
+        sys.stdout.write(msg)
+    except:
+        error("broken pipe")
+
+def read_graph(s):
+    """read go mod graph output from a string"""
+    deps = {} # {importer: set(importee, ...)}
+    for line in s.splitlines():
+        if not line:
+            continue
+        if not " " in line:
+            continue
+        importer, importee = line.split(" ", 1)
+        if not importer in deps:
+            deps[importer] = set()
+        deps[importer].add(importee)
+    return deps
+
+g_lineno = 0
+def dump_tree(graph, module, depth=0, already_seen={}, max_depth=opt_depth):
+    def dump_line(depth, node):
+        global g_lineno
+        g_lineno += 1
+        if "D" not in opt_hide:
+            pp_depth = "D%d" % (depth,)
+        else:
+            pp_depth = ""
+        if "L" not in opt_hide:
+            pp_lineno = "L%d" % (g_lineno,)
+        else:
+            pp_lineno = ""
+        if "D" in opt_hide and "L" in opt_hide:
+            pp_lineprefix = ""
+        else:
+            pp_lineprefix = "%-8s" % ((pp_lineno + pp_depth),)
+        if "I" in opt_hide:
+            pp_indent = ""
+        else:
+            pp_indent = opt_indent * depth
+        pp_ref = ""
+        if node in already_seen and "R" not in opt_hide:
+            pp_ref = " (see L%(line)sD%(depth)s...)" % already_seen[node]
+        output((opt_fmt % {
+            'prefix': pp_lineprefix,
+            'indent': pp_indent,
+            'node': node,
+            'ref': pp_ref}))
+    if depth > max_depth:
+        return
+    dump_line(depth, module)
+    if module in already_seen:
+        return
+    already_seen[module] = {"line": g_lineno, "depth": depth}
+    for child in sorted(graph.get(module, set())):
+        dump_tree(graph, child, depth+1, already_seen, max_depth=max_depth)
+
+def graph_clear(graph):
+    """return graph without node keys that have no outgoing edges"""
+    new_graph = {}
+    for node in graph:
+        if graph[node]:
+            new_graph[node] = set(graph[node])
+    return new_graph
+
+def graph_exclude(graph, exclude_nodes):
+    """return graph without nodes in the exclude_nodes set"""
+    new_graph = {}
+    for node in graph:
+        if node not in exclude_nodes:
+            new_graph[node] = graph[node] - exclude_nodes
+    return graph_clear(new_graph)
+
+def graph_reverse(graph):
+    """return reversed graph"""
+    new_graph = {}
+    for from_node, to_nodes in graph.items():
+        for to_node in to_nodes:
+            if not to_node in new_graph:
+                new_graph[to_node] = set()
+            new_graph[to_node].add(from_node)
+    return new_graph
+
+def graph_reachable_part(graph, from_nodes):
+    """return the part of the graph that is reachable from a set of nodes"""
+    new_graph = {}
+    stack = list(set(graph.keys()).intersection(from_nodes))
+    while stack:
+        node = stack.pop()
+        if node in new_graph:
+            continue
+        new_graph[node] = set()
+        for child in graph.get(node, set()):
+            new_graph[node].add(child)
+            stack.append(child)
+    return graph_clear(new_graph)
+
+def graph_from_to(graph, from_nodes, to_nodes):
+    """return graph between from_nodes and to_nodes"""
+    new_graph = graph
+    new_graph = graph_reverse(new_graph)
+    new_graph = graph_reachable_part(new_graph, to_nodes)
+    new_graph = graph_reverse(new_graph)
+    new_graph = graph_reachable_part(new_graph, from_nodes)
+    return new_graph
+
+def shortest_path(graph, from_node, to_node):
+    """return new graph that contains only a shorest path between nodes"""
+    shortest_path = None
+    bfs_queue = [(child, [from_node]) for child in sorted(graph.get(from_node, set()))]
+    seen = set(from_node)
+    while bfs_queue:
+        node, history = bfs_queue.pop(0)
+        seen.add(node)
+        if node == to_node:
+            shortest_path = history + [node]
+            break
+        for child in sorted(graph.get(node, set())):
+            if child in seen:
+                continue
+            bfs_queue.append((child, history + [node]))
+    return shortest_path
+
+def graph_add_path(graph, path):
+    """add a path to current graph"""
+    for n, node in enumerate(path):
+        if not node in graph:
+            graph[node] = set()
+        if n > 0:
+            graph[path[n-1]].add(node)
+    return graph
+
+def matching_nodes(graph, node_regexp):
+    matching = set()
+    nodes = set.union(set(graph.keys()), set.union(*graph.values()))
+    for node in nodes:
+        if re.match(node_regexp, node):
+            matching.add(node)
+    return sorted(matching)
+
+def root_nodes(graph):
+    dest_nodes = set.union(*graph.values())
+    src_nodes = set(graph.keys())
+    roots = src_nodes - dest_nodes
+    return sorted(roots)
+
+if __name__ == "__main__":
+    try:
+        opts, remainder = getopt.gnu_getopt(
+            sys.argv[1:],
+            'd:f:g:hrs:t:x:H:I:',
+            ['depth=', 'exclude=', 'from=', 'graph=', 'help', 'reverse',
+             'shortest-path=', 'to='])
+    except getopt.GetoptError as e:
+        error(str(e))
+    for opt, arg in opts:
+        if opt in ["-h", "--help"]:
+            print(__doc__)
+            error(None, exit_status=0)
+        elif opt in ["-d", "--depth"]:
+            try:
+                opt_depth = int(arg)
+                if opt_depth <= 0:
+                    raise Exception("depth <= 0")
+            except:
+                error('invalid --depth=%r, positive integer expected', (arg,))
+        elif opt in ["-f", "--from"]:
+            opt_from = arg
+        elif opt in ["-g", "--graph"]:
+            opt_graph = arg
+        elif opt in ["-r", "--reverse"]:
+            opt_reverse = True
+        elif opt in ["-s", "--shortest-path"]:
+            opt_shortest_path = arg
+        elif opt in ["-t", "--to"]:
+            opt_to = arg
+        elif opt in ["-H"]:
+            opt_hide = arg
+        elif opt in ["-I"]:
+            opt_indent = arg
+        elif opt in ["-x", "--exclude"]:
+            opt_exclude = arg
+        else:
+            error('internal error: option "%s" not handled' % (opt,))
+    if len(remainder) > 0:
+        error('too many parameters')
+
+    if opt_graph == "-":
+        graph_string = sys.stdin.read()
+    else:
+        try:
+            graph_string = open(opt_graph).read()
+        except Exception as err:
+            error('failed to read graph from file "%s": %s' % (opt_graph, err))
+    graph = read_graph(graph_string)
+
+    if opt_exclude:
+        exclude_modules = matching_nodes(graph, opt_exclude)
+        if not exclude_modules:
+            error('no modules matching regular expression --exclude %r' % (opt_exclude,))
+        graph = graph_exclude(graph, set(exclude_modules))
+
+    if opt_reverse:
+        graph = graph_reverse(graph)
+
+    if opt_from:
+        from_modules = matching_nodes(graph, opt_from)
+        if not from_modules:
+            error('no modules matching regular expression --from %r' % (opt_from,))
+    else:
+        from_modules = root_nodes(graph)
+
+    if opt_to:
+        to_modules = matching_nodes(graph, opt_to)
+        if not to_modules:
+            error('no modules matching regular expression --to %r' % (opt_to,))
+        graph = graph_from_to(graph, set(from_modules), set(to_modules))
+        from_modules = set(from_modules).intersection(
+            set.union(set(graph.keys()), set.union(*graph.values())))
+
+    if opt_shortest_path:
+        new_graph = {}
+        to_modules = matching_nodes(graph, opt_shortest_path)
+        if not to_modules:
+            error('no modules matching regular expression --shortest-path %r' % (opt_shortest_path,))
+        for from_node in from_modules:
+            for to_node in to_modules:
+                path = shortest_path(graph, from_node, to_node)
+                if path:
+                    graph_add_path(new_graph, path)
+        graph = new_graph
+
+    for from_node in from_modules:
+        dump_tree(graph, from_node, max_depth=opt_depth)
