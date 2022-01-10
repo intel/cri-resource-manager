@@ -15,6 +15,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -94,9 +95,19 @@ func WaitForServer(socket string, timeout time.Duration, opts ...interface{}) er
 	}
 }
 
-// ServerActiveAt checks if a gRPC server is accepting connections at the socket.
-func ServerActiveAt(socket string) bool {
-	return WaitForServer(socket, time.Second) == nil
+// IsListeningSocket returns true if connections are accepted on the socket.
+func IsListeningSocket(socket string) (bool, error) {
+	conn, err := net.Dial("unix", socket)
+	if err == nil {
+		conn.Close()
+		return true, nil
+	}
+
+	if errors.Is(err, syscall.ECONNREFUSED) || os.IsNotExist(err) {
+		return false, nil
+	}
+
+	return false, err
 }
 
 // Check if a socket connection error looks fatal.
