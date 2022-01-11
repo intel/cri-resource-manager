@@ -289,12 +289,12 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 	if *pk > -1 {
 		kpFile, err := memtier.ProcKpageflagsOpen()
 		if err != nil {
-			p.output("opening kpageflags failed: %w\n", err)
+			p.output("opening kpageflags failed: %s\n", err)
 			return csOk
 		}
 		flags, err := kpFile.ReadFlags(uint64(*pk))
 		if err != nil {
-			p.output("reading flags of PFN %d from kpageflags failed: %w\n", *pk, err)
+			p.output("reading flags of PFN %d from kpageflags failed: %s\n", *pk, err)
 			return csOk
 		}
 		p.output(`LOCKED        %d
@@ -387,7 +387,7 @@ PGTABLE       %d
 	if *pm != -1 {
 		pmFile, err := memtier.ProcPagemapOpen(*pid)
 		if err != nil {
-			p.output("%w", err)
+			p.output("%s", err)
 			return csOk
 		}
 		defer pmFile.Close()
@@ -442,6 +442,7 @@ PGTABLE       %d
 
 func (p *Prompt) cmdMover(args []string) commandStatus {
 	config := p.f.String("config", "", "reconfigure mover with JSON string")
+	configDump := p.f.Bool("config-dump", false, "dump current configuration")
 	pagesTo := p.f.Int("pages-to", -1, "move pages to NODE int")
 	start := p.f.Bool("start", false, "start mover")
 	stop := p.f.Bool("stop", false, "stop mover")
@@ -456,6 +457,9 @@ func (p *Prompt) cmdMover(args []string) commandStatus {
 		if err := p.mover.SetConfigJson(*config); err != nil {
 			p.output("mover reconfiguration error: %v\n", err)
 		}
+	}
+	if *configDump {
+		p.output("%s\n", p.mover.GetConfigJson())
 	}
 	if *pagesTo >= 0 {
 		err := p.mover.Start()

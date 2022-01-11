@@ -53,9 +53,14 @@ type PolicyHeat struct {
 	chLoop       chan interface{} // for communication to the main loop of the policy
 	tracker      Tracker
 	heatmap      *Heatmap
+	pageData     *AddrDatas
 	mover        *Mover
 	numaFree     map[int]int // free space for pages on each NUMA node
 	numaSize     map[int]int // total capacity (in pages) on each NUMA node
+}
+
+type pageInfo struct {
+	node int // NUMA node where a page is located
 }
 
 func init() {
@@ -66,6 +71,7 @@ func NewPolicyHeat() (Policy, error) {
 	var err error
 	p := &PolicyHeat{
 		heatmap:  NewCounterHeatmap(),
+		pageInfo: NewAddrDatas(),
 		mover:    NewMover(),
 		numaFree: make(map[int]int),
 		numaSize: make(map[int]int),
@@ -262,6 +268,7 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 		for _, hr := range hrHotToCold {
 			fmt.Printf("heat: %.6f\n", hr.heat)
 		}
+
 	}
 }
 
