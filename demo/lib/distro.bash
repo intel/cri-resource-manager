@@ -126,6 +126,10 @@ debian-10-image-url() {
     echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
 }
 
+debian-11-image-url() {
+    echo "https://cloud.debian.org/images/cloud/bullseye/daily/latest/debian-11-generic-amd64-daily.qcow2"
+}
+
 debian-sid-image-url() {
     echo "https://cloud.debian.org/images/cloud/sid/daily/latest/debian-sid-generic-amd64-daily.qcow2"
 }
