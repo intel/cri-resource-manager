@@ -1,9 +1,12 @@
 ---
+
+# TODO: to be replaced with daemonset installation as in gvisor
+
 apiVersion: v1
 kind: Secret
 metadata:
   name: managedresource2-example1
-  namespace: shoot--local--local
+  namespace: {{ .Values.shoot_namespace }}
 type: Opaque
 stringData:
   objects.yaml: |
@@ -19,7 +22,7 @@ apiVersion: resources.gardener.cloud/v1alpha1
 kind: ManagedResource
 metadata:
   name: example2
-  namespace: shoot--local--local
+  namespace: {{ .Values.shoot_namespace }}
 spec:
   secretRefs:
   - name: managedresource2-example1

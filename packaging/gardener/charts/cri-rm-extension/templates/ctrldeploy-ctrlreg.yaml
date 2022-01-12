@@ -9,6 +9,7 @@ providerConfig:
   values:
     image:
       tag: v0.0.1
+    shoot_namespace: {{ .Values.shoot_namespace }}
 ---
 apiVersion: core.gardener.cloud/v1beta1
 kind: ControllerRegistration
