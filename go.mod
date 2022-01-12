@@ -7,6 +7,7 @@ require (
 	contrib.go.opencensus.io/exporter/prometheus v0.1.1-0.20191218042359-6151c48ac7fa
 	github.com/apache/thrift v0.13.0 // indirect
 	github.com/cilium/ebpf v0.6.2
+	github.com/containerd/nri v0.1.0
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.6
@@ -19,10 +20,10 @@ require (
 	github.com/prometheus/common v0.30.0
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd
-	github.com/stretchr/testify v1.7.0 // indirect
-	go.opencensus.io v0.22.4
+	github.com/stretchr/testify v1.7.0
+	go.opencensus.io v0.23.0
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
-	golang.org/x/sys v0.0.0-20210903071746-97244b99971b
+	golang.org/x/sys v0.0.0-20210906170528-6f6e22806c34
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.38.0
 	k8s.io/api v0.22.2
@@ -31,10 +32,11 @@ require (
 	k8s.io/cri-api v0.22.2
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kubernetes v1.22.2
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 replace (
+	github.com/containerd/nri v0.1.0 => github.com/klihub/nri v0.0.0-20220112195312-ece02b4d3336
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0 => ./pkg/topology
 	google.golang.org/grpc => google.golang.org/grpc v1.38.0
 
