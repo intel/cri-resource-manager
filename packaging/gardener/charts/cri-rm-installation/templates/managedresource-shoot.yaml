@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: managedresource2-example1
+  namespace: shoot--local--local
+type: Opaque
+stringData:
+  objects.yaml: |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: test-1234
+      namespace: default
+      annotations:
+        resources.gardener.cloud/ignore: "true"
+---
+apiVersion: resources.gardener.cloud/v1alpha1
+kind: ManagedResource
+metadata:
+  name: example2
+  namespace: shoot--local--local
+spec:
+  secretRefs:
+  - name: managedresource2-example1
+
+  # - name: managedresource-example2
+# injectLabels:
+#   foo: bar
+# forceOverwriteLabels: false
+# forceOverwriteAnnotations: false
+# keepObjects: false
+# deletePersistentVolumeClaims: false

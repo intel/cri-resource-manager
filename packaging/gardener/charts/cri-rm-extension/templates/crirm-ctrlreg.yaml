@@ -1,0 +1,25 @@
+---
+apiVersion: core.gardener.cloud/v1beta1
+kind: ControllerDeployment
+metadata:
+  name: cri-rm
+type: helm
+providerConfig:
+  chart: H4sIAAAAAAAAA+1XS2/cNhD2mb9iGl/aoNJK2hewt2AdIEEaOIgLXwtKmpUYUyRDUuu4KPrbO3qs7azrLoJgbbTld6Co0XA4nBdHhRW2mZwcFQlhOZ/3T8L+s5+ns3Qxn06TbEF8abJYzk9gfly1BrTOcwtwYrX2/8R36Pu/FEXv/3XNrY9veCOPsUfn4MVs9qj/02W65/9skaUnkBxDmX38z/3PjbhE64RWK9hmjBtz95rESZyyEh0FifE97RW8QdlA0cULbLSFd22OVqFHxxRvcAV9QDF/Y2hO0qQoeLeUbffEPvfBA3oM+b/lskV3rAJwKP8f1v9pMluE/H8KDP732BjJKYmP0gl8+/2fLZbTcP8/Bfb933DFKywtOt3aAiNX07m/szAcyP80W2Zf+z9Lkvky5P9TIIoi9lUPkLIrocoVXGBh0bMGPS+55ysGMFzwexGSRfiFU/RgOnI4wwti6wMniqQuuBwfY1dwbvjnFpnzVqjqbJSt809Y+OEKWsEfRAHY06sjDbqttdqI6j03Pe2+ih0GNSmYfZRm09k96qhaiRveSj9+4Epp3/cobicBYHc6F1fclqjQxoXUbTkRldKWZLzwtsUXbN98j67bplyamu+s+34w4seR/W/MPFo1O2xVZ7Do1rneYx9x058jOuguYjp9jC263f4UhOpc8wvPUZLkU7LORusV5NzSC/WABZ5Tc3dthceRCTZcOnzw9dU9S9+yXCGa88H5d8QSJbWUHzqrOo/KX2rZNriWXDS3XM+dOf8NDPU/rqmrH0L7CHsc6v/m0/mD/m+ahfr/FDiFD9x7+oVz4DUMIQDXNSrIWyFLqtBAleeKaoOLKTF/rYUD1xqjracJhY2ESuqc6ocvauL+mUogdRJii7TO1/foXJUkQGHVVwD40VjciC9YwrUgvh9+iuFcyRvQql/ZqQQGLUihMGbx2cVvF550IxFr3TQk4HJ9AaWwjsWV8JN+HNRncf67nfTjjlBXk27YvbqtmtwJyul8rYGNkPQT+zJ214bGnF/R6JturkkOe/knrbjkVujWwduz17SvsbqrWywWJfLJwE4kFm9doUuchBIVEBAQEBAQEBAQEBAQEBAQEBAQ8Jz4CyAiHVwAKAAA
+  values:
+    image:
+      tag: v0.0.1
+---
+apiVersion: core.gardener.cloud/v1beta1
+kind: ControllerRegistration
+metadata:
+  name: crirm
+spec:
+  deployment:
+    policy: Always
+    deploymentRefs:
+    - name: cri-rm
+  resources:
+  - kind: Extension
+    type: cri-rm 
+    # globallyEnabled: true
