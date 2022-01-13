@@ -1,19 +1,26 @@
 ---
-
-# TODO: to be replaced with daemonset installation as in gvisor
-
 apiVersion: v1
 kind: Secret
 metadata:
-  name: managedresource2-example1
+  name: cri-rm-installation
   namespace: {{ .Values.shoot_namespace }}
 type: Opaque
 stringData:
+  # TO BE REPLACED with DaemonSet installation based on gvisor
   objects.yaml: |
+    ---
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: test-1234
+      name: cri-rm-installation-example1
+      namespace: default
+      annotations:
+        resources.gardener.cloud/ignore: "true"
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: cri-rm-installation-example2
       namespace: default
       annotations:
         resources.gardener.cloud/ignore: "true"
@@ -21,13 +28,12 @@ stringData:
 apiVersion: resources.gardener.cloud/v1alpha1
 kind: ManagedResource
 metadata:
-  name: example2
+  name: cri-rm-installation
   namespace: {{ .Values.shoot_namespace }}
 spec:
   secretRefs:
-  - name: managedresource2-example1
+  - name: cri-rm-installation
 
-  # - name: managedresource-example2
 # injectLabels:
 #   foo: bar
 # forceOverwriteLabels: false

@@ -10,6 +10,10 @@ spec:
   cloudProfileName: local
   secretBindingName: local # dummy, doesn't contain any credentials
   region: local
+  ### Mark as required extension or use globallyEnabled: true
+  # extensions:
+  #   - type: cri-rm-extension
+
   networking:
     type: local
   provider:
