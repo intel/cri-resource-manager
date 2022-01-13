@@ -59,6 +59,25 @@ func (a *AddrDatas) Data(addr uint64) (interface{}, bool) {
 	return nil, false
 }
 
+// ForEach iterates over addrdatas.
+// - handle(*AddrRange, data) is called for every entry
+//   in the ascending start address order. Handle return values:
+//       0 (continue): ForEach continues iteration from the next element
+//       -1 (break):   ForEach returns immediately.
+func (a *AddrDatas) ForEach(handle func(*AddrRange, interface{}) int) {
+	for _, ad := range a.ads {
+		next := handle(&ad.AddrRange, ad.data)
+		switch next {
+		case 0:
+			continue
+		case -1:
+			return
+		default:
+			panic(fmt.Sprintf("illegal AddrDatas.ForEach handler return value %d", next))
+		}
+	}
+}
+
 func (a *AddrDatas) Dump() string {
 	sl := []string{}
 	for _, ad := range a.ads {
@@ -73,7 +92,8 @@ func (a *AddrDatas) Dump() string {
 	return "AddrDatas{" + strings.Join(sl, ",") + "}"
 }
 
-func (a *AddrDatas) Overwrite(ad *AddrData) {
+func (a *AddrDatas) SetData(ar AddrRange, data interface{}) {
+	ad := NewAddrData(ar.addr, ar.length, data)
 	first, count := a.overlapping(&ad.AddrRange)
 	last := first + count - 1
 	newLen := len(a.ads) - count + 1

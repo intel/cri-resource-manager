@@ -53,14 +53,14 @@ type PolicyHeat struct {
 	chLoop       chan interface{} // for communication to the main loop of the policy
 	tracker      Tracker
 	heatmap      *Heatmap
-	pageData     *AddrDatas
+	pidAddrDatas map[int]*AddrDatas
 	mover        *Mover
-	numaFree     map[int]int // free space for pages on each NUMA node
-	numaSize     map[int]int // total capacity (in pages) on each NUMA node
+	numaUsed     map[Node]int // used capacity (in pages) on each NUMA node
+	numaSize     map[Node]int // total capacity (in pages) on each NUMA node
 }
 
 type pageInfo struct {
-	node int // NUMA node where a page is located
+	node Node // NUMA node where a page is located
 }
 
 func init() {
@@ -70,11 +70,11 @@ func init() {
 func NewPolicyHeat() (Policy, error) {
 	var err error
 	p := &PolicyHeat{
-		heatmap:  NewCounterHeatmap(),
-		pageInfo: NewAddrDatas(),
-		mover:    NewMover(),
-		numaFree: make(map[int]int),
-		numaSize: make(map[int]int),
+		heatmap:      NewCounterHeatmap(),
+		pidAddrDatas: make(map[int]*AddrDatas),
+		mover:        NewMover(),
+		numaUsed:     make(map[Node]int),
+		numaSize:     make(map[Node]int),
 	}
 	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
 		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
@@ -106,14 +106,15 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 			return fmt.Errorf("configuring tracker %q for the heat policy failed: %s", config.Tracker.Name, err)
 		}
 	}
-	newNumaFree := make(map[int]int)
-	newNumaSize := make(map[int]int)
-	for numa, sizeString := range config.NumaSize {
+	newNumaUsed := make(map[Node]int)
+	newNumaSize := make(map[Node]int)
+	for nodeInt, sizeString := range config.NumaSize {
+		node := Node(nodeInt)
 		sizeBytes, err := ParseBytes(sizeString)
 		if err != nil {
-			return fmt.Errorf("NumaSize[%d]: %s", numa, err)
+			return fmt.Errorf("NumaSize[%d]: %s", node, err)
 		}
-		newNumaSize[numa] = int(sizeBytes / constPagesize)
+		newNumaSize[node] = int(sizeBytes / constPagesize)
 	}
 	err = p.heatmap.SetConfig(&config.Heatmap)
 	if err != nil {
@@ -123,7 +124,7 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 		return fmt.Errorf("configuring mover failed: %s", err)
 	}
 	p.switchToTracker(newTracker)
-	p.numaFree = newNumaFree
+	p.numaUsed = newNumaUsed
 	p.numaSize = newNumaSize
 	p.config = config
 	return nil
@@ -257,7 +258,12 @@ func (p *PolicyHeat) startMoves(timestamp int64) {
 }
 
 func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
+	moverTasks := 0
+	fmt.Printf("startMovesFillFastFree\n")
 	for _, pid := range p.heatmap.Pids() {
+		debugLinesFrom := map[Node]int{}
+		debugLinesTo := map[Node]int{}
+		log.Debugf("startMovesFillFastFree sort start\n")
 		hrHotToCold := p.heatmap.Sorted(pid, func(hr0, hr1 *HeatRange) bool {
 			if hr0.heat > hr1.heat ||
 				(hr0.heat == hr1.heat && hr0.addr < hr1.addr) {
@@ -265,11 +271,106 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			}
 			return false
 		})
+		log.Debugf("startMovesFillFastFree sort end\n")
 		for _, hr := range hrHotToCold {
-			fmt.Printf("heat: %.6f\n", hr.heat)
+			currNode := Node(-1)
+			heatClass := p.heatmap.HeatClass(hr)
+			numas, ok := p.config.HeatNumas[heatClass]
+			if !ok || len(numas) == 0 {
+				// No NUMAs for this heat class, do nothing
+				continue
+			}
+			addrDatas, ok := p.pidAddrDatas[pid]
+			if !ok {
+				addrDatas = NewAddrDatas()
+				p.pidAddrDatas[pid] = addrDatas
+			}
+			// TODO: heatrange hr may be on many nodes
+			// when using variable address ranges (damon).
+			// Now using just only the start address of a
+			// heatrange, which can be used as a fast path
+			// for stable ranges.
+			if addrData, ok := addrDatas.Data(hr.addr); ok {
+				addrInfo, _ := addrData.(pageInfo)
+				currNode = addrInfo.node
+				if sliceContainsInt(numas, int(currNode)) {
+					// Already on a good node, do nothing
+					continue
+				}
+			}
+			// We either do not know where these pages
+			// are, or we know they are on a wrong
+			// node. Choose new node with largest free
+			// space for the pages. TODO: filter
+			// mems_allowed from numas
+			destNode := Node(numas[0])
+			destFree := p.numaSize[destNode] - p.numaUsed[destNode]
+			for _, candNodeInt := range numas[1:] {
+				candNode := Node(candNodeInt)
+				candFree := p.numaSize[candNode] - p.numaUsed[candNode]
+				if candFree > destFree {
+					destNode = candNode
+					destFree = candFree
+				}
+			}
+			// Is there enough free space for pages of
+			// this heat range?
+			if destFree < int(hr.length) {
+				continue
+			}
+			ar := NewAddrRanges(pid, hr.AddrRange())
+			ppages, err := ar.PagesMatching(PMPresentSet | PMExclusiveSet)
+			if err != nil {
+				continue
+			}
+			if len(ppages.pages) == 0 {
+				continue
+			}
+			moverTasks += 1
+			task := NewMoverTask(ppages, destNode)
+			p.mover.AddTask(task)
+			addrDatas.SetData(hr.AddrRange(), pageInfo{node: destNode})
+			p.numaUsed[destNode] += int(hr.length)
+			// numaUsed[-1] will contain the number of pages moved away from
+			// an unknown node.
+			p.numaUsed[currNode] -= int(hr.length)
+			// DEBUG
+			if debugLinesFrom[currNode] < 2 || debugLinesTo[destNode] < 2 {
+				log.Debugf("move %d pages at %x from node %d to %d\n",
+					hr.length, hr.addr, currNode, destNode)
+				debugLinesFrom[currNode] += 1
+				debugLinesTo[destNode] += 1
+			}
 		}
-
 	}
+	// just debugging...
+	if true {
+		log.Debugf("debug print coming up...\n")
+		for _, pid := range p.heatmap.Pids() {
+			nodeUsed := map[Node]uint64{}
+			addrDatas := p.pidAddrDatas[pid]
+			if addrDatas == nil {
+				continue
+			}
+			addrDatas.ForEach(func(ar *AddrRange, data interface{}) int {
+				arpi := data.(pageInfo)
+				nodeUsed[arpi.node] += ar.length * constUPagesize
+				return 0
+			})
+			for node, used := range nodeUsed {
+				log.Debugf("node %d used %d M (pageData) %d M (numaUsed)\n", node, used/(1024*1024), int64(p.numaUsed[node])*constPagesize/(1024*1024))
+			}
+		}
+	}
+}
+
+func sliceContainsInt(haystack []int, needle int) bool {
+	for _, straw := range haystack {
+		if straw == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *PolicyHeat) startMovesNoLimits(timestamp int64) {
