@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 

@@ -31,7 +31,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/dump"
 	"google.golang.org/grpc"
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	api "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )

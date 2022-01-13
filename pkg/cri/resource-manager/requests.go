@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	criapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"

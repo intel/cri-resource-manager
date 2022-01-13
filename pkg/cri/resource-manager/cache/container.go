@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	extapi "github.com/intel/cri-resource-manager/pkg/apis/resmgr/v1alpha1"
 )

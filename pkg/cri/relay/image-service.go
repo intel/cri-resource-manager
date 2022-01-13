@@ -16,7 +16,8 @@ package relay
 
 import (
 	"context"
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	api "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (r *relay) ListImages(ctx context.Context,

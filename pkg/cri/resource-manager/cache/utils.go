@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"

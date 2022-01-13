@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	api "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"

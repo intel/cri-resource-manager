@@ -20,11 +20,11 @@ import (
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
 
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	api "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
-	apiVersion = "v1alpha2"
+	apiVersion = "v1"
 
 	imageService = "ImageService"
 	listImages   = "ListImages"
