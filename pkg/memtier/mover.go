@@ -220,7 +220,7 @@ func (m *Mover) handleTask(task *MoverTask) taskStatus {
 	}
 	// select destination memory node, now go with the first one
 	toNode := task.to[0]
-	// bandwidth is MB/s => bandwith * 1024 is kB/s
+	// bandwidth is MB/s => bandwidth * 1024 is kB/s
 	// constPagesize is 4096 kB/page
 	// count is ([kB/s] / [kB/page] = [page/s]) * ([ms] / 1000 [ms/s] == [s]) = [page]
 	count := (m.config.Bandwidth * 1024 * 1024 / int(constPagesize)) * m.config.IntervalMs / 1000
