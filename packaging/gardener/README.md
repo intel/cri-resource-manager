@@ -2,12 +2,12 @@
 
 Note: This is work in progress and so far the only installed resources in shoot cluster are two configmaps for testing - in future they will be replaced with "installation" DaemonSet that will copy necessary binary and reconfigure and restart kubelet.
 
-## Introduction
+### Introduction
 
 This charts will deploy CRI-resource-manager as proxy between kubectl and containerd for "shoot" clusters deployed by Gardener.
 
 
-## Description
+### Description
 
 There are two charts:
 
@@ -30,7 +30,6 @@ To install extension you just need to use *cri-rm-extension* chart.
 ## I. Getting started locally (with kind-based local gardener setup).
 
 ### Prepare local kind-based garden cluster
-
 
 #### 1. Clone the gardener
 ```
@@ -69,7 +68,7 @@ Check that three gardener charts are installed:
 helm list -n garden
 ```
 
-
+### Deploy cri-rm extenion
 
 #### 4. Deploy cri-rm-extension as Gardener extension using ControllerRegistration/ControllerDeployment
 
@@ -129,25 +128,27 @@ kubectl get managedresource -n shoot--local--local | grep cri-rm-installation
 
 
 
-### 7. Install Extension object manually into seed cluster.
+#### 7. Install Extension object manually into seed cluster.
 
 ```
 kubectl apply -f ~/work/cri-resource-manager/packaging/gardener/examples/extension.yaml
 ```
 
-### 8. Verify that secret is installed properly in shoot cluster
+First get credentials to access shoot cluster:
 
-
-# Get credentials to shoot cluster
 ``` 
 kubectl -n garden-local get secret local.kubeconfig -o jsonpath={.data.kubeconfig} | base64 -d > /tmp/kubeconfig-shoot-local.yaml
 # Check you can connect to node
 kubectl --kubeconfig=/tmp/kubeconfig-shoot-local.yaml get nodes
 ```
 
-Check managed resources were created:
+Then check managed resources were created:
+
+
+```
 kubectl get managedresource -n garden | grep cri-rm-extension
 kubectl get managedresource -n shoot--local--local cri-rm-installation -o yaml
+```
 
 
 Check that the resources from cri-rm-installation were deployed to shoot cluster.
@@ -155,7 +156,7 @@ Check that the resources from cri-rm-installation were deployed to shoot cluster
 kubectl --kubeconfig=/tmp/kubeconfig-shoot-local.yaml get cm -n default | grep cri-rm-installation-example
 ```
 
-8. Optional installation 
+#### 8. Optional extenion installation 
 
 Enable required extension in shoot.yaml definition and then following objects should be created automatically:
 
@@ -165,19 +166,19 @@ kubectl apply -f ~/work/cri-resource-manager/packaging/gardener/examples/extensi
 ```
 
 
-### II. Generating extension chart based on cri-rm-installation chart.
+## II. Generating extension chart based on cri-rm-installation chart.
 
 This step is optional. Current release is already generated in cri-rm-extension/templates/
 
 This is optional step ff you change the cri-rm-installation chart you need to update providerConfig.config in cri-rm-extension chart with following steps:
 
-1. Clone Gardener project to get access to generate ControllerDeployment/ControllerRegistration resources:
+#### 1. Clone Gardener project to get access to generate ControllerDeployment/ControllerRegistration resources:
 ```
 mkdir -p ~/work/
 git clone https://github.com/gardener/gardener ~/work/gardener
 ```
 
-2. (optionally) Fix unsupported tar (for old tar version) arguments issue (remote sort/user/group arguments from the script):
+#### 2. (optionally) Fix unsupported tar (for old tar version) arguments issue (remote sort/user/group arguments from the script):
 
 ```
 sed -i 's/--sort=name//' ~/work/gardener/hack/generate-controller-registration.sh
@@ -185,14 +186,14 @@ sed -i 's/--owner=root:0//' ~/work/gardener/hack/generate-controller-registratio
 sed -i 's/--group=root:0//' ~/work/gardener/hack/generate-controller-registration.sh
 ```
 
-3. Generate CR/CD yamls from charts directory:
+#### 3. Generate CR/CD yamls from charts directory:
 
 ```
 cd ~/work/cri-resource-manager/packaging/gardener/charts
 ~/work/gardener/hack/generate-controller-registration.sh cri-rm-extension cri-rm-installation v0.0.1 cri-rm-extension/templates/ctrldeploy-ctrlreg.yaml Extension:cri-rm-extension
 ```
 
-4. Patch generated yamls to include additional value "shoot_namespace"
+#### 4. Patch generated yamls to include additional value "shoot_namespace"
 
 ```
 # Add value at 12 line:
