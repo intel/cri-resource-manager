@@ -564,6 +564,14 @@ vm-install-cri-resmgr() {
     elif [ -z "$binsrc" ] || [ "$binsrc" == "local" ]; then
         vm-put-file "$BIN_DIR/cri-resmgr" "$prefix/bin/cri-resmgr"
         vm-put-file "$BIN_DIR/cri-resmgr-agent" "$prefix/bin/cri-resmgr-agent"
+        sed -E -e "s:__DEFAULTDIR__:$(distro-env-file-dir):g" \
+            -E -e "s:__BINDIR__:$prefix/bin:g" < "$HOST_PROJECT_DIR/cmd/cri-resmgr/cri-resource-manager.service.in" |
+            vm-pipe-to-file /usr/lib/systemd/system/cri-resource-manager.service
+        cat <<EOF |
+CONFIG_OPTIONS="--fallback-config /etc/cri-resmgr/fallback.cfg -relay-socket ${cri_resmgr_sock} -runtime-socket ${cri_sock} -image-socket ${cri_sock}"
+EOF
+        vm-pipe-to-file "$(distro-env-file-dir)/cri-resource-manager"
+        vm-put-file "$HOST_PROJECT_DIR/cmd/cri-resmgr/fallback.cfg.sample" "/etc/cri-resmgr/fallback.cfg"
     else
         error "vm-install-cri-resmgr: unknown binsrc=\"$binsrc\""
     fi

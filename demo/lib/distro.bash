@@ -41,6 +41,7 @@ distro-k8s-cni()            { distro-resolve "$@"; }
 distro-k8s-cni-subnet()     { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
+distro-env-file-dir()       { distro-resolve "$@"; }
 
 ###########################################################################
 
@@ -275,6 +276,9 @@ debian-set-kernel-cmdline() {
     }
 }
 
+debian-env-file-dir() {
+    echo "/etc/default"
+}
 
 ###########################################################################
 
@@ -1037,6 +1041,10 @@ EOF
 default-restart-crio() {
     vm-command "systemctl daemon-reload && systemctl restart crio" ||
         command-error "failed to restart crio systemd service"
+}
+
+default-env-file-dir() {
+    echo "/etc/sysconfig"
 }
 
 ###########################################################################
