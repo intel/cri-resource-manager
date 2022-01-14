@@ -1,6 +1,9 @@
 Features
 --------
 
+- damon: drop pids that we are not monitoring, warn if someone else
+  in the system seems to be using damon at the same time.
+
 - running cost analysis utility: calculate CPU and memory consumption
   of running memtierd with different parameters.
 

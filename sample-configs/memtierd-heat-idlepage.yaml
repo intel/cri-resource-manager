@@ -16,6 +16,17 @@ policy:
     heatnumas:
       0: [2, 3]
       3: [0, 1]
+    # NumaSize sets the amount of memory that is usable on each
+    # NUMA node. If a node is missing from the map, it's memory
+    # use is not limited. The size is expressed in syntax:
+    # <NUM>(k|M|G|%). If all the memory in a heat class exceeds
+    # NumaSize of the NUMA nodes of that heat, the remaining
+    # pages are moved to NUMA nodes of lower heats if there is
+    # free capacity.
+    numasize:
+      0: 1G
+      2: 200M
+      3: 200M
     heatmap:
       # HeatMax is the maximum heat of a range
       heatmax: 0.01
