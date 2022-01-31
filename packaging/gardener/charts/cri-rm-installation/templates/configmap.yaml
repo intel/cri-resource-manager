@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cri-rm-installation-script
+  namespace: kube-system
+  annotations:
+    resources.gardener.cloud/ignore: "true"
+data:
+  install-cri-rm.sh: |-
+    #!/bin/sh
+    ID=ubuntu
+    VERSION_ID=20.04
+    apt-get update
+    apt install jq -y
+    apt install curl -y
+    CRIRM_VERSION=`curl -s "https://api.github.com/repos/intel/cri-resource-manager/releases/latest" | jq .tag_name | tr -d '"v'`
+    pkg=cri-resource-manager_${CRIRM_VERSION}_${ID}-${VERSION_ID}_amd64.deb; curl -LO https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/${pkg}; dpkg --instdir=/var/host/ -i ${pkg}; rm ${pkg}
+    cp /var/host/etc/cri-resmgr/fallback.cfg.sample /var/host/etc/cri-resmgr/fallback.cfg
+    chroot /var/host bash -c "systemctl enable cri-resource-manager && systemctl start cri-resource-manager"
+    sed -i  '/containerd/d' /var/host/etc/systemd/system/kubelet.service
+    if ! grep -q container-runtime-endpoint  "/var/host/etc/systemd/system/kubelet.service"; then
+      sed '/KUBELET_EXTRA_ARGS/ s!$! --container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock!' -i /var/host/etc/systemd/system/kubelet.service
+    fi
+    chroot /var/host bash -c "systemctl daemon-reload"
+    chroot /var/host bash -c "systemctl restart kubelet"

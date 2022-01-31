@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cri-rm-installation
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cri-rm-installation
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cri-rm-installation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cri-rm-installation
+    spec:
+      hostPID: true
+      hostIPC: true
+      containers:
+      - name: container-runtime-cri-rm
+        image: ubuntu:21.04
+        command: ["/scripts/install-cri-rm.sh"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: host-volume
+          mountPath: /var/host
+        - name: cri-rm-installation-script
+          mountPath: /scripts
+      volumes:
+      - name: host-volume
+        hostPath:
+          path: /
+      - name: cri-rm-installation-script
+        configMap:
+          name: cri-rm-installation-script
+          defaultMode: 0744
