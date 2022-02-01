@@ -16,6 +16,7 @@ package memtier
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -151,15 +152,8 @@ func (a *AddrDatas) SetData(ar AddrRange, data interface{}) {
 }
 
 func (a *AddrDatas) overlapping(ar0 *AddrRange) (int, int) {
-	// Optimize: bisect would be faster way to find the first overlapping hr
-	first := 0
+	first := sort.Search(len(a.ads), func(i int) bool { return a.ads[i].EndAddr() > ar0.addr })
 	count := 0
-	for _, ad := range a.ads {
-		if ad.EndAddr() > ar0.addr {
-			break
-		}
-		first++
-	}
 	ar0EndAddr := ar0.EndAddr()
 	for _, ad := range a.ads[first:] {
 		if ar0EndAddr <= ad.addr {

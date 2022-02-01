@@ -278,14 +278,7 @@ func (hrs *HeatRanges) Sort() {
 }
 
 func (hrs *HeatRanges) Overlapping(hr0 *HeatRange) *HeatRanges {
-	// Optimize: bisect would be faster way to find the first overlapping hr
-	first := 0
-	for _, hr := range *hrs {
-		if hr.addr+hr.length*constUPagesize > hr0.addr {
-			break
-		}
-		first++
-	}
+	first := sort.Search(len(*hrs), func(i int) bool { return (*hrs)[i].addr+(*hrs)[i].length*constUPagesize > hr0.addr })
 	hr0EndAddr := hr0.addr + hr0.length*constUPagesize
 	count := 0
 	for _, hr := range (*hrs)[first:] {
