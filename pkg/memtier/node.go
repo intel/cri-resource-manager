@@ -14,4 +14,12 @@
 
 package memtier
 
+import (
+	"fmt"
+)
+
 type Node int
+
+func (node Node) String() string {
+	return fmt.Sprintf("node%d", node)
+}
