@@ -143,6 +143,7 @@ func (m *Mover) Tasks() []*MoverTask {
 }
 
 func (m *Mover) AddTask(task *MoverTask) {
+	stats.Store(StatsHeartbeat{"mover.AddTask"})
 	m.mutex.Lock()
 	m.tasks = append(m.tasks, task)
 	// m.mutex must be unlocked before using the channel,
@@ -179,6 +180,7 @@ func (m *Mover) taskHandler() {
 		}
 	busyloop:
 		for {
+			stats.Store(StatsHeartbeat{"mover.taskHandler"})
 			// handle tasks
 			task := m.popTask()
 			if task == nil {

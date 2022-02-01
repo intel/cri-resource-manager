@@ -226,6 +226,7 @@ func (p *PolicyHeat) loop() {
 	quit := false
 	n := uint64(0)
 	for !quit {
+		stats.Store(StatsHeartbeat{"PolicyHeat.loop"})
 		timestamp := time.Now().UnixNano()
 		newCounters := p.tracker.GetCounters()
 		p.tracker.ResetCounters()
@@ -362,15 +363,6 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			}
 		}
 	}
-}
-
-func sliceContainsInt(haystack []int, needle int) bool {
-	for _, straw := range haystack {
-		if straw == needle {
-			return true
-		}
-	}
-	return false
 }
 
 func (p *PolicyHeat) startMovesNoLimits(timestamp int64) {

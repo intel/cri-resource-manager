@@ -210,6 +210,7 @@ func (t *TrackerSoftDirty) sampler() {
 	defer ticker.Stop()
 	lastRegionsUpdateNs := time.Now().UnixNano()
 	for {
+		stats.Store(StatsHeartbeat{"TrackerSoftDirty.sampler"})
 		select {
 		case <-t.toSampler:
 			close(t.toSampler)

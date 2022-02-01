@@ -71,6 +71,7 @@ func (w *PidWatcherCgroup) loop(singleshot bool) {
 	ticker := time.NewTicker(time.Duration(5) * time.Second)
 	defer ticker.Stop()
 	for {
+		stats.Store(StatsHeartbeat{"PidWatcherCgroup.loop"})
 		// Look for all pid files in the current cgroup hierarchy.
 		procPaths := map[string]setMemberType{}
 		for cgroupPath := range w.cgroupPaths {

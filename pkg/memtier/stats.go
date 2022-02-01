@@ -2,25 +2,24 @@ package memtier
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"syscall"
+	"time"
 )
 
 type Stats struct {
-	pidMoves map[int]*StatsPidMoved
-	pidScans map[int]*StatsPidScanned
+	namePulse mapStringPStatsPulse
+	pidMoves  map[int]*StatsPidMoved
+	pidScans  map[int]*StatsPidScanned
 }
-
-type MapIntUint64 map[int]uint64
 
 type StatsPidMoved struct {
 	sumSyscalls       uint64
 	sumReqs           uint64
 	sumDestNode       uint64
 	sumOtherNode      uint64
-	sumDestNodePages  MapIntUint64
-	sumErrorCounts    MapIntUint64
+	sumDestNodePages  mapIntUint64
+	sumErrorCounts    mapIntUint64
 	lastMoveWithError StatsMoved
 	lastMove          StatsMoved
 }
@@ -31,6 +30,16 @@ type StatsPidScanned struct {
 	sumAccessed uint64
 	sumWritten  uint64
 	count       uint64
+}
+
+type StatsPulse struct {
+	sumBeats   uint64
+	firstBeat  int64
+	latestBeat int64
+}
+
+type StatsHeartbeat struct {
+	name string
 }
 
 type StatsMoved struct {
@@ -56,14 +65,19 @@ var stats *Stats = newStats()
 
 func newStats() *Stats {
 	return &Stats{
-		pidMoves: make(map[int]*StatsPidMoved),
-		pidScans: make(map[int]*StatsPidScanned),
+		namePulse: make(mapStringPStatsPulse),
+		pidMoves:  make(map[int]*StatsPidMoved),
+		pidScans:  make(map[int]*StatsPidScanned),
 	}
+}
+
+func newStatsPulse() *StatsPulse {
+	return &StatsPulse{}
 }
 
 func newStatsPidMoved() *StatsPidMoved {
 	return &StatsPidMoved{
-		sumDestNodePages: make(MapIntUint64),
+		sumDestNodePages: make(mapIntUint64),
 		sumErrorCounts:   make(map[int]uint64),
 	}
 }
@@ -78,6 +92,15 @@ func GetStats() *Stats {
 
 func (s *Stats) Store(entry interface{}) {
 	switch v := entry.(type) {
+	case StatsHeartbeat:
+		pulse, ok := s.namePulse[v.name]
+		if !ok {
+			pulse = newStatsPulse()
+			pulse.firstBeat = time.Now().UnixNano()
+			s.namePulse[v.name] = pulse
+		}
+		pulse.sumBeats += 1
+		pulse.latestBeat = time.Now().UnixNano()
 	case StatsMoved:
 		// keep separate statistics for every pid
 		spm, ok := s.pidMoves[v.pid]
@@ -111,15 +134,6 @@ func (s *Stats) Store(entry interface{}) {
 	}
 }
 
-func (m MapIntUint64) sortedKeys() []int {
-	keys := make([]int, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Ints(keys)
-	return keys
-}
-
 func (s *Stats) LastMove(pid int) *StatsMoved {
 	spm, ok := s.pidMoves[pid]
 	if !ok {
@@ -138,6 +152,23 @@ func (s *Stats) LastMoveWithError(pid int) *StatsMoved {
 
 func (s *Stats) Summarize() string {
 	lines := []string{}
+	lines = append(lines, "heartbeats timeint[s] latest[s ago] name")
+	now := time.Now().UnixNano()
+	for _, name := range s.namePulse.sortedKeys() {
+		pulse := s.namePulse[name]
+		secondsSinceFirst := float32(now-pulse.firstBeat) / float32(time.Second)
+		secondsSinceLatest := float32(now-pulse.latestBeat) / float32(time.Second)
+		beatsMinusOne := pulse.sumBeats - 1
+		if beatsMinusOne == 0 {
+			beatsMinusOne = 1
+		}
+		lines = append(lines,
+			fmt.Sprintf("%10d %10.3f %13.3f %s",
+				pulse.sumBeats,
+				(secondsSinceFirst-secondsSinceLatest)/float32(beatsMinusOne),
+				secondsSinceLatest,
+				name))
+	}
 	for pid, spm := range s.pidMoves {
 		lines = append(lines,
 			fmt.Sprintf("move_pages on pid: %d", pid),

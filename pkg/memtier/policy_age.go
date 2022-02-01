@@ -311,6 +311,7 @@ func (p *PolicyAge) loop() {
 	quit := false
 	n := uint64(0)
 	for !quit {
+		stats.Store(StatsHeartbeat{"PolicyAge.loop"})
 		timestamp := time.Now().UnixNano()
 		for _, tc := range *p.tracker.GetCounters() {
 			p.updateCounter(&tc, timestamp)

@@ -349,6 +349,7 @@ func (t *TrackerDamon) perfReader() error {
 	}()
 	quit := false
 	for !quit {
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfReader"})
 		select {
 		case line := <-perfLines:
 			if line == "" {

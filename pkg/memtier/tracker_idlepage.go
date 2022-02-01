@@ -212,6 +212,7 @@ func (t *TrackerIdlePage) sampler() {
 	defer ticker.Stop()
 	lastRegionsUpdateNs := time.Now().UnixNano()
 	for {
+		stats.Store(StatsHeartbeat{"TrackerIdlePage.sampler"})
 		select {
 		case <-t.toSampler:
 			close(t.toSampler)
