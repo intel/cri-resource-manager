@@ -165,7 +165,7 @@ func (p *PolicyHeat) Tracker() Tracker {
 }
 
 func (p *PolicyHeat) Dump(args []string) string {
-	dumpHelp := "dump <heatmap|heatgram>"
+	dumpHelp := "dump <heatmap|heatgram|numa>"
 	if len(args) == 0 {
 		return dumpHelp
 	}
@@ -176,6 +176,32 @@ func (p *PolicyHeat) Dump(args []string) string {
 	}
 	if args[0] == "heatgram" {
 		return "not implemented yet: histogram of heat values"
+	}
+	if args[0] == "numa" {
+		lines := []string{}
+		lines = append(lines, "node      pid pageData numaUsed numaSize")
+		for _, pid := range sortInts(p.heatmap.Pids()) {
+			nodeUsed := mapNodeUint64{}
+			addrDatas := p.pidAddrDatas[pid]
+			if addrDatas == nil {
+				continue
+			}
+			addrDatas.ForEach(func(ar *AddrRange, data interface{}) int {
+				arpi := data.(pageInfo)
+				nodeUsed[arpi.node] += ar.length * constUPagesize
+				return 0
+			})
+			for _, node := range nodeUsed.sortedKeys() {
+				used := nodeUsed[node]
+				lines = append(lines, fmt.Sprintf("%4d %8d %7dM %7dM %7dM",
+					node,
+					pid,
+					used/(1024*1024),
+					int64(p.numaUsed[node])*constPagesize/(1024*1024),
+					int64(p.numaSize[node])*constPagesize/(1024*1024)))
+			}
+		}
+		return strings.Join(lines, "\n")
 	}
 	return dumpHelp
 }
