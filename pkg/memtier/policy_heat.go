@@ -108,6 +108,11 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 	}
 	newNumaUsed := make(map[Node]int)
 	newNumaSize := make(map[Node]int)
+	for _, numas := range config.HeatNumas {
+		for _, nodeInt := range numas {
+			newNumaSize[Node(nodeInt)] = -1 // the default is unlimited
+		}
+	}
 	for nodeInt, sizeString := range config.NumaSize {
 		node := Node(nodeInt)
 		sizeBytes, err := ParseBytes(sizeString)
@@ -291,38 +296,97 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			// Now using just only the start address of a
 			// heatrange, which can be used as a fast path
 			// for stable ranges.
+			pagesOnUnknownNode := false
 			if addrData, ok := addrDatas.Data(hr.addr); ok {
 				addrInfo, _ := addrData.(pageInfo)
 				currNode = addrInfo.node
-				if sliceContainsInt(numas, int(currNode)) {
-					// Already on a good node, do nothing
+			} else {
+				pagesOnUnknownNode = true
+			}
+			var ppages *Pages = nil
+			var err error
+			if pagesOnUnknownNode {
+				// We do not know where these pages
+				// are. Let's figure it out.
+				ppages, err = NewAddrRanges(pid, hr.AddrRange()).PagesMatching(PMPresentSet | PMExclusiveSet)
+				if err != nil {
 					continue
 				}
+				firstPageAddress := uint64(0)
+				prevPageAddress := uint64(0)
+				prevPageNode := Node(-1)
+				node := prevPageNode
+				nodeInts, err := ppages.status()
+				if err != nil {
+					continue
+				}
+				for pageIndex, nodeInt := range nodeInts {
+					node = Node(nodeInt)
+					pageAddress := ppages.pages[pageIndex].Addr()
+					if prevPageAddress+constUPagesize != pageAddress || prevPageNode != node {
+						// previous page was
+						// the last one in a
+						// contiguous sequence
+						// of pages on a node
+						if firstPageAddress != 0 {
+							addrDatas.SetData(*NewAddrRange(firstPageAddress, prevPageAddress+constUPagesize), pageInfo{node: prevPageNode})
+							// log.Debugf("found middle %d pages at %x on node %d\n", (prevPageAddress+constUPagesize-firstPageAddress)/constUPagesize, firstPageAddress, prevPageNode)
+							p.numaUsed[node] += int((prevPageAddress + constUPagesize - firstPageAddress) / constUPagesize)
+						}
+						firstPageAddress = pageAddress
+						prevPageAddress = pageAddress
+						prevPageNode = node
+					}
+					prevPageAddress = pageAddress
+				}
+				if firstPageAddress > 0 {
+					addrDatas.SetData(*NewAddrRange(firstPageAddress, prevPageAddress+constUPagesize), pageInfo{node: Node(prevPageNode)})
+					p.numaUsed[node] += int((prevPageAddress + constUPagesize - firstPageAddress) / constUPagesize)
+					// log.Debugf("found last %d pages at %x on node %d\n", (prevPageAddress+constUPagesize-firstPageAddress)/constUPagesize, firstPageAddress, prevPageNode)
+				}
+				currNode = node
 			}
-			// We either do not know where these pages
-			// are, or we know they are on a wrong
-			// node. Choose new node with largest free
-			// space for the pages. TODO: filter
-			// mems_allowed from numas
-			destNode := Node(numas[0])
-			destFree := p.numaSize[destNode] - p.numaUsed[destNode]
-			for _, candNodeInt := range numas[1:] {
+			if sliceContainsInt(numas, int(currNode)) {
+				// Already on a good node, do nothing.
+				continue
+			}
+			if currNode == -1 {
+				// Failed to find out where the pages are.
+				log.Debugf("addr %x pages %d currNode == -1\n", hr.addr, hr.length)
+				continue
+			}
+			// We know pages are on a wrong node. Choose
+			// new node with largest free space for the
+			// pages. TODO: filter mems_allowed from numas
+			destNode := Node(-1)
+			destFree := -1
+			for _, candNodeInt := range numas {
 				candNode := Node(candNodeInt)
-				candFree := p.numaSize[candNode] - p.numaUsed[candNode]
+				candFree := 0
+				if p.numaSize[candNode] > -1 {
+					candFree = p.numaSize[candNode] - p.numaUsed[candNode] - int(hr.length)
+				}
 				if candFree > destFree {
 					destNode = candNode
 					destFree = candFree
 				}
 			}
-			// Is there enough free space for pages of
-			// this heat range?
-			if destFree < int(hr.length) {
+			if destNode == Node(-1) {
+				log.Debugf("not moving %s: no suitable destination node\n", hr.AddrRange())
 				continue
 			}
-			ar := NewAddrRanges(pid, hr.AddrRange())
-			ppages, err := ar.PagesMatching(PMPresentSet | PMExclusiveSet)
-			if err != nil {
+			// Is there enough free space for pages of
+			// this heat range?
+			if p.numaSize[destNode] > -1 && destFree < int(hr.length) {
+				log.Debugf("not moving %s: %s out of quota\n", hr.AddrRange(), destNode)
 				continue
+			}
+			if ppages == nil {
+				ppages, err = NewAddrRanges(pid, hr.AddrRange()).PagesMatching(PMPresentSet | PMExclusiveSet)
+				if err != nil {
+					log.Debugf("not moving %s: finding pages failed: %s\n", hr.AddrRange(), err)
+					continue
+				}
 			}
 			if len(ppages.pages) == 0 {
 				continue
@@ -341,25 +405,6 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 					hr.length, hr.addr, currNode, destNode)
 				debugLinesFrom[currNode] += 1
 				debugLinesTo[destNode] += 1
-			}
-		}
-	}
-	// just debugging...
-	if true {
-		log.Debugf("debug print coming up...\n")
-		for _, pid := range p.heatmap.Pids() {
-			nodeUsed := map[Node]uint64{}
-			addrDatas := p.pidAddrDatas[pid]
-			if addrDatas == nil {
-				continue
-			}
-			addrDatas.ForEach(func(ar *AddrRange, data interface{}) int {
-				arpi := data.(pageInfo)
-				nodeUsed[arpi.node] += ar.length * constUPagesize
-				return 0
-			})
-			for node, used := range nodeUsed {
-				log.Debugf("node %d used %d M (pageData) %d M (numaUsed)\n", node, used/(1024*1024), int64(p.numaUsed[node])*constPagesize/(1024*1024))
 			}
 		}
 	}
