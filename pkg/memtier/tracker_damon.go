@@ -79,6 +79,10 @@ func NewTrackerDamon() (Tracker, error) {
 	if !procFileExists(t.damonDir) {
 		return nil, fmt.Errorf("no platform support: %q missing", t.damonDir)
 	}
+
+	if err := t.applyMonitor("off"); err != nil {
+		return nil, err
+	}
 	return &t, nil
 }
 
@@ -199,17 +203,23 @@ func (t *TrackerDamon) applyTargetIds() error {
 }
 
 func (t *TrackerDamon) applyMonitor(value string) error {
-	if err := procWrite(t.damonDir+"/monitor_on", []byte(value)); err != nil {
-		return err
-	}
-	status, err := procRead(t.damonDir + "/monitor_on")
+	monitorFilename := t.damonDir + "/monitor_on"
+	currentStatus, err := procRead(monitorFilename)
 	if err != nil {
+		return fmt.Errorf("reading %q failed before writing it: %w", monitorFilename, err)
+	}
+	if currentStatus[:2] == value[:2] {
+		return nil // already correct value, skip writing (might cause an error)
+	}
+	if err = procWrite(monitorFilename, []byte(value)); err != nil {
 		return err
 	}
-	if status[:2] == value[:2] {
-		log.Debugf("TrackerDamon.Start: monitoring is %q\n", value)
-	} else {
-		return fmt.Errorf("wrote %q %s/monitor_on, but value is %q", value, t.damonDir, status)
+	newStatus, err := procRead(monitorFilename)
+	if err != nil {
+		return fmt.Errorf("reading %q failed after setting it: %w", monitorFilename, err)
+	}
+	if newStatus[:2] != value[:2] {
+		return fmt.Errorf("wrote %q to %q, but value is still %q", value, monitorFilename, newStatus)
 	}
 	return nil
 }
@@ -245,6 +255,7 @@ func (t *TrackerDamon) Start() error {
 		if err := t.applyMonitor("on"); err != nil {
 			return err
 		}
+		log.Debugf("TrackerDamon.Start: monitoring is on")
 	}
 	return nil
 }
