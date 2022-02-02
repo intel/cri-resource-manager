@@ -54,6 +54,8 @@ const (
 	portForward              = "PortForward"
 	containerStats           = "ContainerStats"
 	listContainerStats       = "ListContainerStats"
+	podSandboxStats          = "PodSandboxStats"
+	listPodSandboxStats      = "ListPodSandboxStats"
 	updateRuntimeConfig      = "UpdateRuntimeConfig"
 	status                   = "Status"
 )
@@ -424,6 +426,32 @@ func (s *server) ListContainerStats(ctx context.Context,
 	}
 
 	return rsp.(*api.ListContainerStatsResponse), err
+}
+
+func (s *server) PodSandboxStats(ctx context.Context, req *api.PodSandboxStatsRequest) (*api.PodSandboxStatsResponse, error) {
+	rsp, err := s.interceptRequest(ctx, runtimeService, podSandboxStats, req,
+		func(ctx context.Context, req interface{}) (interface{}, error) {
+			return (*s.runtime).PodSandboxStats(ctx, req.(*api.PodSandboxStatsRequest))
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.(*api.PodSandboxStatsResponse), err
+}
+
+func (s *server) ListPodSandboxStats(ctx context.Context, req *api.ListPodSandboxStatsRequest) (*api.ListPodSandboxStatsResponse, error) {
+	rsp, err := s.interceptRequest(ctx, runtimeService, listPodSandboxStats, req,
+		func(ctx context.Context, req interface{}) (interface{}, error) {
+			return (*s.runtime).ListPodSandboxStats(ctx, req.(*api.ListPodSandboxStatsRequest))
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.(*api.ListPodSandboxStatsResponse), err
 }
 
 func (s *server) UpdateRuntimeConfig(ctx context.Context,
