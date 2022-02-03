@@ -1325,7 +1325,7 @@ fi
 
 # Start cri-resmgr if not already running
 if [ "$omit_cri_resmgr" != "1" ]; then
-    if ! vm-command-q "fuser ${cri_resmgr_pidfile}" >/dev/null; then
+    if ! vm-command-q "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1; then
         screen-launch-cri-resmgr
     fi
     if [ -n "$crirm_src" ]; then
