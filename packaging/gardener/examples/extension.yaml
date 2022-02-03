@@ -1,5 +1,0 @@
-apiVersion: extensions.gardener.cloud/v1alpha1
-kind: Extension
-metadata:
-  name: cri-rm-extension
-  namespace: shoot--local--local

@@ -1,5 +1,8 @@
 # CRI-Resource-Manager extension for Gardener
 
+
+**OUTDATED: we're in progress to use full fledged operator approach**
+
 Note: This is work in progress and so far the only installed resources in shoot cluster are two configmaps for testing - in future they will be replaced with "installation" DaemonSet that will copy necessary binary and reconfigure and restart kubelet.
 
 ### Introduction
@@ -193,6 +196,8 @@ cd ~/work/cri-resource-manager/packaging/gardener/charts
 ~/work/gardener/hack/generate-controller-registration.sh cri-rm-extension cri-rm-installation v0.0.1 cri-rm-extension/templates/ctrldeploy-ctrlreg.yaml Extension:cri-rm-extension
 ```
 
+
+
 #### 4. Patch generated yamls to include additional value "shoot_namespace"
 
 ```
@@ -202,4 +207,22 @@ sed -i '12i\ \ \ \ shoot_namespace: {{ .Values.shoot_namespace }}' ~/work/cri-re
 
 # Make it globallyEnabled
 echo '    globallyEnabled: true' >>~/work/cri-resource-manager/packaging/gardener/charts/cri-rm-extension/templates/ctrldeploy-ctrlreg.yaml
+```
+
+Take a look on generated file:
+```
+cat ~/work/cri-resource-manager/packaging/gardener/charts/cri-rm-extension/templates/ctrldeploy-ctrlreg.yaml
+```
+
+### 1.  Alternative approach for develpoment purposes.
+
+```
+cd /root/work/cri-resource-manager/packaging/gardener/charts
+chart="$(tar -c cri-rm-installation | gzip -n | base64 | tr -d '\n')"
+echo $chart
+cd /root/work/cri-resource-manager/packaging/gardener/charts/cri-rm-extension
+helm template --set chart=$chart cri-rm-extension
+helm install --set chart=$chart cri-rm-extension cri-rm-extension
+
+helm uninstall cri-rm-extension
 ```

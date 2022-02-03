@@ -17,3 +17,4 @@ coverage.txt
 /_work
 *.stamp
 test/e2e/**/output
+packaging/gardener/gardener-extension-cri-rm
