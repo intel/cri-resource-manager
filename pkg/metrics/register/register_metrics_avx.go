@@ -1,3 +1,4 @@
+//go:build !noavx
 // +build !noavx
 
 package register

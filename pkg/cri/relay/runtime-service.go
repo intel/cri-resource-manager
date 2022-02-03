@@ -16,6 +16,7 @@ package relay
 
 import (
 	"context"
+
 	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	"github.com/intel/cri-resource-manager/pkg/dump"
@@ -154,6 +155,19 @@ func (r *relay) ListContainerStats(ctx context.Context,
 	req *api.ListContainerStatsRequest) (*api.ListContainerStatsResponse, error) {
 	r.dump("ListContainerStats", req)
 	return r.client.ListContainerStats(ctx, req)
+}
+
+func (r *relay) PodSandboxStats(ctx context.Context,
+	req *api.PodSandboxStatsRequest) (*api.PodSandboxStatsResponse, error) {
+	r.dump("PodSandboxStats", req)
+	return r.client.PodSandboxStats(ctx, req)
+}
+
+func (r *relay) ListPodSandboxStats(ctx context.Context,
+	req *api.ListPodSandboxStatsRequest) (*api.ListPodSandboxStatsResponse,
+	error) {
+	r.dump("ListPodSandboxStats", req)
+	return r.client.ListPodSandboxStats(ctx, req)
 }
 
 func (r *relay) UpdateRuntimeConfig(ctx context.Context,

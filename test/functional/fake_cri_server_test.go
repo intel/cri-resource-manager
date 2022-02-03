@@ -228,6 +228,16 @@ func (s *fakeCriServer) ListContainerStats(ctx context.Context, req *api.ListCon
 	return response.(*api.ListContainerStatsResponse), err
 }
 
+func (s *fakeCriServer) PodSandboxStats(ctx context.Context, req *api.PodSandboxStatsRequest) (*api.PodSandboxStatsResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*api.PodSandboxStatsResponse), err
+}
+
+func (s *fakeCriServer) ListPodSandboxStats(ctx context.Context, req *api.ListPodSandboxStatsRequest) (*api.ListPodSandboxStatsResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*api.ListPodSandboxStatsResponse), err
+}
+
 func (s *fakeCriServer) UpdateRuntimeConfig(ctx context.Context, req *api.UpdateRuntimeConfigRequest) (*api.UpdateRuntimeConfigResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
 	return response.(*api.UpdateRuntimeConfigResponse), err
