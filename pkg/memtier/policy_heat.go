@@ -292,11 +292,7 @@ func (p *PolicyHeat) startMoves(timestamp int64) {
 
 func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 	moverTasks := 0
-	fmt.Printf("startMovesFillFastFree\n")
 	for _, pid := range p.heatmap.Pids() {
-		debugLinesFrom := map[Node]int{}
-		debugLinesTo := map[Node]int{}
-		log.Debugf("startMovesFillFastFree sort start\n")
 		hrHotToCold := p.heatmap.Sorted(pid, func(hr0, hr1 *HeatRange) bool {
 			if hr0.heat > hr1.heat ||
 				(hr0.heat == hr1.heat && hr0.addr < hr1.addr) {
@@ -304,7 +300,6 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			}
 			return false
 		})
-		log.Debugf("startMovesFillFastFree sort end\n")
 		for _, hr := range hrHotToCold {
 			currNode := Node(-1)
 			heatClass := p.heatmap.HeatClass(hr)
@@ -379,7 +374,6 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			}
 			if currNode == -1 {
 				// Failed to find out where the pages are.
-				log.Debugf("addr %x pages %d currNode == -1\n", hr.addr, hr.length)
 				continue
 			}
 			// We know pages are on a wrong node. Choose
@@ -399,23 +393,24 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 				}
 			}
 			if destNode == Node(-1) {
-				log.Debugf("not moving %s: no suitable destination node\n", hr.AddrRange())
+				// Failed to find proper destination node.
 				continue
 			}
 			// Is there enough free space for pages of
 			// this heat range?
 			if p.numaSize[destNode] > -1 && destFree < int(hr.length) {
-				log.Debugf("not moving %s: %s out of quota\n", hr.AddrRange(), destNode)
+				// Failed to find a destination node with enough quota.
 				continue
 			}
 			if ppages == nil {
 				ppages, err = NewAddrRanges(pid, hr.AddrRange()).PagesMatching(PMPresentSet | PMExclusiveSet)
 				if err != nil {
-					log.Debugf("not moving %s: finding pages failed: %s\n", hr.AddrRange(), err)
+					// Error in finding page list.
 					continue
 				}
 			}
 			if len(ppages.pages) == 0 {
+				// The address range contains no pages that could be moved.
 				continue
 			}
 			moverTasks += 1
@@ -426,13 +421,6 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			// numaUsed[-1] will contain the number of pages moved away from
 			// an unknown node.
 			p.numaUsed[currNode] -= int(hr.length)
-			// DEBUG
-			if debugLinesFrom[currNode] < 2 || debugLinesTo[destNode] < 2 {
-				log.Debugf("move %d pages at %x from node %d to %d\n",
-					hr.length, hr.addr, currNode, destNode)
-				debugLinesFrom[currNode] += 1
-				debugLinesTo[destNode] += 1
-			}
 		}
 	}
 }
