@@ -1,7 +1,8 @@
 chart="$(tar -C charts -c gardener-extension-cri-rm | gzip -n | base64 | tr -d '\n')"
 OUT=examples/ctrldeploy-ctrlreg.yaml
 
-rm -rf /tmp/extract_dir && mkdir -p /tmp/extract_dir/ ; echo $chart | base64 -d  | gunzip | tar -xv -C /tmp/extract_dir && find /tmp/extract_dir
+#FOR DEBUG
+#rm -rf /tmp/extract_dir && mkdir -p /tmp/extract_dir/ ; echo $chart | base64 -d  | gunzip | tar -xv -C /tmp/extract_dir && find /tmp/extract_dir
 
 cat <<EOT > "$OUT"
 ---
