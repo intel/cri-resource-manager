@@ -47,7 +47,6 @@ const (
 	ManagedResourceName = "extension-runtime-cri-rm"
 	ConfigKey           = "config.yaml"
 
-	// ChartPath = "charts/example_configmap"
 	ChartPath               = "charts/cri-rm-installation/"
 	InstallationImageName   = "installation_image_name" // TODO: to be replaced with proper "gardener-extension-cri-rm-" when ready
 	InstallationReleaseName = "cri-rm-installation"
@@ -81,6 +80,10 @@ type Options struct {
 	controllerOptions *controllercmd.ControllerOptions
 	reconcileOptions  *controllercmd.ReconcilerOptions
 }
+
+// ---------------------------------------------------------------------------------------
+// -                                        Main                                         -
+// ---------------------------------------------------------------------------------------
 
 func main() {
 	runtimelog.SetLogger(logger.ZapLogger(true))
@@ -148,7 +151,7 @@ func main() {
 				ControllerOptions:         options.controllerOptions.Completed().Options(),
 				Name:                      ControllerName,
 				FinalizerSuffix:           ExtensionType,
-				Resync:                    60 * time.Minute, // was 60 // FIXME: with 1 minute resync we have race condition during deletion
+				Resync:                    60 * time.Minute, // was 60 // FIXME: with 1 second resync we have race condition during deletion
 				Predicates:                extension.DefaultPredicates(ignoreOperationAnnotation),
 				Type:                      ExtensionType,
 				IgnoreOperationAnnotation: ignoreOperationAnnotation,
@@ -171,6 +174,10 @@ func main() {
 	}
 
 }
+
+// ---------------------------------------------------------------------------------------
+// -                                        Actuator                                     -
+// ---------------------------------------------------------------------------------------
 
 func NewActuator() extension.Actuator {
 	return &actuator{
@@ -197,7 +204,6 @@ func (a *actuator) Reconcile(ctx context.Context, ex *extensionsv1alpha1.Extensi
 	}
 	a.logger.Info("Reconcile: checking extension...") // , "shoot", cluster.Shoot.Name, "namespace", cluster.Shoot.Namespace)
 
-	// TO handle deletion timestamp.
 	mr := &resourcemanagerv1alpha1.ManagedResource{}
 	if err := a.client.Get(ctx, kutil.Key(namespace, ManagedResourceName), mr); err != nil {
 		// Continue only if not found.
