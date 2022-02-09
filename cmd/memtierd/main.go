@@ -91,7 +91,13 @@ func main() {
 			exit("error in starting policy: %s", err)
 		}
 	}
+
 	prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
+	if stdinFileInfo, _ := os.Stdin.Stat(); (stdinFileInfo.Mode() & os.ModeCharDevice) == 0 {
+		// Input comes from a pipe.
+		// Echo commands after prompt in the interaction to explain outputs.
+		prompt.SetEcho(true)
+	}
 	prompt.SetPolicy(policy)
 	prompt.Interact()
 }

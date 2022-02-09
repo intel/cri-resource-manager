@@ -166,7 +166,7 @@ func (p *PolicyHeat) Tracker() Tracker {
 }
 
 func (p *PolicyHeat) Dump(args []string) string {
-	dumpHelp := "dump <heatmap|heatgram [#CLASSES]|numa>"
+	dumpHelp := "dump <heatmap|heatgram [CLASSES]|numa>"
 	if len(args) == 0 {
 		return dumpHelp
 	}

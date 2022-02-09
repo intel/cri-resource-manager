@@ -48,6 +48,7 @@ type Prompt struct {
 	policy  memtier.Policy
 	cmds    map[string]Cmd
 	ps1     string
+	echo    bool
 	quit    bool
 }
 
@@ -96,6 +97,9 @@ func (p *Prompt) Interact() {
 		if err != nil {
 			p.output("quit: %s\n", err)
 			break
+		}
+		if p.echo {
+			p.output("%s", rawcmd)
 		}
 		// If command has "|", run the left-hand-side of the
 		// pipe in a shell and pipe the output of the
@@ -155,6 +159,10 @@ func (p *Prompt) Interact() {
 		}
 	}
 	p.output("quit.\n")
+}
+
+func (p *Prompt) SetEcho(newEcho bool) {
+	p.echo = newEcho
 }
 
 func (p *Prompt) SetPolicy(policy memtier.Policy) {
