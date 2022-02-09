@@ -176,7 +176,60 @@ func (p *PolicyHeat) Dump(args []string) string {
 		return strings.Join(lines, "\n")
 	}
 	if args[0] == "heatgram" {
-		return "not implemented yet: histogram of heat values"
+		classCount := p.heatmap.config.HeatClasses
+		var err error
+		if len(args) > 1 {
+			if classCount, err = strconv.Atoi(args[1]); err != nil || classCount < 1 {
+				return "invalid argument, expected CLASSES > 0, syntax: heatgram CLASSES"
+			}
+		}
+		lines := []string{}
+		// Find the following properties of the heatmap:
+		hrCount := 0            // number of heatranges
+		pageCount := uint64(0)  // total number of pages in the heatmap (all pids)
+		maxHeat := float64(0.0) // maximum heat that appears in the heatmap
+		pidMaxHeat := map[int]float64{}
+		lines = append(lines, "table: maximum heat in heatmaps")
+		lines = append(lines, fmt.Sprintf("     pid   maxHeat"))
+		for _, pid := range sortInts(p.heatmap.Pids()) {
+			p.heatmap.ForEachRange(pid, func(hr *HeatRange) int {
+				if hr.heat > maxHeat {
+					maxHeat = hr.heat
+				}
+				if hr.heat > pidMaxHeat[pid] {
+					pidMaxHeat[pid] = hr.heat
+				}
+				hrCount += 1
+				pageCount += hr.length
+				return 0
+			})
+			lines = append(lines, fmt.Sprintf("%8d %8.3f", pid, pidMaxHeat[pid]))
+		}
+		// Build statistics on each pid and class separately.
+		lines = append(lines, "table: memory in heat classes")
+		for _, pid := range sortInts(p.heatmap.Pids()) {
+			classPages := map[int]uint64{} // pages per class in this pid
+			totPages := uint64(0)          // total pages in this pid
+			p.heatmap.ForEachRange(pid, func(hr *HeatRange) int {
+				hrClass := int(float64(classCount) * hr.heat / p.heatmap.config.HeatMax)
+				if hrClass >= classCount {
+					hrClass--
+				}
+				classPages[hrClass] += hr.length
+				totPages += hr.length
+				return 0
+			})
+			lines = append(lines, "     pid class pidmem[%] totmem[%]   mem[M]")
+			for classNum := 0; classNum < classCount; classNum++ {
+				lines = append(lines, fmt.Sprintf("%8d %5d %9.2f %9.2f %8d",
+					pid,
+					classNum,
+					float32(100*classPages[classNum])/float32(totPages),
+					float32(100*classPages[classNum])/float32(pageCount),
+					classPages[classNum]*constUPagesize/(1024*1024)))
+			}
+		}
+		return strings.Join(lines, "\n")
 	}
 	if args[0] == "numa" {
 		lines := []string{}

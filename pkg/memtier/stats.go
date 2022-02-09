@@ -9,8 +9,8 @@ import (
 
 type Stats struct {
 	namePulse mapStringPStatsPulse
-	pidMoves  map[int]*StatsPidMoved
-	pidScans  map[int]*StatsPidScanned
+	pidMoves  mapIntPStatsPidMoved
+	pidScans  mapIntPStatsPidScanned
 }
 
 type StatsPidMoved struct {
@@ -66,8 +66,8 @@ var stats *Stats = newStats()
 func newStats() *Stats {
 	return &Stats{
 		namePulse: make(mapStringPStatsPulse),
-		pidMoves:  make(map[int]*StatsPidMoved),
-		pidScans:  make(map[int]*StatsPidScanned),
+		pidMoves:  make(mapIntPStatsPidMoved),
+		pidScans:  make(mapIntPStatsPidScanned),
 	}
 }
 
@@ -152,7 +152,8 @@ func (s *Stats) LastMoveWithError(pid int) *StatsMoved {
 
 func (s *Stats) Summarize() string {
 	lines := []string{}
-	lines = append(lines, "heartbeats timeint[s] latest[s ago] name")
+	lines = append(lines, "table: events")
+	lines = append(lines, "   count timeint[s] latest[s ago] name")
 	now := time.Now().UnixNano()
 	for _, name := range s.namePulse.sortedKeys() {
 		pulse := s.namePulse[name]
@@ -163,47 +164,55 @@ func (s *Stats) Summarize() string {
 			beatsMinusOne = 1
 		}
 		lines = append(lines,
-			fmt.Sprintf("%10d %10.3f %13.3f %s",
+			fmt.Sprintf("%8d %10.3f %13.3f %s",
 				pulse.sumBeats,
 				(secondsSinceFirst-secondsSinceLatest)/float32(beatsMinusOne),
 				secondsSinceLatest,
 				name))
 	}
-	for pid, spm := range s.pidMoves {
-		lines = append(lines,
-			fmt.Sprintf("move_pages on pid: %d", pid),
-			fmt.Sprintf("    calls: %d", spm.sumSyscalls),
-			fmt.Sprintf("    requested: %d pages (%d MB)", spm.sumReqs, spm.sumReqs*constUPagesize/(1024*1024)),
-			fmt.Sprintf("    on target: %d pages (%d MB)", spm.sumDestNode, spm.sumDestNode*constUPagesize/(1024*1024)))
+	lines = append(lines, "table: move_pages syscalls")
+	lines = append(lines, "     pid    calls req[pages]  ok[pages] moved[M] targetnode:moved[M]")
+	for _, pid := range s.pidMoves.sortedKeys() {
+		spm := s.pidMoves[pid]
+		node_moved_list := []string{}
 		for _, node := range spm.sumDestNodePages.sortedKeys() {
-			lines = append(lines,
-				fmt.Sprintf("        to node %d: %d pages (%d MB)",
-					node,
-					spm.sumDestNodePages[node],
-					spm.sumDestNodePages[node]*constUPagesize/(1024*1024)))
+			node_moved_list = append(node_moved_list, fmt.Sprintf("%d:%d",
+				node,
+				spm.sumDestNodePages[node]*constUPagesize/(1024*1024)))
 		}
-		errorPages := uint64(0)
-		errorSumIndex := len(lines)
-		lines = append(lines, "") // placeholder for total error count
-		for _, errno := range spm.sumErrorCounts.sortedKeys() {
-			errorPages += spm.sumErrorCounts[errno]
-			lines = append(lines,
-				fmt.Sprintf("        %d (%s): %d pages (%d MB)",
-					errno, syscall.Errno(errno), spm.sumErrorCounts[errno], spm.sumErrorCounts[errno]*constUPagesize/(1024*1024)))
-		}
-		lines[errorSumIndex] = fmt.Sprintf("    errors: %d pages (%d MB)", errorPages, errorPages*constUPagesize/(1024*1024))
+		node_moved := strings.Join(node_moved_list, ";")
+		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8d %s",
+			pid,
+			spm.sumSyscalls,
+			spm.sumReqs,
+			spm.sumDestNode,
+			spm.sumDestNode*constUPagesize/(1024*1024),
+			node_moved))
 	}
-
-	for pid, sps := range s.pidScans {
-		lines = append(lines,
-			fmt.Sprintf("memory scans on pid: %d", pid),
-			fmt.Sprintf("    scans: %d", sps.count),
-			fmt.Sprintf("    scan time: %d ms (%d ms/scan)",
-				sps.sumTimeUs/1000,
-				sps.sumTimeUs/1000/sps.count),
-			fmt.Sprintf("    scanned: %d pages (%d pages/scan, %d MB/scan)", sps.sumScanned, sps.sumScanned/sps.count, sps.sumScanned*constUPagesize/sps.count/1024/1024),
-			fmt.Sprintf("    accessed: %d pages (%d pages/scan, %d MB/scan)", sps.sumAccessed, sps.sumAccessed/sps.count, sps.sumAccessed*constUPagesize/sps.count/1024/1024),
-			fmt.Sprintf("    written: %d pages (%d pages/scan, %d MB/scan)", sps.sumWritten, sps.sumWritten/sps.count, sps.sumWritten*constUPagesize/sps.count/1024/1024))
+	lines = append(lines, "table: move_pages syscall errors in page statuses")
+	lines = append(lines, "     pid    pages  size[M]    errno error")
+	for pid, spm := range s.pidMoves {
+		for _, errno := range spm.sumErrorCounts.sortedKeys() {
+			lines = append(lines, fmt.Sprintf("%8d %8d %8d %8d %s",
+				pid,
+				spm.sumErrorCounts[errno],
+				spm.sumErrorCounts[errno]*constUPagesize/(1024*1024),
+				errno,
+				syscall.Errno(errno)))
+		}
+	}
+	lines = append(lines, "table: memory scans")
+	lines = append(lines, "     pid    scans tot[pages]   avg[M]  avg[ms] avgaccs[M] avgwrite[M]")
+	for _, pid := range s.pidScans.sortedKeys() {
+		sps := s.pidScans[pid]
+		lines = append(lines, fmt.Sprintf("%8d %8d %10d %8d %8d %10d %11d",
+			pid,
+			sps.count,
+			sps.sumScanned,
+			sps.sumScanned*constUPagesize/sps.count/1024/1024,
+			sps.sumTimeUs/1000/sps.count,
+			sps.sumAccessed*constUPagesize/sps.count/1024/1024,
+			sps.sumWritten*constUPagesize/sps.count/1024/1024))
 	}
 	return strings.Join(lines, "\n")
 }

@@ -76,3 +76,25 @@ func (m mapIntUint64) sortedKeys() []int {
 	sort.Ints(keys)
 	return keys
 }
+
+type mapIntPStatsPidMoved map[int]*StatsPidMoved
+
+func (m mapIntPStatsPidMoved) sortedKeys() []int {
+	keys := make([]int, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Ints(keys)
+	return keys
+}
+
+type mapIntPStatsPidScanned map[int]*StatsPidScanned
+
+func (m mapIntPStatsPidScanned) sortedKeys() []int {
+	keys := make([]int, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Ints(keys)
+	return keys
+}
