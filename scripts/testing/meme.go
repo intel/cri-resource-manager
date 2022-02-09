@@ -59,6 +59,8 @@ var bWriteOffset int64
 var bWriteOffsetDelta int64
 var bWriteInterval time.Duration
 
+var constPagesize int = os.Getpagesize()
+
 func bExerciser(read, write bool, ba *BArray, offset int64, count int64, interval time.Duration, offsetDelta int64, countDelta int64) {
 	b := ba.b
 	if count >= int64(len(b[offset:])) {
@@ -196,7 +198,7 @@ func allocateBArray(bSize int64) {
 		b: make([]byte, bSize),
 	}
 	bas = append(bas, ba)
-	for j := int64(0); j < bSize; j++ {
+	for j := int64(0); j < bSize; j += int64(constPagesize) {
 		ba.b[j] = 0x01
 	}
 	fmt.Printf("    array: %s\n", bAddrRange(ba.b, int(bSize)))
