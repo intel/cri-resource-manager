@@ -14,6 +14,10 @@
 
 package memtier
 
+import (
+	"fmt"
+)
+
 type Pages struct {
 	pid   int
 	pages []Page
@@ -87,6 +91,8 @@ func (pp *Pages) MoveTo(node Node, count int) (int, error) {
 				otherNodeCount += 1
 			}
 		}
+	} else {
+		stats.Store(StatsHeartbeat{fmt.Sprintf("move_pages(...) error: %s", err)})
 	}
 	if stats != nil {
 		stats.Store(StatsMoved{
