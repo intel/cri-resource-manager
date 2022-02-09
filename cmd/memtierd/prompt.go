@@ -157,6 +157,12 @@ func (p *Prompt) Interact() {
 	p.output("quit.\n")
 }
 
+func (p *Prompt) SetPolicy(policy memtier.Policy) {
+	p.policy = policy
+	p.mover = p.policy.Mover()
+	p.tracker = p.policy.Tracker()
+}
+
 func sortedStringKeys(m map[string]Cmd) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -618,6 +624,7 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
+	remainder := p.f.Args()
 	if *ls {
 		p.output(strings.Join(memtier.PolicyList(), "\n") + "\n")
 		return csOk
@@ -654,8 +661,7 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 			return csOk
 		}
 	}
-	p.mover = p.policy.Mover()
-	p.tracker = p.policy.Tracker()
+	p.SetPolicy(p.policy)
 	if *start {
 		err := p.policy.Start()
 		if err != nil {
@@ -671,7 +677,8 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 		p.output("policy stopped\n")
 	}
 	if *dump != "" {
-		p.output(p.policy.Dump([]string{*dump}))
+		dumpArgs := append([]string{*dump}, remainder...)
+		p.output("%s\n", p.policy.Dump(dumpArgs))
 		p.output("\n")
 	}
 	return csOk

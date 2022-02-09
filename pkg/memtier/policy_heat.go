@@ -17,6 +17,7 @@ package memtier
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -165,7 +166,7 @@ func (p *PolicyHeat) Tracker() Tracker {
 }
 
 func (p *PolicyHeat) Dump(args []string) string {
-	dumpHelp := "dump <heatmap|heatgram|numa>"
+	dumpHelp := "dump <heatmap|heatgram [#CLASSES]|numa>"
 	if len(args) == 0 {
 		return dumpHelp
 	}

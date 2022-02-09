@@ -92,6 +92,6 @@ func main() {
 		}
 	}
 	prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
-	prompt.policy = policy
+	prompt.SetPolicy(policy)
 	prompt.Interact()
 }
