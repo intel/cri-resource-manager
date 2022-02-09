@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gardener-extension-cri-rm
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: gardener-extension-cri-rm
+spec:
+  revisionHistoryLimit: 0
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gardener-extension-cri-rm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gardener-extension-cri-rm
+    spec:
+      priorityClassName: gardener-extension-cri-rm
+      serviceAccountName: gardener-extension-cri-rm
+      containers:
+      - name: gardener-extension-cri-rm
+        image: {{ include "image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - /gardener-extension-cri-rm
+        - --leader-election=false

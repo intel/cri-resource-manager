@@ -1,0 +1,4 @@
+image:
+  repository: gardener-extension-cri-rm
+  tag: latest
+  pullPolicy: IfNotPresent

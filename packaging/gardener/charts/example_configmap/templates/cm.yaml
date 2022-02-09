@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cri-rm-installation-example-extension
-  # annotations:
-  #   resources.gardener.cloud/ignore: "true"
-data:
-  installation_image_name: {{ .Values.images.installation_image_name }}

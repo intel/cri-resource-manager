@@ -18,6 +18,7 @@ spec:
       hostIPC: true
       containers:
       - name: container-runtime-cri-rm
+        # TODO: replace with gardener-extension-cri-rm-installation + support for imagevector
         image: ubuntu:21.04
         command: ["/scripts/install-cri-rm.sh"]
         securityContext:

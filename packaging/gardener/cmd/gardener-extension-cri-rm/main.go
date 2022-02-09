@@ -47,9 +47,9 @@ const (
 	ManagedResourceName = "extension-runtime-cri-rm"
 	ConfigKey           = "config.yaml"
 
-	ChartPath = "charts/example_configmap"
-	// ChartPath               = "charts/cri-rm-installation/"
-	InstallationImageName   = "installation_image_name"
+	// ChartPath = "charts/example_configmap"
+	ChartPath               = "charts/cri-rm-installation/"
+	InstallationImageName   = "installation_image_name" // TODO: to be replaced with proper "gardener-extension-cri-rm-" when ready
 	InstallationReleaseName = "cri-rm-installation"
 )
 

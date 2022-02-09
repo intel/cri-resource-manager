@@ -1,0 +1,114 @@
+# SPDX-FileCopyrightText: 2021 SAP SE or an SAP affiliate company and Gardener contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: extensions.gardener.cloud:gardener-extension-cri-rm
+  labels:
+    app.kubernetes.io/name: gardener-extension-cri-rm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  resourceNames:
+  - kube-apiserver
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions.gardener.cloud
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - create
+  - patch
+- apiGroups:
+  - extensions.gardener.cloud
+  resources:
+  - dnsrecords
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - resources.gardener.cloud
+  resources:
+  - managedresources
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions.gardener.cloud
+  resources:
+  - extensions
+  - extensions/status
+  verbs:
+  - get
+  - list
+  - watch
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - events
+  verbs:
+  - "*"
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: extensions.gardener.cloud:gardener-extension-cri-rm
+  labels:
+    app.kubernetes.io/name: gardener-extension-cri-rm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: extensions.gardener.cloud:gardener-extension-cri-rm
+subjects:
+- kind: ServiceAccount
+  name: gardener-extension-cri-rm
+  namespace: {{ .Release.Namespace }}
