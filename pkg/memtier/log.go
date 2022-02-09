@@ -34,9 +34,14 @@ type logger struct {
 const logPrefix = "memtier "
 
 var log Logger = &logger{Logger: nil}
+var logDebugMessages bool = false
 
 func SetLogger(l *stdlog.Logger) {
 	log = NewLoggerWrapper(l)
+}
+
+func SetLogDebug(debug bool) {
+	logDebugMessages = debug
 }
 
 func NewLoggerWrapper(l *stdlog.Logger) Logger {
@@ -44,7 +49,7 @@ func NewLoggerWrapper(l *stdlog.Logger) Logger {
 }
 
 func (l *logger) Debugf(format string, v ...interface{}) {
-	if l.Logger != nil {
+	if l.Logger != nil && logDebugMessages {
 		l.Logger.Printf("DEBUG: "+logPrefix+format, v...)
 	}
 }

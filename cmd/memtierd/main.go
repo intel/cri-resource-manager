@@ -65,8 +65,10 @@ func main() {
 	optPrompt := flag.Bool("prompt", false, "launch interactive prompt (ignore other parameters)")
 	optConfig := flag.String("config", "", "launch non-interactive mode with config file")
 	optConfigDumpJson := flag.Bool("config-dump-json", false, "dump effective configuration in JSON")
+	optDebug := flag.Bool("debug", false, "print debug output")
 
 	flag.Parse()
+	memtier.SetLogDebug(*optDebug)
 
 	if *optPrompt {
 		prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
