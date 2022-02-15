@@ -274,7 +274,7 @@ exclusive allocation.
 `CRI Resource Manager` automatically generates HW `Topology Hints` for devices
 assigned to a container, prior to handing the container off to the active policy
 for resource allocation. The `topology-aware` policy is hint-aware and normally
-takes topology hints into account when picking the best a pool to allocate
+takes topology hints into account when picking the best pool to allocate
 resources. Hints indicate optimal `HW locality` for device access and they can
 alter significantly which pool gets picked for a container.
 
