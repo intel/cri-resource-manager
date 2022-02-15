@@ -135,20 +135,20 @@ B. If the request needs to be intercepted for policying, do the following:
  3. If the request has no resource allocation consequences, do proxying
     (step 6).
  4. Otherwise, invoke the policy layer for resource allocation:
-   - Pass it on to the configured active policy, which will
-   - Allocate resources for the container.
-   - Update the assignments for the container in the cache.
-   - Update any other containers affected by the allocation in the cache.
+    - Pass it on to the configured active policy, which will
+    - Allocate resources for the container.
+    - Update the assignments for the container in the cache.
+    - Update any other containers affected by the allocation in the cache.
  5. Invoke the controller layer for post-policy processing, which will:
-   - Collect controllers with pending changes in their domain of control
-   - for each invoke the post-policy processing function corresponding to
-     the request.
-   - Clear pending markers for the controllers.
+    - Collect controllers with pending changes in their domain of control
+    - for each invoke the post-policy processing function corresponding to
+      the request.
+    - Clear pending markers for the controllers.
  6. Proxy the request:
-   - Relay the request to the server.
-   - Send update requests for any additional affected containers.
-   - Update the cache if/as necessary based on the response.
-   - Relay the response back to the client.
+    - Relay the request to the server.
+    - Send update requests for any additional affected containers.
+    - Update the cache if/as necessary based on the response.
+    - Relay the response back to the client.
  7. Release the processing pipeline serialization lock.
 
 The high-level control flow of the event processing pipeline is one of the
@@ -269,7 +269,7 @@ A resource controller implementation responsible for the practical details of
 associating a container with Intel RDT classes. This class effectively
 determines how much last level cache and memory bandwidth will be available
 for the container. This controller uses the resctrl pseudo filesystem of the
-Linux\* kernel for control.
+Linux kernel for control.
 
 #### [Block I/O](/pkg/cri/resource-manager/control/blockio/)
 
