@@ -24,15 +24,30 @@ Classes of Service (CLOS) (under `/sys/fs/resctrl`) corresponding the RDT class.
 the CLOSes according to its configuration at startup or whenever the
 configuration changes.
 
-By default there is a direct mapping between Pod QoS classes and RDT classes:
-the containers of the Pod get an RDT class with the same name as its QoS class
-(Guaranteed, Burstable or Besteffort). However, that can be overridden with the
-`rdtclass.cri-resource-manager.intel.com` Pod annotation. You can also specify
-RDT classes other than Guaranteed, Burstable or Besteffort. In this case, the
-Pod can only be assigned to these classes with the Pod annotation, though.
-The default behavior can also be overridden by a policy but currently none of
-the builtin policies do that.
+CRI-RM maintains a direct mapping between Pod QoS classes and RDT classes. If
+RDT is enabled CRI-RM tries to assign containers into an RDT class with a name
+matching their Pod QoS class. This default behavior can be overridden with
+pod annotations.
 
+## Class Assignment
+
+By default, containers get an RDT class with the same name as its Pod QoS class
+(Guaranteed, Burstable or Besteffort). If the RDT class is missing the
+container will be assigned to the system root class.
+
+The default behavior can be overridden with pod annoations:
+
+- `rdtclass.cri-resource-manager.intel.com/pod: <class-name>` specifies a
+  pod-level default that will be used for all containers of a pod
+- `rdtclass.cri-resource-manager.intel.com/container.<container-name>: <class-name>`
+   specifies container-specific assignment, taking preference over possible
+   pod-level annotation (above)
+
+With pod annoations it is possible to specify RDT classes other than
+Guaranteed, Burstable or Besteffort.
+
+The default assignment could also be overridden by a policy but currently none
+of the builtin policies do that.
 
 ## Configuration
 
