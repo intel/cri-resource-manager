@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Container Affinity and Anti-Affinity &mdash; CRI Resource Manager 0.6.0-2-g21ed50ef documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Container Affinity and Anti-Affinity &mdash; CRI Resource Manager 0.6.0-86-g766b66cc documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -13,7 +12,6 @@
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
         <script src="../../_static/doctools.js"></script>
-        <script src="../../_static/language_data.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -39,7 +37,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p><span class="caption-text">Contents:</span></p>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -97,9 +95,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="container-affinity-and-anti-affinity">
+  <div class="tex2jax_ignore mathjax_ignore section" id="container-affinity-and-anti-affinity">
 <h1>Container Affinity and Anti-Affinity<a class="headerlink" href="#container-affinity-and-anti-affinity" title="Permalink to this headline">¶</a></h1>
-<section id="introduction">
+<div class="section" id="introduction">
 <h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
 <p>Some policies allow the user to give hints about how particular containers
 should be <em>co-located</em> within a node. In particular these hints express whether
@@ -124,8 +122,8 @@ There are two types of affinities:</p>
 <li><p>close to those the container has affinity towards</p></li>
 <li><p>far from those the container has anti-affinity towards.</p></li>
 </ul>
-</section>
-<section id="affinity-annotation-syntax">
+</div>
+<div class="section" id="affinity-annotation-syntax">
 <h2>Affinity Annotation Syntax<a class="headerlink" href="#affinity-annotation-syntax" title="Permalink to this headline">¶</a></h2>
 <p><em>Affinities</em> are defined as the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/affinity</span></code> annotation.
 <em>Anti-affinities</em> are defined as the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/anti-affinity</span></code>
@@ -176,8 +174,8 @@ as the annotation key.</p>
           <span class="no">weight: w</span>
 </pre></div>
 </div>
-</section>
-<section id="affinity-semantics">
+</div>
+<div class="section" id="affinity-semantics">
 <h2>Affinity Semantics<a class="headerlink" href="#affinity-semantics" title="Permalink to this headline">¶</a></h2>
 <p>An affinity consists of three parts:</p>
 <ul class="simple">
@@ -279,8 +277,8 @@ A non-existent subkey evaluates to the empty string. For instance the joint key<
 <p>evaluates to</p>
 <p><code class="docutils literal notranslate"><span class="pre">&lt;qosclass&gt;:&lt;pod</span> <span class="pre">name&gt;:&lt;container</span> <span class="pre">name&gt;</span></code></p>
 <p>For existence operators, a joint key is considered to exist if any of its subkeys exists.</p>
-</section>
-<section id="examples">
+</div>
+<div class="section" id="examples">
 <h2>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h2>
 <p>Put the container <code class="docutils literal notranslate"><span class="pre">peter</span></code> close to the container <code class="docutils literal notranslate"><span class="pre">sheep</span></code> but far away from the
 container <code class="docutils literal notranslate"><span class="pre">wolf</span></code>.</p>
@@ -304,8 +302,8 @@ container <code class="docutils literal notranslate"><span class="pre">wolf</spa
         <span class="no">weight: 5</span>
 </pre></div>
 </div>
-</section>
-<section id="shorthand-notation">
+</div>
+<div class="section" id="shorthand-notation">
 <h2>Shorthand Notation<a class="headerlink" href="#shorthand-notation" title="Permalink to this headline">¶</a></h2>
 <p>There is an alternative shorthand syntax for what is considered to be the most common
 case: defining affinities between containers within the same pod. With this notation
@@ -358,8 +356,8 @@ one needs to give just the names of the containers, like in the example below.</
           <span class="no">- container3</span>
 </pre></div>
 </div>
-</section>
-</section>
+</div>
+</div>
 
 
            </div>

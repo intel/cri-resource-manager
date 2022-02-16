@@ -19,7 +19,7 @@ supports CPU priority detection based on the `intel_pstate` scaling
 driver in the Linux CPUFreq subsystem, and, Intel Speed Select Technology
 (SST).
 
-CPUs are divided into three priority classes, i.e. *hight*, *normal* and *low*.
+CPUs are divided into three priority classes, i.e. *high*, *normal* and *low*.
 Policies utilizing the CPU allocator may choose to prefer certain priority
 class for certain types of workloads. For example, prefer (and preserve) high
 priority CPUs for high priority workloads.

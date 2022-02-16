@@ -4,7 +4,7 @@
 
 Intel® RDT provides capabilities for cache and memory allocation and
 monitoring. In Linux system the functionality is exposed to the user space via
-the [resctrl](https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt)
+the [resctrl](https://docs.kernel.org/x86/resctrl.html)
 filesystem. Cache and memory allocation in RDT is handled by using resource
 control groups. Resource allocation is specified on the group level and each
 task (process/thread) is assigned to one group. In the context of CRI Resource
@@ -20,19 +20,34 @@ Monitoring (MBM).
 
 RDT configuration in CRI-RM is class-based. Each container gets assigned to an
 RDT class. In turn, all processes of the container will be assigned to the RDT
-CLOS  (under `/sys/fs/resctrl`) corresponding the RDT class. CRI-RM will configure
+Classes of Service (CLOS) (under `/sys/fs/resctrl`) corresponding the RDT class. CRI-RM will configure
 the CLOSes according to its configuration at startup or whenever the
 configuration changes.
 
-By default there is a direct mapping between Pod QoS classes and RDT classes:
-the containers of the Pod get an RDT class with the same name as its QoS class
-(Guaranteed, Burstable or Besteffort). However, that can be overridden with the
-rdtclass.cri-resource-manager.intel.com Pod annotation. You can also specify
-RDT classes other than Guaranteed, Burstable or Besteffort. In this case, the
-Pod can only be assigned to these classes with the Pod annotation, though.
-The default behavior can also be overridden by a policy but currently none of
-the builtin policies do that.
+CRI-RM maintains a direct mapping between Pod QoS classes and RDT classes. If
+RDT is enabled CRI-RM tries to assign containers into an RDT class with a name
+matching their Pod QoS class. This default behavior can be overridden with
+pod annotations.
 
+## Class Assignment
+
+By default, containers get an RDT class with the same name as its Pod QoS class
+(Guaranteed, Burstable or Besteffort). If the RDT class is missing the
+container will be assigned to the system root class.
+
+The default behavior can be overridden with pod annoations:
+
+- `rdtclass.cri-resource-manager.intel.com/pod: <class-name>` specifies a
+  pod-level default that will be used for all containers of a pod
+- `rdtclass.cri-resource-manager.intel.com/container.<container-name>: <class-name>`
+   specifies container-specific assignment, taking preference over possible
+   pod-level annotation (above)
+
+With pod annoations it is possible to specify RDT classes other than
+Guaranteed, Burstable or Besteffort.
+
+The default assignment could also be overridden by a policy but currently none
+of the builtin policies do that.
 
 ## Configuration
 
@@ -52,7 +67,7 @@ The RDT controller supports three operating modes, controlled by
   are removed.
 - Full: Full operating mode. The controller manages the configuration of the
   resctrl filesystem according to the rdt class definitions in the CRI-RM
-  configiration. This is the default operating mode.
+  configuration. This is the default operating mode.
 
 ### RDT Classes
 
@@ -83,7 +98,7 @@ exceeded.
 
 ### Example
 
-Below is a config snippet that would allocate (ca.) 60% of the L3 cache lines
+Below is a config snippet that would allocate 60% of the L3 cache lines
 exclusively to the Guarenteed class. The remaining 40% L3 is for Burstable and
 Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
 memory bandwidth whereas the other classes are throttled to 50%.
@@ -159,7 +174,7 @@ and data paths.
         l3Allocation:
           # 'all' denotes the default and must be specified
           all: "40%"
-          # Specific cache allotation for cache-ids 2 and 3
+          # Specific cache allocation for cache-ids 2 and 3
           2-3: "20%"
         mbAllocation: ["100%"]
         classes:
@@ -169,9 +184,9 @@ and data paths.
                 unified: "100%"
                 code: "100%"
                 data: "80%"
-              mbSchema:
-                all: ["80%"]
-                2-3: ["50%"]
+            mbSchema:
+              all: ["80%"]
+              2-3: ["50%"]
 ...
 ...
 ```
@@ -179,10 +194,10 @@ and data paths.
 In addition, if the hardware details are known, raw bitmasks or bit numbers
 ("0x1f" or 0-4) can be used instead of percentages in order to be able to
 configure cache allocations exactly as required. The bits in this case are
-corresponding to those in /sys/fs/resctrl/ bitmasks. You can also mix relative
+corresponding to those in `/sys/fs/resctrl/` bitmasks. You can also mix relative
 (percentage) and absolute (bitmask) allocations. For cases where the resctrl
 filesystem is mounted with `-o mba_MBps` Memory bandwidth must be specifed in
-MBps.
+MegaBytes per second (MBps).
 
 ```yaml
 ...

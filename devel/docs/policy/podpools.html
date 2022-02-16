@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Podpools Policy &mdash; CRI Resource Manager 0.6.0-2-g21ed50ef documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Podpools Policy &mdash; CRI Resource Manager 0.6.0-86-g766b66cc documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -13,7 +12,6 @@
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
         <script src="../../_static/doctools.js"></script>
-        <script src="../../_static/language_data.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -39,7 +37,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p><span class="caption-text">Contents:</span></p>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -102,23 +100,23 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="podpools-policy">
+  <div class="tex2jax_ignore mathjax_ignore section" id="podpools-policy">
 <h1>Podpools Policy<a class="headerlink" href="#podpools-policy" title="Permalink to this headline">¶</a></h1>
-<section id="overview">
+<div class="section" id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p>The podpools policy implements pod-level workload placement. It
 assigns all containers of a pod to the same CPU/memory pool. The
 number of CPUs in a pool is configurable by user.</p>
-</section>
-<section id="deployment">
+</div>
+<div class="section" id="deployment">
 <h2>Deployment<a class="headerlink" href="#deployment" title="Permalink to this headline">¶</a></h2>
-<section id="install-cri-resmgr">
+<div class="section" id="install-cri-resmgr">
 <h3>Install cri-resmgr<a class="headerlink" href="#install-cri-resmgr" title="Permalink to this headline">¶</a></h3>
 <p>Deploy cri-resmgr on each node as you would for any other policy. See
-<a class="reference internal" href="../installation.html"><span class="doc">installation</span></a> for more details.</p>
-</section>
-</section>
-<section id="configuration">
+<a class="reference internal" href="../installation.html"><span class="doc std std-doc">installation</span></a> for more details.</p>
+</div>
+</div>
+<div class="section" id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
 <p>The policy is configured using the yaml-based configuration system of CRI-RM.
 See <a class="reference external" href="../setup.html#setting-up-cri-resource-manager">setup and usage</a> for more
@@ -147,9 +145,9 @@ that are not <code class="docutils literal notranslate"><span class="pre">dualcp
 each pod assigned to the pool. To align with kube-scheduler resource
 accounting, requested CPUs of all containers in this kind of pods must
 sum up to CPU/MaxPods, that is 2000m CPU in this case.</p>
-<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/21ed50ef93b8153aedc298a07a806f19e3e94825/sample-configs/podpools-policy.cfg">sample configmap</a> for a
+<p>See the <span class="xref myst">sample configmap</span> for a
 complete example.</p>
-<section id="debugging">
+<div class="section" id="debugging">
 <h3>Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h3>
 <p>In order to enable more verbose logging for the podpools policy enable
 policy debug from the CRI-RM global config:</p>
@@ -157,9 +155,9 @@ policy debug from the CRI-RM global config:</p>
   <span class="nt">Debug</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">policy</span>
 </pre></div>
 </div>
-</section>
-</section>
-<section id="running-pods-in-podpools">
+</div>
+</div>
+<div class="section" id="running-pods-in-podpools">
 <h2>Running Pods in Podpools<a class="headerlink" href="#running-pods-in-podpools" title="Permalink to this headline">¶</a></h2>
 <p>The podpools policy assigns a pod to a pod pool instance if the pod
 has annotation</p>
@@ -203,8 +201,8 @@ not a <code class="docutils literal notranslate"><span class="pre">kube-system</
 include left-over CPUs after creating user-defined pools. If all CPUs
 were allocated to other pools, reserved CPUs will be used as shared,
 too.</p>
-</section>
-</section>
+</div>
+</div>
 
 
            </div>

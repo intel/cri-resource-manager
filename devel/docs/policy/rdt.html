@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-2-g21ed50ef documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-86-g766b66cc documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -13,7 +12,6 @@
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
         <script src="../../_static/doctools.js"></script>
-        <script src="../../_static/language_data.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -39,7 +37,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p><span class="caption-text">Contents:</span></p>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -54,6 +52,7 @@
 <li class="toctree-l2 current"><a class="current reference internal" href="#">RDT (Intel® Resource Director Technology)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#background">Background</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#class-assignment">Class Assignment</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#operating-modes">Operating Modes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#rdt-classes">RDT Classes</a></li>
@@ -101,13 +100,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="rdt-intel-resource-director-technology">
+  <div class="tex2jax_ignore mathjax_ignore section" id="rdt-intel-resource-director-technology">
 <h1>RDT (Intel® Resource Director Technology)<a class="headerlink" href="#rdt-intel-resource-director-technology" title="Permalink to this headline">¶</a></h1>
-<section id="background">
+<div class="section" id="background">
 <h2>Background<a class="headerlink" href="#background" title="Permalink to this headline">¶</a></h2>
 <p>Intel® RDT provides capabilities for cache and memory allocation and
 monitoring. In Linux system the functionality is exposed to the user space via
-the <a class="reference external" href="https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt">resctrl</a>
+the <a class="reference external" href="https://docs.kernel.org/x86/resctrl.html">resctrl</a>
 filesystem. Cache and memory allocation in RDT is handled by using resource
 control groups. Resource allocation is specified on the group level and each
 task (process/thread) is assigned to one group. In the context of CRI Resource
@@ -116,26 +115,40 @@ we use the term ‘RDT class’ instead of ‘resource control group’.</p>
 Cache Allocation (CAT) with Code and Data Prioritization (CDP) and Memory
 Bandwidth Allocation (MBA) plus Cache Monitoring (CMT) and Memory Bandwidth
 Monitoring (MBM).</p>
-</section>
-<section id="overview">
+</div>
+<div class="section" id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p>RDT configuration in CRI-RM is class-based. Each container gets assigned to an
 RDT class. In turn, all processes of the container will be assigned to the RDT
-CLOS  (under <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl</span></code>) corresponding the RDT class. CRI-RM will configure
+Classes of Service (CLOS) (under <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl</span></code>) corresponding the RDT class. CRI-RM will configure
 the CLOSes according to its configuration at startup or whenever the
 configuration changes.</p>
-<p>By default there is a direct mapping between Pod QoS classes and RDT classes:
-the containers of the Pod get an RDT class with the same name as its QoS class
-(Guaranteed, Burstable or Besteffort). However, that can be overridden with the
-rdtclass.cri-resource-manager.intel.com Pod annotation. You can also specify
-RDT classes other than Guaranteed, Burstable or Besteffort. In this case, the
-Pod can only be assigned to these classes with the Pod annotation, though.
-The default behavior can also be overridden by a policy but currently none of
-the builtin policies do that.</p>
-</section>
-<section id="configuration">
+<p>CRI-RM maintains a direct mapping between Pod QoS classes and RDT classes. If
+RDT is enabled CRI-RM tries to assign containers into an RDT class with a name
+matching their Pod QoS class. This default behavior can be overridden with
+pod annotations.</p>
+</div>
+<div class="section" id="class-assignment">
+<h2>Class Assignment<a class="headerlink" href="#class-assignment" title="Permalink to this headline">¶</a></h2>
+<p>By default, containers get an RDT class with the same name as its Pod QoS class
+(Guaranteed, Burstable or Besteffort). If the RDT class is missing the
+container will be assigned to the system root class.</p>
+<p>The default behavior can be overridden with pod annoations:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rdtclass.cri-resource-manager.intel.com/pod:</span> <span class="pre">&lt;class-name&gt;</span></code> specifies a
+pod-level default that will be used for all containers of a pod</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rdtclass.cri-resource-manager.intel.com/container.&lt;container-name&gt;:</span> <span class="pre">&lt;class-name&gt;</span></code>
+specifies container-specific assignment, taking preference over possible
+pod-level annotation (above)</p></li>
+</ul>
+<p>With pod annoations it is possible to specify RDT classes other than
+Guaranteed, Burstable or Besteffort.</p>
+<p>The default assignment could also be overridden by a policy but currently none
+of the builtin policies do that.</p>
+</div>
+<div class="section" id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
-<section id="operating-modes">
+<div class="section" id="operating-modes">
 <h3>Operating Modes<a class="headerlink" href="#operating-modes" title="Permalink to this headline">¶</a></h3>
 <p>The RDT controller supports three operating modes, controlled by
 <code class="docutils literal notranslate"><span class="pre">rdt.options.mode</span></code> configuration option.</p>
@@ -151,15 +164,15 @@ of this mode all CRI-RM specific control groups from the resctrl filesystem
 are removed.</p></li>
 <li><p>Full: Full operating mode. The controller manages the configuration of the
 resctrl filesystem according to the rdt class definitions in the CRI-RM
-configiration. This is the default operating mode.</p></li>
+configuration. This is the default operating mode.</p></li>
 </ul>
-</section>
-<section id="rdt-classes">
+</div>
+<div class="section" id="rdt-classes">
 <h3>RDT Classes<a class="headerlink" href="#rdt-classes" title="Permalink to this headline">¶</a></h3>
 <p>The RDT class configuration in CRI-RM is a two-level hierarchy consisting of
 partitions and classes. It specifies a set of partitions each having a set of
 classes.</p>
-<section id="partitions">
+<div class="section" id="partitions">
 <h4>Partitions<a class="headerlink" href="#partitions" title="Permalink to this headline">¶</a></h4>
 <p>Partitions represent a logical grouping of the underlying classes, each
 partition specifying a portion of the available resources (L2/L3/MB) which will
@@ -168,8 +181,8 @@ exclusive cache allocation - i.e. no overlap on the cache ways between
 partitions is allowed. However, by technology, MB allocations are not
 exclusive. Thus, it is possible to assign all partitions 100% of memory
 bandwidth, for example.</p>
-</section>
-<section id="classes">
+</div>
+<div class="section" id="classes">
 <h4>Classes<a class="headerlink" href="#classes" title="Permalink to this headline">¶</a></h4>
 <p>Classes represent the actual RDT classes containers are assigned to. In
 contrast to partitions, cache allocation between classes under a specific
@@ -178,11 +191,11 @@ partition may overlap (and they usually do).</p>
 classes corresponding to the Pod QoS classes are specified. Also, the maximum
 number of classes (CLOSes) supported by the underlying hardware must not be
 exceeded.</p>
-</section>
-</section>
-<section id="example">
+</div>
+</div>
+<div class="section" id="example">
 <h3>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h3>
-<p>Below is a config snippet that would allocate (ca.) 60% of the L3 cache lines
+<p>Below is a config snippet that would allocate 60% of the L3 cache lines
 exclusively to the Guarenteed class. The remaining 40% L3 is for Burstable and
 Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
 memory bandwidth whereas the other classes are throttled to 50%.</p>
@@ -254,7 +267,7 @@ and data paths.</p>
         <span class="nt">l3Allocation</span><span class="p">:</span>
           <span class="c1"># &#39;all&#39; denotes the default and must be specified</span>
           <span class="nt">all</span><span class="p">:</span> <span class="s">&quot;40%&quot;</span>
-          <span class="c1"># Specific cache allotation for cache-ids 2 and 3</span>
+          <span class="c1"># Specific cache allocation for cache-ids 2 and 3</span>
           <span class="nt">2-3</span><span class="p">:</span> <span class="s">&quot;20%&quot;</span>
         <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span>
         <span class="nt">classes</span><span class="p">:</span>
@@ -264,20 +277,20 @@ and data paths.</p>
                 <span class="nt">unified</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
                 <span class="nt">code</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
                 <span class="nt">data</span><span class="p">:</span> <span class="s">&quot;80%&quot;</span>
-              <span class="nt">mbSchema</span><span class="p">:</span>
-                <span class="nt">all</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;80%&quot;</span><span class="p p-Indicator">]</span>
-                <span class="nt">2-3</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span>
+            <span class="nt">mbSchema</span><span class="p">:</span>
+              <span class="nt">all</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;80%&quot;</span><span class="p p-Indicator">]</span>
+              <span class="nt">2-3</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span>
 <span class="nn">...</span>
 <span class="nn">...</span>
 </pre></div>
 </div>
 <p>In addition, if the hardware details are known, raw bitmasks or bit numbers
-(”0x1f” or 0-4) can be used instead of percentages in order to be able to
+(“0x1f” or 0-4) can be used instead of percentages in order to be able to
 configure cache allocations exactly as required. The bits in this case are
-corresponding to those in /sys/fs/resctrl/ bitmasks. You can also mix relative
+corresponding to those in <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl/</span></code> bitmasks. You can also mix relative
 (percentage) and absolute (bitmask) allocations. For cases where the resctrl
 filesystem is mounted with <code class="docutils literal notranslate"><span class="pre">-o</span> <span class="pre">mba_MBps</span></code> Memory bandwidth must be specifed in
-MBps.</p>
+MegaBytes per second (MBps).</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
     <span class="nt">partitions</span><span class="p">:</span>
       <span class="nt">exclusive</span><span class="p">:</span>
@@ -301,19 +314,19 @@ MBps.</p>
             <span class="nt">mbSchema</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">,</span> <span class="s">&quot;1000MBps&quot;</span><span class="p p-Indicator">]</span>
 </pre></div>
 </div>
-<p>See <code class="docutils literal notranslate"><span class="pre">rdt</span></code> in the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/21ed50ef93b8153aedc298a07a806f19e3e94825/sample-configs/cri-resmgr-configmap.example.yaml">example ConfigMap spec</a>
+<p>See <code class="docutils literal notranslate"><span class="pre">rdt</span></code> in the <span class="xref myst">example ConfigMap spec</span>
 for another example configuration.</p>
-</section>
-<section id="dynamic-configuration">
+</div>
+<div class="section" id="dynamic-configuration">
 <h3>Dynamic Configuration<a class="headerlink" href="#dynamic-configuration" title="Permalink to this headline">¶</a></h3>
 <p>RDT supports dynamic configuration i.e. the resctrl filesystem is reconfigured
-whenever a configuration update e.g. via the <a class="reference internal" href="../node-agent.html"><span class="doc">Node Agent</span></a> is
+whenever a configuration update e.g. via the <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">Node Agent</span></a> is
 received. However, the configuration update is rejected if it is incompatible
 with the set of currently running containers - e.g. the new config is missing a
 class that a running container has been assigned to.</p>
-</section>
-</section>
-</section>
+</div>
+</div>
+</div>
 
 
            </div>

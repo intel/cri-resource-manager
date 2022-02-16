@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.6.0-2-g21ed50ef documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.6.0-86-g766b66cc documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -13,7 +12,6 @@
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
         <script src="../../_static/doctools.js"></script>
-        <script src="../../_static/language_data.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -39,7 +37,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p><span class="caption-text">Contents:</span></p>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -109,9 +107,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="static-pools-stp-policy">
+  <div class="tex2jax_ignore mathjax_ignore section" id="static-pools-stp-policy">
 <h1>Static-Pools (STP) Policy<a class="headerlink" href="#static-pools-stp-policy" title="Permalink to this headline">¶</a></h1>
-<section id="overview">
+<div class="section" id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">static-pools</span></code> (STP) builtin policy was inspired by <a class="reference external" href="https://github.com/intel/CPU-Manager-for-Kubernetes">CMK (CPU Manager for
 Kubernetes)</a>. It is an example policy demonstrating capabilities of
@@ -121,7 +119,7 @@ a drop-in replacement in order to allow easier testing and prototyping.</p>
 <p>Features:</p>
 <ul class="simple">
 <li><p>arbitrary number of configurable CPU list pools</p></li>
-<li><p>dynamic configuration updates via the <a class="reference internal" href="../node-agent.html"><span class="doc">node agent</span></a></p></li>
+<li><p>dynamic configuration updates via the <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">node agent</span></a></p></li>
 </ul>
 <p>Please see the documentation of
 <a class="reference external" href="https://github.com/intel/CPU-Manager-for-Kubernetes">CMK</a> for a more detailed
@@ -143,34 +141,34 @@ the pool configuration</p></li>
 options of <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code></p></li>
 <li><p>supports generating CMK-specific node label and taint (off by default)</p></li>
 </ul>
-</section>
-<section id="deployment">
+</div>
+<div class="section" id="deployment">
 <h2>Deployment<a class="headerlink" href="#deployment" title="Permalink to this headline">¶</a></h2>
-<section id="install-cri-resmgr">
+<div class="section" id="install-cri-resmgr">
 <h3>Install cri-resmgr<a class="headerlink" href="#install-cri-resmgr" title="Permalink to this headline">¶</a></h3>
 <p>Deploy cri-resmgr on each node as you would for any other policy. See
-<a class="reference internal" href="../installation.html"><span class="doc">installation</span></a> for more details.</p>
-</section>
-<section id="deploy-node-agent">
+<a class="reference internal" href="../installation.html"><span class="doc std std-doc">installation</span></a> for more details.</p>
+</div>
+<div class="section" id="deploy-node-agent">
 <h3>Deploy Node Agent<a class="headerlink" href="#deploy-node-agent" title="Permalink to this headline">¶</a></h3>
 <p>The CRI-RM node agent is required in order to communicate with the Kubernetes
 control plane. In particular, the STP policy needs this capability for
 updating the extended resource (that represents exclusive cores) as well as
 managing legacy CMK node annotation and taint. In addition, the node agent
 enables dynamic configuration updates.</p>
-<p>See <a class="reference internal" href="../node-agent.html"><span class="doc">node agent</span></a> for detailed instructions for set-up and
+<p>See <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">node agent</span></a> for detailed instructions for set-up and
 usage.</p>
-</section>
-<section id="deploy-admission-webhook">
+</div>
+<div class="section" id="deploy-admission-webhook">
 <h3>Deploy Admission Webhook<a class="headerlink" href="#deploy-admission-webhook" title="Permalink to this headline">¶</a></h3>
 <p>You need to run and enable the cri-resmgr mutating admission webhook which
 creates pod annotations consumed by CRI-RM. This is required so that the STP
 policy is able to inspect the extended resources (in this case, exclusive CPU
 cores) requested by containers.</p>
-<p>See the <a class="reference internal" href="../webhook.html"><span class="doc">webhook</span></a> for instructions how to set it up.</p>
-</section>
-</section>
-<section id="configuration">
+<p>See the <a class="reference internal" href="../webhook.html"><span class="doc std std-doc">webhook</span></a> for instructions how to set it up.</p>
+</div>
+</div>
+<div class="section" id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
 <p>The policy is configured using the yaml-based configuration system of CRI-RM.
 See <a class="reference external" href="../setup.html#setting-up-cri-resource-manager">setup and usage</a> for more
@@ -188,13 +186,13 @@ and taint.</p>
   <span class="l l-Scalar l-Scalar-Plain">...</span>
 </pre></div>
 </div>
-<p>See the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/21ed50ef93b8153aedc298a07a806f19e3e94825/sample-configs/cri-resmgr-configmap.example.yaml">sample configmap</a>
+<p>See the <span class="xref myst">sample configmap</span>
 for a complete example containing all available configuration options.</p>
-<p>If dynamic configuration via the <a class="reference internal" href="../node-agent.html"><span class="doc">node agent</span></a> is in use the
+<p>If dynamic configuration via the <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">node agent</span></a> is in use the
 policy options, including pools configuration, may be altered at runtime.</p>
 <p><strong>NOTE</strong>: the active policy (<code class="docutils literal notranslate"><span class="pre">policy.Active</span></code>) cannot be changed at runtime. In
 order to change the active policy cri-resmgr needs to be restarted.</p>
-<section id="pools-configuration">
+<div class="section" id="pools-configuration">
 <h3>Pools Configuration<a class="headerlink" href="#pools-configuration" title="Permalink to this headline">¶</a></h3>
 <p>There are three possible sources of the pools configuration, in decreasing
 priority order:</p>
@@ -213,7 +211,7 @@ effective.</p>
 configuration. Thus, you need to either manually write one by yourself, or, run
 the <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">init</span></code> command (of the original CMK) in order to create a legacy
 configuration directory structure.</p>
-<section id="global-config">
+<div class="section" id="global-config">
 <h4>Global Config<a class="headerlink" href="#global-config" title="Permalink to this headline">¶</a></h4>
 <p>Configuration from the global CRI-RM config takes the highest preference, if
 specified (under <code class="docutils literal notranslate"><span class="pre">policy.static-pools.pools</span></code>). A referential example:</p>
@@ -232,8 +230,8 @@ specified (under <code class="docutils literal notranslate"><span class="pre">po
         <span class="l l-Scalar l-Scalar-Plain">...</span>
 </pre></div>
 </div>
-</section>
-<section id="stand-alone-yaml-file">
+</div>
+<div class="section" id="stand-alone-yaml-file">
 <h4>Stand-alone YAML File<a class="headerlink" href="#stand-alone-yaml-file" title="Permalink to this headline">¶</a></h4>
 <p>Path to a stand-alone configuration file can be specified by the
 <code class="docutils literal notranslate"><span class="pre">policy.static-pools.ConfFilePath</span></code> option (empty by default) in the CRI-RM
@@ -245,10 +243,10 @@ global config:</p>
 </div>
 <p>Format of the configuration file is similar to the pools config used in the
 global CRI-RM config. You can also see the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/21ed50ef93b8153aedc298a07a806f19e3e94825/sample-configs/static-pools-policy.conf.example">example config file</a>
+<span class="xref myst">example config file</span>
 for a starting point.</p>
-</section>
-<section id="cmk-directory-tree">
+</div>
+<div class="section" id="cmk-directory-tree">
 <h4>CMK Directory Tree<a class="headerlink" href="#cmk-directory-tree" title="Permalink to this headline">¶</a></h4>
 <p>The STP policy also supports configuration directory format of the original
 CMK. It reads the configuration from a location specified by the
@@ -259,9 +257,9 @@ global config:</p>
     <span class="nt">ConfFileDir</span><span class="p">:</span> <span class="s">&quot;/etc/cmk&quot;</span>
 </pre></div>
 </div>
-</section>
-</section>
-<section id="debugging">
+</div>
+</div>
+<div class="section" id="debugging">
 <h3>Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h3>
 <p>In order to enable more verbose logging for the STP policy set the
 <code class="docutils literal notranslate"><span class="pre">LOGGER_DEBUG=static-pools</span></code> environment variable or enable debug from the CRI-RM
@@ -270,16 +268,16 @@ global config:</p>
   <span class="nt">Debug</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">static-pools</span>
 </pre></div>
 </div>
-</section>
-</section>
-<section id="running-workloads">
+</div>
+</div>
+<div class="section" id="running-workloads">
 <h2>Running Workloads<a class="headerlink" href="#running-workloads" title="Permalink to this headline">¶</a></h2>
 <p>The preferred way to specify the pod configuration is through environment
 variables. However, exclusive cores must be reserved by making a request of the
 <code class="docutils literal notranslate"><span class="pre">cmk.intel.com/exclusive-cores</span></code> extended resource. Naming of the extended
 resource has <code class="docutils literal notranslate"><span class="pre">cmk</span></code> prefix in order to provide backwards compatibility with the
 original CMK.</p>
-<section id="pod-configuration-using-env-variables">
+<div class="section" id="pod-configuration-using-env-variables">
 <h3>Pod Configuration Using Env Variables<a class="headerlink" href="#pod-configuration-using-env-variables" title="Permalink to this headline">¶</a></h3>
 <p>The following environment variables are recognized:</p>
 <table border="1" class="docutils">
@@ -303,7 +301,8 @@ original CMK.</p>
 <td>Socket where cores should be allocated. Set to -1 to accept any socket.</td>
 </tr>
 </tbody>
-</table><p>An example Pod spec for running a workload in the <code class="docutils literal notranslate"><span class="pre">exclusive</span></code> pool with one
+</table>
+<p>An example Pod spec for running a workload in the <code class="docutils literal notranslate"><span class="pre">exclusive</span></code> pool with one
 core reserved from socket id 0:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">v1</span>
 <span class="nt">kind</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Pod</span>
@@ -329,8 +328,8 @@ core reserved from socket id 0:</p>
         <span class="nt">cmk.intel.com/exclusive-cores</span><span class="p">:</span> <span class="s">&quot;1&quot;</span>
 </pre></div>
 </div>
-</section>
-<section id="backwards-compatibility-for-cmk-isolate">
+</div>
+<div class="section" id="backwards-compatibility-for-cmk-isolate">
 <h3>Backwards Compatibility for <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code><a class="headerlink" href="#backwards-compatibility-for-cmk-isolate" title="Permalink to this headline">¶</a></h3>
 <p>The STP policy parses the container command/args in an attempt to
 retrieve the Pod configuration (from <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code> options). This is to provide
@@ -354,9 +353,10 @@ pool.</p>
       <span class="p p-Indicator">-</span> <span class="s">&quot;/opt/bin/cmk</span><span class="nv"> </span><span class="s">isolate</span><span class="nv"> </span><span class="s">--conf-dir=/etc/cmk</span><span class="nv"> </span><span class="s">--pool=infra</span><span class="nv"> </span><span class="s">sleep</span><span class="nv"> </span><span class="s">10000&quot;</span>
 </pre></div>
 </div>
-<!-- Links --></section>
-</section>
-</section>
+<!-- Links -->
+</div>
+</div>
+</div>
 
 
            </div>

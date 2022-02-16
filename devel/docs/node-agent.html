@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Node Agent &mdash; CRI Resource Manager 0.6.0-2-g21ed50ef documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <title>Node Agent &mdash; CRI Resource Manager 0.6.0-86-g766b66cc documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
@@ -13,7 +12,6 @@
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/language_data.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -39,7 +37,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p><span class="caption-text">Contents:</span></p>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
@@ -80,13 +78,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="node-agent">
+  <div class="tex2jax_ignore mathjax_ignore section" id="node-agent">
 <h1>Node Agent<a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h1>
 <p>CRI Resource Manager can be configured dynamically using the CRI Resource
 Manager Node Agent and Kubernetes* ConfigMaps. The agent can be build using
-the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/21ed50ef93b8153aedc298a07a806f19e3e94825/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be
+the <span class="xref myst">provided Dockerfile</span>. It can be
 deployed as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/21ed50ef93b8153aedc298a07a806f19e3e94825/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
+<span class="xref myst">provided deployment file</span>.</p>
 <p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment
 variable <code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running
 on. If necessary pass it the credentials for accessing the cluster using
@@ -108,11 +106,11 @@ configuration</p></li>
 the configuration group. You can remove a node from its group by deleting
 the node group label.</p>
 <p>There is a
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/21ed50ef93b8153aedc298a07a806f19e3e94825/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
+<span class="xref myst">sample ConfigMap spec</span>
 that contains a node-specific, a group-specific, and a default ConfigMap
-example. See <a class="reference internal" href="policy/index.html">any available policy-specific documentation</a>
+example. See <a class="reference internal" href="policy/index.html"><span class="doc std std-doc">any available policy-specific documentation</span></a>
 for more information on the policy configurations.</p>
-</section>
+</div>
 
 
            </div>
