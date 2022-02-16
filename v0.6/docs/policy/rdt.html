@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-10-g0ae1d21c documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-13-g478f9cbe documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -52,6 +52,7 @@
 <li class="toctree-l2 current"><a class="current reference internal" href="#">RDT (Intel® Resource Director Technology)</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#background">Background</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#class-assignment">Class Assignment</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#operating-modes">Operating Modes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#rdt-classes">RDT Classes</a></li>
@@ -122,14 +123,28 @@ RDT class. In turn, all processes of the container will be assigned to the RDT
 Classes of Service (CLOS) (under <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl</span></code>) corresponding the RDT class. CRI-RM will configure
 the CLOSes according to its configuration at startup or whenever the
 configuration changes.</p>
-<p>By default there is a direct mapping between Pod QoS classes and RDT classes:
-the containers of the Pod get an RDT class with the same name as its QoS class
-(Guaranteed, Burstable or Besteffort). However, that can be overridden with the
-<code class="docutils literal notranslate"><span class="pre">rdtclass.cri-resource-manager.intel.com</span></code> Pod annotation. You can also specify
-RDT classes other than Guaranteed, Burstable or Besteffort. In this case, the
-Pod can only be assigned to these classes with the Pod annotation, though.
-The default behavior can also be overridden by a policy but currently none of
-the builtin policies do that.</p>
+<p>CRI-RM maintains a direct mapping between Pod QoS classes and RDT classes. If
+RDT is enabled CRI-RM tries to assign containers into an RDT class with a name
+matching their Pod QoS class. This default behavior can be overridden with
+pod annotations.</p>
+</div>
+<div class="section" id="class-assignment">
+<h2>Class Assignment<a class="headerlink" href="#class-assignment" title="Permalink to this headline">¶</a></h2>
+<p>By default, containers get an RDT class with the same name as its Pod QoS class
+(Guaranteed, Burstable or Besteffort). If the RDT class is missing the
+container will be assigned to the system root class.</p>
+<p>The default behavior can be overridden with pod annotations:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rdtclass.cri-resource-manager.intel.com/pod:</span> <span class="pre">&lt;class-name&gt;</span></code> specifies a
+pod-level default that will be used for all containers of a pod</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rdtclass.cri-resource-manager.intel.com/container.&lt;container-name&gt;:</span> <span class="pre">&lt;class-name&gt;</span></code>
+specifies container-specific assignment, taking preference over possible
+pod-level annotation (above)</p></li>
+</ul>
+<p>With pod annotations it is possible to specify RDT classes other than
+Guaranteed, Burstable or Besteffort.</p>
+<p>The default assignment could also be overridden by a policy but currently none
+of the builtin policies do that.</p>
 </div>
 <div class="section" id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
