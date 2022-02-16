@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-88-g2badf2c6 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-90-gd92efbb4 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -133,7 +133,7 @@ pod annotations.</p>
 <p>By default, containers get an RDT class with the same name as its Pod QoS class
 (Guaranteed, Burstable or Besteffort). If the RDT class is missing the
 container will be assigned to the system root class.</p>
-<p>The default behavior can be overridden with pod annoations:</p>
+<p>The default behavior can be overridden with pod annotations:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">rdtclass.cri-resource-manager.intel.com/pod:</span> <span class="pre">&lt;class-name&gt;</span></code> specifies a
 pod-level default that will be used for all containers of a pod</p></li>
@@ -141,7 +141,7 @@ pod-level default that will be used for all containers of a pod</p></li>
 specifies container-specific assignment, taking preference over possible
 pod-level annotation (above)</p></li>
 </ul>
-<p>With pod annoations it is possible to specify RDT classes other than
+<p>With pod annotations it is possible to specify RDT classes other than
 Guaranteed, Burstable or Besteffort.</p>
 <p>The default assignment could also be overridden by a policy but currently none
 of the builtin policies do that.</p>

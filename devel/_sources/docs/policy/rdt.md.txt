@@ -35,7 +35,7 @@ By default, containers get an RDT class with the same name as its Pod QoS class
 (Guaranteed, Burstable or Besteffort). If the RDT class is missing the
 container will be assigned to the system root class.
 
-The default behavior can be overridden with pod annoations:
+The default behavior can be overridden with pod annotations:
 
 - `rdtclass.cri-resource-manager.intel.com/pod: <class-name>` specifies a
   pod-level default that will be used for all containers of a pod
@@ -43,7 +43,7 @@ The default behavior can be overridden with pod annoations:
    specifies container-specific assignment, taking preference over possible
    pod-level annotation (above)
 
-With pod annoations it is possible to specify RDT classes other than
+With pod annotations it is possible to specify RDT classes other than
 Guaranteed, Burstable or Besteffort.
 
 The default assignment could also be overridden by a policy but currently none
