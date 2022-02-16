@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quick-start &mdash; CRI Resource Manager 0.6.0 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <title>Quick-start &mdash; CRI Resource Manager 0.6.0-6-g798bcba0 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
@@ -13,7 +12,6 @@
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/language_data.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -29,7 +27,7 @@
             <a href="index.html" class="icon icon-home"> CRI Resource Manager
           </a>
               <div class="version">
-                v0.6.0
+                0.6.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -39,7 +37,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p><span class="caption-text">Contents:</span></p>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quick-start</a><ul>
@@ -102,23 +100,23 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="quick-start">
+  <div class="tex2jax_ignore mathjax_ignore section" id="quick-start">
 <h1>Quick-start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h1>
 <p>The following describes the minimum number of steps to get started with CRI
 Resource Manager.</p>
-<section id="pre-requisites">
+<div class="section" id="pre-requisites">
 <h2>Pre-requisites<a class="headerlink" href="#pre-requisites" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
 <li><p>containerd container runtime installed and running</p></li>
 <li><p>kubelet installed on your nodes</p></li>
 </ul>
-</section>
-<section id="setup-cri-resmgr">
+</div>
+<div class="section" id="setup-cri-resmgr">
 <h2>Setup CRI-Resmgr<a class="headerlink" href="#setup-cri-resmgr" title="Permalink to this headline">¶</a></h2>
 <p>First, install and setup cri-resource-manager.</p>
-<section id="install-package">
+<div class="section" id="install-package">
 <h3>Install package<a class="headerlink" href="#install-package" title="Permalink to this headline">¶</a></h3>
-<section id="centos-fedora-and-suse">
+<div class="section" id="centos-fedora-and-suse">
 <h4>CentOS*, Fedora*, and SUSE*<a class="headerlink" href="#centos-fedora-and-suse" title="Permalink to this headline">¶</a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=`curl -s &quot;https://api.github.com/repos/intel/cri-resource-manager/releases/latest&quot; | \
                jq .tag_name | tr -d &#39;&quot;v&#39;`
@@ -127,8 +125,8 @@ source /etc/os-release
 sudo rpm -Uvh https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/cri-resource-manager-${CRIRM_VERSION}-0.${ID}-${VERSION_ID}.x86_64.rpm
 </pre></div>
 </div>
-</section>
-<section id="ubuntu-and-debian">
+</div>
+<div class="section" id="ubuntu-and-debian">
 <h4>Ubuntu* and Debian*<a class="headerlink" href="#ubuntu-and-debian" title="Permalink to this headline">¶</a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=`curl -s &quot;https://api.github.com/repos/intel/cri-resource-manager/releases/latest&quot; | \
                jq .tag_name | tr -d &#39;&quot;v&#39;`
@@ -136,9 +134,9 @@ source /etc/os-release
 pkg=cri-resource-manager_${CRIRM_VERSION}_${ID}-${VERSION_ID}_amd64.deb; curl -LO https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/${pkg}; sudo dpkg -i ${pkg}; rm ${pkg}
 </pre></div>
 </div>
-</section>
-</section>
-<section id="setup-and-verify">
+</div>
+</div>
+<div class="section" id="setup-and-verify">
 <h3>Setup and verify<a class="headerlink" href="#setup-and-verify" title="Permalink to this headline">¶</a></h3>
 <p>Create configuration and start cri-resource-manager</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">cp</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">fallback</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">sample</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">fallback</span><span class="o">.</span><span class="n">cfg</span>
@@ -149,59 +147,60 @@ pkg=cri-resource-manager_${CRIRM_VERSION}_${ID}-${VERSION_ID}_amd64.deb; curl -L
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">systemctl</span> <span class="n">status</span> <span class="n">cri</span><span class="o">-</span><span class="n">resource</span><span class="o">-</span><span class="n">manager</span>
 </pre></div>
 </div>
-</section>
-</section>
-<section id="kubelet-setup">
+</div>
+</div>
+<div class="section" id="kubelet-setup">
 <h2>Kubelet setup<a class="headerlink" href="#kubelet-setup" title="Permalink to this headline">¶</a></h2>
 <p>Next, you need to configure kubelet to user cri-resource-manager as it’s
 container runtime endpoint.</p>
-<section id="existing-cluster">
+<div class="section" id="existing-cluster">
 <h3>Existing cluster<a class="headerlink" href="#existing-cluster" title="Permalink to this headline">¶</a></h3>
 <p>When integrating into an existing cluster you need to change kubelet to use
 cri-resmgr instead of the existing container runtime (expecting containerd
 here).</p>
-<section id="id1">
+<div class="section" id="id1">
 <h4>CentOS, Fedora, and SUSE<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">sed</span> <span class="s1">&#39;/KUBELET_EXTRA_ARGS/ s!$! --container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock!&#39;</span> <span class="o">-</span><span class="n">i</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">sysconfig</span><span class="o">/</span><span class="n">kubelet</span>
 <span class="n">sudo</span> <span class="n">systemctl</span> <span class="n">restart</span> <span class="n">kubelet</span>
 </pre></div>
 </div>
-</section>
-<section id="id2">
+</div>
+<div class="section" id="id2">
 <h4>Ubuntu and Debian<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">sed</span> <span class="s1">&#39;/KUBELET_EXTRA_ARGS/ s!$! --container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock!&#39;</span> <span class="o">-</span><span class="n">i</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">default</span><span class="o">/</span><span class="n">kubelet</span>
 <span class="n">sudo</span> <span class="n">systemctl</span> <span class="n">restart</span> <span class="n">kubelet</span>
 </pre></div>
 </div>
-</section>
-</section>
-<section id="new-cluster">
+</div>
+</div>
+<div class="section" id="new-cluster">
 <h3>New Cluster<a class="headerlink" href="#new-cluster" title="Permalink to this headline">¶</a></h3>
 <p>When in the process of setting up a new cluster you simply point the kubelet
 to use the cri-resmgr cri sockets on cluster node setup time. Here’s an
 example with kubeadm:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubeadm</span> <span class="n">join</span> <span class="o">--</span><span class="n">cri</span><span class="o">-</span><span class="n">socket</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">.</span><span class="n">sock</span> \
 <span class="o">...</span>
+
 </pre></div>
 </div>
-</section>
-</section>
-<section id="what-next">
+</div>
+</div>
+<div class="section" id="what-next">
 <h2>What Next<a class="headerlink" href="#what-next" title="Permalink to this headline">¶</a></h2>
 <p>Congratulations, you now have cri-resource-manager running on your system and
 policying container resource allocations. Next, you could see:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="installation.html"><span class="doc">Installation</span></a> for more installation options and
+<li><p><a class="reference internal" href="installation.html"><span class="doc std std-doc">Installation</span></a> for more installation options and
 detailed installation instructions</p></li>
-<li><p><a class="reference internal" href="setup.html"><span class="doc">Setup</span></a> for details on setup and usage</p></li>
-<li><p><a class="reference internal" href="node-agent.html"><span class="doc">Node Agent</span></a> for setting up cri-resmgr-agent for dynamic
+<li><p><a class="reference internal" href="setup.html"><span class="doc std std-doc">Setup</span></a> for details on setup and usage</p></li>
+<li><p><a class="reference internal" href="node-agent.html"><span class="doc std std-doc">Node Agent</span></a> for setting up cri-resmgr-agent for dynamic
 configuration and more</p></li>
-<li><p><a class="reference internal" href="webhook.html"><span class="doc">Webhook</span></a> for setting up our resource-annotating webhook</p></li>
+<li><p><a class="reference internal" href="webhook.html"><span class="doc std std-doc">Webhook</span></a> for setting up our resource-annotating webhook</p></li>
 <li><p><a class="reference external" href="setup.html#kata-containers">Support for Kata Containers*</a> for setting up
 CRI-RM with Kata Containers</p></li>
 </ul>
-</section>
-</section>
+</div>
+</div>
 
 
            </div>

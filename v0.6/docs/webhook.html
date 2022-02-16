@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Webhook &mdash; CRI Resource Manager 0.6.0 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <title>Webhook &mdash; CRI Resource Manager 0.6.0-6-g798bcba0 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
@@ -13,7 +12,6 @@
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
         <script src="../_static/doctools.js"></script>
-        <script src="../_static/language_data.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -29,7 +27,7 @@
             <a href="index.html" class="icon icon-home"> CRI Resource Manager
           </a>
               <div class="version">
-                v0.6.0
+                0.6.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -39,7 +37,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p><span class="caption-text">Contents:</span></p>
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
@@ -80,7 +78,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="webhook">
+  <div class="tex2jax_ignore mathjax_ignore section" id="webhook">
 <h1>Webhook<a class="headerlink" href="#webhook" title="Permalink to this headline">¶</a></h1>
 <p>By default, CRI Resource Manager does not see the original container
 <em>resource requirements</em> specified in the <em>Pod Spec</em>. It tries to calculate
@@ -94,13 +92,13 @@ not possible to use these parameters to estimate <code class="docutils literal n
 Pod. This is necessary if you plan using or writing a policy which needs
 <em>extended resource</em>s.</p>
 <p>This process can be fully automated using the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/tree/e04ce5152fe907943db8a1b6bf5a8c99627d5246/cmd/cri-resmgr-webhook">CRI Resource Manager Annotating Webhook</a>. Once you
+<span class="xref myst">CRI Resource Manager Annotating Webhook</span>. Once you
 built the Docker* image for it using the
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/e04ce5152fe907943db8a1b6bf5a8c99627d5246/cmd/cri-resmgr-webhook/Dockerfile">provided Dockerfile</a> and published it,
+<span class="xref myst">provided Dockerfile</span> and published it,
 you can set up the webhook as follows:</p>
 <ul>
 <li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">IMAGE_PLACEHOLDER</span></code> in
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/e04ce5152fe907943db8a1b6bf5a8c99627d5246/cmd/cri-resmgr-webhook/webhook-deployment.yaml">webhook-deployment.yaml</a>
+<span class="xref myst">webhook-deployment.yaml</span>
 to match the image.</p></li>
 <li><p>Create a <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook-secret</span></code> that carries a key and a certificate
 to <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook</span></code>. You can create a key, a self-signed certificate
@@ -128,7 +126,7 @@ kubectl create -f cmd/cri-resmgr-webhook/webhook-secret.yaml
 </div>
 </li>
 <li><p>Fill in the <code class="docutils literal notranslate"><span class="pre">CA_BUNDLE_PLACEHOLDER</span></code> in
-<a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/e04ce5152fe907943db8a1b6bf5a8c99627d5246/cmd/cri-resmgr-webhook/mutating-webhook-config.yaml">mutating-webhook-config.yaml</a>.
+<span class="xref myst">mutating-webhook-config.yaml</span>.
 If you created the key and the certificate with the commands above,
 you can do this with the following command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sed -e <span class="s2">&quot;s/CA_BUNDLE_PLACEHOLDER/</span><span class="k">$(</span>base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem<span class="k">)</span><span class="s2">/&quot;</span> <span class="se">\</span>
@@ -144,7 +142,7 @@ kubectl apply -f cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
 </div>
 </li>
 </ul>
-</section>
+</div>
 
 
            </div>
