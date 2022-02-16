@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Architecture &mdash; CRI Resource Manager 0.6.0-8-gb4977b5e documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Architecture &mdash; CRI Resource Manager 0.6.0-10-g0ae1d21c documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -225,33 +225,30 @@ corresponding response back to the client.</p>
 <li><p>Look up/create cache objects (pod/container) for the request.</p></li>
 <li><p>If the request has no resource allocation consequences, do proxying
 (step 6).</p></li>
-<li><p>Otherwise, invoke the policy layer for resource allocation:</p></li>
-</ol>
+<li><p>Otherwise, invoke the policy layer for resource allocation:</p>
 <ul class="simple">
 <li><p>Pass it on to the configured active policy, which will</p></li>
 <li><p>Allocate resources for the container.</p></li>
 <li><p>Update the assignments for the container in the cache.</p></li>
 <li><p>Update any other containers affected by the allocation in the cache.</p></li>
 </ul>
-<ol class="simple">
-<li><p>Invoke the controller layer for post-policy processing, which will:</p></li>
-</ol>
+</li>
+<li><p>Invoke the controller layer for post-policy processing, which will:</p>
 <ul class="simple">
 <li><p>Collect controllers with pending changes in their domain of control</p></li>
 <li><p>for each invoke the post-policy processing function corresponding to
 the request.</p></li>
 <li><p>Clear pending markers for the controllers.</p></li>
 </ul>
-<ol class="simple">
-<li><p>Proxy the request:</p></li>
-</ol>
+</li>
+<li><p>Proxy the request:</p>
 <ul class="simple">
 <li><p>Relay the request to the server.</p></li>
 <li><p>Send update requests for any additional affected containers.</p></li>
 <li><p>Update the cache if/as necessary based on the response.</p></li>
 <li><p>Relay the response back to the client.</p></li>
 </ul>
-<ol class="simple">
+</li>
 <li><p>Release the processing pipeline serialization lock.</p></li>
 </ol>
 <p>The high-level control flow of the event processing pipeline is one of the
@@ -374,7 +371,7 @@ typically a DRAM/PMEM combination configured in 2-layer memory mode.</p>
 associating a container with Intel RDT classes. This class effectively
 determines how much last level cache and memory bandwidth will be available
 for the container. This controller uses the resctrl pseudo filesystem of the
-Linux* kernel for control.</p>
+Linux kernel for control.</p>
 </div>
 <div class="section" id="block-i-o">
 <h4><span class="xref myst">Block I/O</span><a class="headerlink" href="#block-i-o" title="Permalink to this headline">¶</a></h4>

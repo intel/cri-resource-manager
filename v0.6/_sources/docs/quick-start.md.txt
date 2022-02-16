@@ -48,7 +48,7 @@ systemctl status cri-resource-manager
 
 ## Kubelet setup
 
-Next, you need to configure kubelet to user cri-resource-manager as it's
+Next, you need to configure kubelet to use cri-resource-manager as it's
 container runtime endpoint.
 
 ### Existing cluster

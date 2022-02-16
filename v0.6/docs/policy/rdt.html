@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-8-gb4977b5e documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.6.0-10-g0ae1d21c documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -105,7 +105,7 @@
 <h2>Background<a class="headerlink" href="#background" title="Permalink to this headline">¶</a></h2>
 <p>Intel® RDT provides capabilities for cache and memory allocation and
 monitoring. In Linux system the functionality is exposed to the user space via
-the <a class="reference external" href="https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt">resctrl</a>
+the <a class="reference external" href="https://docs.kernel.org/x86/resctrl.html">resctrl</a>
 filesystem. Cache and memory allocation in RDT is handled by using resource
 control groups. Resource allocation is specified on the group level and each
 task (process/thread) is assigned to one group. In the context of CRI Resource
@@ -119,13 +119,13 @@ Monitoring (MBM).</p>
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p>RDT configuration in CRI-RM is class-based. Each container gets assigned to an
 RDT class. In turn, all processes of the container will be assigned to the RDT
-CLOS  (under <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl</span></code>) corresponding the RDT class. CRI-RM will configure
+Classes of Service (CLOS) (under <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl</span></code>) corresponding the RDT class. CRI-RM will configure
 the CLOSes according to its configuration at startup or whenever the
 configuration changes.</p>
 <p>By default there is a direct mapping between Pod QoS classes and RDT classes:
 the containers of the Pod get an RDT class with the same name as its QoS class
 (Guaranteed, Burstable or Besteffort). However, that can be overridden with the
-rdtclass.cri-resource-manager.intel.com Pod annotation. You can also specify
+<code class="docutils literal notranslate"><span class="pre">rdtclass.cri-resource-manager.intel.com</span></code> Pod annotation. You can also specify
 RDT classes other than Guaranteed, Burstable or Besteffort. In this case, the
 Pod can only be assigned to these classes with the Pod annotation, though.
 The default behavior can also be overridden by a policy but currently none of
@@ -149,7 +149,7 @@ of this mode all CRI-RM specific control groups from the resctrl filesystem
 are removed.</p></li>
 <li><p>Full: Full operating mode. The controller manages the configuration of the
 resctrl filesystem according to the rdt class definitions in the CRI-RM
-configiration. This is the default operating mode.</p></li>
+configuration. This is the default operating mode.</p></li>
 </ul>
 </div>
 <div class="section" id="rdt-classes">
@@ -180,7 +180,7 @@ exceeded.</p>
 </div>
 <div class="section" id="example">
 <h3>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h3>
-<p>Below is a config snippet that would allocate (ca.) 60% of the L3 cache lines
+<p>Below is a config snippet that would allocate 60% of the L3 cache lines
 exclusively to the Guarenteed class. The remaining 40% L3 is for Burstable and
 Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
 memory bandwidth whereas the other classes are throttled to 50%.</p>
@@ -252,7 +252,7 @@ and data paths.</p>
         <span class="nt">l3Allocation</span><span class="p">:</span>
           <span class="c1"># &#39;all&#39; denotes the default and must be specified</span>
           <span class="nt">all</span><span class="p">:</span> <span class="s">&quot;40%&quot;</span>
-          <span class="c1"># Specific cache allotation for cache-ids 2 and 3</span>
+          <span class="c1"># Specific cache allocation for cache-ids 2 and 3</span>
           <span class="nt">2-3</span><span class="p">:</span> <span class="s">&quot;20%&quot;</span>
         <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span>
         <span class="nt">classes</span><span class="p">:</span>
@@ -262,9 +262,9 @@ and data paths.</p>
                 <span class="nt">unified</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
                 <span class="nt">code</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
                 <span class="nt">data</span><span class="p">:</span> <span class="s">&quot;80%&quot;</span>
-              <span class="nt">mbSchema</span><span class="p">:</span>
-                <span class="nt">all</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;80%&quot;</span><span class="p p-Indicator">]</span>
-                <span class="nt">2-3</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span>
+            <span class="nt">mbSchema</span><span class="p">:</span>
+              <span class="nt">all</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;80%&quot;</span><span class="p p-Indicator">]</span>
+              <span class="nt">2-3</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span>
 <span class="nn">...</span>
 <span class="nn">...</span>
 </pre></div>
@@ -272,10 +272,10 @@ and data paths.</p>
 <p>In addition, if the hardware details are known, raw bitmasks or bit numbers
 (“0x1f” or 0-4) can be used instead of percentages in order to be able to
 configure cache allocations exactly as required. The bits in this case are
-corresponding to those in /sys/fs/resctrl/ bitmasks. You can also mix relative
+corresponding to those in <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl/</span></code> bitmasks. You can also mix relative
 (percentage) and absolute (bitmask) allocations. For cases where the resctrl
 filesystem is mounted with <code class="docutils literal notranslate"><span class="pre">-o</span> <span class="pre">mba_MBps</span></code> Memory bandwidth must be specifed in
-MBps.</p>
+MegaBytes per second (MBps).</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
     <span class="nt">partitions</span><span class="p">:</span>
       <span class="nt">exclusive</span><span class="p">:</span>

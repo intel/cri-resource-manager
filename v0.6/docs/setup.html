@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Setup and Usage &mdash; CRI Resource Manager 0.6.0-8-gb4977b5e documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <title>Setup and Usage &mdash; CRI Resource Manager 0.6.0-10-g0ae1d21c documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
@@ -265,7 +265,7 @@ the configuration, and in your adjustment specifications.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">get</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span>
 </pre></div>
 </div>
-<p>You can examine the contents of a single adjustments with these commands:</p>
+<p>You can examine the contents of a single adjustment with these commands:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">describe</span> <span class="n">adjustments</span> <span class="n">external</span><span class="o">-</span><span class="n">adjustment</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span>
 <span class="n">kubectl</span> <span class="n">get</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/&lt;</span><span class="n">adjustment</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span> <span class="o">-</span><span class="n">oyaml</span>
 </pre></div>
@@ -274,7 +274,7 @@ the configuration, and in your adjustment specifications.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">get</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span> <span class="o">-</span><span class="n">oyaml</span>
 </pre></div>
 </div>
-<p>Finally, you can delete and adjustment with commands like these:</p>
+<p>Finally, you can delete an adjustment with commands like these:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">delete</span> <span class="o">-</span><span class="n">f</span> <span class="n">sample</span><span class="o">-</span><span class="n">configs</span><span class="o">/</span><span class="n">external</span><span class="o">-</span><span class="n">adjustment</span><span class="o">.</span><span class="n">yaml</span>
 <span class="n">kubectl</span> <span class="n">delete</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/&lt;</span><span class="n">adjustment</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span>
 </pre></div>

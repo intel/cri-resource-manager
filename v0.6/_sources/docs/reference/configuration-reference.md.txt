@@ -13,11 +13,13 @@ policy:
 ```
 
 **AvailableResources** specifies the available hardware resources.
+
 **ReservedResources** specifies the hardware resources reserved for system and
 kube tasks.
+
 Currently, only CPU resources are supported. CPUs may be specified as a cpuset
 or as a numerical value, similar to Kubernetes resource quantities. Not all
-policies use these configuration settins. See the policy-specific documentation
+policies use these configuration settings. See the policy-specific documentation
 for details.
 
 ```yaml
