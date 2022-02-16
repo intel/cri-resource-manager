@@ -22,15 +22,6 @@ jobs:
     - name: Gofmt
       run: make format
 
-    - name: Protoc
-      run: go get -u github.com/golang/protobuf/protoc-gen-go
-
-    - name: Protoc-gRPC
-      run: go get -u google.golang.org/grpc
-
-    - name: InstallVFSGenDev
-      run: go get -u github.com/shurcooL/vfsgen/cmd/vfsgendev
-
     - name: Build
       run: make
 
