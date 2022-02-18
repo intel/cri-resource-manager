@@ -37,6 +37,18 @@ def all_combinations(var_values):
         combinations = new_combinations
     return combinations
 
+def combination_to_triplets(d):
+    triplets = set()
+    keys = sorted(d.keys())
+    for key1_index, key1 in enumerate(keys):
+        val1 = d[key1]
+        for key2_index, key2 in enumerate(keys[key1_index+1:]):
+            val2 = d[key2]
+            for key3 in keys[key1_index + key2_index + 2:]:
+                val3 = d[key3]
+                triplets.add(frozenset(((key1, val1), (key2, val2), (key3, val3))))
+    return triplets
+
 def combination_to_pairs(d):
     pairs = set()
     keys = sorted(d.keys())
@@ -58,25 +70,32 @@ def cover_pairwise(var_values):
     chosen_combinations = []
     covered_pairs = set()
     combination_pairs = {}
+    all_triplets = set()
     all_pairs = set()
     all_singles = set()
     combinations = all_combinations(var_values)
     for c in combinations:
+        all_triplets = all_triplets.union(combination_to_triplets(c))
         all_pairs = all_pairs.union(combination_to_pairs(c))
         all_singles = all_singles.union(combination_to_singles(c))
+    uncovered_triplets = set(all_triplets)
+    number_of_triplets = len(uncovered_triplets)
     uncovered_pairs = set(all_pairs)
     uncovered_singles = set(all_singles)
     while uncovered_pairs:
         combination_score = []
         for c in combinations:
+            covers_triplets = combination_to_triplets(c)
             covers_pairs = combination_to_pairs(c)
             covers_singles = combination_to_singles(c)
             combination_score.append(
                 (len(uncovered_pairs.intersection(covers_pairs)) +
-                 len(uncovered_singles.intersection(covers_singles)),
-                 c, covers_pairs, covers_singles))
-        best_score, best_comb, best_pairs, best_singles = sorted(combination_score, key=lambda comb_score: comb_score[0])[-1]
+                 len(uncovered_singles.intersection(covers_singles)) +
+                 len(uncovered_triplets.intersection(covers_triplets)) / number_of_triplets,
+                 c, covers_pairs, covers_singles, covers_triplets))
+        best_score, best_comb, best_pairs, best_singles, best_triplets = sorted(combination_score, key=lambda comb_score: comb_score[0])[-1]
         chosen_combinations.append(best_comb)
+        uncovered_triplets = uncovered_triplets - best_triplets
         uncovered_pairs = uncovered_pairs - best_pairs
         uncovered_singles = uncovered_singles - best_singles
     return chosen_combinations
