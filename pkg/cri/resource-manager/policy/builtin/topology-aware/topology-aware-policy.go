@@ -315,7 +315,7 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	isolated := grant.ExclusiveCPUs().Intersection(grant.GetCPUNode().GetSupply().IsolatedCPUs())
 	exclusive := grant.ExclusiveCPUs().Difference(isolated).String()
 
-	if shared != "" {
+	if grant.SharedPortion() > 0 && shared != "" {
 		data[policyapi.ExportSharedCPUs] = shared
 	}
 	if isolated.String() != "" {
