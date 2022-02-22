@@ -62,7 +62,8 @@ type TrackerDamon struct {
 	started      bool
 	toPerfReader chan byte
 	// accesses maps pid -> startAddr -> lengthPgs -> accessCount
-	accesses   map[int64]map[uint64]map[uint64]uint64
+	accesses   map[int]map[uint64]map[uint64]uint64
+	tidpid     map[int64]int
 	lostEvents uint
 }
 
@@ -73,7 +74,8 @@ func init() {
 func NewTrackerDamon() (Tracker, error) {
 	t := TrackerDamon{
 		damonDir: "/sys/kernel/debug/damon",
-		accesses: make(map[int64]map[uint64]map[uint64]uint64),
+		accesses: make(map[int]map[uint64]map[uint64]uint64),
+		tidpid:   make(map[int64]int),
 	}
 
 	if !procFileExists(t.damonDir) {
@@ -279,7 +281,7 @@ func (t *TrackerDamon) ResetCounters() {
 	if t.lostEvents > 0 {
 		log.Debugf("TrackerDamon: ResetCounters: events lost %d\n", t.lostEvents)
 	}
-	t.accesses = make(map[int64]map[uint64]map[uint64]uint64)
+	t.accesses = make(map[int]map[uint64]map[uint64]uint64)
 	t.lostEvents = 0
 }
 
@@ -287,15 +289,7 @@ func (t *TrackerDamon) GetCounters() *TrackerCounters {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	tcs := &TrackerCounters{}
-	for targetId, startLengthCount := range t.accesses {
-		pid := 0
-		if len(t.pids) > 0 {
-			// TODO: a proper targetId-to-pid detection.
-			// pid should be based on targetId.
-			var _ = targetId // unused, but
-			pid = t.pids[0]
-		}
-
+	for pid, startLengthCount := range t.accesses {
 		for start, lengthCount := range startLengthCount {
 			for length, count := range lengthCount {
 				addrRange := AddrRanges{
@@ -383,12 +377,48 @@ func (t *TrackerDamon) perfReader() error {
 	return nil
 }
 
+func (t *TrackerDamon) targetIdToPid(targetId int64, start uint64, end uint64) int {
+	// If targetId is already mapped to pid, return it.
+	if pid, ok := t.tidpid[targetId]; ok {
+		return pid
+	}
+
+	// Unseen targetId. Read address ranges of all current
+	// processes. If we would go through only address ranges we
+	// have seen sometime earlier, we might end up trusting only
+	// matching address range yet that would belong to a wrong
+	// processs.
+	stats.Store(StatsHeartbeat{"TrackerDamon.targetIdToPid:read /proc/PID/*maps"})
+	matchingPid := 0
+	matchingPids := 0
+	for _, pid := range t.pids {
+		arlist, err := procMaps(pid)
+		if err != nil {
+			continue
+		}
+		for _, ar := range arlist {
+			if start >= ar.addr && end < ar.addr+ar.length*constUPagesize {
+				matchingPid = pid
+				matchingPids += 1
+				break
+			}
+		}
+	}
+	if matchingPids == 1 {
+		log.Debugf("TrackerDamon: associating tid=%d with pid=%d\n", targetId, matchingPid)
+		t.tidpid[targetId] = matchingPid
+		return matchingPid
+	}
+	return 0
+}
+
 func (t *TrackerDamon) perfHandleLine(line string) error {
 	// Parse line. Example of perf damon:damon_aggregated output lines:
 	// 12400.049 kdamond.0/30572 damon:damon_aggregated(target_id: -121171723722880, nr_regions: 13, start: 139995295608832, end: 139995297484800, nr_accesses: 1)
 	// 12400.049 kdamond.0/30572 damon:damon_aggregated(target_id: -121171723722880, nr_regions: 13, start: 139995295608832, end: 139995297484800)
 	// LOST 123 events!
 	if strings.HasPrefix(line, "LOST ") {
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine:events lost"})
 		lostEventsStr := strings.Split(line, " ")[1]
 		lostEvents, err := strconv.ParseUint(lostEventsStr, 10, 0)
 		if err != nil {
@@ -437,13 +467,18 @@ func (t *TrackerDamon) perfHandleLine(line string) error {
 			return fmt.Errorf("parse error on nrStr %q element %q line %q", nrStr, csLine[4], line)
 		}
 	}
+	pid := t.targetIdToPid(targetId, uint64(start), uint64(end))
+	if pid < 1 {
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine:unknown target id"})
+		return nil
+	}
 	// TODO: avoid locking this often
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	startLengthCount, ok := t.accesses[targetId]
+	startLengthCount, ok := t.accesses[pid]
 	if !ok {
 		startLengthCount = make(map[uint64]map[uint64]uint64)
-		t.accesses[targetId] = startLengthCount
+		t.accesses[pid] = startLengthCount
 	}
 	lengthPgs := uint64(int64(end-start) / constPagesize)
 	lengthCount, ok := startLengthCount[uint64(start)]
