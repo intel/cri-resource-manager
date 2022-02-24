@@ -70,6 +70,7 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		"q":       Cmd{"quit interactive prompt.", p.cmdQuit},
 		"tracker": Cmd{"manage tracker, track memory accesses.", p.cmdTracker},
 		"stats":   Cmd{"print statistics.", p.cmdStats},
+		"swap":    Cmd{"print swapped pages.", p.cmdSwap},
 		"pages":   Cmd{"select pages, print selected page nodes and flags.", p.cmdPages},
 		"arange":  Cmd{"select/split/filter address ranges.", p.cmdArange},
 		"mover":   Cmd{"manage mover, move selected pages.", p.cmdMover},
@@ -245,6 +246,44 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 		}
 	}
 	p.output("selected address ranges: %d\n", len(p.aranges.Ranges()))
+	return csOk
+}
+
+func (p *Prompt) cmdSwap(args []string) commandStatus {
+	pid := p.f.Int("pid", -1, "look for pages of PID")
+	if err := p.f.Parse(args); err != nil {
+		return csOk
+	}
+	if *pid <= 0 {
+		p.output("missing -pid=PID\n")
+		return csOk
+	}
+	process := memtier.NewProcess(*pid)
+	ar, err := process.AddressRanges()
+	if err != nil {
+		p.output("error reading address ranges of process %d: %v\n", *pid, err)
+		return csOk
+	}
+
+	pmFile, err := memtier.ProcPagemapOpen(*pid)
+	if err != nil {
+		p.output("%s", err)
+		return csOk
+	}
+	defer pmFile.Close()
+
+	pages := 0
+	swapped := 0
+	pmFile.ForEachPage(ar.Ranges(), 0,
+		func(pmBits, pageAddr uint64) int {
+			pages += 1
+			if (pmBits>>memtier.PMB_SWAP)&1 == 0 {
+				return 0
+			}
+			swapped += 1
+			return 0
+		})
+	p.output("%d / %d pages (%.1f %%) swapped\n", swapped, pages, float32(100*swapped)/float32(pages))
 	return csOk
 }
 
