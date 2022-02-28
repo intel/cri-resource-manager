@@ -59,6 +59,11 @@ const (
 	csErr
 )
 
+var (
+	constUPagesize = uint64(os.Getpagesize())
+	constPagesize  = os.Getpagesize()
+)
+
 func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 	p := Prompt{
 		r:     reader,
@@ -251,6 +256,10 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 
 func (p *Prompt) cmdSwap(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
+	ranges := p.f.String("ranges", "", "-ranges=START[-STOP][,START[-STOP]...] include only given virtual address ranges")
+	status := p.f.Bool("status", false, "print number of swapped out pages")
+	vaddrs := p.f.Bool("vaddrs", false, "print vaddrs of swapped out pages")
+
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
@@ -265,25 +274,57 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 		return csOk
 	}
 
-	pmFile, err := memtier.ProcPagemapOpen(*pid)
-	if err != nil {
-		p.output("%s", err)
+	selectedRanges := []memtier.AddrRange{}
+	if *ranges != "" {
+		selectedRanges = parseOptRanges(*ranges)
+	}
+	if len(selectedRanges) > 0 {
+		ar.Intersection(selectedRanges)
+		p.output("using %d address ranges\n", len(ar.Ranges()))
+	}
+	if len(ar.Ranges()) == 0 {
+		p.output("no address ranges from which to find pages\n")
 		return csOk
 	}
-	defer pmFile.Close()
 
-	pages := 0
-	swapped := 0
-	pmFile.ForEachPage(ar.Ranges(), 0,
-		func(pmBits, pageAddr uint64) int {
-			pages += 1
-			if (pmBits>>memtier.PMB_SWAP)&1 == 0 {
+	if *status || *vaddrs {
+		pmFile, err := memtier.ProcPagemapOpen(*pid)
+		if err != nil {
+			p.output("%s", err)
+			return csOk
+		}
+		defer pmFile.Close()
+
+		pages := 0
+		swapped := 0
+		vaddrStart := uint64(0)
+		vaddrEnd := uint64(0)
+		pmFile.ForEachPage(ar.Ranges(), 0,
+			func(pmBits, pageAddr uint64) int {
+				pages += 1
+				if (pmBits>>memtier.PMB_SWAP)&1 == 0 {
+					if vaddrStart > 0 && *vaddrs {
+						p.output("%s\n", memtier.NewAddrRange(vaddrStart, vaddrEnd))
+					}
+					vaddrStart = 0
+					return 0
+				}
+				swapped += 1
+				vaddrEnd = pageAddr + constUPagesize
+				if vaddrStart == 0 {
+					vaddrStart = pageAddr
+				}
 				return 0
-			}
-			swapped += 1
-			return 0
-		})
-	p.output("%d / %d pages (%.1f %%) swapped\n", swapped, pages, float32(100*swapped)/float32(pages))
+			})
+		if vaddrStart > 0 && *vaddrs {
+			p.output("%s\n", memtier.NewAddrRange(vaddrStart, vaddrEnd))
+		}
+		p.output("%d / %d pages, %d / %d MB (%.1f %%) swapped out\n",
+			swapped, pages,
+			swapped*constPagesize/(1024*1024),
+			pages*constPagesize/(1024*1024),
+			float32(100*swapped)/float32(pages))
+	}
 	return csOk
 }
 
@@ -778,7 +819,7 @@ func parseOptRanges(rangeStr string) []memtier.AddrRange {
 			exit("invalid start address %q", startStopSlice[0])
 		}
 		if len(startStopSlice) == 1 {
-			addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, startAddr+uint64(os.Getpagesize())))
+			addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, startAddr+constUPagesize))
 			continue
 		}
 
