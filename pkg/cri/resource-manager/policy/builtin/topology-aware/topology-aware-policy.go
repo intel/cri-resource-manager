@@ -400,6 +400,7 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("  - pin containers to memory: %v", opt.PinMemory)
 	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
 	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
+	log.Info("  - reserved pool namespaces: %v", opt.ReservedPoolNamespaces)
 
 	var allowed, reserved cpuset.CPUSet
 	var reinit bool

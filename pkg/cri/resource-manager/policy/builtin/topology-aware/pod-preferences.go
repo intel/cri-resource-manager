@@ -17,6 +17,7 @@ package topologyaware
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -319,6 +320,25 @@ func podColdStartPreference(pod cache.Pod, container cache.Container) (ColdStart
 	return preference, nil
 }
 
+func checkReservedPoolNamespaces(namespace string) bool {
+	if namespace == metav1.NamespaceSystem {
+		return true
+	}
+
+	for _, str := range opt.ReservedPoolNamespaces {
+		ret, err := filepath.Match(str, namespace)
+		if err != nil {
+			return false
+		}
+
+		if ret {
+			return true
+		}
+	}
+
+	return false
+}
+
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.
 // Returned values:
 // 1. full: number of full CPUs
@@ -392,7 +412,7 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 
 	// easy cases: kube-system namespace, Burstable or BestEffort QoS class containers
 	switch {
-	case namespace == metav1.NamespaceSystem:
+	case checkReservedPoolNamespaces(namespace):
 		return 0, fraction, false, cpuReserved
 	case qosClass == corev1.PodQOSBurstable:
 		return 0, fraction, false, cpuNormal
