@@ -27,7 +27,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	api "k8s.io/cri-api/pkg/apis/runtime/v1"
+	v1alpha2 "github.com/intel/cri-resource-manager/pkg/cri/server/v1alpha2"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 	"github.com/intel/cri-resource-manager/pkg/dump"
@@ -61,9 +62,9 @@ type Interceptor func(context.Context, string, interface{}, Handler) (interface{
 // Server is the interface we expose for controlling our CRI server.
 type Server interface {
 	// RegisterImageService registers the provided image service with the server.
-	RegisterImageService(api.ImageServiceServer) error
+	RegisterImageService(criv1.ImageServiceServer) error
 	// RegistersRuntimeService registers the provided runtime service with the server.
-	RegisterRuntimeService(api.RuntimeServiceServer) error
+	RegisterRuntimeService(criv1.RuntimeServiceServer) error
 	// RegisterInterceptors registers the given interceptors with the server.
 	RegisterInterceptors(map[string]Interceptor) error
 	// SetBypassCheckFn sets a function to check if interception should be bypassed.
@@ -81,13 +82,14 @@ type Server interface {
 // server is the implementation of Server.
 type server struct {
 	logger.Logger
-	listener     net.Listener              // socket our gRPC server listens on
-	server       *grpc.Server              // our gRPC server
-	options      Options                   // server options
-	interceptors map[string]Interceptor    // request intercepting hooks
-	chkBypassFn  func() bool               // function to check interception bypass
-	runtime      *api.RuntimeServiceServer // CRI runtime service
-	image        *api.ImageServiceServer   // CRI image service
+	listener     net.Listener                // socket our gRPC server listens on
+	server       *grpc.Server                // our gRPC server
+	options      Options                     // server options
+	interceptors map[string]Interceptor      // request intercepting hooks
+	chkBypassFn  func() bool                 // function to check interception bypass
+	runtime      *criv1.RuntimeServiceServer // CRI runtime service
+	image        *criv1.ImageServiceServer   // CRI image service
+	v1alpha2     *v1alpha2.Server            // CRI v1alpha2 bridging service
 }
 
 // NewServer creates a new server instance.
@@ -106,7 +108,7 @@ func NewServer(options Options) (Server, error) {
 }
 
 // RegisterImageService registers an image service with the server.
-func (s *server) RegisterImageService(service api.ImageServiceServer) error {
+func (s *server) RegisterImageService(service criv1.ImageServiceServer) error {
 	if s.image != nil {
 		return serverError("can't register image service, already registered")
 	}
@@ -117,13 +119,14 @@ func (s *server) RegisterImageService(service api.ImageServiceServer) error {
 
 	is := service
 	s.image = &is
-	api.RegisterImageServiceServer(s.server, s)
+	criv1.RegisterImageServiceServer(s.server, s)
+	s.v1alpha2.RegisterImageService(s)
 
 	return nil
 }
 
 // RegisterRuntimeService registers a runtime service with the server.
-func (s *server) RegisterRuntimeService(service api.RuntimeServiceServer) error {
+func (s *server) RegisterRuntimeService(service criv1.RuntimeServiceServer) error {
 	if s.runtime != nil {
 		return serverError("can't register runtime server, already registered")
 	}
@@ -134,7 +137,8 @@ func (s *server) RegisterRuntimeService(service api.RuntimeServiceServer) error 
 
 	rs := service
 	s.runtime = &rs
-	api.RegisterRuntimeServiceServer(s.server, s)
+	criv1.RegisterRuntimeServiceServer(s.server, s)
+	s.v1alpha2.RegisterRuntimeService(s)
 
 	return nil
 }
@@ -228,6 +232,7 @@ func (s *server) createGrpcServer() error {
 	}
 
 	s.server = grpc.NewServer(instrumentation.InjectGrpcServerTrace()...)
+	s.v1alpha2 = v1alpha2.NewServer(s.server)
 
 	return nil
 }
