@@ -256,6 +256,7 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 
 func (p *Prompt) cmdSwap(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
+	swapIn := p.f.Bool("in", false, "swap in selected ranges")
 	ranges := p.f.String("ranges", "", "-ranges=START[-STOP][,START[-STOP]...] include only given virtual address ranges")
 	status := p.f.Bool("status", false, "print number of swapped out pages")
 	vaddrs := p.f.Bool("vaddrs", false, "print vaddrs of swapped out pages")
@@ -286,11 +287,25 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 		p.output("no address ranges from which to find pages\n")
 		return csOk
 	}
+	if *swapIn {
+		memFile, err := memtier.ProcMemOpen(ar.Pid())
+		defer memFile.Close()
+		if err != nil {
+			p.output("%s\n", err)
+			return csOk
+		}
+		for _, r := range ar.Ranges() {
+			if err = memFile.ReadNoData(r.Addr(), r.EndAddr()); err != nil {
+				p.output("%s\n", err)
+				return csOk
+			}
+		}
+	}
 
 	if *status || *vaddrs {
 		pmFile, err := memtier.ProcPagemapOpen(*pid)
 		if err != nil {
-			p.output("%s", err)
+			p.output("%s\n", err)
 			return csOk
 		}
 		defer pmFile.Close()

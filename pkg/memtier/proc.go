@@ -100,6 +100,12 @@ const (
 	KPF_PGTABLE        = uint64(0x1) << 26
 )
 
+type procMemFile struct {
+	osFile  *os.File
+	bufSize uint64
+	pos     uint64
+}
+
 type procPagemapFile struct {
 	osFile    *os.File
 	readahead int
@@ -150,6 +156,45 @@ func procReadInt(path string) (int, error) {
 		return 0, err
 	}
 	return n, nil
+}
+
+func ProcMemOpen(pid int) (*procMemFile, error) {
+	path := fmt.Sprintf("/proc/%d/mem", pid)
+	osFile, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &procMemFile{osFile, 64 * constUPagesize, 0}, nil
+}
+
+func (f *procMemFile) Close() error {
+	return f.osFile.Close()
+}
+
+// ReadNoData reads one byte from every page in the address range
+// to force each page in memory.
+func (f *procMemFile) ReadNoData(startAddr, endAddr uint64) error {
+	buf := make([]byte, f.bufSize)
+	for startAddr < endAddr {
+		readLen := len(buf)
+		if startAddr+uint64(readLen) > endAddr {
+			readLen = int(endAddr - startAddr)
+		}
+		if f.pos != startAddr {
+			if _, err := f.osFile.Seek(int64(startAddr), io.SeekStart); err != nil {
+				f.pos = 0
+				return err
+			}
+		}
+		nbytes, err := io.ReadAtLeast(f.osFile, buf[:readLen], readLen)
+		if err != nil {
+			f.pos = 0
+			return err
+		}
+		startAddr += uint64(nbytes)
+		f.pos += uint64(nbytes)
+	}
+	return nil
 }
 
 func ProcKpageflagsOpen() (*procKpageflagsFile, error) {
