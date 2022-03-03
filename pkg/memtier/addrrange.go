@@ -127,6 +127,18 @@ func (r AddrRange) String() string {
 	return fmt.Sprintf("%x-%x (%d bytes)", r.addr, r.addr+(r.length*constUPagesize), r.length*constUPagesize)
 }
 
+func (ar *AddrRanges) ProcessMadvice(advice int) error {
+	pidfd, err := PidfdOpenSyscall(ar.Pid(), 0)
+	if pidfd < 0 || err != nil {
+		return fmt.Errorf("pidfd_open error: %s", err)
+	}
+	defer PidfdCloseSyscall(pidfd)
+	if _, err = ProcessMadviceSyscall(pidfd, ar.Ranges(), advice, 0); err != nil {
+		return fmt.Errorf("process_madvice error: %s", err)
+	}
+	return nil
+}
+
 // PagesMatching returns pages with pagetable attributes.
 func (ar *AddrRanges) PagesMatching(pageAttributes uint64) (*Pages, error) {
 	pmFile, err := ProcPagemapOpen(ar.pid)

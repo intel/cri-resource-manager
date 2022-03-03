@@ -29,6 +29,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/intel/cri-resource-manager/pkg/memtier"
 )
 
@@ -257,6 +259,7 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 func (p *Prompt) cmdSwap(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	swapIn := p.f.Bool("in", false, "swap in selected ranges")
+	swapOut := p.f.Bool("out", false, "swap out selected ranges")
 	ranges := p.f.String("ranges", "", "-ranges=START[-STOP][,START[-STOP]...] include only given virtual address ranges")
 	status := p.f.Bool("status", false, "print number of swapped out pages")
 	vaddrs := p.f.Bool("vaddrs", false, "print vaddrs of swapped out pages")
@@ -299,6 +302,11 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 				p.output("%s\n", err)
 				return csOk
 			}
+		}
+	}
+	if *swapOut {
+		if err := ar.ProcessMadvice(unix.MADV_PAGEOUT); err != nil {
+			p.output("%s\n", err)
 		}
 	}
 
