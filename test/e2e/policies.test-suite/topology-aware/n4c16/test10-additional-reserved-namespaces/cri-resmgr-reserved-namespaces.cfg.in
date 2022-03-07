@@ -1,0 +1,10 @@
+policy:
+  Active: topology-aware
+  ReservedResources:
+    cpu: ${RESERVED_CPU}
+  AvailableResources:
+    cpu: ${AVAILABLE_CPU}
+  topology-aware:
+    ReservedPoolNamespaces: [\"reserved-pool\",\"reserved-*\",\"foobar\",\"kube-system\"]
+logger:
+  Debug: cri-resmgr,resource-manager,cache,policy

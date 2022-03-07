@@ -279,16 +279,17 @@ func TestPodSharedCPUPreference(t *testing.T) {
 
 func TestCpuAllocationPreferences(t *testing.T) {
 	tcases := []struct {
-		name             string
-		pod              *mockPod
-		container        *mockContainer
-		preferIsolated   bool
-		preferShared     bool
-		expectedFull     int
-		expectedFraction int
-		expectedIsolate  bool
-		expectedCpuType  cpuClass
-		disabled         bool
+		name                   string
+		pod                    *mockPod
+		container              *mockContainer
+		preferIsolated         bool
+		preferShared           bool
+		expectedFull           int
+		expectedFraction       int
+		expectedIsolate        bool
+		expectedCpuType        cpuClass
+		disabled               bool
+		reservedPoolNamespaces []string
 	}{
 		{
 			name:     "cpuAllocationPreferences() should handle nil container arg gracefully",
@@ -893,13 +894,117 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			expectedFraction: 500,
 			expectedIsolate:  true,
 		},
+		{
+			name: "return request's value for reserved pool namespace container",
+			container: &mockContainer{
+				namespace: "foobar",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction:       2000,
+			expectedCpuType:        cpuReserved,
+			reservedPoolNamespaces: []string{"foobar"},
+		},
+		{
+			name: "return request's value for reserved pool namespace container using a glob 1",
+			container: &mockContainer{
+				namespace: "foobar2",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction:       2000,
+			expectedCpuType:        cpuReserved,
+			reservedPoolNamespaces: []string{"foobar*"},
+		},
+		{
+			name: "return request's value for reserved pool namespace container using a glob 2",
+			container: &mockContainer{
+				namespace: "foobar-testing",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction:       2000,
+			expectedCpuType:        cpuReserved,
+			reservedPoolNamespaces: []string{"barfoo", "foobar*"},
+		},
+		{
+			name: "return request's value for reserved pool namespace container using a glob 3",
+			container: &mockContainer{
+				namespace: "testing",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction:       2000,
+			expectedCpuType:        cpuNormal,
+			reservedPoolNamespaces: []string{"barfoo", "foobar?"},
+		},
+		{
+			name: "return request's value for reserved pool namespace container using a glob 4",
+			container: &mockContainer{
+				namespace: "1foobar2",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction:       2000,
+			expectedCpuType:        cpuNormal,
+			reservedPoolNamespaces: []string{"barfoo", "foobar?"},
+		},
+		{
+			name: "return request's value for reserved pool namespace container using a glob 5",
+			container: &mockContainer{
+				namespace: "foobar12",
+				returnValueForGetResourceRequirements: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						corev1.ResourceCPU: resapi.MustParse("2"),
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction:       2000,
+			expectedCpuType:        cpuNormal,
+			reservedPoolNamespaces: []string{"barfoo", "foobar?", "testing"},
+		},
 	}
+
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.disabled {
 				t.Skipf("The case '%s' is skipped", tc.name)
 			}
 			opt.PreferIsolated, opt.PreferShared = tc.preferIsolated, tc.preferShared
+			opt.ReservedPoolNamespaces = tc.reservedPoolNamespaces
 			full, fraction, isolate, cpuType := cpuAllocationPreferences(tc.pod, tc.container)
 			if full != tc.expectedFull || fraction != tc.expectedFraction ||
 				isolate != tc.expectedIsolate || cpuType != tc.expectedCpuType {
