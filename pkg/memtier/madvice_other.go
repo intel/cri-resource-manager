@@ -16,3 +16,9 @@
 // limitations under the License.
 
 package memtier
+
+import "syscall"
+
+func ProcessMadviceSyscall(pidfd int, ranges []AddrRange, advice int, flags uint) (int, syscall.Errno, error) {
+	panic("ProcessMadviceSyscall not implemented on this platform")
+}

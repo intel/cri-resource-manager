@@ -61,6 +61,51 @@ func (pp *Pages) InAddrRanges(addrRanges ...AddrRange) *Pages {
 	return &Pages{pid: pp.pid}
 }
 
+// AddrRanges returns up to count Pages as AddrRanges. If count is -1,
+// all pages are returned.
+func (pp *Pages) AddrRanges(count int) *AddrRanges {
+	if count == -1 {
+		count = len(pp.pages)
+	}
+	ar := &AddrRanges{
+		pid:   pp.pid,
+		addrs: []AddrRange{},
+	}
+	if len(pp.pages) == 0 {
+		return ar
+	}
+	contRegionStartAddr := pp.pages[0].addr
+	contRegionPageCount := uint64(1)
+	totalPageCount := 1
+	for _, p := range pp.pages[1:] {
+		if totalPageCount >= count {
+			break
+		}
+		if p.addr != contRegionStartAddr+contRegionPageCount*constUPagesize {
+			ar.addrs = append(ar.addrs, AddrRange{
+				addr:   contRegionStartAddr,
+				length: contRegionPageCount,
+			})
+			contRegionStartAddr = p.addr
+			contRegionPageCount = 1
+		} else {
+			contRegionPageCount += 1
+		}
+		totalPageCount += 1
+	}
+	ar.addrs = append(ar.addrs, AddrRange{
+		addr:   contRegionStartAddr,
+		length: contRegionPageCount,
+	})
+	return ar
+}
+
+func (pp *Pages) SwapOut(count int) error {
+	// Build contiguous address ranges from pages and swap them out.
+	ar := pp.AddrRanges(count)
+	return ar.SwapOut()
+}
+
 func (pp *Pages) MoveTo(node Node, count int) (int, error) {
 	pageCount, pages := pp.countAddrs()
 	uCount := uint(count)

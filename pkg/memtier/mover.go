@@ -229,8 +229,15 @@ func (m *Mover) handleTask(task *MoverTask) taskStatus {
 	if count == 0 {
 		return tsBlocked
 	}
-	if _, err := pp.MoveTo(toNode, count); err != nil {
-		return tsError
+	switch toNode {
+	case NODE_SWAP:
+		if err := pp.SwapOut(count); err != nil {
+			return tsError
+		}
+	default:
+		if _, err := pp.MoveTo(toNode, count); err != nil {
+			return tsError
+		}
 	}
 	task.offset += count
 	if len(task.pages.Offset(count).Pages()) > 0 {

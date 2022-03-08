@@ -64,6 +64,10 @@ type pageInfo struct {
 	node Node // NUMA node where a page is located
 }
 
+const (
+	constNUMASIZE_UNLIMITED = -1
+)
+
 func init() {
 	PolicyRegister("heat", NewPolicyHeat)
 }
@@ -111,7 +115,7 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 	newNumaSize := make(map[Node]int)
 	for _, numas := range config.HeatNumas {
 		for _, nodeInt := range numas {
-			newNumaSize[Node(nodeInt)] = -1 // the default is unlimited
+			newNumaSize[Node(nodeInt)] = constNUMASIZE_UNLIMITED // the default is unlimited
 		}
 	}
 	for nodeInt, sizeString := range config.NumaSize {
@@ -354,7 +358,7 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			return false
 		})
 		for _, hr := range hrHotToCold {
-			currNode := Node(-1)
+			currNode := NODE_UNDEFINED
 			heatClass := p.heatmap.HeatClass(hr)
 			numas, ok := p.config.HeatNumas[heatClass]
 			if !ok || len(numas) == 0 {
@@ -389,7 +393,7 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 				}
 				firstPageAddress := uint64(0)
 				prevPageAddress := uint64(0)
-				prevPageNode := Node(-1)
+				prevPageNode := NODE_UNDEFINED
 				node := prevPageNode
 				nodeInts, err := ppages.status()
 				if err != nil {
@@ -405,7 +409,6 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 						// of pages on a node
 						if firstPageAddress != 0 {
 							addrDatas.SetData(*NewAddrRange(firstPageAddress, prevPageAddress+constUPagesize), pageInfo{node: prevPageNode})
-							// log.Debugf("found middle %d pages at %x on node %d\n", (prevPageAddress+constUPagesize-firstPageAddress)/constUPagesize, firstPageAddress, prevPageNode)
 							p.numaUsed[node] += int((prevPageAddress + constUPagesize - firstPageAddress) / constUPagesize)
 						}
 						firstPageAddress = pageAddress
@@ -425,19 +428,19 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 				// Already on a good node, do nothing.
 				continue
 			}
-			if currNode == -1 {
+			if currNode == NODE_UNDEFINED {
 				// Failed to find out where the pages are.
 				continue
 			}
 			// We know pages are on a wrong node. Choose
 			// new node with largest free space for the
 			// pages. TODO: filter mems_allowed from numas
-			destNode := Node(-1)
+			destNode := NODE_UNDEFINED
 			destFree := -1
 			for _, candNodeInt := range numas {
 				candNode := Node(candNodeInt)
 				candFree := 0
-				if p.numaSize[candNode] > -1 {
+				if p.numaSize[candNode] != constNUMASIZE_UNLIMITED {
 					candFree = p.numaSize[candNode] - p.numaUsed[candNode] - int(hr.length)
 				}
 				if candFree > destFree {
@@ -445,13 +448,13 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 					destFree = candFree
 				}
 			}
-			if destNode == Node(-1) {
+			if destNode == NODE_UNDEFINED {
 				// Failed to find proper destination node.
 				continue
 			}
 			// Is there enough free space for pages of
 			// this heat range?
-			if p.numaSize[destNode] > -1 && destFree < int(hr.length) {
+			if p.numaSize[destNode] != constNUMASIZE_UNLIMITED && destFree < int(hr.length) {
 				// Failed to find a destination node with enough quota.
 				continue
 			}

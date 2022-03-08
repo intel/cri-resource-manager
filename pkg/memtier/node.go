@@ -20,6 +20,18 @@ import (
 
 type Node int
 
+const (
+	NODE_UNDEFINED = Node(1 << 31)
+	NODE_SWAP      = Node(-1)
+)
+
 func (node Node) String() string {
-	return fmt.Sprintf("node%d", node)
+	switch node {
+	case NODE_UNDEFINED:
+		return "<undefined>"
+	case NODE_SWAP:
+		return "swap"
+	default:
+		return fmt.Sprintf("node%d", node)
+	}
 }

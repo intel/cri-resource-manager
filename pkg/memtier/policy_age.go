@@ -27,10 +27,14 @@ type PolicyAgeConfig struct {
 	// policy manages processes in listed cgroups and recursively
 	// in their subgroups.
 	Cgroups []string
-	// IntervalMs is the length of the period in milliseconds
-	// in which new ages are calculated based on gathered
-	// tracker values, and page move tasks are triggered.
+	// IntervalMs is the length of the period in milliseconds in
+	// which new ages are calculated based on gathered tracker
+	// values, and page move and swap tasks are triggered.
 	IntervalMs int
+	// SwapOutMs is the number of milliseconds. If a tracker
+	// has not seen activity in a set of pages during this time,
+	// the pages will be swapped out.
+	SwapOutMs int
 	// IdleDurationMs is the number of milliseconds. If a tracker
 	// has not seen activity in a set of pages during this time,
 	// the pages are considered idle and good to move to IdleNumas.
@@ -98,6 +102,9 @@ func (p *PolicyAge) SetConfig(config *PolicyAgeConfig) error {
 	}
 	if config.IdleDurationMs < 0 {
 		return fmt.Errorf("invalid age policy IdleDurationMs: %d, >= 0 expected", config.IdleDurationMs)
+	}
+	if config.SwapOutMs < 0 {
+		return fmt.Errorf("invalid age policy SwapOutMs: %d, >= 0 expected", config.SwapOutMs)
 	}
 	if config.Tracker.Name == "" {
 		return fmt.Errorf("tracker name missing from the age policy configuration")
@@ -269,9 +276,11 @@ func (p *PolicyAge) activeCounters() *TrackerCounters {
 	return tcs
 }
 
-func (p *PolicyAge) idleCounters(timestamp int64) *TrackerCounters {
+// idleCounters returns counters that have not been changed during a
+// duration.
+func (p *PolicyAge) idleCounters(timestamp int64, durationMs int) *TrackerCounters {
 	tcs := &TrackerCounters{}
-	idleThreshold := timestamp - int64(time.Duration(p.config.IdleDurationMs)*time.Millisecond)
+	idleThreshold := timestamp - int64(time.Duration(durationMs)*time.Millisecond)
 	for _, alt := range *p.palt {
 		for _, lt := range alt {
 			for _, tcage := range lt {
@@ -317,9 +326,16 @@ func (p *PolicyAge) loop() {
 			p.updateCounter(&tc, timestamp)
 		}
 		p.deleteDeadCounters(timestamp)
+		if p.config.SwapOutMs > 0 {
+			sotcs := p.idleCounters(timestamp, p.config.SwapOutMs).RegionsMerged()
+			for _, tc := range *sotcs {
+				log.Debugf("%d ms swapout: %s\n", p.config.SwapOutMs, tc.AR.Ranges()[0])
+			}
+			p.move(sotcs, NODE_SWAP)
+		}
 		if p.config.IdleDurationMs > 0 && len(p.config.IdleNumas) > 0 {
 			// Moving idle pages is enabled.
-			itcs := p.idleCounters(timestamp).RegionsMerged()
+			itcs := p.idleCounters(timestamp, p.config.IdleDurationMs).RegionsMerged()
 			for _, tc := range *itcs {
 				log.Debugf("%d ms idle: %s\n", p.config.IdleDurationMs, tc.AR.Ranges()[0])
 			}

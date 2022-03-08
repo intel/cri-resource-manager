@@ -20,6 +20,7 @@ package memtier
 import "C"
 
 import (
+	"syscall"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -45,7 +46,7 @@ type cIovec struct {
 	iovLen  C.size_t
 }
 
-func ProcessMadviceSyscall(pidfd int, ranges []AddrRange, advice int, flags uint) (int, error) {
+func ProcessMadviceSyscall(pidfd int, ranges []AddrRange, advice int, flags uint) (int, syscall.Errno, error) {
 
 	// syscall:
 	// ssize_t syscall(SYS_process_madvise, int pidfd,
@@ -72,5 +73,5 @@ func ProcessMadviceSyscall(pidfd int, ranges []AddrRange, advice int, flags uint
 		err = unix.Errno(en)
 	}
 
-	return int(ret), err
+	return int(ret), en, err
 }

@@ -5,12 +5,22 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 type Stats struct {
-	namePulse mapStringPStatsPulse
-	pidMoves  mapIntPStatsPidMoved
-	pidScans  mapIntPStatsPidScanned
+	namePulse   mapStringPStatsPulse
+	pidMadvices mapIntPStatsPidMadviced
+	pidMoves    mapIntPStatsPidMoved
+	pidScans    mapIntPStatsPidScanned
+}
+
+type StatsPidMadviced struct {
+	sumSyscalls     uint64
+	sumPageCount    uint64
+	advicePageCount map[int]uint64
+	errnoPageCount  map[int]uint64
 }
 
 type StatsPidMoved struct {
@@ -42,6 +52,14 @@ type StatsHeartbeat struct {
 	name string
 }
 
+type StatsMadviced struct {
+	pid       int
+	sysRet    int
+	errno     int
+	advice    int
+	pageCount uint64
+}
+
 type StatsMoved struct {
 	pid            int
 	sysRet         uint
@@ -65,14 +83,22 @@ var stats *Stats = newStats()
 
 func newStats() *Stats {
 	return &Stats{
-		namePulse: make(mapStringPStatsPulse),
-		pidMoves:  make(mapIntPStatsPidMoved),
-		pidScans:  make(mapIntPStatsPidScanned),
+		namePulse:   make(mapStringPStatsPulse),
+		pidMadvices: make(mapIntPStatsPidMadviced),
+		pidMoves:    make(mapIntPStatsPidMoved),
+		pidScans:    make(mapIntPStatsPidScanned),
 	}
 }
 
 func newStatsPulse() *StatsPulse {
 	return &StatsPulse{}
+}
+
+func newStatsPidMadviced() *StatsPidMadviced {
+	return &StatsPidMadviced{
+		advicePageCount: make(map[int]uint64),
+		errnoPageCount:  make(map[int]uint64),
+	}
 }
 
 func newStatsPidMoved() *StatsPidMoved {
@@ -101,6 +127,16 @@ func (s *Stats) Store(entry interface{}) {
 		}
 		pulse.sumBeats += 1
 		pulse.latestBeat = time.Now().UnixNano()
+	case StatsMadviced:
+		spm, ok := s.pidMadvices[v.pid]
+		if !ok {
+			spm = newStatsPidMadviced()
+			s.pidMadvices[v.pid] = spm
+		}
+		spm.sumSyscalls += 1
+		spm.sumPageCount += v.pageCount
+		spm.advicePageCount[v.advice] += v.pageCount
+		spm.errnoPageCount[v.errno] += v.pageCount
 	case StatsMoved:
 		// keep separate statistics for every pid
 		spm, ok := s.pidMoves[v.pid]
@@ -169,6 +205,21 @@ func (s *Stats) Summarize() string {
 				(secondsSinceFirst-secondsSinceLatest)/float32(beatsMinusOne),
 				secondsSinceLatest,
 				name))
+	}
+	lines = append(lines, "table: process_madvice syscalls")
+	lines = append(lines, "     pid    calls req[pages]  ok[pages]    ok[M] advice:mem[M]")
+	for _, pid := range s.pidMadvices.sortedKeys() {
+		spm := s.pidMadvices[pid]
+		advMem := fmt.Sprintf("PAGEOUT:%d;COLD:%d",
+			spm.advicePageCount[unix.MADV_PAGEOUT]*constUPagesize/(1024*1024),
+			spm.advicePageCount[unix.MADV_COLD]*constUPagesize/(1024*1024))
+		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8d %s",
+			pid,
+			spm.sumSyscalls,
+			spm.sumPageCount,
+			spm.errnoPageCount[0],
+			spm.errnoPageCount[0]*constUPagesize/(1024*1024),
+			advMem))
 	}
 	lines = append(lines, "table: move_pages syscalls")
 	lines = append(lines, "     pid    calls req[pages]  ok[pages] moved[M] targetnode:moved[M]")

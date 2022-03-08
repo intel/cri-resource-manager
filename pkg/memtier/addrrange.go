@@ -17,6 +17,8 @@ package memtier
 import (
 	"fmt"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 type AddrRanges struct {
@@ -34,6 +36,10 @@ func NewAddrRange(startAddr, stopAddr uint64) *AddrRange {
 		startAddr, stopAddr = stopAddr, startAddr
 	}
 	return &AddrRange{addr: startAddr, length: (stopAddr - startAddr) / constUPagesize}
+}
+
+func (r AddrRange) String() string {
+	return fmt.Sprintf("%x-%x (%d B)", r.addr, r.addr+(r.length*constUPagesize), r.length*constUPagesize)
 }
 
 func (r *AddrRange) Addr() uint64 {
@@ -123,8 +129,8 @@ func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
 	return newAr
 }
 
-func (r AddrRange) String() string {
-	return fmt.Sprintf("%x-%x (%d bytes)", r.addr, r.addr+(r.length*constUPagesize), r.length*constUPagesize)
+func (ar *AddrRanges) SwapOut() error {
+	return ar.ProcessMadvice(unix.MADV_PAGEOUT)
 }
 
 func (ar *AddrRanges) ProcessMadvice(advice int) error {
@@ -133,10 +139,29 @@ func (ar *AddrRanges) ProcessMadvice(advice int) error {
 		return fmt.Errorf("pidfd_open error: %s", err)
 	}
 	defer PidfdCloseSyscall(pidfd)
-	if _, err = ProcessMadviceSyscall(pidfd, ar.Ranges(), advice, 0); err != nil {
+	sysRet, errno, err := ProcessMadviceSyscall(pidfd, ar.Ranges(), advice, 0)
+	if stats != nil {
+		stats.Store(StatsMadviced{
+			pid:       ar.Pid(),
+			sysRet:    sysRet,
+			errno:     int(errno),
+			advice:    advice,
+			pageCount: ar.PageCount(),
+		})
+	}
+	if err != nil {
+		stats.Store(StatsHeartbeat{fmt.Sprintf("process_madvice(...) error: %s", err)})
 		return fmt.Errorf("process_madvice error: %s", err)
 	}
 	return nil
+}
+
+func (ar *AddrRanges) PageCount() uint64 {
+	pageCount := uint64(0)
+	for _, r := range ar.Ranges() {
+		pageCount += r.length
+	}
+	return pageCount
 }
 
 // PagesMatching returns pages with pagetable attributes.

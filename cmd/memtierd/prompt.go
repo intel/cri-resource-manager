@@ -29,8 +29,6 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/intel/cri-resource-manager/pkg/memtier"
 )
 
@@ -305,7 +303,7 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 		}
 	}
 	if *swapOut {
-		if err := ar.ProcessMadvice(unix.MADV_PAGEOUT); err != nil {
+		if err := ar.SwapOut(); err != nil {
 			p.output("%s\n", err)
 		}
 	}
