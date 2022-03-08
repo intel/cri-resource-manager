@@ -1,0 +1,57 @@
+# This memtierd configuration demonstrates how to configure
+# memtierd-based swapping.
+#
+# Example: compress memory that has been idle for 10 seconds.
+#
+# Solution:
+#
+# 1. Enable compressed in-memory swap:
+#
+#    modprobe zram
+#    echo 4G > /sys/block/zram0/disksize
+#    mkswap /dev/zram0
+#    swapon /dev/zram0
+#
+# 2. Start swapping all memory of processes in /sys/fs/cgroup/swapus
+#    if pages have been idle for more than 10 seconds:
+#
+#    memtierd -config memtierd-age-swapidle.yaml
+
+policy:
+  name: age
+  config: |
+    # The policy reads tracker counters and acts based on them in
+    # IntervalMs (milliseconds) periods.
+    intervalms: 10000
+
+    # The policy manages processes that can be found under listed
+    # cgroups paths.
+    cgroups:
+      - /sys/fs/cgroup/swapus
+
+    # If the tracker has not seen activity on a page region during last
+    # swapoutms, the region will be swapped out.
+    swapoutms: 10000
+
+    # The policy uses the idlepage tracker to make sure that it will
+    # not swap out memory that is used. The softdirty tracker cannot
+    # detect page reads, and the damon tracker may not detect activity
+    # of small address ranges due to sampling.
+    tracker:
+      name: idlepage
+      config: |
+        # Track memory in 2 MB chunks (512 pages).
+        pagesinregion: 512
+        # If a single page has been accessed, skip the rest of the chunk.
+        # No need to count further: the chunk is active.
+        maxcountperregion: 1
+        # No need to scan more often than the policy acts.
+        scanintervalms: 10000
+
+    # Low-level page mover and swapper configuration.
+    mover:
+      # IntervalMs is the period (in milliseconds) how often next
+      # chunk of memory is moved or swapped.
+      intervalms: 20
+      # Bandwidth is memory swap out speed (in MB/s)
+      bandwidth: 100
