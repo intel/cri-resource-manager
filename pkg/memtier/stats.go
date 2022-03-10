@@ -188,7 +188,7 @@ func (s *Stats) LastMoveWithError(pid int) *StatsMoved {
 
 func (s *Stats) Summarize() string {
 	lines := []string{}
-	lines = append(lines, "table: events")
+	lines = append(lines, "", "table: events")
 	lines = append(lines, "   count timeint[s] latest[s ago] name")
 	now := time.Now().UnixNano()
 	for _, name := range s.namePulse.sortedKeys() {
@@ -206,7 +206,7 @@ func (s *Stats) Summarize() string {
 				secondsSinceLatest,
 				name))
 	}
-	lines = append(lines, "table: process_madvice syscalls")
+	lines = append(lines, "", "table: process_madvice syscalls")
 	lines = append(lines, "     pid    calls req[pages]  ok[pages]    ok[M] advice:mem[M]")
 	for _, pid := range s.pidMadvices.sortedKeys() {
 		spm := s.pidMadvices[pid]
@@ -221,7 +221,7 @@ func (s *Stats) Summarize() string {
 			spm.errnoPageCount[0]*constUPagesize/(1024*1024),
 			advMem))
 	}
-	lines = append(lines, "table: move_pages syscalls")
+	lines = append(lines, "", "table: move_pages syscalls")
 	lines = append(lines, "     pid    calls req[pages]  ok[pages] moved[M] targetnode:moved[M]")
 	for _, pid := range s.pidMoves.sortedKeys() {
 		spm := s.pidMoves[pid]
@@ -240,7 +240,7 @@ func (s *Stats) Summarize() string {
 			spm.sumDestNode*constUPagesize/(1024*1024),
 			node_moved))
 	}
-	lines = append(lines, "table: move_pages syscall errors in page statuses")
+	lines = append(lines, "", "table: move_pages syscall errors in page statuses")
 	lines = append(lines, "     pid    pages  size[M]    errno error")
 	for pid, spm := range s.pidMoves {
 		for _, errno := range spm.sumErrorCounts.sortedKeys() {
@@ -252,7 +252,7 @@ func (s *Stats) Summarize() string {
 				syscall.Errno(errno)))
 		}
 	}
-	lines = append(lines, "table: memory scans")
+	lines = append(lines, "", "table: memory scans")
 	lines = append(lines, "     pid    scans tot[pages]   avg[M]  avg[ms] avgaccs[M] avgwrite[M]")
 	for _, pid := range s.pidScans.sortedKeys() {
 		sps := s.pidScans[pid]

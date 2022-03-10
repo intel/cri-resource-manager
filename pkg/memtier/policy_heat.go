@@ -193,8 +193,8 @@ func (p *PolicyHeat) Dump(args []string) string {
 		pageCount := uint64(0)  // total number of pages in the heatmap (all pids)
 		maxHeat := float64(0.0) // maximum heat that appears in the heatmap
 		pidMaxHeat := map[int]float64{}
-		lines = append(lines, "table: maximum heat in heatmaps")
-		lines = append(lines, fmt.Sprintf("     pid   maxHeat"))
+		lines = append(lines, "", "table: maximum heat in heatmaps")
+		lines = append(lines, fmt.Sprintf("     pid  maxHeat"))
 		for _, pid := range sortInts(p.heatmap.Pids()) {
 			p.heatmap.ForEachRange(pid, func(hr *HeatRange) int {
 				if hr.heat > maxHeat {
@@ -207,10 +207,10 @@ func (p *PolicyHeat) Dump(args []string) string {
 				pageCount += hr.length
 				return 0
 			})
-			lines = append(lines, fmt.Sprintf("%8d %8.3f", pid, pidMaxHeat[pid]))
+			lines = append(lines, fmt.Sprintf("%8d %8.4f", pid, pidMaxHeat[pid]))
 		}
 		// Build statistics on each pid and class separately.
-		lines = append(lines, "table: memory in heat classes")
+		lines = append(lines, "", "table: memory in heat classes")
 		for _, pid := range sortInts(p.heatmap.Pids()) {
 			classPages := map[int]uint64{} // pages per class in this pid
 			totPages := uint64(0)          // total pages in this pid
