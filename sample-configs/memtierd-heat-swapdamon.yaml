@@ -1,0 +1,71 @@
+# This memtierd configuration demonstrates how to configure
+# memtierd-based swapping and memory tiering based on memory heat from
+# the damon tracker.
+#
+# Solution:
+#
+# 1. Enable compressed in-memory swap:
+#
+#    modprobe zram
+#    echo 4G > /sys/block/zram0/disksize
+#    mkswap /dev/zram0
+#    swapon /dev/zram0
+#
+# 2. Start swapping all memory of processes in /sys/fs/cgroup/swapus
+#    if pages have been idle for more than 10 seconds:
+#
+#    memtierd -config memtierd-heat-swapdamon.yaml
+
+policy:
+  name: heat
+  config: |
+    # The policy reads tracker counters and acts based on them in
+    # IntervalMs (milliseconds) periods.
+    intervalms: 10000
+
+    # The policy manages processes that can be found under listed
+    # cgroups paths.
+    cgroups:
+      - /sys/fs/cgroup/swapus
+
+    # HeatNumas maps heat class values into NUMA node lists where
+    # pages of each heat class should be located.
+    # - If a heat class is missing, the NUMA node is "don't care",
+    #   and memory in that heat class will not be moved or swapped.
+    # - Special NUMA node value -1 stands for swap.
+    # In this example we assume that NUMA node 1 is a CPU-less PMEM
+    # NUMA node. Relatively cold memory is moved there from NUMA
+    # nodes 0 that is a NUMA node with DRAM and CPU.
+    heatnumas:
+      0: [-1]
+      1: [-1]
+      4: [1]
+      5: [1]
+      8: [0]
+      9: [0]
+
+    heatmap:
+      # HeatMax is the maximum heat of a range
+      heatmax: 0.001
+      # HeatRetention is the portion of the remaining heat in a region
+      # after one second of complete inactivity.
+      heatretention: 0.999
+      heatclasses: 10
+
+    tracker:
+      name: damon
+      config: |
+        connection: perf
+        samplingus: 2000
+        aggregationus: 1000000
+        regionsupdateus: 5000000
+        mintargetregions: 1000
+        maxtargetregions: 20000
+
+    # Low-level page mover and swapper configuration.
+    mover:
+      # IntervalMs is the period (in milliseconds) how often next
+      # chunk of memory is moved or swapped.
+      intervalms: 20
+      # Bandwidth is memory swap out speed (in MB/s)
+      bandwidth: 100
