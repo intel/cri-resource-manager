@@ -49,7 +49,7 @@ policy:
       heatmax: 0.001
       # HeatRetention is the portion of the remaining heat in a region
       # after one second of complete inactivity.
-      heatretention: 0.999
+      heatretention: 0.98
       heatclasses: 10
 
     tracker:
