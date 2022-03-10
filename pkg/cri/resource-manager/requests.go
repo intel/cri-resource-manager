@@ -188,7 +188,21 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 	if err != nil {
 		return nil, nil, resmgrError("cache synchronization container query failed: %v", err)
 	}
-	added, deleted := m.cache.RefreshContainers(containers)
+
+	cStatus := map[string]*criapi.ContainerStatusResponse{}
+	for _, c := range containers.Containers {
+		s, err := m.relay.Client().ContainerStatus(ctx, &criapi.ContainerStatusRequest{
+			ContainerId: c.Id,
+			Verbose:     true,
+		})
+		if err != nil {
+			m.Error("failed to query status of container %s: %v", c.Id, err)
+		} else {
+			cStatus[c.Id] = s
+		}
+	}
+
+	added, deleted := m.cache.RefreshContainers(containers, cStatus)
 	for _, c := range added {
 		if c.GetState() != cache.ContainerStateRunning {
 			m.Info("ignoring discovered container %s (in state %v)...",
@@ -396,7 +410,7 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 		}
 	}
 
-	container, err := m.cache.InsertContainer(request)
+	container, err := m.cache.InsertContainer(request, nil)
 	if err != nil {
 		m.Error("%s: failed to insert new container to cache: %v", method, err)
 		return nil, resmgrError("%s: failed to insert new container to cache: %v", method, err)

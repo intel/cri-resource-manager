@@ -524,7 +524,7 @@ type Cache interface {
 	// LookupPod looks up a pod in the cache.
 	LookupPod(id string) (Pod, bool)
 	// InsertContainer inserts a container into the cache, using a runtime request or reply.
-	InsertContainer(msg interface{}) (Container, error)
+	InsertContainer(msg interface{}, s *cri.ContainerStatusResponse) (Container, error)
 	// UpdateContainerID updates a containers runtime id.
 	UpdateContainerID(cacheID string, msg interface{}) (Container, error)
 	// DeleteContainer deletes a container from the cache.
@@ -583,7 +583,7 @@ type Cache interface {
 	// RefreshPods purges/inserts stale/new pods/containers using a pod sandbox list response.
 	RefreshPods(*cri.ListPodSandboxResponse, map[string]*PodStatus) ([]Pod, []Pod, []Container)
 	// RefreshContainers purges/inserts stale/new containers using a container list response.
-	RefreshContainers(*cri.ListContainersResponse) ([]Container, []Container)
+	RefreshContainers(*cri.ListContainersResponse, map[string]*cri.ContainerStatusResponse) ([]Container, []Container)
 
 	// Get the container (data) directory for a container.
 	ContainerDirectory(string) string
@@ -901,7 +901,7 @@ func (cch *cache) LookupPod(id string) (Pod, bool) {
 }
 
 // Insert a container into the cache.
-func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
+func (cch *cache) InsertContainer(msg interface{}, status *cri.ContainerStatusResponse) (Container, error) {
 	var err error
 
 	c := &container{
@@ -912,6 +912,7 @@ func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
 	case *cri.CreateContainerRequest:
 		err = c.fromCreateRequest(msg.(*cri.CreateContainerRequest))
 	case *cri.Container:
+		c.LinuxReq = resourcesFromStatus(status)
 		err = c.fromListResponse(msg.(*cri.Container))
 	default:
 		err = fmt.Errorf("cannot create container from message %T", msg)
@@ -1058,7 +1059,7 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string
 }
 
 // RefreshContainers purges/inserts stale/new containers using a container list response.
-func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Container, []Container) {
+func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse, status map[string]*cri.ContainerStatusResponse) ([]Container, []Container) {
 	valid := make(map[string]struct{})
 
 	add := []Container{}
@@ -1072,7 +1073,7 @@ func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Containe
 		valid[c.Id] = struct{}{}
 		if _, ok := cch.Containers[c.Id]; !ok {
 			cch.Debug("inserting discovered container %s...", c.Id)
-			inserted, err := cch.InsertContainer(c)
+			inserted, err := cch.InsertContainer(c, status[c.Id])
 			if err != nil {
 				cch.Error("failed to insert discovered container %s to cache: %v",
 					c.Id, err)

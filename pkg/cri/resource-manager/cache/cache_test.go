@@ -135,7 +135,7 @@ func createFakeContainer(cch Cache, fc *fakeContainer) (Container, error) {
 	}
 
 	cch.(*cache).Debug("*** => creating Container: %+v\n", *req)
-	c, err := cch.InsertContainer(req)
+	c, err := cch.InsertContainer(req, nil)
 	if err != nil {
 		return nil, err
 	}

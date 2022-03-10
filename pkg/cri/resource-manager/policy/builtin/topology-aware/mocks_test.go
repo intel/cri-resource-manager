@@ -665,7 +665,7 @@ func (m *mockCache) DeletePod(string) cache.Pod {
 func (m *mockCache) LookupPod(string) (cache.Pod, bool) {
 	panic("unimplemented")
 }
-func (m *mockCache) InsertContainer(interface{}) (cache.Container, error) {
+func (m *mockCache) InsertContainer(interface{}, *cri.ContainerStatusResponse) (cache.Container, error) {
 	panic("unimplemented")
 }
 func (m *mockCache) UpdateContainerID(string, interface{}) (cache.Container, error) {
@@ -738,7 +738,7 @@ func (m *mockCache) Save() error {
 func (m *mockCache) RefreshPods(*cri.ListPodSandboxResponse, map[string]*cache.PodStatus) ([]cache.Pod, []cache.Pod, []cache.Container) {
 	panic("unimplemented")
 }
-func (m *mockCache) RefreshContainers(*cri.ListContainersResponse) ([]cache.Container, []cache.Container) {
+func (m *mockCache) RefreshContainers(*cri.ListContainersResponse, map[string]*cri.ContainerStatusResponse) ([]cache.Container, []cache.Container) {
 	panic("unimplemented")
 }
 func (m *mockCache) ContainerDirectory(string) string {

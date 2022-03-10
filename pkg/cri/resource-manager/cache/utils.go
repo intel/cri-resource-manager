@@ -15,12 +15,14 @@
 package cache
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 
+	rspec "github.com/opencontainers/runtime-spec/specs-go"
 	corev1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -39,6 +41,75 @@ func IsPodQOSClassName(class string) bool {
 		return true
 	}
 	return false
+}
+
+// resourcesFromStatus tries to recover LinuxContainerResources from a status response.
+func resourcesFromStatus(s *cri.ContainerStatusResponse) *cri.LinuxContainerResources {
+	if s == nil || s.Info == nil || s.Info["info"] == "" {
+		return nil
+	}
+
+	info := struct {
+		RuntimeSpec *rspec.Spec `json:"runtimeSpec"`
+	}{}
+
+	err := json.Unmarshal([]byte(s.Info["info"]), &info)
+	if err != nil {
+		return nil
+	}
+
+	return fromOCIResources(info.RuntimeSpec)
+}
+
+// fromOCIResources converts OCI resource constraints to CRI resources.
+func fromOCIResources(s *rspec.Spec) *cri.LinuxContainerResources {
+	if s == nil || s.Linux == nil || s.Linux.Resources == nil {
+		return nil
+	}
+
+	resources := s.Linux.Resources
+	r := &cri.LinuxContainerResources{}
+
+	if cpu := resources.CPU; cpu != nil {
+		r.CpusetCpus = cpu.Cpus
+		r.CpusetMems = cpu.Mems
+		if cpu.Shares != nil {
+			r.CpuShares = int64(*cpu.Shares)
+		}
+		if cpu.Period != nil {
+			r.CpuPeriod = int64(*cpu.Period)
+		}
+		if cpu.Quota != nil {
+			r.CpuQuota = *cpu.Quota
+		}
+	}
+	if mem := resources.Memory; mem != nil {
+		if mem.Limit != nil {
+			r.MemoryLimitInBytes = *mem.Limit
+		}
+		if mem.Swap != nil {
+			r.MemorySwapLimitInBytes = *mem.Swap
+		}
+	}
+	if s.Process != nil && s.Process.OOMScoreAdj != nil {
+		r.OomScoreAdj = int64(*s.Process.OOMScoreAdj)
+	}
+
+	for _, l := range resources.HugepageLimits {
+		r.HugepageLimits = append(r.HugepageLimits, &cri.HugepageLimit{
+			PageSize: l.Pagesize,
+			Limit:    l.Limit,
+		})
+	}
+
+	if len(resources.Unified) != 0 {
+		r.Unified = make(map[string]string)
+		for key, value := range resources.Unified {
+			r.Unified[key] = value
+		}
+	}
+
+	return r
 }
 
 // estimateComputeResources calculates resource requests/limits from a CRI request.
