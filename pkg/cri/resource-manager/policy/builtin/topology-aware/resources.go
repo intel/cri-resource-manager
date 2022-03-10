@@ -1274,6 +1274,7 @@ func (cg *grant) Clone() Grant {
 		memoryNode:   cg.GetMemoryNode(),
 		container:    cg.GetContainer(),
 		exclusive:    cg.ExclusiveCPUs(),
+		cpuType:      cg.CPUType(),
 		cpuPortion:   cg.SharedPortion(),
 		memType:      cg.MemoryType(),
 		memset:       cg.Memset().Clone(),
