@@ -67,6 +67,9 @@ const (
 
 	// TopologyHintsKey can be used to opt out from automatic topology hint generation.
 	TopologyHintsKey = "topologyhints" + "." + kubernetes.ResmgrKeyNamespace
+
+	// CPURequestKey annotates saved CPU requests eg. for mixed allocations.
+	CPURequestKey = "cpu-request" + "." + kubernetes.ResmgrKeyNamespace
 )
 
 // allControllers is a slice of all controller domains.
@@ -321,6 +324,10 @@ type Container interface {
 	GetCPUQuota() int64
 	// GetCPUShares gets the CFS CPU shares of the container.
 	GetCPUShares() int64
+	// HasCPURequestAnnotations checks for a AnnotateCPURequest() annotation.
+	HasCPURequestAnnotation() bool
+	// ParseCPURequestAnnotation parses an annotation saved by AnnotateCPURequest().
+	ParseCPURequestAnnotation(string) int
 	// GetmemoryLimit gets the memory limit in bytes for the container.
 	GetMemoryLimit() int64
 	// GetOomScoreAdj gets the OOM score adjustment for the container.
@@ -338,6 +345,8 @@ type Container interface {
 	SetCPUQuota(int64)
 	// SetCPUShares sets the CFS CPU shares of the container.
 	SetCPUShares(int64)
+	// AnnotateCPURequest saves the given CPU request as a container annotation.
+	AnnotateCPURequest(int)
 	// SetmemoryLimit sets the memory limit in bytes for the container.
 	SetMemoryLimit(int64)
 	// SetOomScoreAdj sets the OOM score adjustment for the container.
@@ -912,8 +921,10 @@ func (cch *cache) InsertContainer(msg interface{}, status *cri.ContainerStatusRe
 	case *cri.CreateContainerRequest:
 		err = c.fromCreateRequest(msg.(*cri.CreateContainerRequest))
 	case *cri.Container:
-		c.LinuxReq = resourcesFromStatus(status)
-		err = c.fromListResponse(msg.(*cri.Container))
+		criCtr := msg.(*cri.Container)
+		cpuReq := c.ParseCPURequestAnnotation(criCtr.Annotations[CPURequestKey])
+		c.LinuxReq = resourcesFromStatus(status, cpuReq)
+		err = c.fromListResponse(criCtr)
 	default:
 		err = fmt.Errorf("cannot create container from message %T", msg)
 	}

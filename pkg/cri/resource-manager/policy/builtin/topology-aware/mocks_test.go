@@ -427,6 +427,12 @@ func (m *mockContainer) GetCPUQuota() int64 {
 func (m *mockContainer) GetCPUShares() int64 {
 	panic("unimplemented")
 }
+func (m *mockContainer) HasCPURequestAnnotation() bool {
+	return false
+}
+func (m *mockContainer) ParseCPURequestAnnotation(string) int {
+	panic("unimplemented")
+}
 func (m *mockContainer) GetMemoryLimit() int64 {
 	return m.memoryLimit
 }
@@ -449,6 +455,8 @@ func (m *mockContainer) SetCPUQuota(int64) {
 	panic("unimplemented")
 }
 func (m *mockContainer) SetCPUShares(int64) {
+}
+func (m *mockContainer) AnnotateCPURequest(int) {
 }
 func (m *mockContainer) SetMemoryLimit(int64) {
 	panic("unimplemented")

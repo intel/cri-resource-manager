@@ -16,6 +16,7 @@ package cache
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"sort"
 	"strconv"
@@ -612,6 +613,22 @@ func (c *container) GetCPUShares() int64 {
 	return c.LinuxReq.CpuShares
 }
 
+func (c *container) HasCPURequestAnnotation() bool {
+	_, ok := c.Annotations[CPURequestKey]
+	return ok
+}
+
+func (c *container) ParseCPURequestAnnotation(value string) int {
+	if value == "" {
+		return 0
+	}
+	req, err := strconv.Atoi(value)
+	if err != nil || req <= 0 {
+		return 0
+	}
+	return req
+}
+
 func (c *container) GetMemoryLimit() int64 {
 	if c.LinuxReq == nil {
 		return 0
@@ -667,6 +684,10 @@ func (c *container) SetCPUShares(value int64) {
 	}
 	c.LinuxReq.CpuShares = value
 	c.markPending(CRI)
+}
+
+func (c *container) AnnotateCPURequest(value int) {
+	c.SetAnnotation(CPURequestKey, fmt.Sprintf("%d", value))
 }
 
 func (c *container) SetMemoryLimit(value int64) {

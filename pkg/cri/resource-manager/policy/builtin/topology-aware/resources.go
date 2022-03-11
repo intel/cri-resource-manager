@@ -949,6 +949,22 @@ func newRequest(container cache.Container) Request {
 	log.Debug("%s: CPU preferences: cpuType=%s, full=%v, fraction=%v, isolate=%v",
 		container.PrettyName(), cpuType, full, fraction, isolate)
 
+	if full > 0 && fraction > 0 {
+		state := container.GetState()
+		if state != cache.ContainerStateCreating {
+			if !container.HasCPURequestAnnotation() {
+				fraction += 1000 * full
+				full = 0
+				log.Warn("%s: state %d => falling back to shared CPU (%d) allocation",
+					container.PrettyName(), container.GetState(), fraction)
+			}
+		} else {
+			log.Warn("%s: annotating full mixed allocation on container...",
+				container.PrettyName())
+			container.AnnotateCPURequest(1000*full + fraction)
+		}
+	}
+
 	if mtype == memoryUnspec {
 		mtype = defaultMemoryType
 	}

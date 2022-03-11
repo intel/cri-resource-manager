@@ -44,7 +44,7 @@ func IsPodQOSClassName(class string) bool {
 }
 
 // resourcesFromStatus tries to recover LinuxContainerResources from a status response.
-func resourcesFromStatus(s *cri.ContainerStatusResponse) *cri.LinuxContainerResources {
+func resourcesFromStatus(s *cri.ContainerStatusResponse, cpuReq int) *cri.LinuxContainerResources {
 	if s == nil || s.Info == nil || s.Info["info"] == "" {
 		return nil
 	}
@@ -58,11 +58,11 @@ func resourcesFromStatus(s *cri.ContainerStatusResponse) *cri.LinuxContainerReso
 		return nil
 	}
 
-	return fromOCIResources(info.RuntimeSpec)
+	return fromOCIResources(info.RuntimeSpec, cpuReq)
 }
 
 // fromOCIResources converts OCI resource constraints to CRI resources.
-func fromOCIResources(s *rspec.Spec) *cri.LinuxContainerResources {
+func fromOCIResources(s *rspec.Spec, cpuReq int) *cri.LinuxContainerResources {
 	if s == nil || s.Linux == nil || s.Linux.Resources == nil {
 		return nil
 	}
@@ -73,7 +73,9 @@ func fromOCIResources(s *rspec.Spec) *cri.LinuxContainerResources {
 	if cpu := resources.CPU; cpu != nil {
 		r.CpusetCpus = cpu.Cpus
 		r.CpusetMems = cpu.Mems
-		if cpu.Shares != nil {
+		if cpuReq > 0 {
+			r.CpuShares = MilliCPUToShares(cpuReq)
+		} else if cpu.Shares != nil {
 			r.CpuShares = int64(*cpu.Shares)
 		}
 		if cpu.Period != nil {

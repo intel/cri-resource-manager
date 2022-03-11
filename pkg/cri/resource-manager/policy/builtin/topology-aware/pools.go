@@ -657,7 +657,30 @@ func (p *policy) applyGrant(grant Grant) {
 		//     processes in the same pool. Also the 'data' process should run fine, since
 		//     it does not need to compete for CPU with any other processes in the system
 		//     as long as that allocation is genuinely system-wide exclusive.
-		container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
+		//
+		//     For exclusive-only allocations (as opposed to mixed ones), we set up
+		//     CPU shares as if the allocation was shared. This should protect us
+		//     better against any extra-K8s processes co-scheduled to the same CPUs
+		//     (due to misconfiguration). This will also help to correctly detect
+		//     CPU resources for the container if the cache ever gets nuked.
+		//
+		//     Nuking the cache with mixed allocations in place would still leave us
+		//     in trouble. CPU shares for such containers are set up according to the
+		//     shared portion. With a nuked cache, without any extra information we'd
+		//     have no way of getting back the original CPU amount correctly. To get
+		//     around this we annotate such containers with the correct full CPU shares
+		//     and use this info during discovery. This is handled in newRequest(),
+		//     which also falls back to shared allocation if the container has already
+		//     been created (a discovered running or already created container).
+
+		if exclusive.IsEmpty() {
+			container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
+		} else {
+			if cpuPortion == 0 {
+				exclusivePortion := 1000 * exclusive.Size()
+				container.SetCPUShares(int64(cache.MilliCPUToShares(exclusivePortion)))
+			}
+		}
 	}
 
 	if mems != "" {
