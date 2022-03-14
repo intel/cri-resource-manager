@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.6.0-101-g0986164a documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.6.0-104-g7527a978 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -59,6 +59,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#cold-start">Cold Start</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#dynamic-page-demotion">Dynamic Page Demotion</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#container-memory-requests-and-limits">Container memory requests and limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#reserved-pool-namespaces">Reserved pool namespaces</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
@@ -533,6 +534,26 @@ the amount of memory for containers in <code class="docutils literal notranslate
 <a class="reference internal" href="../webhook.html"><span class="doc std std-doc">resource-annotating webhook</span></a> to provide <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> with
 an exact copy of the resource requirements from the Pod Spec as an extra
 Pod annotation.</p>
+</div>
+<div class="section" id="reserved-pool-namespaces">
+<h2>Reserved pool namespaces<a class="headerlink" href="#reserved-pool-namespaces" title="Permalink to this headline">¶</a></h2>
+<p>User is able to mark certain namespaces to have a reserved CPU allocation.
+Containers belonging to such namespaces will only run on CPUs set aside
+according to the global CPU reservation, as configured by the ReservedResources
+configuration option in the policy section.
+The <code class="docutils literal notranslate"><span class="pre">ReservedPoolNamespaces</span></code> option is a list of namespace globs that will be
+allocated to reserved CPU class.</p>
+<p>For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+  <span class="nt">Active</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">topology-aware</span>
+  <span class="nt">topology-aware</span><span class="p">:</span>
+    <span class="nt">ReservedPoolNamespaces</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;my-pool&quot;</span><span class="p p-Indicator">,</span><span class="s">&quot;reserved-*&quot;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>In this setup, all the workloads in <code class="docutils literal notranslate"><span class="pre">my-pool</span></code> namespace and those namespaces
+starting with <code class="docutils literal notranslate"><span class="pre">reserved-</span></code> string are allocated to reserved CPU class.
+The workloads in <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> are automatically assigned to reserved CPU
+class so no need to mention <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> in this list.</p>
 </div>
 </div>
 
