@@ -5,6 +5,6 @@ policy:
   AvailableResources:
     cpu: ${AVAILABLE_CPU}
   topology-aware:
-    ReservedPoolNamespaces: [\"reserved-pool\",\"reserved-*\",\"foobar\",\"kube-system\"]
+    ReservedPoolNamespaces: [\"reserved-pool\",\"reserved-*\",\"foobar\"]
 logger:
   Debug: cri-resmgr,resource-manager,cache,policy
