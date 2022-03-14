@@ -369,3 +369,26 @@ the amount of memory for containers in `Burstable` pods or run the
 [resource-annotating webhook](../webhook.md) to provide `cri-resmgr` with
 an exact copy of the resource requirements from the Pod Spec as an extra
 Pod annotation.
+
+## Reserved pool namespaces
+
+User is able to mark certain namespaces to have a reserved CPU allocation.
+Containers belonging to such namespaces will only run on CPUs set aside
+according to the global CPU reservation, as configured by the ReservedResources
+configuration option in the policy section.
+The `ReservedPoolNamespaces` option is a list of namespace globs that will be
+allocated to reserved CPU class.
+
+For example:
+
+```yaml
+policy:
+  Active: topology-aware
+  topology-aware:
+    ReservedPoolNamespaces: ["my-pool","reserved-*"]
+```
+
+In this setup, all the workloads in `my-pool` namespace and those namespaces
+starting with `reserved-` string are allocated to reserved CPU class.
+The workloads in `kube-system` are automatically assigned to reserved CPU
+class so no need to mention `kube-system` in this list.
