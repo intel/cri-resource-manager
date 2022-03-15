@@ -16,6 +16,7 @@ package resmgr
 
 import (
 	// List of builtin policies
+	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/balloons"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/none"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/podpools"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/static"

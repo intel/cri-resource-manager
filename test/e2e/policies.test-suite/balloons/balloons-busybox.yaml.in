@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  $(if [ -n "$POD_ANNOTATION" ]; then echo "
+  annotations:
+    $POD_ANNOTATION
+  "; fi)
+  labels:
+    app: ${NAME}
+spec:
+  containers:
+  $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
+  - name: ${NAME}c$(( contnum - 1 ))
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+      - -c
+      - ${WORK}echo ${NAME}c$(( contnum - 1 )) \$(sleep inf)
+    $(if [ -n "${CPUREQ}" ]; then echo "
+    resources:
+      requests:
+        cpu: ${CPUREQ}
+        $(if [ -n "${MEMREQ}" ]; then echo "
+        memory: '${MEMREQ}'
+        "; fi)
+      $(if [ -n "${CPULIM}" ]; then echo "
+      limits:
+        cpu: ${CPULIM}
+        $(if [ -n "$MEMLIM" ]; then echo "
+        memory: '${MEMLIM}'
+        "; fi)
+    "; fi)
+    "; fi)
+  "; done )
+  terminationGracePeriodSeconds: 1
