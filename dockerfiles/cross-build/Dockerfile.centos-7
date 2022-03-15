@@ -9,7 +9,7 @@ ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-RUN yum install -y rpm-build \
+RUN yum install -y --nogpgcheck rpm-build \
     kernel-devel clang gcc \
     curl-devel zlib-devel openssl-devel expat-devel \
     make wget
