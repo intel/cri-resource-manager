@@ -259,7 +259,7 @@ done
 if ! dotgit_version; then
     if ! stored_version; then
         if ! parent_version; then
-            fail "failed to determine version from any source"
+            unknown_version
         fi
     fi
 fi

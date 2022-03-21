@@ -31,6 +31,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/rdt"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
+	"github.com/prometheus/client_golang/prometheus"
+
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 )
@@ -127,6 +129,12 @@ type Backend interface {
 	ExportResourceData(cache.Container) map[string]string
 	// Introspect provides data for external introspection.
 	Introspect(*introspect.State)
+	// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+	DescribeMetrics() []*prometheus.Desc
+	// PollMetrics provides policy metrics for monitoring.
+	PollMetrics() Metrics
+	// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
+	CollectMetrics(Metrics) ([]prometheus.Metric, error)
 }
 
 // Policy is the exposed interface for container resource allocations decision making.
@@ -135,7 +143,7 @@ type Policy interface {
 	Start([]cache.Container, []cache.Container) error
 	// Sync synchronizes the state of the active policy.
 	Sync([]cache.Container, []cache.Container) error
-	// AlocateResources allocates resources to a container.
+	// AllocateResources allocates resources to a container.
 	AllocateResources(cache.Container) error
 	// ReleaseResources releases resources of a container.
 	ReleaseResources(cache.Container) error
@@ -153,7 +161,15 @@ type Policy interface {
 	Introspect() *introspect.State
 	// Bypassed checks if local policy processing is effectively disabled/bypassed.
 	Bypassed() bool
+	// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+	DescribeMetrics() []*prometheus.Desc
+	// PollMetrics provides policy metrics for monitoring.
+	PollMetrics() Metrics
+	// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
+	CollectMetrics(Metrics) ([]prometheus.Metric, error)
 }
+
+type Metrics interface{}
 
 // Policy instance/state.
 type policy struct {
@@ -398,6 +414,30 @@ func (p *policy) Introspect() *introspect.State {
 	}
 
 	return state
+}
+
+// PollMetrics provides policy metrics for monitoring.
+func (p *policy) PollMetrics() Metrics {
+	if !p.Bypassed() {
+		return p.active.PollMetrics()
+	}
+	return nil
+}
+
+// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+func (p *policy) DescribeMetrics() []*prometheus.Desc {
+	if !p.Bypassed() {
+		return p.active.DescribeMetrics()
+	}
+	return nil
+}
+
+// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
+func (p *policy) CollectMetrics(m Metrics) ([]prometheus.Metric, error) {
+	if !p.Bypassed() {
+		return p.active.CollectMetrics(m)
+	}
+	return nil, nil
 }
 
 // Register registers a policy backend.

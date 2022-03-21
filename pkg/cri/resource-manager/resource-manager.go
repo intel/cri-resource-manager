@@ -15,13 +15,14 @@
 package resmgr
 
 import (
-	"golang.org/x/sys/unix"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sys/unix"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/relay"
@@ -35,6 +36,9 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/visualizer"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/pidfile"
+
+	policyCollector "github.com/intel/cri-resource-manager/pkg/policycollector"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 )
 
@@ -110,7 +114,15 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, err
 	}
 
+	if err := m.registerPolicyMetricsCollector(); err != nil {
+		return nil, err
+	}
+
 	if err := m.setupRelay(); err != nil {
+		pid, _ := pidfile.OwnerPid()
+		if pid > 0 {
+			m.Error("looks like we're already running as pid %d...", pid)
+		}
 		return nil, err
 	}
 
@@ -156,6 +168,13 @@ func (m *resmgr) Start() error {
 
 	if err := m.relay.Start(); err != nil {
 		return resmgrError("failed to start CRI relay: %v", err)
+	}
+
+	if err := pidfile.Remove(); err != nil {
+		return resmgrError("failed to remove stale/old PID file: %v", err)
+	}
+	if err := pidfile.Write(); err != nil {
+		return resmgrError("failed to write PID file: %v", err)
 	}
 
 	if opt.ForceConfig == "" {
@@ -234,7 +253,7 @@ func (m *resmgr) resetCachedPolicy() int {
 	m.Info("resetting active policy stored in cache...")
 	defer logger.Flush()
 
-	if utils.ServerActiveAt(opt.RelaySocket) {
+	if ls, err := utils.IsListeningSocket(opt.RelaySocket); ls || err != nil {
 		m.Error("refusing to reset, looks like an instance of %q is active at socket %q...",
 			filepath.Base(os.Args[0]), opt.RelaySocket)
 		return 1
@@ -252,7 +271,7 @@ func (m *resmgr) resetCachedConfig() int {
 	m.Info("resetting cached configuration...")
 	defer logger.Flush()
 
-	if utils.ServerActiveAt(opt.RelaySocket) {
+	if ls, err := utils.IsListeningSocket(opt.RelaySocket); ls || err != nil {
 		m.Error("refusing to reset, looks like an instance of %q is active at socket %q...",
 			filepath.Base(os.Args[0]), opt.RelaySocket)
 		return 1
@@ -514,4 +533,15 @@ func (m *resmgr) stopIntrospection() {
 // updateIntrospection pushes updated data for external introspection·
 func (m *resmgr) updateIntrospection() {
 	m.introspect.Set(m.policy.Introspect())
+}
+
+// registerPolicyMetricsCollector registers policy metrics collector·
+func (m *resmgr) registerPolicyMetricsCollector() error {
+	pc := &policyCollector.PolicyCollector{}
+	pc.SetPolicy(m.policy)
+	if pc.HasPolicySpecificMetrics() {
+		return pc.RegisterPolicyMetricsCollector()
+	}
+	m.Info("%s policy has no policy-specific metrics.", policy.ActivePolicy())
+	return nil
 }

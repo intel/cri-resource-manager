@@ -71,6 +71,8 @@ usage() {
     echo "             The default is 0."
     echo "             Set containerd_src/crio_src/runc_src to install a local build."
     echo "    reinstall_k8s: if 1, destroy existing k8s cluster and create a new one."
+    echo "    reinstall_bootstrap: if 1, run the bootstrap and proxy setup commands."
+    echo "                         Only available if VM_IP is set when calling the script."
     echo "    reinstall_all: if 1, set all above reinstall_* options to 1."
     echo "    omit_cri_resmgr: if 1, omit checking/installing/starting cri-resmgr."
     echo "    omit_agent: if 1, omit checking/installing/starting cri-resmgr-agent."
@@ -90,13 +92,16 @@ usage() {
     echo "             mode if a verification fails: on_verify_fail=interactive"
     echo "    on_verify, on_create, on_launch: code to be executed every time"
     echo "             after verify/create/launch function"
+    echo "    on_{cri,runc,k8s}_install: code to be executed right after installing"
+    echo "             these components."
     echo ""
     echo "  VM configuration VARs: (effective when vm is not already configured)"
     echo "    topology: JSON to override NUMA node list used in tests."
     echo "             See: python3 ${DEMO_LIB_DIR}/topology2qemuopts.py --help"
     echo "    distro:  Linux distribution to be / already installed on vm."
     echo "             Supported values: centos-7, centos-8, debian-10, debian-sid"
-    echo "                 fedora, opensuse, opensuse-tumbleweed, sles,"
+    echo "                 fedora, fedora-33, opensuse-tumbleweed,"
+    echo "                 opensuse-15.3 (same as opensuse), opensuse-15.2, sles,"
     echo "                 ubuntu-18.04, ubuntu-20.04, ubuntu-21.04"
     echo "             If sles: set VM_SLES_REGCODE=<CODE> to use official packages."
     echo "    cgroups: cgroups version in the VM, v1 or v2. The default is v1."
@@ -113,8 +118,14 @@ usage() {
     echo "             \"crio\"                  cri-o, no cri-resmgr."
     echo "             \"crio&cri-resmgr\"       cri-o, cri-resmgr is an NRI plugin."
     echo "             The default is \"cri-resmgr|containerd\"."
+    echo "    k8scni:  The container network interface plugin to install. Options are:"
+    echo "             \"cilium\" (the default), \"flannel\", \"weavenet\"."
     echo "    crio_version: Version of cri-o to try to pull in, if cri-o is"
     echo "                  not being installed from sources."
+    echo "    setup_proxies: Setup proxies even if not using govm based VM."
+    echo "                   This is only needed if you have set VM_IP and want"
+    echo "                   the proxy information set in the target host. By default"
+    echo "                   the proxies are not set if VM_IP is set."
     echo ""
     echo "  Test input VARs:"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
@@ -122,6 +133,9 @@ usage() {
     echo "             command line when launched"
     echo "    cri_resmgr_agent_extra_args: arguments to be added on"
     echo "              cri-resmgr-agent command line when launched"
+    echo "    use_host_images: if \"1\", export images from the host docker"
+    echo "              to vm whenever they are available."
+    echo "              The default is 0: always pull images from repositories to vm."
     echo "    vm_files: \"serialized\" associative array of files to be created on vm"
     echo "             associative array syntax:"
     echo "             vm_files['/path/file']=file:/path/on/host"
@@ -503,7 +517,7 @@ launch() { # script API
             vm-command "cat $(basename "$cri_resmgr_cfg")"
             if [[ "$k8scri" == cri-resmgr* ]]; then
                 # launch cri-resmgr as the top element in the k8s container runtime stack
-                cri_resmgr_mode="-relay-socket /var/run/cri-resmgr/cri-resmgr.sock -runtime-socket $cri_sock -image-socket $cri_sock"
+                cri_resmgr_mode="-relay-socket ${cri_resmgr_sock} -runtime-socket $cri_sock -image-socket $cri_sock"
             else
                 # launch cri-resmgr as an NRI plugin to running container runtime
                 cri_resmgr_mode="-use-nri-plugin"
@@ -515,7 +529,7 @@ launch() { # script API
             vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
                 command-error "launching cri-resmgr failed with FATAL ERROR"
             }
-            vm-command "pidof cri-resmgr" >/dev/null 2>&1 || {
+            vm-command "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1 || {
                 echo "cri-resmgr last output line:"
                 vm-command-q "tail -n 1 cri-resmgr.output.txt"
                 command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
@@ -532,7 +546,7 @@ launch() { # script API
             sleep 2 >/dev/null 2>&1
             vm-command "grep 'FATAL ERROR' cri-resmgr-agent.output.txt" >/dev/null 2>&1 &&
                 command-error "launching cri-resmgr-agent failed with FATAL ERROR"
-            vm-command "pidof cri-resmgr-agent" >/dev/null 2>&1 ||
+            vm-command "fuser ${cri_resmgr_agent_sock}" >/dev/null 2>&1 ||
                 command-error "launching cri-resmgr-agent failed, cannot find cri-resmgr-agent PID"
             ;;
 
@@ -574,10 +588,10 @@ terminate() { # script API
     local target="$1"
     case $target in
         "cri-resmgr")
-            vm-command "kill -9 \$(pidof cri-resmgr) 2>/dev/null"
+            vm-command "fuser --kill ${cri_resmgr_pidfile} 2>/dev/null"
             ;;
         "cri-resmgr-agent")
-            vm-command "kill -9 \$(pidof cri-resmgr-agent) 2>/dev/null"
+            vm-command "fuser --kill ${cri_resmgr_agent_sock} 2>/dev/null"
             ;;
         "cri-resmgr-webhook")
             vm-command "kubectl delete -f webhook/mutating-webhook-config.yaml; kubectl delete -f webhook/webhook-deployment.yaml"
@@ -899,15 +913,19 @@ create() { # script API
         fi
         for image in $images; do
             if ! [[ " ${pulled_images_on_vm[*]} " == *" ${image} "* ]]; then
-                vm-command "crictl -i unix://${k8scri_sock} pull \"$image\"" || {
-                    errormsg="pulling image \"$image\" for \"$OUTPUT_DIR/$NAME.yaml\" failed."
-                    if is-hooked on_create_fail; then
-                        echo "$errormsg"
-                        run-hook on_create_fail
-                    else
-                        command-error "$errormsg"
-                    fi
-                }
+                if [ "$use_host_images" == "1" ] && vm-put-docker-image "$image"; then
+                    : # no need to pull the image to vm, it is now imported.
+                else
+                    vm-command "crictl -i unix://${k8scri_sock} pull \"$image\"" || {
+                        errormsg="pulling image \"$image\" for \"$OUTPUT_DIR/$NAME.yaml\" failed."
+                        if is-hooked on_create_fail; then
+                            echo "$errormsg"
+                            run-hook on_create_fail
+                        else
+                            command-error "$errormsg"
+                        fi
+                    }
+                fi
                 pulled_images_on_vm+=("$image")
             fi
         done
@@ -991,14 +1009,17 @@ user_script_file=$2
 distro=${distro:=$DEFAULT_DISTRO}
 k8s=${k8s:=}
 k8scri=${k8scri:="cri-resmgr|containerd"}
+cri_resmgr_pidfile="/var/run/cri-resmgr*.pid"
+cri_resmgr_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+cri_resmgr_agent_sock="/var/run/cri-resmgr/cri-resmgr-agent.sock"
 case "${k8scri}" in
     "cri-resmgr|containerd")
-        k8scri_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+        k8scri_sock="${cri_resmgr_sock}"
         cri_sock="/var/run/containerd/containerd.sock"
         cri=containerd
         ;;
     "cri-resmgr|crio")
-        k8scri_sock="/var/run/cri-resmgr/cri-resmgr.sock"
+        k8scri_sock="${cri_resmgr_sock}"
         cri_sock="/var/run/crio/crio.sock"
         cri=crio
         ;;
@@ -1053,6 +1074,7 @@ cri_resmgr_extra_args=${cri_resmgr_extra_args:-""}
 cri_resmgr_agent_extra_args=${cri_resmgr_agent_extra_args:-""}
 cleanup=${cleanup:-0}
 reinstall_all=${reinstall_all:-0}
+reinstall_bootstrap=${reinstall_bootstrap:-0}
 reinstall_containerd=${reinstall_containerd:-0}
 reinstall_cri_resmgr=${reinstall_cri_resmgr:-0}
 reinstall_cri_resmgr_agent=${reinstall_cri_resmgr_agent:-0}
@@ -1073,8 +1095,12 @@ if [ "$reinstall_k8s" == "1" ]; then
     reinstall_kubectl=1
     reinstall_kubelet=1
 fi
+if [ "$reinstall_bootstrap" == "1" ]; then
+    setup_proxies=1
+fi
 omit_agent=${omit_agent:-0}
 omit_cri_resmgr=${omit_cri_resmgr:-0}
+use_host_images=${use_host_images:-0}
 py_consts="${py_consts:-''}"
 topology=${topology:-'[
     {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
@@ -1199,6 +1225,14 @@ host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri"
 
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
+else
+    if [ "$setup_proxies" == "1" ]; then
+	vm-setup-proxies
+    fi
+
+    if [ "$reinstall_bootstrap" == "1" ]; then
+	vm-bootstrap
+    fi
 fi
 
 is-hooked "on_vm_online" && run-hook "on_vm_online"
@@ -1214,6 +1248,7 @@ fi
 
 if [ "$reinstall_containerd" == "1" ] || [ "$reinstall_crio" == "1" ] || ! vm-command-q "( type -p containerd || type -p crio ) >/dev/null"; then
     vm-install-cri
+    is-hooked on_cri_install && run-hook on_cri_install
 fi
 
 # runc is installed as a dependency of containerd and crio.
@@ -1222,10 +1257,12 @@ fi
 # a custom locally built runc may be overridden from packages.
 if [ "$reinstall_runc" == "1" ] || ! vm-command-q "type -p runc >/dev/null"; then
     vm-install-runc
+    is-hooked on_runc_install && run-hook on_runc_install
 fi
 
 if [ "$reinstall_k8s" == "1" ] || ! vm-command-q "type -p kubelet >/dev/null"; then
     vm-install-k8s
+    is-hooked on_k8s_install && run-hook on_k8s_install
 fi
 
 if [ "$reinstall_cri_resmgr" == "1" ]; then
@@ -1288,7 +1325,7 @@ fi
 
 # Start cri-resmgr if not already running
 if [ "$omit_cri_resmgr" != "1" ]; then
-    if ! vm-command-q "pidof cri-resmgr" >/dev/null; then
+    if ! vm-command-q "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1; then
         screen-launch-cri-resmgr
     fi
     if [ -n "$crirm_src" ]; then
@@ -1311,7 +1348,7 @@ fi
 
 # Start cri-resmgr-agent if not already running
 if [ "$omit_agent" != "1" ]; then
-    if ! vm-command-q "pidof cri-resmgr-agent" >/dev/null; then
+    if ! vm-command-q "fuser ${cri_resmgr_agent_sock}" >/dev/null; then
         screen-launch-cri-resmgr-agent
     fi
 fi

@@ -565,13 +565,29 @@ func (p *podpools) setConfig(ppoptions *PodpoolsOptions) error {
 	freeCpus = freeCpus.Difference(p.reserved)
 	nonReservedCpuCount := freeCpus.Size()
 	userPoolDefs := 0
+	// First apply customizations to built-in pools: "reserved"
+	// and "default".
 	for _, poolDef := range ppoptions.PoolDefs {
+		if poolDef.Name != reservedPoolDefName && poolDef.Name != defaultPoolDefName {
+			continue
+		}
 		if err := p.applyPoolDef(&pools, poolDef, &freeCpus, nonReservedCpuCount); err != nil {
 			return err
 		}
-		if poolDef.Name != reservedPoolDefName && poolDef.Name != defaultPoolDefName {
-			userPoolDefs += 1
+	}
+	// Update nonReservedCount: if the default pool is customized
+	// with its own CPUs, do not count those CPUs in the
+	// "Instances: 100%" syntax of user-defined pools.
+	nonReservedCpuCount = freeCpus.Size()
+	// Apply all user pool definitions, skip "reserved" and "default".
+	for _, poolDef := range ppoptions.PoolDefs {
+		if poolDef.Name == reservedPoolDefName || poolDef.Name == defaultPoolDefName {
+			continue
 		}
+		if err := p.applyPoolDef(&pools, poolDef, &freeCpus, nonReservedCpuCount); err != nil {
+			return err
+		}
+		userPoolDefs += 1
 	}
 	// Check if there are unallocated CPUs.
 	if freeCpus.Size() > 0 {

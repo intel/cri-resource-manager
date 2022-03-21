@@ -61,8 +61,8 @@ func newFakeCriServer(t *testing.T, socket string, fakeHandlers map[string]inter
 
 	lis, err := net.Listen("unix", socket)
 	if err != nil {
-		if utils.ServerActiveAt(socket) {
-			t.Fatalf("failed to create fake server: socket %s already in use", socket)
+		if ls, err := utils.IsListeningSocket(socket); ls || err != nil {
+			t.Fatalf("failed to create fake server: socket %s already exists", socket)
 		}
 		os.Remove(socket)
 		lis, err = net.Listen("unix", socket)
@@ -226,6 +226,16 @@ func (s *fakeCriServer) ContainerStats(ctx context.Context, req *api.ContainerSt
 func (s *fakeCriServer) ListContainerStats(ctx context.Context, req *api.ListContainerStatsRequest) (*api.ListContainerStatsResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
 	return response.(*api.ListContainerStatsResponse), err
+}
+
+func (s *fakeCriServer) PodSandboxStats(ctx context.Context, req *api.PodSandboxStatsRequest) (*api.PodSandboxStatsResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*api.PodSandboxStatsResponse), err
+}
+
+func (s *fakeCriServer) ListPodSandboxStats(ctx context.Context, req *api.ListPodSandboxStatsRequest) (*api.ListPodSandboxStatsResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*api.ListPodSandboxStatsResponse), err
 }
 
 func (s *fakeCriServer) UpdateRuntimeConfig(ctx context.Context, req *api.UpdateRuntimeConfigRequest) (*api.UpdateRuntimeConfigResponse, error) {

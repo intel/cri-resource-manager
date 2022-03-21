@@ -20,6 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
@@ -287,6 +288,21 @@ func (p *policy) Introspect(state *introspect.State) {
 	state.Assignments = assignments
 }
 
+// DescribeMetrics generates policy-specific prometheus metrics data descriptors.
+func (p *policy) DescribeMetrics() []*prometheus.Desc {
+	return nil
+}
+
+// PollMetrics provides policy metrics for monitoring.
+func (p *policy) PollMetrics() policyapi.Metrics {
+	return nil
+}
+
+// CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
+func (p *policy) CollectMetrics(policyapi.Metrics) ([]prometheus.Metric, error) {
+	return nil, nil
+}
+
 // ExportResourceData provides resource data to export for the container.
 func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	grant, ok := p.allocations.grants[c.GetCacheID()]
@@ -299,7 +315,7 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 	isolated := grant.ExclusiveCPUs().Intersection(grant.GetCPUNode().GetSupply().IsolatedCPUs())
 	exclusive := grant.ExclusiveCPUs().Difference(isolated).String()
 
-	if shared != "" {
+	if grant.SharedPortion() > 0 && shared != "" {
 		data[policyapi.ExportSharedCPUs] = shared
 	}
 	if isolated.String() != "" {
@@ -384,6 +400,7 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	log.Info("  - pin containers to memory: %v", opt.PinMemory)
 	log.Info("  - prefer isolated CPUs: %v", opt.PreferIsolated)
 	log.Info("  - prefer shared CPUs: %v", opt.PreferShared)
+	log.Info("  - reserved pool namespaces: %v", opt.ReservedPoolNamespaces)
 
 	var allowed, reserved cpuset.CPUSet
 	var reinit bool

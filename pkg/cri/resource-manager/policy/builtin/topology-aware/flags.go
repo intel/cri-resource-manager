@@ -31,6 +31,8 @@ type options struct {
 	PreferShared bool `json:"PreferSharedCPUs"`
 	// FakeHints are the set of fake TopologyHints to use for testing purposes.
 	FakeHints fakehints `json:",omitempty"`
+	// ReservedPoolNamespaces is a list of namespace globs that will be allocated to reserved CPUs
+	ReservedPoolNamespaces []string `json:"ReservedPoolNamespaces,omitempty"`
 }
 
 // Our runtime configuration.
@@ -55,11 +57,12 @@ func (fh *fakehints) merge(hints fakehints) {
 // defaultOptions returns a new options instance, all initialized to defaults.
 func defaultOptions() interface{} {
 	return &options{
-		PinCPU:         true,
-		PinMemory:      true,
-		PreferIsolated: true,
-		PreferShared:   false,
-		FakeHints:      make(fakehints),
+		PinCPU:                 true,
+		PinMemory:              true,
+		PreferIsolated:         true,
+		PreferShared:           false,
+		FakeHints:              make(fakehints),
+		ReservedPoolNamespaces: []string{"kube-system"},
 	}
 }
 

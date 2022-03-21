@@ -1,7 +1,7 @@
 # pull in base + a minimal set of useful packages
 FROM centos:7 as centos-7-build
 
-ARG GOLANG_VERSION=1.16.8
+ARG GOLANG_VERSION=1.17
 ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG GIT_VERSION=2.27.0
 ARG GIT_URLDIR=https://github.com/git/git/archive
@@ -9,7 +9,7 @@ ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-RUN yum install -y rpm-build \
+RUN yum install -y --nogpgcheck rpm-build \
     kernel-devel clang gcc \
     curl-devel zlib-devel openssl-devel expat-devel \
     make wget

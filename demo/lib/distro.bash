@@ -2,7 +2,6 @@
 GO_URLDIR=https://golang.org/dl
 GO_VERSION=1.16.8
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
-CNI_SUBNET=10.217.0.0/16
 
 ###########################################################################
 
@@ -37,9 +36,12 @@ distro-install-crio()       { distro-resolve "$@"; }
 distro-config-crio()        { distro-resolve "$@"; }
 distro-restart-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
+distro-install-kernel-dev() { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
+distro-k8s-cni-subnet()     { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
+distro-env-file-dir()       { distro-resolve "$@"; }
 
 ###########################################################################
 
@@ -123,6 +125,10 @@ ubuntu-21_04-image-url() {
 
 debian-10-image-url() {
     echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
+}
+
+debian-11-image-url() {
+    echo "https://cloud.debian.org/images/cloud/bullseye/daily/latest/debian-11-generic-amd64-daily.qcow2"
 }
 
 debian-sid-image-url() {
@@ -270,6 +276,9 @@ debian-set-kernel-cmdline() {
     }
 }
 
+debian-env-file-dir() {
+    echo "/etc/default"
+}
 
 ###########################################################################
 
@@ -328,6 +337,15 @@ centos-8-install-crio-pre() {
     fi
 }
 
+centos-8-install-crio() {
+    if [ -n "$crio_src" ]; then
+	default-install-crio
+    else
+	distro-install-pkg cri-o
+	vm-command "systemctl enable crio"
+    fi
+}
+
 centos-8-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
 }
@@ -342,7 +360,15 @@ centos-install-golang() {
 }
 
 fedora-image-url() {
-    echo "https://download.fedoraproject.org/pub/fedora/linux/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
+    echo "https://mirrors.xtom.de/fedora/releases/35/Cloud/x86_64/images/Fedora-Cloud-Base-35-1.2.x86_64.qcow2"
+}
+
+fedora-34-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/34/Cloud/x86_64/images/Fedora-Cloud-Base-34-1.2.x86_64.qcow2"
+}
+
+fedora-33-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
 }
 
 fedora-ssh-user() {
@@ -403,13 +429,24 @@ fedora-install-golang() {
     from-tarball-install-golang
 }
 
-fedora-install-crio-pre() {
+fedora-install-crio-version() {
     distro-install-pkg runc conmon
     vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
 
     if [ -z "$crio_src" ]; then
-        vm-command "dnf -y module enable cri-o:${crio_version:-1.20}"
+        vm-command "dnf -y module enable cri-o:${crio_version:-$1}"
     fi
+}
+
+fedora-install-containernetworking-plugins() {
+    distro-install-pkg containernetworking-plugins
+    vm-command "[ -x /opt/cni/bin/loopback ] || { mkdir -p /opt/cni/bin; mount --bind /usr/libexec/cni /opt/cni/bin; }"
+    vm-command "grep /usr/libexec/cni /etc/fstab || echo /usr/libexec/cni /opt/cni/bin none defaults,bind,nofail 0 0 >> /etc/fstab"
+}
+
+fedora-install-crio-pre() {
+    fedora-install-crio-version 1.21
+    fedora-install-containernetworking-plugins
 }
 
 fedora-install-crio() {
@@ -417,22 +454,14 @@ fedora-install-crio() {
         default-install-crio
     else
         distro-install-pkg cri-o
+        vm-command "systemctl enable --now crio" ||
+            command-error "failed to enable cri-o"
     fi
 }
 
 fedora-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/fedora/docker-ce.repo
-}
-
-fedora-install-containerd-post() {
-    distro-install-pkg containernetworking-plugins
-}
-
-fedora-config-containerd-post() {
-    if [ "$VM_DISTRO" = "fedora" ]; then
-        vm-command "mkdir -p /opt/cni/bin && mount --bind /usr/libexec/cni /opt/cni/bin"
-        vm-command "echo /usr/libexec/cni /opt/cni/bin none defaults,bind,nofail 0 0 >> /etc/fstab"
-    fi
+    fedora-install-containernetworking-plugins
 }
 
 fedora-install-k8s() {
@@ -457,13 +486,14 @@ EOF
     else
         k8sverparam=""
     fi
-    distro-install-pkg tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
+    distro-install-pkg iproute-tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
 }
 
-fedora-bootstrap-commands-pre() {
+fedora-bootstrap-commands-post() {
     cat <<EOF
+reboot_needed=0
 mkdir -p /etc/sudoers.d
 echo 'Defaults !requiretty' > /etc/sudoers.d/10-norequiretty
 
@@ -477,11 +507,33 @@ EOF
 if grep -q NAME=Fedora /etc/os-release; then
     if ! grep -q systemd.unified_cgroup_hierarchy=0 /proc/cmdline; then
         sudo grubby --update-kernel=ALL --args="systemd.unified_cgroup_hierarchy=0"
-        shutdown -r now
+        reboot_needed=1
     fi
 fi
 EOF
     fi
+
+    # Using swapoff is not enough as we also need to disable the swap from systemd
+    # and then reboot the VM
+    cat <<EOF
+if swapon --show | grep -q partition; then
+    sed -E -i '/^\\/.*[[:space:]]swap[[:space:]].*\$/d' /etc/fstab
+    systemctl --type swap
+    for swp in \`systemctl --type swap | awk '/\\.swap/ { print \$1 }'\`; do systemctl stop "\$swp"; systemctl mask "\$swp"; done
+    swapoff --all
+    reboot_needed=1
+fi
+EOF
+
+    cat <<EOF
+if [ "\$reboot_needed" == "1" ]; then
+   shutdown -r now
+fi
+EOF
+}
+
+fedora-33-install-crio-pre() {
+    fedora-install-crio-version 1.20
 }
 
 ###########################################################################
@@ -546,6 +598,10 @@ sles-install-utils() {
 }
 
 opensuse-image-url() {
+    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.3/appliances/openSUSE-Leap-15.3-JeOS.x86_64-15.3-OpenStack-Cloud-Current.qcow2"
+}
+
+opensuse-15_2-image-url() {
     echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
 }
 
@@ -553,8 +609,8 @@ opensuse-tumbleweed-image-url() {
     echo "https://ftp.uni-erlangen.de/opensuse/tumbleweed/appliances/openSUSE-Tumbleweed-JeOS.x86_64-OpenStack-Cloud.qcow2"
 }
 
-opensuse-tumbleweed-install-utils() {
-    distro-install-pkg psmisc
+opensuse-install-utils() {
+    distro-install-pkg psmisc sysvinit-tools
 }
 
 opensuse-ssh-user() {
@@ -563,6 +619,17 @@ opensuse-ssh-user() {
 
 opensuse-pkg-type() {
     echo "rpm"
+}
+
+opensuse-set-kernel-cmdline() {
+    local e2e_defaults="$*"
+    vm-command "mkdir -p /etc/default; touch /etc/default/grub; sed -i '/e2e:opensuse-set-kernel-cmdline/d' /etc/default/grub"
+    vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\" # by e2e:opensuse-set-kernel-cmdline' >> /etc/default/grub" || {
+        command-error "writing new command line parameters failed"
+    }
+    vm-command "grub2-mkconfig -o /boot/grub2/grub.cfg" || {
+        command-error "updating grub failed"
+    }
 }
 
 opensuse-setup-oneshot() {
@@ -594,7 +661,10 @@ opensuse-install-pkg() {
             break
         fi
     done
-    vm-command "$ZYPPER install $opts $*" ||
+    # In OpenSUSE 15.2 zypper exits with status 106 if already installed,
+    # in 15.3 the exit status is 0. Do not consider "already installed"
+    # as an error.
+    vm-command "$ZYPPER install $opts $*" || [ "$COMMAND_STATUS" == "106" ] ||
         command-error "failed to install $*"
 }
 
@@ -750,6 +820,15 @@ EOF
         command-error "failed to enable kubelet"
 }
 
+opensuse-install-kernel-dev() {
+    vm-command-q "zypper lr | grep -q openSUSE_Tools" ||
+        distro-install-repo "http://download.opensuse.org/repositories/openSUSE:/Tools/openSUSE_Factory/openSUSE:Tools.repo"
+    distro-install-pkg "git-core make gcc flex bison bc ncurses-devel patch bzip2 osc build python quilt"
+    vm-command "cd /root; [ -d kernel ] || git clone --depth=100 https://github.com/SUSE/kernel"
+    vm-command "cd /root; [ -d kernel-source ] || git clone --depth=100 https://github.com/SUSE/kernel-source"
+    vm-command "[ -f /etc/profile.d/linux_git.sh ] || echo export LINUX_GIT=/root/kernel > /etc/profile.d/linux_git.sh"
+}
+
 opensuse-bootstrap-commands-pre() {
     cat <<EOF
 sed -e '/Signature checking/a gpgcheck = off' -i /etc/zypp/zypp.conf
@@ -787,7 +866,7 @@ rpm-refresh-pkg-db() {
 
 default-bootstrap-commands() {
     cat <<EOF
-touch /etc/modules-load.d/k8s.conf
+rm -f /etc/modules-load.d/k8s.conf; touch /etc/modules-load.d/k8s.conf
 modprobe bridge && echo bridge >> /etc/modules-load.d/k8s.conf || :
 modprobe nf-tables-bridge && echo nf-tables-bridge >> /etc/modules-load.d/k8s.conf || :
 modprobe br_netfilter && echo br_netfilter >> /etc/modules-load.d/k8s.conf || :
@@ -878,7 +957,15 @@ default-install-utils() {
 }
 
 default-k8s-cni() {
-    echo cilium
+    echo ${k8scni:-cilium}
+}
+
+default-k8s-cni-subnet() {
+    if [ "$(distro-k8s-cni)" == "flannel" ]; then
+        echo 10.244.0.0/16
+    else
+        echo 10.217.0.0/16
+    fi
 }
 
 default-install-runc() {
@@ -956,6 +1043,10 @@ default-restart-crio() {
         command-error "failed to restart crio systemd service"
 }
 
+default-env-file-dir() {
+    echo "/etc/sysconfig"
+}
+
 ###########################################################################
 
 #
@@ -1021,3 +1112,5 @@ EOF
             command-error "failed to copy $dir.orig to $dir"
     fi
 }
+
+CNI_SUBNET=$(distro-k8s-cni-subnet)

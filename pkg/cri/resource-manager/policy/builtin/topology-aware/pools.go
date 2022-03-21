@@ -351,7 +351,13 @@ func (p *policy) allocatePool(container cache.Container, poolHint string) (Grant
 	if request.CPUType() == cpuReserved || container.GetNamespace() == kubernetes.NamespaceSystem {
 		pool = p.root
 	} else {
-		affinity := p.calculatePoolAffinities(request.GetContainer())
+		affinity, err := p.calculatePoolAffinities(request.GetContainer())
+
+		if err != nil {
+			return nil, policyError("failed to calculate affinity for container %s: %v",
+				container.PrettyName(), err)
+		}
+
 		scores, pools := p.sortPoolsByScore(request, affinity)
 
 		if log.DebugEnabled() {
@@ -630,23 +636,28 @@ func (p *policy) applyGrant(grant Grant) {
 			log.Debug("  => not pinning CPUs, allocated cpuset is empty...")
 		}
 		container.SetCpusetCpus(cpus)
-		if exclusive.IsEmpty() {
-			container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
-		} else {
-			// Notes:
-			//   Hmm... I think setting CPU shares according to the normal formula
-			//   can be dangerous when we do mixed allocations (both exclusive and
-			//   shared CPUs assigned). If the exclusive cpuset is not isolated and
-			//   there are other processes (unbeknown to us) running on some of the
-			//   same exclusive CPU(s) with CPU shares not set by us, those processes
-			//   can starve our containers with supposedly exclusive CPUs...
-			//   There's not much we can do though... if we don't set the CPU shares
-			//   then any process/thread in the container that might sched_setaffinity
-			//   itself to the shared subset will not get properly weighted wrt. other
-			//   processes sharing the same CPUs.
-			//
-			container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
-		}
+
+		// Notes:
+		//     It is extremely important to ensure that the exclusive subset of mixed
+		//     CPU allocations are really exclusive at the level of the whole system
+		//     and not just the orchestration. This is something we can't really do
+		//     from here reliably ATM.
+		//
+		//     We set the CPU scheduling weight for the whole container (all processes
+		//     within the container) according to container's partial allocation.
+		//     This is typically a sub-CPU allocation (< 1000 mCPU) which is meant to be
+		//     consumed by an 'infra/mgmt' process within the container from the shared subset
+		//     of CPUs assigned to the container. The container entry point or the processes
+		//     within the container are supposed to arrange so that the 'infra' process(es)
+		//     are pinned to the shared CPUs and the 'data/performance critical' critical'
+		//     process(es) to the exclusive CPU(s).
+		//
+		//     With this setup the kernel will slice out the correct amount of CPU from
+		//     the shared pool for the 'infra' process as it competes with other workloads'
+		//     processes in the same pool. Also the 'data' process should run fine, since
+		//     it does not need to compete for CPU with any other processes in the system
+		//     as long as that allocation is genuinely system-wide exclusive.
+		container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
 	}
 
 	if mems != "" {
@@ -773,11 +784,16 @@ func (p *policy) addImplicitAffinities() error {
 }
 
 // Calculate pool affinities for the given container.
-func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int32 {
+func (p *policy) calculatePoolAffinities(container cache.Container) (map[int]int32, error) {
 	log.Debug("=> calculating pool affinities...")
 
+	affinities, err := p.calculateContainerAffinity(container)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make(map[int]int32, len(p.nodes))
-	for id, w := range p.calculateContainerAffinity(container) {
+	for id, w := range affinities {
 		grant, ok := p.allocations.grants[id]
 		if !ok {
 			continue
@@ -788,14 +804,17 @@ func (p *policy) calculatePoolAffinities(container cache.Container) map[int]int3
 		// TODO: calculate affinity for memory here too?
 	}
 
-	return result
+	return result, nil
 }
 
 // Calculate affinity of this container (against all other containers).
-func (p *policy) calculateContainerAffinity(container cache.Container) map[string]int32 {
+func (p *policy) calculateContainerAffinity(container cache.Container) (map[string]int32, error) {
 	log.Debug("* calculating affinity for container %s...", container.PrettyName())
 
-	ca := container.GetAffinity()
+	ca, err := container.GetAffinity()
+	if err != nil {
+		return nil, err
+	}
 
 	result := make(map[string]int32)
 	for _, a := range ca {
@@ -809,7 +828,7 @@ func (p *policy) calculateContainerAffinity(container cache.Container) map[strin
 
 	log.Debug("  => affinity: %v", result)
 
-	return result
+	return result, nil
 }
 
 func (p *policy) filterInsufficientResources(req Request, originals []Node) []Node {

@@ -147,6 +147,14 @@ DOCKER_RPM_BUILD := \
     done && \
     cp -v $$(rpm --eval %{_rpmdir}/%{_arch})/*.rpm /output
 
+# Docker boilerplate/commands to build binary tarballs.
+DOCKER_TAR_BUILD := \
+    cd ~ && \
+    $(GZIP_DC) /build/input/cri-resource-manager-$(TAR_VERSION).tar$(GZ_EXT) | \
+        $(TAR) -xf - && \
+    cd cri-resource-manager-$(TAR_VERSION) && \
+    $(MAKE) OUTPUT=/output/ binary-dist
+
 # Docker boilerplate/commands to build binaries.
 DOCKER_BIN_BUILD := \
     mkdir ~/build && cd ~/build && \
@@ -498,7 +506,7 @@ vendored-dist: dist
 	rm -fr $$tardir
 
 binary-dist: build
-	$(Q)tarball=cri-resource-manager-$(TAR_VERSION).$$(uname -m).tar; \
+	$(Q)tarball=$(OUTPUT)cri-resource-manager-$(TAR_VERSION).$$(uname -m).tar; \
 	echo "Creating binary dist tarball $$tarball..."; \
 	tardir=binary-dist; \
 	rm -fr $$tarball* $$tardir && \
@@ -600,6 +608,20 @@ cross-bin.%: docker/cross-build/% dist
 	    $$distro-build /bin/bash -c '$(DOCKER_BIN_BUILD)' && \
 	rm -fr $$builddir
 
+cross-tar cross-tarball: dist docker/cross-build/centos-7
+	$(Q)distro=tarball; \
+	builddir=$(BUILD_DIR)/docker/$$distro; \
+	outdir=$(PACKAGES_DIR)/$$distro; \
+	echo "Docker cross-building $$distro packages..."; \
+	mkdir -p $$outdir && \
+	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
+	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
+	    -v $$(pwd)/$$builddir:/build \
+	    -v $$(pwd)/$$outdir:/output \
+	    centos-7-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
+	rm -fr $$builddir
 
 # Build a docker image (for distro cross-building).
 docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%

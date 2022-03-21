@@ -196,11 +196,11 @@ func (s *server) createGrpcServer() error {
 
 	l, err := net.Listen("unix", s.options.Socket)
 	if err != nil {
-		if utils.ServerActiveAt(s.options.Socket) {
-			return serverError("failed to create server: socket %s already in use",
+		if ls, lsErr := utils.IsListeningSocket(s.options.Socket); ls || lsErr != nil {
+			return serverError("failed to create server: socket %q already exists",
 				s.options.Socket)
 		}
-		s.Warn("removing abandoned socket '%s' in use...", s.options.Socket)
+		s.Warn("removing abandoned socket %q...", s.options.Socket)
 		os.Remove(s.options.Socket)
 		l, err = net.Listen("unix", s.options.Socket)
 		if err != nil {

@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+
+"""pairwise - print var-value combinations that cover all value pairs
+
+Usage: pairwise VAR=VALUE [VAR=VALUE...]
+
+Example:
+$ pairwise \\
+    distro={debian-sid,opensuse,fedora} \\
+    k8scni={cilium,weavenet,flannel} \\
+    k8scri={crio,containerd} \\
+    k8s={1.22.0,1.23.0}
+"""
+
+import sys
+
+def error(msg, exit_status=1):
+    sys.stderr.write('pairwise: %s\n' % (msg,))
+    if exit_status is not None:
+        sys.exit(exit_status)
+
+def output(msg):
+    sys.stdout.write(msg)
+
+# This program prints an optimized set of value combinations
+# that covers all value pairs.
+
+def all_combinations(var_values):
+    combinations = [{}]
+    for var in var_values:
+        new_combinations = []
+        for d in combinations:
+            for value in var_values[var]:
+                new_comb = dict(d)
+                new_comb[var] = value
+                new_combinations.append(new_comb)
+        combinations = new_combinations
+    return combinations
+
+def combination_to_pairs(d):
+    pairs = set()
+    keys = sorted(d.keys())
+    for key1_index, key1 in enumerate(keys):
+        val1 = d[key1]
+        for key2 in keys[key1_index+1:]:
+            val2 = d[key2]
+            pairs.add(frozenset(((key1, val1), (key2, val2))))
+    return pairs
+
+def combination_to_singles(d):
+    singles = set()
+    for key1 in d.keys():
+        val1 = d[key1]
+        singles.add(frozenset((key1, val1)))
+    return singles
+
+def cover_pairwise(var_values):
+    chosen_combinations = []
+    covered_pairs = set()
+    combination_pairs = {}
+    all_pairs = set()
+    all_singles = set()
+    combinations = all_combinations(var_values)
+    for c in combinations:
+        all_pairs = all_pairs.union(combination_to_pairs(c))
+        all_singles = all_singles.union(combination_to_singles(c))
+    uncovered_pairs = set(all_pairs)
+    uncovered_singles = set(all_singles)
+    while uncovered_pairs:
+        combination_score = []
+        for c in combinations:
+            covers_pairs = combination_to_pairs(c)
+            covers_singles = combination_to_singles(c)
+            combination_score.append(
+                (len(uncovered_pairs.intersection(covers_pairs)) +
+                 len(uncovered_singles.intersection(covers_singles)),
+                 c, covers_pairs, covers_singles))
+        best_score, best_comb, best_pairs, best_singles = sorted(combination_score, key=lambda comb_score: comb_score[0])[-1]
+        chosen_combinations.append(best_comb)
+        uncovered_pairs = uncovered_pairs - best_pairs
+        uncovered_singles = uncovered_singles - best_singles
+    return chosen_combinations
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or "-h" in sys.argv or "--help" in sys.argv:
+        output(__doc__)
+        error('missing VAR=VALUE...', exit_status=0)
+    # construct var_values from command line arguments
+    var_values = {} # {var: list-of-values}
+    for var_value in sys.argv[1:]:
+        try:
+            var, value = var_value.split("=", 1)
+        except:
+            error('bad argument %r, VAR=VALUE expected', var_value)
+        if var not in var_values:
+            var_values[var] = []
+        var_values[var].append(value)
+
+    for comb in cover_pairwise(var_values):
+        var_value_row = []
+        for var in sorted(comb.keys()):
+            var_value_row.append('%s="%s"' % (var, comb[var]))
+        output(" ".join(var_value_row) + "\n")

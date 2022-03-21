@@ -751,19 +751,22 @@ func getKubeletHint(cpus, mems string) (ret topology.Hints) {
 	return
 }
 
-func (c *container) GetAffinity() []*Affinity {
+func (c *container) GetAffinity() ([]*Affinity, error) {
 	pod, ok := c.GetPod()
 	if !ok {
 		c.cache.Error("internal error: can't find Pod for container %s", c.PrettyName())
 	}
-
-	affinity := append(pod.GetContainerAffinity(c.GetName()), c.implicitAffinities()...)
+	affinity, err := pod.GetContainerAffinity(c.GetName())
+	if err != nil {
+		return nil, err
+	}
+	affinity = append(affinity, c.implicitAffinities()...)
 	c.cache.Debug("affinity for container %s:", c.PrettyName())
 	for _, a := range affinity {
 		c.cache.Debug("  - %s", a.String())
 	}
 
-	return affinity
+	return affinity, nil
 }
 
 func (c *container) GetCgroupDir() string {

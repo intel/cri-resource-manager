@@ -30,6 +30,12 @@ vms:
         grep -E -v '^ *$'
 }
 
+vm-bootstrap() {
+    distro-bootstrap-commands | vm-pipe-to-file "./e2e-bootstrap.sh"
+    vm-command "sh ./e2e-bootstrap.sh"
+    host-wait-vm-ssh-server --timeout 600
+}
+
 vm-image-url() {
     distro-image-url
 }
@@ -516,11 +522,16 @@ vm-reboot() { # script API
     host-wait-vm-ssh-server
 }
 
+vm-setup-proxies() {
+    distro-setup-proxies
+}
+
 vm-networking() {
     vm-command-q "touch /etc/hosts; grep -q \$(hostname) /etc/hosts" || {
         vm-command "echo \"$VM_IP \$(hostname)\" >>/etc/hosts"
     }
-    distro-setup-proxies
+
+    vm-setup-proxies
 }
 
 vm-install-cri-resmgr() {
@@ -553,6 +564,14 @@ vm-install-cri-resmgr() {
     elif [ -z "$binsrc" ] || [ "$binsrc" == "local" ]; then
         vm-put-file "$BIN_DIR/cri-resmgr" "$prefix/bin/cri-resmgr"
         vm-put-file "$BIN_DIR/cri-resmgr-agent" "$prefix/bin/cri-resmgr-agent"
+        sed -E -e "s:__DEFAULTDIR__:$(distro-env-file-dir):g" \
+            -E -e "s:__BINDIR__:$prefix/bin:g" < "$HOST_PROJECT_DIR/cmd/cri-resmgr/cri-resource-manager.service.in" |
+            vm-pipe-to-file /usr/lib/systemd/system/cri-resource-manager.service
+        cat <<EOF |
+CONFIG_OPTIONS="--fallback-config /etc/cri-resmgr/fallback.cfg -relay-socket ${cri_resmgr_sock} -runtime-socket ${cri_sock} -image-socket ${cri_sock}"
+EOF
+        vm-pipe-to-file "$(distro-env-file-dir)/cri-resource-manager"
+        vm-put-file "$HOST_PROJECT_DIR/cmd/cri-resmgr/fallback.cfg.sample" "/etc/cri-resmgr/fallback.cfg"
     else
         error "vm-install-cri-resmgr: unknown binsrc=\"$binsrc\""
     fi
@@ -688,31 +707,39 @@ vm-install-runc() {
 }
 
 vm-install-cri() {
+    local vm_cri_dir="/usr/bin"
     distro-install-"$VM_CRI"
     distro-config-"$VM_CRI"
     if [ "$VM_CRI" == "containerd" ]; then
         if [ -n "$containerd_src" ]; then
             vm-command "systemctl stop containerd"
+            vm-command 'command -v containerd'
+            if [ -n "$COMMAND_OUTPUT" ] && [ "x$COMMAND_STATUS" == "x0" ]; then
+                vm_cri_dir="${COMMAND_OUTPUT%/*}"
+            fi
             for f in ctr containerd containerd-stress containerd-shim containerd-shim-runc-v1 containerd-shim-runc-v2; do
-                vm-put-file "$containerd_src/bin/$f" "/usr/bin/$f"
+                vm-put-file "$containerd_src/bin/$f" "$vm_cri_dir/$f"
             done
-            vm-command "systemctl start containerd"
+            vm-command "systemctl enable --now containerd"
         fi
     elif [ "$VM_CRI" == "crio" ]; then
         if [ -n "$crio_src" ]; then
             vm-command "systemctl stop crio"
+            vm-command 'command -v crio'
+            if [ -n "$COMMAND_OUTPUT" ] && [ "x$COMMAND_STATUS" == "x0" ]; then
+                vm_cri_dir="${COMMAND_OUTPUT%/*}"
+            fi
             for f in crio crio-status pinns; do
-                vm-put-file "$crio_src/bin/$f" "/usr/bin/$f"
+                vm-put-file "$crio_src/bin/$f" "$vm_cri_dir/$f"
             done
-            vm-command "systemctl enable crio"
-            vm-command "systemctl start crio"
+            vm-command "systemctl enable --now crio"
         fi
     fi
 }
 
 vm-install-containernetworking() {
     vm-install-golang
-    vm-command "go get -d github.com/containernetworking/plugins"
+    vm-command "GO111MODULE=off go get -d github.com/containernetworking/plugins"
     CNI_PLUGINS_SOURCE_DIR="$(awk '/package.*plugins/{print $NF}' <<< "$COMMAND_OUTPUT")"
     [ -n "$CNI_PLUGINS_SOURCE_DIR" ] || {
         command-error "downloading containernetworking plugins failed"
@@ -765,6 +792,83 @@ vm-install-dlv() {
     vm-command "echo 'substitute-path:' > \"\$HOME/.config/dlv/config.yml.d/00-substitute-path\""
 }
 
+vm-install-glibc() { # script API
+    # Usage: vm-install-glibc [VERSION]
+    #
+    # If glibc_src=/host/path/to/glibc is set, install a glibc that is
+    # built and installed on host using configure --prefix $glibc_src.
+    # If glibc_src is not set, download, build and install a glibc on vm.
+    # In both cases glibc is installed to /opt/glibc/VERSION on vm.
+    #
+    # vm-set-glibc wraps selected binaries to use an installed glibc.
+    #
+    # Example: install a glibc from host and use it with two binaries.
+    #   glibc_src=/host/glibc/install/prefix vm-install-glibc host-2.34
+    #   vm-set-glibc host-2.34 /usr/bin/containerd /usr/local/bin/cri-resmgr
+    #
+    # Example: download, build and install glibc 2.32 on vm:
+    #   vm-install-glibc 2.32
+    #   vm-set-glibc 2.32 /usr/bin/containerd /usr/local/bin/cri-resmgr
+    local glibc_ver="${1:-host}"
+    local vm_glibc_dir="/opt/glibc/${glibc_ver}"
+    if [ -n "$glibc_src" ] && [ -d "$glibc_src" ]; then
+        vm-command "mkdir -p $vm_glibc_dir"
+        ( cd "$glibc_src" && tar cz . ) | vm-pipe-to-file "$vm_glibc_dir/glibc-$glibc_ver.tar.gz" ||
+            error "failed to package glibc from '$glibc_src'"
+        vm-command "cd $vm_glibc_dir && tar xf glibc-$glibc_ver.tar.gz && rm -f glibc-$glibc_ver.tar.gz" ||
+            command-error "failed to extract glibc-$glibc_ver.tar.gz"
+        return 0
+    fi
+    if [[ "$glibc_ver" == "host"* ]]; then
+        error "vm-install-glibc: invalid glibc_src='$glibc_src' when installing glibc from host"
+    fi
+    local vm_glibc_src="$vm_glibc_dir/src/glibc-${glibc_ver}"
+    local vm_glibc_build="$vm_glibc_dir/src/build"
+    local vm_glibc_install="$vm_glibc_dir"
+    vm-install-pkg make bison flex gcc
+    vm-command "mkdir -p $vm_glibc_src; cd $vm_glibc_src; curl -L --remote-name-all https://ftp.gnu.org/gnu/glibc/glibc-${glibc_ver}.tar.gz" ||
+        command-error "failed to download glibc"
+    vm-command "mkdir -p $vm_glibc_src; cd $vm_glibc_src/..; tar xzf $vm_glibc_src/glibc-${glibc_ver}.tar.gz" ||
+        command-error "failed to extract glibc"
+    vm-command "mkdir -p $vm_glibc_build; cd $vm_glibc_build && $vm_glibc_src/configure --prefix=$vm_glibc_install" ||
+        command-error "failed to configure glibc"
+    vm-command "cd $vm_glibc_build && make -j 4 >make.output.txt 2>&1 || ( tail make.output.txt; exit 1 )" ||
+        command-error "failed to build glibc, see $vm_glibc_build/make.output.txt"
+    vm-command "cd $vm_glibc_build && make install" ||
+        command-error "failed to install glibc"
+}
+
+vm-set-glibc() { # script API
+    # Usage: vm-set-glibc VERSION BIN [BIN...]
+    #
+    # Wrap binaries to use glibc VERSION.
+    #
+    # Note glibc VERSION must be installed first.
+    # See vm-install-glibc.
+    local glibc_ver="$1"
+    local vm_glibc_dir="/opt/glibc/${glibc_ver}"
+    local vm_glibc_install="$vm_glibc_dir"
+    local vm_glibc_ld="$vm_glibc_install/lib/ld-linux-x86-64.so.2"
+    shift
+    if [ -z "$glibc_ver" ]; then
+        error "vm-switch-glibc: missing glibc version to switch to"
+    fi
+    vm-command "[ -x $vm_glibc_ld ]" ||
+        command-error "cannot find loader $vm_glibc_ld"
+    local vm_bin
+    for vm_bin in "$@"; do
+        vm-command "[ -x $vm_bin ]" ||
+            command-error "cannot find binary to be wrapped: $vm_bin"
+        vm-command "( [ \"\$(dd bs=1 count=3 skip=1 if=$vm_bin)\" == \"ELF\" ] && mv $vm_bin ${vm_bin}.bin ) || [ -f $vm_bin.bin ]" ||
+            command-error "failed to rename binary"
+        vm-pipe-to-file "$vm_bin" <<EOF
+#!/bin/bash
+LD_LIBRARY_PATH=$vm_glibc_install/lib:\$LD_LIBRARY_PATH exec $vm_glibc_ld ${vm_bin}.bin "\$@"
+EOF
+        vm-command "chmod a+rx $vm_bin"
+    done
+}
+
 vm-dlv-add-src() {
     local host_src_dir="$1"
     [ -d "$host_src_dir" ] || error "vm-dlv-add-src: invalid source directory \"$host_src_dir\", existing go project directory expected"
@@ -784,6 +888,9 @@ vm-install-k8s() {
 }
 
 vm-create-singlenode-cluster() {
+    if ! [ "$(type -t vm-install-cni-$(distro-k8s-cni))" == "function" ]; then
+        error "invalid CNI: $(distro-k8s-cni)"
+    fi
     vm-create-cluster
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
     vm-install-cni-"$(distro-k8s-cni)"
@@ -808,9 +915,8 @@ vm-destroy-cluster() {
 }
 
 vm-install-cni-cilium() {
-    vm-command "kubectl create -f https://raw.githubusercontent.com/cilium/cilium/v1.9/install/kubernetes/quick-install.yaml"
-    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/cilium"; then
-        command-error "installing cilium CNI to Kubernetes timed out"
+    if ! vm-command "curl -L --remote-name-all https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz && tar xzvfC cilium-linux-amd64.tar.gz /usr/local/bin && cilium install && rm -f cilium-linux-amd64.tar.gz"; then
+        command-error "installing cilium CNI to Kubernetes failed"
     fi
 }
 
@@ -818,6 +924,13 @@ vm-install-cni-weavenet() {
     vm-command "kubectl apply -f \"https://cloud.weave.works/k8s/net?k8s-version=\$(kubectl version | base64 | tr -d '\n')\""
     if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/weave-net"; then
         command-error "installing weavenet CNI to Kubernetes failed/timed out"
+    fi
+}
+
+vm-install-cni-flannel() {
+    vm-command "kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"
+    if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/kube-flannel-ds"; then
+        command-error "installing flannel CNI to Kubernetes failed/timed out"
     fi
 }
 
