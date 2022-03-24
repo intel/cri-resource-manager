@@ -689,7 +689,7 @@ func (m *resmgr) RebalanceContainers() error {
 
 // rebalance triggers a policy-specific rebalancing cycle of containers.
 func (m *resmgr) rebalance(method string) error {
-	if m.policy == nil {
+	if m.policy == nil || m.policy.Bypassed() {
 		return nil
 	}
 
@@ -713,6 +713,10 @@ func (m *resmgr) rebalance(method string) error {
 func (m *resmgr) DeliverPolicyEvent(e *events.Policy) error {
 	m.Lock()
 	defer m.Unlock()
+
+	if m.policy == nil || m.policy.Bypassed() {
+		return nil
+	}
 
 	if e.Source == "" {
 		e.Source = "unspecified"
@@ -759,15 +763,17 @@ func (m *resmgr) setConfig(v interface{}) error {
 		return resmgrError("configuration rejected: %v", err)
 	}
 
-	// synchronize state of controllers with new configuration
-	if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
-		m.Error("failed to synchronize controllers with new configuration: %v", err)
-		return resmgrError("failed to synchronize controllers with new configuration: %v", err)
-	}
+	if !(m.policy == nil || m.policy.Bypassed()) {
+		// synchronize state of controllers with new configuration
+		if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+			m.Error("failed to synchronize controllers with new configuration: %v", err)
+			return resmgrError("failed to synchronize controllers with new configuration: %v", err)
+		}
 
-	if err = m.runPostUpdateHooks(context.Background(), "setConfig"); err != nil {
-		m.Error("failed to run post-update hooks after reconfiguration: %v", err)
-		return resmgrError("failed to run post-update hooks after reconfiguration: %v", err)
+		if err = m.runPostUpdateHooks(context.Background(), "setConfig"); err != nil {
+			m.Error("failed to run post-update hooks after reconfiguration: %v", err)
+			return resmgrError("failed to run post-update hooks after reconfiguration: %v", err)
+		}
 	}
 
 	// if we managed to activate a configuration from the agent, store it in the cache
