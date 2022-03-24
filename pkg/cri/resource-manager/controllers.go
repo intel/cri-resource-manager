@@ -17,6 +17,7 @@ package resmgr
 import (
 	// List of controllers to pull in.
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/blockio"
+	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/cpu"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/cri"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/memory"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/page-migrate"

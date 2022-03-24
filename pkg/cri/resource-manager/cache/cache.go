@@ -38,6 +38,8 @@ import (
 )
 
 const (
+	// CPU marks changes that can be applied by the CPU controller.
+	CPU = "cpu"
 	// CRI marks changes that can be applied by the CRI controller.
 	CRI = "cri"
 	// RDT marks changes that can be applied by the RDT controller.
@@ -70,7 +72,7 @@ const (
 )
 
 // allControllers is a slice of all controller domains.
-var allControllers = []string{CRI, RDT, BlockIO, Memory}
+var allControllers = []string{CPU, CRI, RDT, BlockIO, Memory}
 
 // PodState is the pod state in the runtime.
 type PodState int32
