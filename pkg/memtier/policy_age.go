@@ -17,6 +17,9 @@ package memtier
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -156,8 +159,93 @@ func (p *PolicyAge) Tracker() Tracker {
 }
 
 func (p *PolicyAge) Dump(args []string) string {
-	// TODO: describe policy state
-	return ""
+	dumpHelp := `dump <accessed> TIMESPEC,TIMESPEC[,TIMESPEC]... [PID[,PID]]
+        Examples:
+            dump accessed 0,0.5s,1s,2s,4s,10s,1m
+	`
+	if len(args) == 0 {
+		return dumpHelp
+	}
+	lines := []string{}
+	if args[0] == "accessed" {
+		timeDurations := []time.Duration{}
+		pids := []int{}
+		if len(args) == 1 {
+			lines = append(lines, fmt.Sprintf("using limits from configuration: active %d ms, idle %d ms, swapout %d ms",
+				p.config.ActiveDurationMs,
+				p.config.IdleDurationMs,
+				p.config.SwapOutMs))
+			timeDurations = append(timeDurations,
+				time.Duration(0),
+				time.Duration(p.config.ActiveDurationMs)*time.Millisecond,
+				time.Duration(p.config.IdleDurationMs)*time.Millisecond,
+				time.Duration(p.config.SwapOutMs)*time.Millisecond,
+				time.Duration(0))
+		} else {
+			for _, timeSpec := range strings.Split(args[1], ",") {
+				timeDur, err := parseTimeDuration(timeSpec)
+				if err != nil {
+					return fmt.Sprintf("invalid TIMESPEC %q: %s", timeSpec, err)
+				}
+				timeDurations = append(timeDurations, timeDur)
+			}
+			if len(args) == 3 {
+				for _, pidSpec := range strings.Split(args[2], ",") {
+					pid, err := strconv.Atoi(pidSpec)
+					if err != nil {
+						return fmt.Sprintf("invalid pid: %q", pidSpec)
+					}
+					pids = append(pids, pid)
+				}
+			}
+		}
+		if len(timeDurations) < 2 {
+			return "too few TIMESPECs for printing amount of memory between TIMESPECs"
+		}
+		if len(pids) == 0 {
+			if len(*p.palt) > 1 {
+				// If there are more than one pid,
+				// include "all" pids, too.
+				pids = append(pids, 0)
+			}
+			for pid, _ := range *p.palt {
+				pids = append(pids, pid)
+			}
+		}
+		sort.Ints(pids)
+		timestamp := time.Now().UnixNano()
+		// minLastSeen is alive threshold
+		minLastSeen := timestamp - int64(2*time.Duration(p.config.IntervalMs)*time.Millisecond)
+		timestamps := make([]int64, len(timeDurations))
+		for i := range timeDurations {
+			if timeDurations[i] != 0 {
+				timestamps[i] = timestamp - int64(timeDurations[i])
+			}
+		}
+		lines = append(lines, "table: time since last access")
+		lines = append(lines, "     pid lastacc>=[s] lastacc<[s]    pages   mem[M] pidmem[%]")
+		lineFmt := "%8s %12.3f %11.3f %8d %8d %9.2f"
+		for _, pid := range pids {
+			pidStr := strconv.Itoa(pid)
+			if pid == 0 {
+				pidStr = "all"
+			}
+			for latterI := 1; latterI < len(timestamps); latterI++ {
+				pagesPid, _, pagesChanged := p.pageCountOfAge(pid, minLastSeen, 0, timestamps[latterI], timestamps[latterI-1])
+				lines = append(lines, fmt.Sprintf(lineFmt,
+					pidStr,
+					float32(timeDurations[latterI-1])/float32(time.Second),
+					float32(timeDurations[latterI])/float32(time.Second),
+					pagesChanged,
+					pagesChanged*constUPagesize/(1024*1024),
+					float64(100*pagesChanged)/float64(pagesPid)))
+			}
+		}
+	} else {
+		return fmt.Sprintf("unknown dump %q\nUsage: %s", args[0], dumpHelp)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func (p *PolicyAge) Stop() {
@@ -274,6 +362,31 @@ func (p *PolicyAge) activeCounters() *TrackerCounters {
 		}
 	}
 	return tcs
+}
+
+func (p *PolicyAge) pageCountOfAge(exactPid int, minLastSeen int64, maxLastSeen int64, minLastChanged int64, maxLastChanged int64) (uint64, uint64, uint64) {
+	pagesMatchPid := uint64(0)
+	pagesMatchPidSeen := uint64(0)
+	pagesMatchPidSeenChanged := uint64(0)
+	for pid, alt := range *p.palt {
+		for _, lt := range alt {
+			if exactPid != 0 && pid != exactPid {
+				continue
+			}
+			for lenPages, tcage := range lt {
+				pagesMatchPid += lenPages
+				if tcage.LastSeen >= minLastSeen && (maxLastSeen == 0 || tcage.LastSeen < maxLastSeen) {
+					pagesMatchPidSeen += lenPages
+				} else {
+					continue
+				}
+				if tcage.LastChanged >= minLastChanged && (maxLastChanged == 0 || tcage.LastChanged < maxLastChanged) {
+					pagesMatchPidSeenChanged += lenPages
+				}
+			}
+		}
+	}
+	return pagesMatchPid, pagesMatchPidSeen, pagesMatchPidSeenChanged
 }
 
 // idleCounters returns counters that have not been changed during a

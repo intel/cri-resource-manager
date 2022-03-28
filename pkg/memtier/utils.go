@@ -15,8 +15,48 @@
 package memtier
 
 import (
+	"fmt"
+	"math"
 	"sort"
+	"strconv"
+	"strings"
+	"time"
 )
+
+// parseTimeDuration parses time duration string
+func parseTimeDuration(s string) (time.Duration, error) {
+	factor := float64(time.Second)
+	suffixLen := 0
+	switch {
+	case strings.HasSuffix(s, "ns"):
+		factor = 1
+		suffixLen = 2
+	case strings.HasSuffix(s, "us"):
+		factor = 1000
+		suffixLen = 2
+	case strings.HasSuffix(s, "ms"):
+		factor = 1000 * 1000
+		suffixLen = 2
+	case strings.HasSuffix(s, "s"):
+		factor = 1000 * 1000 * 1000
+		suffixLen = 1
+	case strings.HasSuffix(s, "m"):
+		factor = 1000 * 1000 * 1000 * 60
+		suffixLen = 1
+	case strings.HasSuffix(s, "h"):
+		factor = 1000 * 1000 * 1000 * 60 * 60
+		suffixLen = 1
+	}
+	numpart := s[0 : len(s)-suffixLen]
+	f, err := strconv.ParseFloat(strings.TrimSpace(numpart), 64)
+	if err != nil {
+		return time.Duration(0), fmt.Errorf("syntax error in time duration %s %w, expected [1-9][0-9]*(ns|us|ms|s|m|h)?\n", s, err)
+	}
+	if math.IsNaN(f) {
+		return time.Duration(0), fmt.Errorf("invalid time duration %s, number or inf expected\n", s)
+	}
+	return time.Duration(f * factor), nil
+}
 
 func sliceContainsInt(haystack []int, needle int) bool {
 	for _, straw := range haystack {
