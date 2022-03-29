@@ -1,16 +1,17 @@
 # memtierd - daemon for moving memory between NUMA nodes
 
-Memtierd is a userspace daemon that moves memory pages between NUMA
-nodes. It supports both promotion and demotion of pages, that is,
-moving active pages to low-latency memory, and moving idle pages away
-from low-latency memory to free it for better use.
+Memtierd is a userspace daemon that manages memory of chosen
+processes. Memtierd supports reclaiming memory and moving memory
+between NUMA nodes. Moving enables both promotion and demotion of
+pages, that is, moving actively used pages to low-latency memory, and
+idle pages away from low-latency memory to free it for better use.
 
-Memtierd includes configurable alternative memory trackers and
-policies. A tracker counts accesses of memory pages, while a policy
-classifies the pages based on the counts: is a page active, idle, or
-somewhere between.
+Memtierd includes alternative memory trackers and policies. A tracker
+counts accesses of memory pages, while a policy classifies the pages
+based on observed accesses: is a page active, idle, or somewhere
+between.
 
-The granularity of memtierd trackers and classifications is
+The granularity of memtierd trackers and memory classifications is
 configurable, and often significantly larger than a single page. For
 simplicity, this document talks about "pages", but most often this
 means an address range that contains one or more pages.
@@ -23,8 +24,8 @@ make bin/memtierd
 
 ## Usage
 
-Memtierd starts in an automatic mode with a configuration file, or
-in a command mode with interactive prompt.
+Memtierd starts in an automatic mode with a configuration file, or in
+a command mode with interactive prompt.
 
 ### Automatic mode
 
@@ -37,6 +38,24 @@ memtierd -config FILE
 ```
 
 See configuration samples below.
+
+- [memtierd-age-idlepage-trackonly.yaml](../../sample-configs/memtierd-age-idlepage-trackonly.yaml)
+  tracks processes in `/sys/fs/cgroup/track-me` but does not swap out or
+  move memory. Useful for understanding memory access time
+  demographics. Example:
+  ```
+  # (while :; do sleep 5; echo policy -dump accessed 0,5s,30s,10m,2h,24h,0; done) | memtierd -config memtierd-age-idlepage-trackonly.yaml
+  ...
+  memtierd> policy -dump accessed 0,5s,30s,10m,2h,24h,0
+  table: time since last access
+       pid lastacc>=[s] lastacc<[s]    pages   mem[M] pidmem[%]
+   2857761        0.000       5.000    99438      388     35.37
+   2857761        5.000      30.000        0        0      0.00
+   2857761       30.000     600.000   181697      709     64.63
+   2857761      600.000    7200.000        0        0      0.00
+   2857761     7200.000   86400.000        0        0      0.00
+   2857761    86400.000       0.000        0        0      0.00
+  ```
 
 - [memtierd-heat-damon.yaml](../../sample-configs/memtierd-heat-damon.yaml)
   configures the heat policy to use the damon tracker.

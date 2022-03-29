@@ -1,0 +1,12 @@
+policy:
+  name: age
+  config: |
+    intervalms: 2000
+    cgroups:
+      - /sys/fs/cgroup/track-me
+    tracker:
+      name: idlepage
+      config: |
+        pagesinregion: 512
+        maxcountperregion: 1
+        scanintervalms: 2000
