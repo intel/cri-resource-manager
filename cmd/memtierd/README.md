@@ -48,13 +48,13 @@ See configuration samples below.
   ...
   memtierd> policy -dump accessed 0,5s,30s,10m,2h,24h,0
   table: time since last access
-       pid lastacc>=[s] lastacc<[s]    pages   mem[M] pidmem[%]
-   2857761        0.000       5.000    99438      388     35.37
-   2857761        5.000      30.000        0        0      0.00
-   2857761       30.000     600.000   181697      709     64.63
-   2857761      600.000    7200.000        0        0      0.00
-   2857761     7200.000   86400.000        0        0      0.00
-   2857761    86400.000       0.000        0        0      0.00
+       pid lastaccs>=[s] lastaccs<[s]    pages   mem[G] pidmem[%]
+   2888906         0.000        5.000   318574    1.215     14.64
+   2888906         5.000       30.000   755200    2.881     34.72
+   2888906        30.000      600.000  1101542    4.202     50.64
+   2888906       600.000     7200.000        0    0.000      0.00
+   2888906      7200.000    86400.000        0    0.000      0.00
+   2888906     86400.000        0.000        0    0.000      0.00
   ```
 
 - [memtierd-heat-damon.yaml](../../sample-configs/memtierd-heat-damon.yaml)

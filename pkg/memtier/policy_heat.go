@@ -223,14 +223,14 @@ func (p *PolicyHeat) Dump(args []string) string {
 				totPages += hr.length
 				return 0
 			})
-			lines = append(lines, "     pid class pidmem[%] totmem[%]   mem[M]")
+			lines = append(lines, "     pid class pidmem[%] totmem[%]    mem[G]")
 			for classNum := 0; classNum < classCount; classNum++ {
-				lines = append(lines, fmt.Sprintf("%8d %5d %9.2f %9.2f %8d",
+				lines = append(lines, fmt.Sprintf("%8d %5d %9.2f %9.2f %9.3f",
 					pid,
 					classNum,
 					float32(100*classPages[classNum])/float32(totPages),
 					float32(100*classPages[classNum])/float32(pageCount),
-					classPages[classNum]*constUPagesize/(1024*1024)))
+					float32(classPages[classNum]*constUPagesize)/float32(1024*1024*1024)))
 			}
 		}
 		return strings.Join(lines, "\n")

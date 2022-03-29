@@ -223,8 +223,8 @@ func (p *PolicyAge) Dump(args []string) string {
 			}
 		}
 		lines = append(lines, "table: time since last access")
-		lines = append(lines, "     pid lastacc>=[s] lastacc<[s]    pages   mem[M] pidmem[%]")
-		lineFmt := "%8s %12.3f %11.3f %8d %8d %9.2f"
+		lines = append(lines, "     pid lastaccs>=[s] lastaccs<[s]    pages   mem[G] pidmem[%]")
+		lineFmt := "%8s %13.3f %12.3f %8d %8.3f %9.2f"
 		for _, pid := range pids {
 			pidStr := strconv.Itoa(pid)
 			if pid == 0 {
@@ -237,7 +237,7 @@ func (p *PolicyAge) Dump(args []string) string {
 					float32(timeDurations[latterI-1])/float32(time.Second),
 					float32(timeDurations[latterI])/float32(time.Second),
 					pagesChanged,
-					pagesChanged*constUPagesize/(1024*1024),
+					float64(pagesChanged*constUPagesize)/float64(1024*1024*1024),
 					float64(100*pagesChanged)/float64(pagesPid)))
 			}
 		}

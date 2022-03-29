@@ -3,6 +3,7 @@ package memtier
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 )
 
 type Stats struct {
+	sync.RWMutex
 	namePulse   mapStringPStatsPulse
 	pidMadvices mapIntPStatsPidMadviced
 	pidMoves    mapIntPStatsPidMoved
@@ -35,11 +37,16 @@ type StatsPidMoved struct {
 }
 
 type StatsPidScanned struct {
-	sumTimeUs   uint64
-	sumScanned  uint64
-	sumAccessed uint64
-	sumWritten  uint64
-	count       uint64
+	sumTimeUs    uint64
+	sumScanned   uint64
+	sumAccessed  uint64
+	sumWritten   uint64
+	lastTimeUs   uint64
+	lastScanned  uint64
+	lastAccessed uint64
+	lastWritten  uint64
+	maxTimeUs    uint64
+	count        uint64
 }
 
 type StatsPulse struct {
@@ -117,6 +124,8 @@ func GetStats() *Stats {
 }
 
 func (s *Stats) Store(entry interface{}) {
+	s.Lock()
+	defer s.Unlock()
 	switch v := entry.(type) {
 	case StatsHeartbeat:
 		pulse, ok := s.namePulse[v.name]
@@ -167,6 +176,13 @@ func (s *Stats) Store(entry interface{}) {
 		sps.sumScanned += v.scanned
 		sps.sumAccessed += v.accessed
 		sps.sumWritten += v.written
+		sps.lastTimeUs = uint64(v.timeUs)
+		sps.lastScanned = v.scanned
+		sps.lastAccessed = v.accessed
+		sps.lastWritten = v.written
+		if sps.lastTimeUs > sps.maxTimeUs {
+			sps.maxTimeUs = sps.lastTimeUs
+		}
 	}
 }
 
@@ -207,63 +223,67 @@ func (s *Stats) Summarize() string {
 				name))
 	}
 	lines = append(lines, "", "table: process_madvice syscalls")
-	lines = append(lines, "     pid    calls req[pages]  ok[pages]    ok[M] advice:mem[M]")
+	lines = append(lines, "     pid    calls req[pages]  ok[pages]    ok[G] advice:mem[G]")
 	for _, pid := range s.pidMadvices.sortedKeys() {
 		spm := s.pidMadvices[pid]
-		advMem := fmt.Sprintf("PAGEOUT:%d;COLD:%d",
-			spm.advicePageCount[unix.MADV_PAGEOUT]*constUPagesize/(1024*1024),
-			spm.advicePageCount[unix.MADV_COLD]*constUPagesize/(1024*1024))
-		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8d %s",
+		advMem := fmt.Sprintf("PAGEOUT:%.3f;COLD:%.3f",
+			float64(spm.advicePageCount[unix.MADV_PAGEOUT]*constUPagesize)/float64(1024*1024*1024),
+			float64(spm.advicePageCount[unix.MADV_COLD]*constUPagesize)/float64(1024*1024*1024))
+		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8.3f %s",
 			pid,
 			spm.sumSyscalls,
 			spm.sumPageCount,
 			spm.errnoPageCount[0],
-			spm.errnoPageCount[0]*constUPagesize/(1024*1024),
+			float64(spm.errnoPageCount[0]*constUPagesize)/float64(1024*1024*1024),
 			advMem))
 	}
 	lines = append(lines, "", "table: move_pages syscalls")
-	lines = append(lines, "     pid    calls req[pages]  ok[pages] moved[M] targetnode:moved[M]")
+	lines = append(lines, "     pid    calls req[pages]  ok[pages] moved[G] targetnode:moved[G]")
 	for _, pid := range s.pidMoves.sortedKeys() {
 		spm := s.pidMoves[pid]
 		node_moved_list := []string{}
 		for _, node := range spm.sumDestNodePages.sortedKeys() {
-			node_moved_list = append(node_moved_list, fmt.Sprintf("%d:%d",
+			node_moved_list = append(node_moved_list, fmt.Sprintf("%d:%.3f",
 				node,
-				spm.sumDestNodePages[node]*constUPagesize/(1024*1024)))
+				float64(spm.sumDestNodePages[node]*constUPagesize)/float64(1024*1024*1024)))
 		}
 		node_moved := strings.Join(node_moved_list, ";")
-		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8d %s",
+		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8.3f %s",
 			pid,
 			spm.sumSyscalls,
 			spm.sumReqs,
 			spm.sumDestNode,
-			spm.sumDestNode*constUPagesize/(1024*1024),
+			float64(spm.sumDestNode*constUPagesize)/float64(1024*1024*1024),
 			node_moved))
 	}
 	lines = append(lines, "", "table: move_pages syscall errors in page statuses")
-	lines = append(lines, "     pid    pages  size[M]    errno error")
+	lines = append(lines, "     pid    pages  size[G]    errno error")
 	for pid, spm := range s.pidMoves {
 		for _, errno := range spm.sumErrorCounts.sortedKeys() {
-			lines = append(lines, fmt.Sprintf("%8d %8d %8d %8d %s",
+			lines = append(lines, fmt.Sprintf("%8d %8d %8.3f %8d %s",
 				pid,
 				spm.sumErrorCounts[errno],
-				spm.sumErrorCounts[errno]*constUPagesize/(1024*1024),
+				float64(spm.sumErrorCounts[errno]*constUPagesize)/float64(1024*1024*1024),
 				errno,
 				syscall.Errno(errno)))
 		}
 	}
 	lines = append(lines, "", "table: memory scans")
-	lines = append(lines, "     pid    scans tot[pages]   avg[M]  avg[ms] avgaccs[M] avgwrite[M]")
+	lines = append(lines, "     pid    scans   tot[pages] avg[s]   last max[s]   avg[G]  last[G] a+w[%%] last")
 	for _, pid := range s.pidScans.sortedKeys() {
 		sps := s.pidScans[pid]
-		lines = append(lines, fmt.Sprintf("%8d %8d %10d %8d %8d %10d %11d",
+		lines = append(lines, fmt.Sprintf("%8d %8d %12d %6.3f %6.3f %6.3f %8.3f %8.3f %5.2f %5.2f",
 			pid,
 			sps.count,
 			sps.sumScanned,
-			sps.sumScanned*constUPagesize/sps.count/1024/1024,
-			sps.sumTimeUs/1000/sps.count,
-			sps.sumAccessed*constUPagesize/sps.count/1024/1024,
-			sps.sumWritten*constUPagesize/sps.count/1024/1024))
+			float64(sps.sumTimeUs)/float64(1000*1000*sps.count),
+			float64(sps.lastTimeUs)/float64(1000*1000),
+			float64(sps.maxTimeUs)/float64(1000*1000),
+			float64(sps.sumScanned*constUPagesize)/float64(sps.count*1024*1024*1024),
+			float64(sps.lastScanned*constUPagesize)/float64(1024*1024*1024),
+			float64(100*(sps.sumAccessed+sps.sumWritten))/float64(sps.sumScanned),
+			float64(100*(sps.lastAccessed+sps.lastWritten))/float64(sps.lastScanned),
+		))
 	}
 	return strings.Join(lines, "\n")
 }
