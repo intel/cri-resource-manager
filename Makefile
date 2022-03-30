@@ -88,8 +88,14 @@ RESMGR_API_VERSION := $(shell ls pkg/apis/resmgr | grep '^v[0-9]*')
 
 # Git (tagged) version and revisions we'll use to linker-tag our binaries with.
 RANDOM_ID := "$(shell head -c20 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+
+ifdef STATIC
+    STATIC_LDFLAGS:=-extldflags=-static
+    BUILD_TAGS:=-tags osusergo,netgo
+endif
+
 LDFLAGS    = \
-    -ldflags "-X=github.com/intel/cri-resource-manager/pkg/version.Version=$(BUILD_VERSION) \
+    -ldflags "$(STATIC_LDFLAGS) -X=github.com/intel/cri-resource-manager/pkg/version.Version=$(BUILD_VERSION) \
              -X=github.com/intel/cri-resource-manager/pkg/version.Build=$(BUILD_BUILDID) \
              -B 0x$(RANDOM_ID)"
 
