@@ -101,6 +101,10 @@ else
     GCFLAGS=
 endif
 
+ifdef GLIBC_PREFIX
+    CGO_LDFLAGS:="$(CGO_LDFLAGS) -nodefaultlibs -L$(GLIBC_PREFIX)/lib -lc"
+endif
+
 # Release/end-to-end testing. Specify E2E_TESTS to override the default test set.
 E2E_RUN := reinstall_cri_resmgr=1 test/e2e/run_tests.sh
 
@@ -268,7 +272,7 @@ bin/%:
 	echo "Building $@ (version $(BUILD_VERSION), build $(BUILD_BUILDID))..."; \
 	mkdir -p bin && \
 	cd $$src && \
-	    $(GO_BUILD) $(BUILD_TAGS) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
+	    CGO_LDFLAGS=$(CGO_LDFLAGS) $(GO_BUILD) $(BUILD_TAGS) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
 
 install-bin-%: bin/%
 	$(Q)bin=$(patsubst install-bin-%,%,$@); dir=cmd/$$bin; \
