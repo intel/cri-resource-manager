@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 type TrackerDamonConfig struct {
@@ -65,6 +66,7 @@ type TrackerDamon struct {
 	accesses   map[int]map[uint64]map[uint64]uint64
 	tidpid     map[int64]int
 	lostEvents uint
+	raes       rawAccessEntries
 }
 
 func init() {
@@ -474,7 +476,6 @@ func (t *TrackerDamon) perfHandleLine(line string) error {
 	}
 	// TODO: avoid locking this often
 	t.mutex.Lock()
-	defer t.mutex.Unlock()
 	startLengthCount, ok := t.accesses[pid]
 	if !ok {
 		startLengthCount = make(map[uint64]map[uint64]uint64)
@@ -491,5 +492,30 @@ func (t *TrackerDamon) perfHandleLine(line string) error {
 	} else {
 		lengthCount[lengthPgs] = uint64(nr)
 	}
+	t.mutex.Unlock()
+	if t.raes.data != nil {
+		timestamp := time.Now().UnixNano()
+		rae := &rawAccessEntry{
+			timestamp: timestamp,
+			pid:       pid,
+			addr:      uint64(start),
+			length:    lengthPgs,
+			accessCounter: accessCounter{
+				a: uint64(nr),
+			},
+		}
+		t.raes.store(rae)
+	}
 	return nil
+}
+
+func (t *TrackerDamon) Dump(args []string) string {
+	usage := "Usage: dump raw PARAMS"
+	if len(args) == 0 {
+		return usage
+	}
+	if args[0] == "raw" {
+		return t.raes.dump(args[1:])
+	}
+	return ""
 }

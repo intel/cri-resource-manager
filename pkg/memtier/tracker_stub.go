@@ -52,3 +52,7 @@ func (t *TrackerStub) ResetCounters() {
 func (t *TrackerStub) GetCounters() *TrackerCounters {
 	return nil
 }
+
+func (t *TrackerStub) Dump([]string) string {
+	return ""
+}

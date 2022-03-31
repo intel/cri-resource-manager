@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type TrackerConfig struct {
@@ -47,8 +48,24 @@ type Tracker interface {
 	RemovePids([]int)           // Remove pids, RemovePids(nil) clears all.
 	Start() error               // Start tracking.
 	Stop()                      // Stop tracking.
+	Dump([]string) string       // Peek at tracker internals.
 	ResetCounters()
 	GetCounters() *TrackerCounters
+}
+
+var raeBufSize int = 4096
+
+type rawAccessEntry struct {
+	timestamp int64
+	pid       int
+	addr      uint64
+	length    uint64
+	accessCounter
+}
+
+type rawAccessEntries struct {
+	mutex sync.Mutex
+	data  []*rawAccessEntry
 }
 
 type TrackerCreator func() (Tracker, error)
@@ -74,6 +91,52 @@ func NewTracker(name string) (Tracker, error) {
 		return creator()
 	}
 	return nil, fmt.Errorf("invalid tracker name %q", name)
+}
+
+func (raes *rawAccessEntries) dump(args []string) string {
+	if len(args) == 0 {
+		return "Usage: dump raw <start|new|stop>"
+	}
+	if raes.data != nil {
+		raes.mutex.Lock()
+		defer raes.mutex.Unlock()
+	}
+	switch args[0] {
+	case "start":
+		raes.data = make([]*rawAccessEntry, 0, raeBufSize)
+		return "raw access events recording started"
+	case "stop":
+		raes.data = nil
+		return "raw access events recording stopped"
+	case "new":
+		if raes.data == nil {
+			return "error: not recording"
+		}
+		raeData := raes.data
+		raes.data = make([]*rawAccessEntry, 0, raeBufSize)
+		return raeDataToString(raeData)
+	default:
+		return fmt.Sprintf("invalid raw parameter: %q", args[0])
+	}
+}
+
+func (raes *rawAccessEntries) store(rae *rawAccessEntry) {
+	if raes.data == nil {
+		return
+	}
+	raes.mutex.Lock()
+	defer raes.mutex.Unlock()
+	raes.data = append(raes.data, rae)
+}
+
+func raeDataToString(raeData []*rawAccessEntry) string {
+	lines := make([]string, len(raeData)+1)
+	lines[0] = "          timestamp       pid             addr    pages     accs   writes"
+	lineFmt := "%20d %8d %16x %8d %8d %8d"
+	for raeIndex, rae := range raeData {
+		lines[raeIndex+1] = fmt.Sprintf(lineFmt, rae.timestamp, rae.pid, rae.addr, rae.length, rae.a, rae.w)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (tcs *TrackerCounters) SortByAccesses() {

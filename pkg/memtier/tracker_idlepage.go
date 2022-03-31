@@ -66,6 +66,7 @@ type TrackerIdlePage struct {
 	// accesses
 	accesses  map[int]map[uint64]map[uint64]*accessCounter
 	toSampler chan byte
+	raes      rawAccessEntries
 }
 
 func init() {
@@ -344,6 +345,18 @@ func (t *TrackerIdlePage) countPages() {
 			}
 			counts.a += cntPagesAccessed
 			totAccessed += cntPagesAccessed
+			if t.raes.data != nil {
+				rae := &rawAccessEntry{
+					timestamp: scanStartTime,
+					pid:       pid,
+					addr:      addr,
+					length:    lengthPages,
+					accessCounter: accessCounter{
+						a: cntPagesAccessed,
+					},
+				}
+				t.raes.store(rae)
+			}
 		}
 		pmFile.Close()
 		scanEndTime := time.Now().UnixNano()
@@ -397,4 +410,15 @@ func (t *TrackerIdlePage) setIdleBits() {
 		}
 		pmFile.Close()
 	}
+}
+
+func (t *TrackerIdlePage) Dump(args []string) string {
+	usage := "Usage: dump raw PARAMS"
+	if len(args) == 0 {
+		return usage
+	}
+	if args[0] == "raw" {
+		return t.raes.dump(args[1:])
+	}
+	return ""
 }

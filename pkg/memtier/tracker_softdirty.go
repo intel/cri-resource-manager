@@ -73,6 +73,7 @@ type TrackerSoftDirty struct {
 	// accesses maps pid -> startAddr -> lengthPages -> num of access & writes
 	accesses  map[int]map[uint64]map[uint64]*accessCounter
 	toSampler chan byte
+	raes      rawAccessEntries
 }
 
 func init() {
@@ -352,6 +353,19 @@ func (t *TrackerSoftDirty) countPages() {
 			counts.w += cntPagesWritten
 			totAccessed += cntPagesAccessed
 			totWritten += cntPagesWritten
+			if t.raes.data != nil {
+				rae := &rawAccessEntry{
+					timestamp: scanStartTime,
+					pid:       pid,
+					addr:      addr,
+					length:    lengthPages,
+					accessCounter: accessCounter{
+						a: cntPagesAccessed,
+						w: cntPagesWritten,
+					},
+				}
+				t.raes.store(rae)
+			}
 		}
 		pmFile.Close()
 		scanEndTime := time.Now().UnixNano()
@@ -380,4 +394,15 @@ func (t *TrackerSoftDirty) clearPageBits() {
 			t.removePid(pid)
 		}
 	}
+}
+
+func (t *TrackerSoftDirty) Dump(args []string) string {
+	usage := "Usage: dump raw PARAMS"
+	if len(args) == 0 {
+		return usage
+	}
+	if args[0] == "raw" {
+		return t.raes.dump(args[1:])
+	}
+	return ""
 }

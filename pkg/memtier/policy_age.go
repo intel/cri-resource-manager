@@ -159,10 +159,9 @@ func (p *PolicyAge) Tracker() Tracker {
 }
 
 func (p *PolicyAge) Dump(args []string) string {
-	dumpHelp := `dump <accessed> TIMESPEC,TIMESPEC[,TIMESPEC]... [PID[,PID]]
+	dumpHelp := `dump accessed TIMESPEC,TIMESPEC[,TIMESPEC]... [PID[,PID]]
         Examples:
-            dump accessed 0,0.5s,1s,2s,4s,10s,1m
-	`
+            dump accessed 0,0.5s,1s,2s,4s,10s,1m`
 	if len(args) == 0 {
 		return dumpHelp
 	}
@@ -182,7 +181,7 @@ func (p *PolicyAge) Dump(args []string) string {
 				time.Duration(p.config.SwapOutMs)*time.Millisecond,
 				time.Duration(0))
 		} else {
-			for _, timeSpec := range strings.Split(args[1], ",") {
+			for _, timeSpec := range strings.Split(strings.TrimSpace(args[1]), ",") {
 				timeDur, err := parseTimeDuration(timeSpec)
 				if err != nil {
 					return fmt.Sprintf("invalid TIMESPEC %q: %s", timeSpec, err)
@@ -190,7 +189,7 @@ func (p *PolicyAge) Dump(args []string) string {
 				timeDurations = append(timeDurations, timeDur)
 			}
 			if len(args) == 3 {
-				for _, pidSpec := range strings.Split(args[2], ",") {
+				for _, pidSpec := range strings.Split(strings.TrimSpace(args[2]), ",") {
 					pid, err := strconv.Atoi(pidSpec)
 					if err != nil {
 						return fmt.Sprintf("invalid pid: %q", pidSpec)

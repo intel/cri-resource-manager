@@ -104,6 +104,20 @@ process. After 10 seconds print detected accesses and statistics:
 ( echo "tracker -create idlepage -start $(pidof meme)"; sleep 10; echo "tracker -counters"; echo "stats" ) | ./memtierd -prompt
 ```
 
+Example: Save timestamped raw memory access events that a tracker has
+recorded.
+
+```
+# Start recording raw memory access events.
+memtierd> tracker -dump raw start
+# Append new (unreported) raw memory access events to a file.
+memtierd> tracker -dump raw new | tee -a raw-events.txt | wc -l
+...
+memtierd> tracker -dump raw new | tee -a raw-events.txt | wc -l
+# Finally stop recording.
+memtierd> tracker -dump raw stop
+```
+
 > Tip: install `rlwrap` and run `sudo rlwrap memtierd --prompt` to
 > enable convenient readline input with history.
 

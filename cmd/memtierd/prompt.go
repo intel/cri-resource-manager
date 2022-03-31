@@ -643,10 +643,12 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 	stop := p.f.Bool("stop", false, "stop tracker")
 	counters := p.f.Bool("counters", false, "print tracker raw counters")
 	heat := p.f.Bool("heat", false, "print address range heats")
+	dump := p.f.Bool("dump", false, "dump tracker internals")
 
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
+	remainder := p.f.Args()
 	if *ls {
 		p.output(strings.Join(memtier.TrackerList(), "\n") + "\n")
 		return csOk
@@ -718,6 +720,10 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 		p.tracker.ResetCounters()
 		p.output("tracker counters reset\n")
 	}
+	if *dump {
+		p.output("%s\n", p.tracker.Dump(remainder))
+		p.output("\n")
+	}
 	return csOk
 }
 
@@ -727,7 +733,7 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	config := p.f.String("config", "", "reconfigure policy with JSON string")
 	configDump := p.f.Bool("config-dump", false, "dump current config")
 	configFile := p.f.String("config-file", "", "reconfigure policy with JSON FILE")
-	dump := p.f.String("dump", "", "dump policy state")
+	dump := p.f.Bool("dump", false, "dump policy state")
 	start := p.f.Bool("start", false, "start policy")
 	stop := p.f.Bool("stop", false, "stop policy")
 	if err := p.f.Parse(args); err != nil {
@@ -785,9 +791,8 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 		p.policy.Stop()
 		p.output("policy stopped\n")
 	}
-	if *dump != "" {
-		dumpArgs := append([]string{*dump}, remainder...)
-		p.output("%s\n", p.policy.Dump(dumpArgs))
+	if *dump {
+		p.output("%s\n", p.policy.Dump(remainder))
 		p.output("\n")
 	}
 	return csOk
