@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Policies &mdash; CRI Resource Manager 0.6.1rc1-8-g012da76e documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Balloons Policy &mdash; CRI Resource Manager 0.6.1rc1-8-g012da76e documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -15,8 +15,8 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Topology-Aware Policy" href="topology-aware.html" />
-    <link rel="prev" title="Setup and Usage" href="../setup.html" /> 
+    <link rel="next" title="Podpools Policy" href="podpools.html" />
+    <link rel="prev" title="Static-Pools (STP) Policy" href="static-pools.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -43,10 +43,21 @@
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Policies</a><ul>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Policies</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="topology-aware.html">Topology-Aware Policy</a></li>
 <li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
-<li class="toctree-l2"><a class="reference internal" href="balloons.html">Balloons Policy</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Balloons Policy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#deployment">Deployment</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#install-cri-resmgr">Install cri-resmgr</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#debugging">Debugging</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="podpools.html">Podpools Policy</a></li>
 <li class="toctree-l2"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
 <li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
@@ -78,9 +89,10 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>Policies</li>
+          <li><a href="index.html">Policies</a> &raquo;</li>
+      <li>Balloons Policy</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../_sources/docs/policy/index.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/docs/policy/balloons.md.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -88,19 +100,63 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="policies">
-<h1>Policies<a class="headerlink" href="#policies" title="Permalink to this headline">¶</a></h1>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="topology-aware.html">Topology-Aware Policy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="balloons.html">Balloons Policy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="podpools.html">Podpools Policy</a></li>
-<li class="toctree-l1"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
-<li class="toctree-l1"><a class="reference internal" href="blockio.html">Block IO</a></li>
-<li class="toctree-l1"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cpu-allocator.html">CPU Allocator</a></li>
-</ul>
+  <div class="tex2jax_ignore mathjax_ignore section" id="balloons-policy">
+<h1>Balloons Policy<a class="headerlink" href="#balloons-policy" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>The balloons policy implements workload placement into “balloons” that
+are pools of exclusive CPUs. A balloon can be inflated and deflated,
+that is CPUs added and removed, based on the CPU resource requests of
+the workloads in the balloon. The policy supports both static and
+dynamically created and popped balloons. The balloons policy enables
+configuring balloon-specific CPU classes.</p>
+</div>
+<div class="section" id="deployment">
+<h2>Deployment<a class="headerlink" href="#deployment" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="install-cri-resmgr">
+<h3>Install cri-resmgr<a class="headerlink" href="#install-cri-resmgr" title="Permalink to this headline">¶</a></h3>
+<p>Deploy cri-resmgr on each node as you would for any other policy. See
+<a class="reference internal" href="../installation.html"><span class="doc std std-doc">installation</span></a> for more details.</p>
+</div>
+</div>
+<div class="section" id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
+<p>The balloons policy is configured using the yaml-based configuration
+system of CRI-RM. See <a class="reference external" href="../setup.html#setting-up-cri-resource-manager">setup and
+usage</a> for more details
+on managing the configuration.</p>
+<p>Example configuration that runs all pods in balloons of 1-4 CPUs.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+  <span class="nt">Active</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">balloons</span>
+  <span class="nt">ReservedResources</span><span class="p">:</span>
+    <span class="nt">CPU</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+  <span class="nt">balloons</span><span class="p">:</span>
+    <span class="nt">BalloonTypes</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">Name</span><span class="p">:</span> <span class="s">&quot;quad&quot;</span>
+        <span class="nt">MinCpus</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+        <span class="nt">MaxCPUs</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">4</span>
+        <span class="nt">Namespaces</span><span class="p">:</span>
+          <span class="p p-Indicator">-</span> <span class="s">&quot;*&quot;</span>
+</pre></div>
+</div>
+<p>See the <span class="xref myst">sample configmap</span> for a
+complete example.</p>
+<div class="section" id="debugging">
+<h3>Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h3>
+<p>In order to enable more verbose logging and metrics exporting from the
+balloons policy, enable instrumentation and policy debugging from the
+CRI-RM global config:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">instrumentation</span><span class="p">:</span>
+  <span class="c1"># The balloons policy exports containers running in each balloon,</span>
+  <span class="c1"># and cpusets of balloons. Accessible in command line:</span>
+  <span class="c1"># curl --silent http://localhost:8891/metrics</span>
+  <span class="nt">HTTPEndpoint</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">:8891</span>
+  <span class="nt">PrometheusExport</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">logger</span><span class="p">:</span>
+  <span class="nt">Debug</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">policy</span>
+</pre></div>
+</div>
+</div>
 </div>
 </div>
 
@@ -108,8 +164,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../setup.html" class="btn btn-neutral float-left" title="Setup and Usage" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="topology-aware.html" class="btn btn-neutral float-right" title="Topology-Aware Policy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="static-pools.html" class="btn btn-neutral float-left" title="Static-Pools (STP) Policy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="podpools.html" class="btn btn-neutral float-right" title="Podpools Policy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
