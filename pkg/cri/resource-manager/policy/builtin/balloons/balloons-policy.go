@@ -417,7 +417,8 @@ func (p *balloons) resetCpuClass() error {
 	//
 	// Note: p.useCpuClass(balloon) will be called before assigning
 	// containers on the balloon, including the reserved balloon.
-	log.Errorf("NOT IMPLEMENTED: resetCpuClass available: %s; reserved: %s", p.allowed, p.reserved)
+	p.cch.SetCPUClass(p.bpoptions.IdleCpuClass, p.allowed.ToSliceNoSort()...)
+	log.Debugf("resetCpuClass available: %s; reserved: %s", p.allowed, p.reserved)
 	return nil
 }
 
@@ -441,7 +442,8 @@ func (p *balloons) useCpuClass(bln *Balloon) error {
 	// - User-defined CPU AllocatorPriority: bln.Def.AllocatorPriority.
 	// - All existing balloon instances: p.balloons.
 	// - CPU configurations by user: bln.Def.CpuClass (for bln in p.balloons)
-	log.Errorf("NOT IMPLEMENTED: useCpuClass Cpus: %s; CpuClass: %s", bln.Cpus, bln.Def.CpuClass)
+	p.cch.SetCPUClass(bln.Def.CpuClass, bln.Cpus.ToSliceNoSort()...)
+	log.Debugf("useCpuClass Cpus: %s; CpuClass: %s", bln.Cpus, bln.Def.CpuClass)
 	return nil
 }
 
@@ -449,7 +451,8 @@ func (p *balloons) useCpuClass(bln *Balloon) error {
 func (p *balloons) forgetCpuClass(bln *Balloon) {
 	// Use p.IdleCpuClass for bln.Cpus.
 	// Usual inputs: see useCpuClass
-	log.Errorf("NOT IMPLEMENTED: forgetCpuClass Cpus: %s; CpuClass: %s", bln.Cpus, bln.Def.CpuClass)
+	p.cch.SetCPUClass(p.bpoptions.IdleCpuClass, bln.Cpus.ToSliceNoSort()...)
+	log.Debugf("forgetCpuClass Cpus: %s; CpuClass: %s", bln.Cpus, bln.Def.CpuClass)
 }
 
 func (p *balloons) newBalloon(blnDef *BalloonDef, confCpus bool) (*Balloon, error) {

@@ -38,6 +38,8 @@ type Control interface {
 	RunPostUpdateHooks(cache.Container) error
 	// RunPostStopHooks runs the post-stop hooks of all registered controllers.
 	RunPostStopHooks(cache.Container) error
+	// RunUpdateConfigHooks runs the config hooks of all registered controllers.
+	RunUpdateConfigHooks(cache.Cache) error
 }
 
 // Controller is the interface all resource controllers must implement.
@@ -56,6 +58,8 @@ type Controller interface {
 	PostUpdateHook(cache.Container) error
 	// PostStopHook is the controller's post-stop hook.
 	PostStopHook(cache.Container) error
+	// UpdateConfig is the controller's config hook.
+	UpdateConfig(cache.Cache) error
 }
 
 // control encapsulates our controller-agnostic runtime state.
@@ -76,11 +80,12 @@ type controller struct {
 
 // our hook names
 const (
-	precreate  = "pre-create"
-	prestart   = "pre-start"
-	poststart  = "post-start"
-	postupdate = "post-update"
-	poststop   = "post-stop"
+	precreate    = "pre-create"
+	prestart     = "pre-start"
+	poststart    = "post-start"
+	postupdate   = "post-update"
+	poststop     = "post-stop"
+	updateconfig = "update-config"
 )
 
 // All registered controllers.
@@ -202,6 +207,45 @@ func (c *control) RunPostStopHooks(container cache.Container) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// RunUpdateConfigHooks runs all registered controllers' hardware config hooks.
+func (c *control) RunUpdateConfigHooks(cache cache.Cache) error {
+	for _, controller := range c.controllers {
+		if err := c.runupdateconfighook(controller, updateconfig, cache); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// runhook executes the given container hook according to the controller settings
+func (c *control) runupdateconfighook(controller *controller, hook string, cch cache.Cache) error {
+	if controller.mode == Disabled || !controller.running {
+		return nil
+	}
+
+	var fn func(cache.Cache) error
+
+	switch hook {
+	case updateconfig:
+		fn = controller.c.UpdateConfig
+	}
+
+	if fn == nil {
+		return nil
+	}
+
+	log.Debug("running %s %s hook", controller.name, hook)
+
+	if err := fn(cch); err != nil {
+		if controller.mode == Required {
+			return controlError("%s %s hook failed: %v", controller.name, hook, err)
+		}
+		log.Error("%s %s hook failed: %v", controller.name, hook, err)
+	}
+
 	return nil
 }
 

@@ -813,7 +813,7 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 				c.PrettyName(), c.GetState())
 		}
 	}
-	return nil
+	return m.runUpdateConfigHooks(ctx, method)
 }
 
 // runPostStartHooks runs the necessary hooks after having started a container.
@@ -858,7 +858,7 @@ func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string, release
 				method, c.PrettyName(), c.GetState())
 		}
 	}
-	return nil
+	return m.runUpdateConfigHooks(ctx, method)
 }
 
 // runPostUpdateHooks runs the necessary hooks after reconcilation.
@@ -883,6 +883,17 @@ func (m *resmgr) runPostUpdateHooks(ctx context.Context, method string) error {
 				c.PrettyName(), c.GetState())
 		}
 	}
+
+	return m.runUpdateConfigHooks(ctx, method)
+}
+
+// runUpdateConfigHooks runs the necessary hooks after configuration changes
+func (m *resmgr) runUpdateConfigHooks(ctx context.Context, method string) error {
+	if err := m.control.RunUpdateConfigHooks(m.cache); err != nil {
+		m.Warn("updateconfig hook failed: %v", err)
+	}
+
+	m.cache.ClearPendingConfig()
 	return nil
 }
 

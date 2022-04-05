@@ -156,6 +156,10 @@ func (ctl *rdtctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+func (ctl *rdtctl) UpdateConfig(cache cache.Cache) error {
+	return nil
+}
+
 // assign assigns all processes/threads in a container to the correct class
 func (ctl *rdtctl) assign(c cache.Container) error {
 	if ctl.opt.Options.Mode == OperatingModeDisabled {

@@ -129,6 +129,11 @@ func (ctl *cpuctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+// UpdateHWConfig handler for the CPU controller.
+func (ctl *cpuctl) UpdateConfig(cache cache.Cache) error {
+	return cache.TraversePendingConfig(Assign)
+}
+
 // assign assigns a cpuset to a class
 func (ctl *cpuctl) assign(class string, cpus ...int) error {
 	if _, ok := ctl.config.Classes[class]; !ok {
@@ -157,6 +162,8 @@ func (ctl *cpuctl) assign(class string, cpus ...int) error {
 			}
 		}
 	}
+
+	ctl.setClassAssignments(&assignments)
 
 	return nil
 }

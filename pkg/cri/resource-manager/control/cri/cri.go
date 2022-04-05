@@ -145,6 +145,10 @@ func (ctl *crictl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+func (ctl *crictl) UpdateConfig(cache cache.Cache) error {
+	return nil
+}
+
 // criError creates an CRI-controller-specific formatted error message.
 func criError(format string, args ...interface{}) error {
 	return fmt.Errorf("cri: "+format, args...)

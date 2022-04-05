@@ -108,6 +108,10 @@ func (ctl *blockioctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+func (ctl *blockioctl) UpdateConfig(cache cache.Cache) error {
+	return nil
+}
+
 // isImplicitlyDisabled checks if we run without any classes confiured
 func (ctl *blockioctl) isImplicitlyDisabled() bool {
 	if ctl.idle != nil {

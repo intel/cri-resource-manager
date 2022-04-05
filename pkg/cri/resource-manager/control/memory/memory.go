@@ -115,6 +115,10 @@ func (ctl *memctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+func (ctl *memctl) UpdateConfig(cache cache.Cache) error {
+	return nil
+}
+
 // Check if memory cgroup controller supports top tier soft limits.
 func (ctl *memctl) checkToptierLimitSupport() bool {
 	_, err := os.Stat(memoryCgroupPath + "/" + toptierSoftLimitControl)

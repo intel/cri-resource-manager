@@ -144,6 +144,10 @@ func (m *migration) PostStopHook(cc cache.Container) error {
 	return nil
 }
 
+func (m *migration) UpdateConfig(cache cache.Cache) error {
+	return nil
+}
+
 // syncWithCache synchronizes tracked containers with the cache.
 func (m *migration) syncWithCache() {
 	m.Lock()

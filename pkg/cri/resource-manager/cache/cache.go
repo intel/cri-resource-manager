@@ -593,6 +593,13 @@ type Cache interface {
 	OpenFile(string, string, os.FileMode) (*os.File, error)
 	// WriteFile writes a container data file, creating it if necessary.
 	WriteFile(string, string, os.FileMode, []byte) error
+
+	// SetCPUClass assigns a list of CPUs to the given CPU class.
+	SetCPUClass(string, ...int)
+	// ClearPendingConfig clears the pending configuration.
+	ClearPendingConfig()
+	// TraversePendingConfig() returns the pending list of CPU class mapping.
+	TraversePendingConfig(func(string, ...int) error) error
 }
 
 const (
@@ -614,6 +621,22 @@ var (
 	dataFilePerm  = &permissions{prefer: 0644, reject: 0022}
 )
 
+// ControllerConfig is the exposed interface from a cached configuration.
+type ControllerConfig interface {
+	// SetCPUClass assigns a list of CPUs to the given CPU class.
+	SetCPUClass(string, ...int)
+}
+
+// A cached controller configuration
+type controllerConfig struct {
+	// CPU controller needs CPU number to CPU class mapping
+	pending map[string][]int
+}
+
+func (conf *controllerConfig) SetCPUClass(class string, cpus ...int) {
+	conf.pending[class] = cpus
+}
+
 // Our cache of objects.
 type cache struct {
 	sync.Mutex    `json:"-"` // we're lockable
@@ -631,7 +654,8 @@ type cache struct {
 	policyData map[string]interface{} // opaque policy data
 	PolicyJSON map[string]string      // ditto in raw, unmarshaled form
 
-	pending map[string]struct{} // cache IDs of containers with pending changes
+	pending        map[string]struct{} // cache IDs of containers with pending changes
+	controllerConf controllerConfig    // generic controller configurations
 
 	implicit map[string]*ImplicitAffinity // implicit affinities
 }
@@ -657,6 +681,9 @@ func NewCache(options Options) (Cache, error) {
 		policyData: make(map[string]interface{}),
 		PolicyJSON: make(map[string]string),
 		implicit:   make(map[string]*ImplicitAffinity),
+		controllerConf: controllerConfig{
+			pending: make(map[string][]int),
+		},
 	}
 
 	if _, err := cch.checkPerm("cache", cch.filePath, false, cacheFilePerm); err != nil {
@@ -1604,6 +1631,41 @@ func (cch *cache) OpenFile(id string, name string, perm os.FileMode) (*os.File, 
 	}
 
 	return file, nil
+}
+
+// clear the pending state of the config.
+func (cch *cache) ClearPendingConfig() {
+	cch.controllerConf.pending = nil
+}
+
+// Mark a container as having pending changes.
+func (cch *cache) setupPendingConfig() {
+	if cch.controllerConf.pending == nil {
+		cch.controllerConf.pending = make(map[string][]int)
+	}
+}
+
+// SetCPUClass assigns a list of CPUs to the given CPU class.
+func (cch *cache) SetCPUClass(cpuclass string, cpus ...int) {
+	if cpuclass == "" {
+		cpuclass = "default"
+	}
+
+	cch.Debug("Setting CPU class %s cpus %v", cpuclass, cpus)
+
+	cch.setupPendingConfig()
+	cch.controllerConf.SetCPUClass(cpuclass, cpus...)
+}
+
+func (cch *cache) TraversePendingConfig(fn func(string, ...int) error) error {
+	for class, cpus := range cch.controllerConf.pending {
+		if err := fn(class, cpus...); err != nil {
+			return err
+		}
+	}
+
+	cch.ClearPendingConfig()
+	return nil
 }
 
 func (cch *cache) WriteFile(id string, name string, perm os.FileMode, data []byte) error {

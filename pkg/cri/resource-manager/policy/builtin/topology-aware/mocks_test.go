@@ -750,3 +750,12 @@ func (m *mockCache) OpenFile(string, string, os.FileMode) (*os.File, error) {
 func (m *mockCache) WriteFile(string, string, os.FileMode, []byte) error {
 	panic("unimplemented")
 }
+func (m *mockCache) SetCPUClass(string, ...int) {
+	panic("unimplemented")
+}
+func (m *mockCache) ClearPendingConfig() {
+	panic("unimplemented")
+}
+func (m *mockCache) TraversePendingConfig(func(string, ...int) error) error {
+	panic("unimplemented")
+}
