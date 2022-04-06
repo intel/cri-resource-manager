@@ -119,8 +119,15 @@ func (ctl *cpuctl) enforce(class string, cpus ...int) error {
 		return fmt.Errorf("non-existent cpu class %q", class)
 	}
 
-	//TODO: configure cpus (sysfs)
 	log.Debug("enforcing cpu class %q on %v", class, cpus)
+
+	if err := utils.SetCPUsScalingMinFreq(cpus, (int)(ctl.config.Classes[class].MinFreq)); err != nil {
+		return fmt.Errorf("Cannot set min freq %d: %w", ctl.config.Classes[class].MinFreq, err)
+	}
+
+	if err := utils.SetCPUsScalingMaxFreq(cpus, (int)(ctl.config.Classes[class].MaxFreq)); err != nil {
+		return fmt.Errorf("Cannot set max freq %d: %w", ctl.config.Classes[class].MaxFreq, err)
+	}
 
 	return nil
 }
