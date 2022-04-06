@@ -283,6 +283,12 @@ Memtierd implements two policies: age and heat. These policies have
 different ways of interpreting memory tracker counters as page
 activity.
 
+Policies measure and manage the memory of processes that are defined
+in the configuration. Processes are searched from directories listed
+under `cgroups:`, or their process id's are listed under
+`pids:`. These options work similarly in both policies. See
+[memtierd-age-idlepage-trackonly.yaml](../../sample-configs/memtierd-age-idlepage-trackonly.yaml).
+
 ### The age policy
 
 The age policy keeps record on two times:

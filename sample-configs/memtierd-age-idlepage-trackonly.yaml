@@ -2,8 +2,13 @@ policy:
   name: age
   config: |
     intervalms: 2000
+    # cgroups is a list of cgroup directories from which pids to be
+    # tracked are searched for.
     cgroups:
       - /sys/fs/cgroup/track-me
+    # pids is a static list of process ids to be tracked.
+    # pids:
+    #   - 42024
     tracker:
       name: idlepage
       config: |
