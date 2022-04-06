@@ -30,6 +30,8 @@ type PolicyAgeConfig struct {
 	// policy manages processes in listed cgroups and recursively
 	// in their subgroups.
 	Cgroups []string
+	// Pids is a list of process id's to be tracked.
+	Pids []int
 	// IntervalMs is the length of the period in milliseconds in
 	// which new ages are calculated based on gathered tracker
 	// values, and page move and swap tasks are triggered.
@@ -272,14 +274,17 @@ func (p *PolicyAge) Start() error {
 	if p.tracker == nil {
 		return fmt.Errorf("missing tracker")
 	}
-	if len(p.config.Cgroups) == 0 {
-		return fmt.Errorf("policy has nothing to watch")
+	if len(p.config.Cgroups) == 0 && len(p.config.Pids) == 0 {
+		return fmt.Errorf("policy has no cgroups or pids to watch")
 	}
 	p.tracker.Start()
 	p.cgLoop = make(chan interface{})
 	p.cgPidWatcher.SetSources(p.config.Cgroups)
 	if len(p.config.Cgroups) > 0 {
 		p.cgPidWatcher.Start(p.tracker)
+	}
+	if len(p.config.Pids) > 0 {
+		p.tracker.AddPids(p.config.Pids)
 	}
 	p.mover.Start()
 	go p.loop()
