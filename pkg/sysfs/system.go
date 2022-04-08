@@ -976,7 +976,7 @@ func (sys *system) discoverSst() error {
 		}
 		sys.DebugBlock("", "Speed Select Technology info detected for package %d:\n%s", pkg.id, utils.DumpJSON(sstInfo))
 
-		if sstInfo.CPEnabled {
+		if sstInfo[pkg.id].CPEnabled {
 			ids := pkg.cpus.SortedMembers()
 
 			for _, id := range ids {
@@ -988,7 +988,7 @@ func (sys *system) discoverSst() error {
 				sys.cpus[id].sstClos = clos
 			}
 		}
-		pkg.sstInfo = sstInfo
+		pkg.sstInfo = *sstInfo[pkg.id]
 	}
 
 	return nil
