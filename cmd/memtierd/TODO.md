@@ -1,6 +1,17 @@
 Features
 --------
 
+- memtierd prometheus export.
+
+- Refactor cri-rm memorytiering to use pkg/memtier.
+
+- Huge pages. Autodetect!
+
+- CSV output from stats/dumps?
+
+- memtierd: check free memory availability from the system before
+  moving pages to a NUMA node.
+
 - damon: drop pids that we are not monitoring, warn if someone else
   in the system seems to be using damon at the same time.
 
