@@ -446,6 +446,7 @@ func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID idset.ID)
 	// 2. SST-CP dictates over SST-BF
 	// 3. SST-BF is meaningful if neither SST-TF nor SST-CP is enabled
 	switch {
+	case sst == nil:
 	case sst.TFEnabled:
 		log.Debug("package #%d: using SST-TF based CPU prioritization", pkgID)
 		// We only look at the CLOS id as SST-TF (seems to) follows ordered CLOS priority
@@ -475,7 +476,7 @@ func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID idset.ID)
 		}
 	}
 
-	if !active && sst.BFEnabled {
+	if !active && sst != nil && sst.BFEnabled {
 		log.Debug("package #%d: using SST-BF based CPU prioritization", pkgID)
 		for _, i := range cpuIDs {
 			id := idset.ID(i)
