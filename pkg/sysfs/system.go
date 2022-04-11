@@ -115,7 +115,7 @@ type CPUPackage interface {
 	NodeIDs() []idset.ID
 	DieNodeIDs(idset.ID) []idset.ID
 	DieCPUSet(idset.ID) cpuset.CPUSet
-	SstInfo() sst.SstPackageInfo
+	SstInfo() *sst.SstPackageInfo
 }
 
 type cpuPackage struct {
@@ -125,7 +125,7 @@ type cpuPackage struct {
 	dies     idset.IDSet              // dies in this package
 	dieCPUs  map[idset.ID]idset.IDSet // CPUs per die
 	dieNodes map[idset.ID]idset.IDSet // NUMA nodes per die
-	sstInfo  sst.SstPackageInfo       // Speed Select Technology info
+	sstInfo  *sst.SstPackageInfo      // Speed Select Technology info
 }
 
 // Node represents a NUMA node.
@@ -988,7 +988,7 @@ func (sys *system) discoverSst() error {
 				sys.cpus[id].sstClos = clos
 			}
 		}
-		pkg.sstInfo = *sstInfo[pkg.id]
+		pkg.sstInfo = sstInfo[pkg.id]
 	}
 
 	return nil
@@ -1030,7 +1030,7 @@ func (p *cpuPackage) DieCPUSet(id idset.ID) cpuset.CPUSet {
 	return cpuset.NewCPUSet()
 }
 
-func (p *cpuPackage) SstInfo() sst.SstPackageInfo {
+func (p *cpuPackage) SstInfo() *sst.SstPackageInfo {
 	return p.sstInfo
 }
 

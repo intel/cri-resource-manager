@@ -104,8 +104,8 @@ func (p *mockCPUPackage) DieNodeIDs(idset.ID) []idset.ID {
 	return []idset.ID{}
 }
 
-func (p *mockCPUPackage) SstInfo() sst.SstPackageInfo {
-	return sst.SstPackageInfo{}
+func (p *mockCPUPackage) SstInfo() *sst.SstPackageInfo {
+	return &sst.SstPackageInfo{}
 }
 
 type mockCPU struct {
