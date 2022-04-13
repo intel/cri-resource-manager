@@ -385,6 +385,11 @@ func (t *TrackerDamon) targetIdToPid(targetId int64, start uint64, end uint64) i
 		return pid
 	}
 
+	if len(t.pids) == 1 {
+		t.tidpid[targetId] = t.pids[0]
+		return t.tidpid[targetId]
+	}
+
 	// Unseen targetId. Read address ranges of all current
 	// processes. If we would go through only address ranges we
 	// have seen sometime earlier, we might end up trusting only
