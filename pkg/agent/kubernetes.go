@@ -262,9 +262,17 @@ func (w *watch) Start(name string) {
 
 		for {
 			if events == nil {
-				w.parent.Info("creating %s watch", w.Name())
+				if ratelimit == nil {
+					w.parent.Info("creating %s watch", w.Name())
+				} else {
+					w.parent.Debug("creating %s watch", w.Name())
+				}
 				if k8w, err = w.openfn(w.ns, w.name); err != nil {
-					w.parent.Warn("failed to create %s watch: %v", w.Name(), err)
+					if ratelimit == nil {
+						w.parent.Warn("failed to create %s watch: %v", w.Name(), err)
+					} else {
+						w.parent.Debug("failed to create %s watch: %v", w.Name(), err)
+					}
 					ratelimit = time.After(1 * time.Second)
 				} else {
 					events = k8w.ResultChan()
