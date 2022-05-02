@@ -328,7 +328,7 @@ func (t *TrackerDamon) perfReader() error {
 	// cool-down for regions where we don't get any reports but that
 	// are still in process's address space. Now those regions are
 	// considered possibly free()'d by tracked process.
-	perfTraceArgs := []string{"trace", "-e", "damon:damon_aggregated"}
+	perfTraceArgs := []string{"trace", "-e", "damon:damon_aggregated", "--libtraceevent_print"}
 	perfExtraArgs := strings.Split(t.config.Connection, " ")[1:]
 	perfArgs := append(perfTraceArgs, perfExtraArgs...)
 	cmd := exec.Command("perf", perfArgs...)
@@ -379,7 +379,7 @@ func (t *TrackerDamon) perfReader() error {
 	return nil
 }
 
-func (t *TrackerDamon) targetIdToPid(targetId int64, start uint64, end uint64) int {
+func (t *TrackerDamon) targetIdToPid(targetId int64, start uint64, end uint64, targetIdIsPidIndex bool) int {
 	// If targetId is already mapped to pid, return it.
 	if pid, ok := t.tidpid[targetId]; ok {
 		return pid
@@ -388,6 +388,10 @@ func (t *TrackerDamon) targetIdToPid(targetId int64, start uint64, end uint64) i
 	if len(t.pids) == 1 {
 		t.tidpid[targetId] = t.pids[0]
 		return t.tidpid[targetId]
+	}
+
+	if targetIdIsPidIndex && targetId > 0 && targetId < int64(len(t.pids)) {
+		return t.pids[targetId]
 	}
 
 	// Unseen targetId. Read address ranges of all current
@@ -420,10 +424,13 @@ func (t *TrackerDamon) targetIdToPid(targetId int64, start uint64, end uint64) i
 }
 
 func (t *TrackerDamon) perfHandleLine(line string) error {
-	// Parse line. Example of perf damon:damon_aggregated output lines:
-	// 12400.049 kdamond.0/30572 damon:damon_aggregated(target_id: -121171723722880, nr_regions: 13, start: 139995295608832, end: 139995297484800, nr_accesses: 1)
-	// 12400.049 kdamond.0/30572 damon:damon_aggregated(target_id: -121171723722880, nr_regions: 13, start: 139995295608832, end: 139995297484800)
+	// Parse line. Example of "perf trace -e damon:damon_aggregated --libtraceevent_print" output lines, Linux 5.15, 5.16:
+	//   0.000 kdamond.0/1527 damon:damon_aggregated(target_id=18446634001245894528 nr_regions=7 4194304-185102770176: 0)
 	// LOST 123 events!
+	// (The last three numbers on the first line being start_addr, end_addr and nr_accesses.)
+	// Linux 5.17+:
+	//   0.030 kdamond.0/262863 damon:damon_aggregated(target_id=0 nr_regions=202 824633720832-824700829696: 0 120)
+	// (The last four numbers being start_addr, end_addr, nr_accesses and age.)
 	if strings.HasPrefix(line, "LOST ") {
 		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine:events lost"})
 		lostEventsStr := strings.Split(line, " ")[1]
@@ -434,47 +441,62 @@ func (t *TrackerDamon) perfHandleLine(line string) error {
 		t.lostEvents += uint(lostEvents)
 		return nil
 	}
-	csLine := strings.Split(line, ", ")
-	if len(csLine) < 4 {
+	csLine := strings.Split(strings.TrimSpace(strings.NewReplacer(
+		"(", " ",
+		")", "",
+		":", "",
+		"=", " ",
+		"-", " ").Replace(line)), " ")
+	// After the replacements and trimming, lines are as follows.
+	// Linux 5.15, 5.16, followed by field indices in csLine:
+	// 0.000 kdamond.0/1527 damon:damon_aggregated target_id 18446634001245894528 nr_regions 7 4194304 185102770176 0
+	// 0     1              2                      3         4                    5          6 7       8            9
+	// Linux 5.17, followed by field indices in csLine:
+	// 0.030 kdamond.0/262863 damon:damon_aggregated target_id 0 nr_regions 202 824633720832 824700829696 0 120
+	// 0     1                2                      3         4 5          6   7            8            9 10
+	if len(csLine) < 10 {
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine: parse error: bad line"})
 		return fmt.Errorf("bad line %q", csLine)
 	}
-	targetIdStrSlice := strings.SplitAfterN(csLine[0], "target_id: ", 2)
-	if len(targetIdStrSlice) != 2 {
-		return fmt.Errorf("target_id not found from %q", csLine[0])
+	if csLine[3] != "target_id" {
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine: parse error: target_id not found"})
+		return fmt.Errorf("target_id not found from %q line %q", csLine[3], line)
 	}
-	targetIdStr := targetIdStrSlice[1]
-	targetId, err := strconv.ParseInt(targetIdStr, 10, 64)
+	targetIdStr := csLine[4]
+	startStr := csLine[7]
+	endStr := csLine[8]
+	nrStr := csLine[9]
+	targetId, err := strconv.ParseUint(targetIdStr, 10, 64)
 	if err != nil {
-		return fmt.Errorf("parse error on targetIdStr %q line %q", targetIdStr, line)
-	}
-	startStr := csLine[2][7:]
-	endStr := csLine[3][5:]
-	nrStr := ""
-	// strip ")\n" from the end of nrStr or endStr
-	if len(csLine) == 5 {
-		nrStr = csLine[4][13 : len(csLine[4])-2]
-	} else {
-		endStr = endStr[:len(endStr)-2]
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine: parse error: target_id syntax error"})
+		return fmt.Errorf("parse error (%w) on targetIdStr %q line %q", err, targetIdStr, line)
 	}
 	start, err := strconv.Atoi(startStr)
 	if err != nil {
-		return fmt.Errorf("parse error on startStr %q element %q line %q", startStr, csLine[2], line)
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine: parse error: start address syntax error"})
+		return fmt.Errorf("parse error (%w) on startStr %q line %q", err, startStr, line)
 	}
 	end, err := strconv.Atoi(endStr)
 	if err != nil {
-		return fmt.Errorf("parse error on endStr %q element %q line %q", endStr, csLine[3], line)
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine: parse error: end address syntax error"})
+		return fmt.Errorf("parse error (%w) on endStr %q line %q", err, endStr, line)
 	}
 	if start >= end {
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine: parse error: start addr after end addr"})
 		return fmt.Errorf("parse error: start >= end (%d >= %d) line %q", start, end, line)
 	}
 	nr := 0
-	if len(nrStr) > 0 {
-		nr, err = strconv.Atoi(nrStr)
-		if err != nil {
-			return fmt.Errorf("parse error on nrStr %q element %q line %q", nrStr, csLine[4], line)
-		}
+	nr, err = strconv.Atoi(nrStr)
+	if err != nil {
+		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine: parse error: nr_access syntax error"})
+		return fmt.Errorf("parse error (%w) on nrStr %q line %q", err, nrStr, line)
 	}
-	pid := t.targetIdToPid(targetId, uint64(start), uint64(end))
+	targetIdIsPidIndex := false
+	if len(csLine) > 10 {
+		// Linux 5.17+: target_id is an index in to the pids in the target_id's file.
+		targetIdIsPidIndex = true
+	}
+	pid := t.targetIdToPid(int64(targetId), uint64(start), uint64(end), targetIdIsPidIndex)
 	if pid < 1 {
 		stats.Store(StatsHeartbeat{"TrackerDamon.perfHandleLine:unknown target id"})
 		return nil
