@@ -57,8 +57,12 @@ func Assign(c cache.Cache, class string, cpus ...int) error {
 	if getCPUController().started {
 		// We don't want to try to enforce until the controller has been fully
 		// started. Enforcement of all assignments happens on StarT(), anyway.
-		if err := getCPUController().enforce(class, cpus...); err != nil {
-			log.Error("cpu class enforcement failed: %v", err)
+		ctl := getCPUController()
+		if err := ctl.enforceCpufreq(class, cpus...); err != nil {
+			log.Error("cpufreq enforcement failed: %v", err)
+		}
+		if err := ctl.enforceUncore(assignments, cpus...); err != nil {
+			log.Error("uncore frequency enforcement failed: %v", err)
 		}
 	}
 
