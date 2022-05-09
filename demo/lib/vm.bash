@@ -892,6 +892,7 @@ vm-create-singlenode-cluster() {
         error "invalid CNI: $(distro-k8s-cni)"
     fi
     vm-create-cluster
+    vm-command "kubectl taint nodes --all node-role.kubernetes.io/control-plane-"
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
     vm-install-cni-"$(distro-k8s-cni)"
     if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=120s"; then
