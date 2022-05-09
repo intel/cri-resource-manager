@@ -392,3 +392,19 @@ In this setup, all the workloads in `my-pool` namespace and those namespaces
 starting with `reserved-` string are allocated to reserved CPU class.
 The workloads in `kube-system` are automatically assigned to reserved CPU
 class so no need to mention `kube-system` in this list.
+
+## Reserved CPU annotations
+
+User is able to mark certain pods and containers to have a reserved CPU allocation
+by using annotations. Containers having a such annotation will only run on CPUs set
+aside according to the global CPU reservation, as configured by the ReservedResources
+configuration option in the policy section.
+
+For example:
+
+```yaml
+metadata:
+  annotations:
+    prefer-reserved-cpus.cri-resource-manager.intel.com/pod: "true"
+    prefer-reserved-cpus.cri-resource-manager.intel.com/container.special: "false"
+```

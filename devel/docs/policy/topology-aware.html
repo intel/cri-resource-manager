@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.6.1rc1-19-g15ec66b8 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.6.1rc1-22-g0572355d documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -60,6 +60,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#dynamic-page-demotion">Dynamic Page Demotion</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#container-memory-requests-and-limits">Container memory requests and limits</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#reserved-pool-namespaces">Reserved pool namespaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#reserved-cpu-annotations">Reserved CPU annotations</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
@@ -555,6 +556,20 @@ allocated to reserved CPU class.</p>
 starting with <code class="docutils literal notranslate"><span class="pre">reserved-</span></code> string are allocated to reserved CPU class.
 The workloads in <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> are automatically assigned to reserved CPU
 class so no need to mention <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> in this list.</p>
+</div>
+<div class="section" id="reserved-cpu-annotations">
+<h2>Reserved CPU annotations<a class="headerlink" href="#reserved-cpu-annotations" title="Permalink to this headline">¶</a></h2>
+<p>User is able to mark certain pods and containers to have a reserved CPU allocation
+by using annotations. Containers having a such annotation will only run on CPUs set
+aside according to the global CPU reservation, as configured by the ReservedResources
+configuration option in the policy section.</p>
+<p>For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="nt">prefer-reserved-cpus.cri-resource-manager.intel.com/pod</span><span class="p">:</span> <span class="s">&quot;true&quot;</span>
+    <span class="nt">prefer-reserved-cpus.cri-resource-manager.intel.com/container.special</span><span class="p">:</span> <span class="s">&quot;false&quot;</span>
+</pre></div>
+</div>
 </div>
 </div>
 
