@@ -41,6 +41,8 @@ const (
 	keyMemoryTypePreference = "memory-type"
 	// annotation key for type "cold start" of workloads
 	keyColdStartPreference = "cold-start"
+	// annotation key for reserved pools
+	keyReservedCPUsPreference = "prefer-reserved-cpus"
 
 	// effective annotation key for isolated CPU preference
 	preferIsolatedCPUsKey = keyIsolationPreference + "." + kubernetes.ResmgrKeyNamespace
@@ -50,6 +52,8 @@ const (
 	preferMemoryTypeKey = keyMemoryTypePreference + "." + kubernetes.ResmgrKeyNamespace
 	// effective annotation key for "cold start" preference
 	preferColdStartKey = keyColdStartPreference + "." + kubernetes.ResmgrKeyNamespace
+	// annotation key for reserved pools
+	preferReservedCPUsKey = keyReservedCPUsPreference + "." + kubernetes.ResmgrKeyNamespace
 )
 
 // cpuClass is a type of CPU to allocate
@@ -339,6 +343,22 @@ func checkReservedPoolNamespaces(namespace string) bool {
 	return false
 }
 
+func checkReservedCPUsAnnotations(c cache.Container) bool {
+	hintSetting, ok := c.GetEffectiveAnnotation(preferReservedCPUsKey)
+	if !ok {
+		return false
+	}
+
+	preference, err := strconv.ParseBool(hintSetting)
+	if err != nil {
+		log.Error("failed to parse reserved CPU preference %s = '%s': %v",
+			keyReservedCPUsPreference, hintSetting, err)
+		return false
+	}
+
+	return preference
+}
+
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.
 // Returned values:
 // 1. full: number of full CPUs
@@ -413,6 +433,8 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 	// easy cases: kube-system namespace, Burstable or BestEffort QoS class containers
 	switch {
 	case checkReservedPoolNamespaces(namespace):
+		return 0, fraction, false, cpuReserved
+	case checkReservedCPUsAnnotations(container):
 		return 0, fraction, false, cpuReserved
 	case qosClass == corev1.PodQOSBurstable:
 		return 0, fraction, false, cpuNormal

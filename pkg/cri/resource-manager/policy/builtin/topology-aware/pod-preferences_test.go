@@ -996,6 +996,39 @@ func TestCpuAllocationPreferences(t *testing.T) {
 			expectedCpuType:        cpuNormal,
 			reservedPoolNamespaces: []string{"barfoo", "foobar?", "testing"},
 		},
+		{
+			name: "return request's value for reserved cpu annotation container",
+			container: &mockContainer{
+				name: "testcontainer",
+				pod: &mockPod{
+					returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+					annotations: map[string]string{
+						preferReservedCPUsKey + "/container.special": "false",
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction: 0,
+			expectedCpuType:  cpuNormal,
+		},
+		{
+			name: "return request's value for reserved cpu annotation container",
+			container: &mockContainer{
+				pod: &mockPod{
+					returnValueFotGetQOSClass: corev1.PodQOSGuaranteed,
+					annotations: map[string]string{
+						preferReservedCPUsKey + "/pod": "true",
+					},
+				},
+			},
+			pod: &mockPod{
+				returnValueFotGetQOSClass: corev1.PodQOSBurstable,
+			},
+			expectedFraction: 0,
+			expectedCpuType:  cpuReserved,
+		},
 	}
 
 	for _, tc := range tcases {
