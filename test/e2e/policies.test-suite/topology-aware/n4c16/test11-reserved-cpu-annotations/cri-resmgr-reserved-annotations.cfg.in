@@ -1,0 +1,8 @@
+policy:
+  Active: topology-aware
+  ReservedResources:
+    cpu: ${RESERVED_CPU}
+  AvailableResources:
+    cpu: ${AVAILABLE_CPU}
+logger:
+  Debug: cri-resmgr,resource-manager,cache,policy
