@@ -71,6 +71,13 @@ type BalloonDef struct {
 	// placed on separate balloons. The default is false: prefer
 	// placing containers of a pod to the same balloon(s).
 	PreferSpreadingPods bool
+	// PreferPerNamespaceBalloon: if true, containers in different
+	// namespaces are preferrably placed in separate balloons,
+	// even if the balloon type is the same for all of them. On
+	// the other hand, containers in the same namespace will be
+	// placed in the same balloon instances. The default is false:
+	// namespaces have no effect on placement.
+	PreferPerNamespaceBalloon bool
 	// PreferNewBalloons: prefer creating new balloons over adding
 	// containers to existing balloons. The default is false:
 	// prefer using filling free capacity and possibly inflating

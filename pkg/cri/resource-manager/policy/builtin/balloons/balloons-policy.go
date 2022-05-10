@@ -287,6 +287,28 @@ func (p *balloons) balloonByContainer(c cache.Container) *Balloon {
 	return nil
 }
 
+// balloonsByNamespace returns balloons that contain containers in a
+// namespace.
+func (p *balloons) balloonsByNamespace(namespace string) []*Balloon {
+	blns := []*Balloon{}
+	for _, bln := range p.balloons {
+		for podID, ctrIDs := range bln.PodIDs {
+			if len(ctrIDs) == 0 {
+				continue
+			}
+			pod, ok := p.cch.LookupPod(podID)
+			if !ok {
+				continue
+			}
+			if pod.GetNamespace() == namespace {
+				blns = append(blns, bln)
+				break
+			}
+		}
+	}
+	return blns
+}
+
 // balloonsByPod returns balloons that contain any container of a pod.
 func (p *balloons) balloonsByPod(pod cache.Pod) []*Balloon {
 	podID := pod.GetID()
@@ -560,6 +582,13 @@ func (p *balloons) chooseBalloonInstance(blnDef *BalloonDef, fm FillMethod, c ca
 		} else {
 			return nil, err
 		}
+	case FillSameNamespace:
+		for _, bln := range p.balloonsByNamespace(c.GetNamespace()) {
+			if bln.Def == blnDef && p.maxFreeMilliCpus(bln) >= reqMilliCpus {
+				return bln, nil
+			}
+		}
+		return nil, nil
 	case FillSamePod:
 		if pod, ok := c.GetPod(); ok {
 			for _, bln := range p.balloonsByPod(pod) {
@@ -647,6 +676,9 @@ func (p *balloons) allocateBalloonOfDef(blnDef *BalloonDef, c cache.Container) (
 	fillChain := []FillMethod{}
 	if !blnDef.PreferSpreadingPods {
 		fillChain = append(fillChain, FillSamePod)
+	}
+	if blnDef.PreferPerNamespaceBalloon {
+		fillChain = append(fillChain, FillSameNamespace, FillNewBalloon)
 	}
 	if blnDef.PreferNewBalloons {
 		fillChain = append(fillChain, FillNewBalloon, FillBalanced, FillBalancedInflate)

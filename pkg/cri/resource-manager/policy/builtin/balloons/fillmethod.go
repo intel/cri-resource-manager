@@ -40,6 +40,9 @@ const (
 	// it minimizes the amount of unused CPUs if the balloon is
 	// inflated to the maximum size.
 	FillPackedInflate
+	// FillSameNamespace: put a container into a balloon that already
+	// includes another container from the same namespace
+	FillSameNamespace
 	// FillSamePod: put a container into a balloon that already
 	// includes another container from the same pod.
 	FillSamePod
@@ -64,6 +67,7 @@ var fillMethodNames = map[FillMethod]string{
 	FillBalancedInflate: "balanced-inflate",
 	FillPacked:          "packed",
 	FillPackedInflate:   "packed-inflate",
+	FillSameNamespace:   "same-namespace",
 	FillSamePod:         "same-pod",
 	FillNewBalloon:      "new-balloon",
 	FillNewBalloonMust:  "new-balloon-must",
