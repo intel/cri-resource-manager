@@ -185,7 +185,8 @@ func (p *balloons) Description() string {
 // Start prepares this policy for accepting allocation/release requests.
 func (p *balloons) Start(add []cache.Container, del []cache.Container) error {
 	log.Info("%s policy started", PolicyName)
-	return p.Sync(add, del)
+	// reassign all containers
+	return p.Sync(p.cch.GetContainers(), nil)
 }
 
 // Sync synchronizes the active policy state.
@@ -719,7 +720,12 @@ func (p *balloons) configNotify(event pkgcfg.Event, source pkgcfg.Source) error 
 		return err
 	}
 	log.Info("config updated successfully")
-	p.Sync(p.cch.GetContainers(), nil)
+	// TODO. Releasing and reallocating all assigned containers is
+	// overkill, and it should not be done unless balloon
+	// configuration has actually changed. It can do even harm by
+	// leading to misalignment of CPUs and memories of running
+	// containers.
+	p.Sync(p.cch.GetContainers(), p.cch.GetContainers())
 	return nil
 }
 
