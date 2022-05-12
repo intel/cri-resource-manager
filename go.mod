@@ -11,7 +11,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
-	github.com/intel/goresctrl v0.2.1-0.20220408111310-9f1bb7c427f7
+	github.com/intel/goresctrl v0.2.1-0.20220511084516-1b61a39df7b6
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
@@ -20,7 +20,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	go.opencensus.io v0.23.0
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63
-	golang.org/x/sys v0.0.0-20220207234003-57398862261d
+	golang.org/x/sys v0.0.0-20220422013727-9388b58f7150
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/grpc v1.40.0
 	k8s.io/api v0.23.3
