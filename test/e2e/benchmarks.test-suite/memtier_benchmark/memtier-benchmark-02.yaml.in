@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: memtier-benchmark
+spec:
+  template:
+    metadata:
+      annotations:
+        cri-resource-manager.intel.com/${AFFINITY}: |+
+          memtier-benchmark:
+            - scope:
+                key: pod/name
+                operator: Matches
+                values:
+                  - redis-*
+              match:
+                key: name
+                operator: Equals
+                values:
+                  - redis
+              weight: 10
+    spec:
+      containers:
+      $(for contnum in $(seq 1 ${CONTCOUNT}); do echo "
+      - name: ${NAME}c$(( contnum - 1 ))
+        image: redislabs/memtier_benchmark:edge
+        imagePullPolicy: IfNotPresent
+        args: ['${ARGS// /\', \'}']
+        resources:
+          requests:
+            cpu: ${CPU}
+            memory: '${MEM}'
+          limits:
+            cpu: ${CPULIM}
+            memory: '${MEMLIM}'
+      "; done )
+      restartPolicy: Never
