@@ -195,6 +195,67 @@ vm-command-q() {
     $SSH "${VM_SSH_USER}@${VM_IP}" sudo bash -l <<<"$1"
 }
 
+vm-ssh-user-ip() {
+    # Usage: vm-ssh-user-ip NODE
+    #
+    # Print canonical USER@HOST for NODE. NODE can be a govm vm name
+    # or already of the form: USER@HOST.
+    local NODE="$1"
+    local node_ssh_user=""
+    local node_ssh_ip=""
+    if [[ "$NODE" == *"@"* ]]; then
+        node_ssh_ip=${NODE/*@}
+        node_ssh_user=${NODE%@*}
+    else
+        node_ssh_ip=$(${GOVM} ls | awk "/$NODE/{print \$4}")
+        node_ssh_user=$( host-get-vm-config $NODE && echo $VM_SSH_USER )
+    fi
+    if [ -z "$node_ssh_ip" ]; then
+        error "cannot find IP address for NODE=$NODE"
+    fi
+    if [ -z "$node_ssh_user" ]; then
+        error "cannot find ssh user for NODE=$NODE"
+    fi
+    echo "${node_ssh_user}@${node_ssh_ip}"
+}
+
+vm-join() {
+    # Usage: vm-join MASTER_NODE
+    #
+    # Join vm to the cluster whose master node is MASTER_NODE."
+    # MASTER_NODE is a name of a govm virtual machine, or
+    # "USER@HOST" that can be logged into using ssh.
+    local MASTER_NODE="$1"
+    local master_user_ip
+    local k8s_join_cmd
+    k8s_join_cmd="$(vm-join-cmd "$MASTER_NODE")"
+    vm-command "$k8s_join_cmd" || {
+        command-error "joining to the cluster master ($MASTER_NODE) failed"
+    }
+    # Enable using kubectl on the worker vm by
+    # copying k8s admin configuration on it.
+    master_user_ip="$(vm-ssh-user-ip $MASTER_NODE)"
+    ssh "$master_user_ip" "sudo cat /etc/kubernetes/admin.conf" | vm-pipe-to-file "/root/.kube/config"
+}
+
+vm-join-cmd() {
+    # Usage: vm-join-cmd MASTER_NODE
+    #
+    # Print a join command to join VM to existing cluster MASTER_NODE.
+    # MASTER_NODE is a name of a govm virtual machine (exists in "govm ls")
+    # or USERNAME@IP.
+    local MASTER_NODE="$1"
+    local master_user_ip
+    local k8s_join_cmd=""
+    master_user_ip="$(vm-ssh-user-ip $MASTER_NODE)"
+    local ssh_get_join_cmd="ssh $master_user_ip sudo kubeadm token create --print-join-command"
+    k8s_join_cmd="$( $ssh_get_join_cmd )"
+    if [[ "$k8s_join_cmd" != *" join "* ]]; then
+        error "failed to get kubeadm join command: $k8s_join_cmd"
+    fi
+    echo $k8s_join_cmd
+}
+
 vm-mem-hotplug() { # script API
     # Usage: vm-mem-hotplug MEMORY
     #
