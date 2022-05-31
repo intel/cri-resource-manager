@@ -78,59 +78,40 @@ data:
   rdt: |+
     # Common options
     options:
-      # Mode must be one of Full, Discovery or Disabled. Defaults to Full.
+      # One of Full, Discovery or Disabled
       mode: Full
+      # Set to true to disable creation of monitoring groups
       monitoringDisabled: false
-      l2:
-        optional: true
       l3:
+        # Make this false if L3 CAT must be available
         optional: true
       mb:
+        # Make this false if MBA must be available
         optional: true
-    # This example config specifies one partition with three classes (resctrl groups in the system)
+
+    # Configuration of classes
     partitions:
-      default:
-        l2Allocation: "100%"
-        l3Allocation: "100%"
+      exclusive:
+        # Allocate 60% of all L3 cache to the "exclusive" partition
+        l3Allocation: "60%"
         mbAllocation: ["100%"]
         classes:
           Guaranteed:
-            l2schema: "100%"
-            l3schema: "100%"
-            ## Specific settings for L3 CDP (Code and Data Prioritization). Note: need to
-            ## remove the "100%" shorthand above if enabling this
-            ## 'all' specificies the default value for all cache-ids
-            #  all:
-            #    unified: "100%"
-            #    code: "100%"
-            #    data: "80%"
-            ## Specify CacheId (typically corresponds to a CPU socket) specific setting
-            #  1: "80%"
-            ## MBA (Memory Bandwidth Allocation) for 'Guaranteed'
-            #mbschema:
-            #  all: [100%]
-            #  1-3: [80%, 10000MBps]
+            # Allocate all of the partitions cache lines to "Guaranteed"
+            l3Allocation: "100%"
+      shared:
+        # Allocate 40% L3 cache IDs to the "shared" partition
+        # These will NOT overlap with the cache lines allocated for "exclusive" partition
+        l3Allocation: "40%"
+        mbAllocation: ["50%"]
+        classes:
           Burstable:
-            l2schema: "66%"
-            l3schema:
-              all:
-                unified: "66%"
-                # Separate schema for L3 code and data paths specified
-                code: "100%"
-                data: "50%"
-            ## MBA (Memory Bandwidth Allocation) for 'Burstable'
-            ## 'all' may be omitted if no cache-id specific settings are required
-            #mbschema: [66%, 5000MBps]
+            # Allow "Burstable" to use all cache lines of the "shared" partition
+            l3Allocation: "100%"
           BestEffort:
-            l2schema: "60%"
-            l3schema: "33%"
-            ## MBA (Memory Bandwidth Allocation) for 'BestEffort'
-            #mbschema: [33%, 3000MBps]
-          ## Special class 'SYSTEM_DEFAULT'. Reserved name for configuring the "root"
-          ## resctrl group of the system
-          #SYSTEM_DEFAULT:
-          #  l2schema: "60%"
-          #  l3schema: "50%"
+            # Allow "Besteffort" to use only half of the L3 cache # lines of the "shared" partition.
+            # These will overlap with those used by "Burstable"
+            l3Allocation: "50%"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -190,59 +171,40 @@ data:
   rdt: |+
     # Common options
     options:
-      # Mode must be one of Full, Discovery or Disabled. Defaults to Full.
+      # One of Full, Discovery or Disabled
       mode: Full
+      # Set to true to disable creation of monitoring groups
       monitoringDisabled: false
-      l2:
-        optional: true
       l3:
+        # Make this false if L3 CAT must be available
         optional: true
       mb:
+        # Make this false if MBA must be available
         optional: true
-    # This example config specifies one partition with three classes (resctrl groups in the system)
+
+    # Configuration of classes
     partitions:
-      default:
-        l2Allocation: "100%"
-        l3Allocation: "100%"
+      exclusive:
+        # Allocate 60% of all L3 cache to the "exclusive" partition
+        l3Allocation: "60%"
         mbAllocation: ["100%"]
         classes:
           Guaranteed:
-            l2schema: "100%"
-            l3schema: "100%"
-            ## Specific settings for L3 CDP (Code and Data Prioritization). Note: need to
-            ## remove the "100%" shorthand above if enabling this
-            ## 'all' specificies the default value for all cache-ids
-            #  all:
-            #    unified: "100%"
-            #    code: "100%"
-            #    data: "80%"
-            ## Specify CacheId (typically corresponds to a CPU socket) specific setting
-            #  1: "80%"
-            ## MBA (Memory Bandwidth Allocation) for 'Guaranteed'
-            #mbschema:
-            #  all: [100%]
-            #  1-3: [80%, 10000MBps]
+            # Allocate all of the partitions cache lines to "Guaranteed"
+            l3Allocation: "100%"
+      shared:
+        # Allocate 40% L3 cache IDs to the "shared" partition
+        # These will NOT overlap with the cache lines allocated for "exclusive" partition
+        l3Allocation: "40%"
+        mbAllocation: ["50%"]
+        classes:
           Burstable:
-            l2schema: "66%"
-            l3schema:
-              all:
-                unified: "66%"
-                # Separate schema for L3 code and data paths specified
-                code: "100%"
-                data: "50%"
-            ## MBA (Memory Bandwidth Allocation) for 'Burstable'
-            ## 'all' may be omitted if no cache-id specific settings are required
-            #mbschema: [66%, 5000MBps]
+            # Allow "Burstable" to use all cache lines of the "shared" partition
+            l3Allocation: "100%"
           BestEffort:
-            l2schema: "60%"
-            l3schema: "33%"
-            ## MBA (Memory Bandwidth Allocation) for 'BestEffort'
-            #mbschema: [33%, 3000MBps]
-          ## Special class 'SYSTEM_DEFAULT'. Reserved name for configuring the "root"
-          ## resctrl group of the system
-          #SYSTEM_DEFAULT:
-          #  l2schema: "60%"
-          #  l3schema: "50%"
+            # Allow "Besteffort" to use only half of the L3 cache # lines of the "shared" partition.
+            # These will overlap with those used by "Burstable"
+            l3Allocation: "50%"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -302,59 +264,40 @@ data:
   rdt: |+
     # Common options
     options:
-      # Mode must be one of Full, Discovery or Disabled. Defaults to Full.
+      # One of Full, Discovery or Disabled
       mode: Full
+      # Set to true to disable creation of monitoring groups
       monitoringDisabled: false
-      l2:
-        optional: true
       l3:
+        # Make this false if L3 CAT must be available
         optional: true
       mb:
+        # Make this false if MBA must be available
         optional: true
-    # This example config specifies one partition with three classes (resctrl groups in the system)
+
+    # Configuration of classes
     partitions:
-      default:
-        l2Allocation: "100%"
-        l3Allocation: "100%"
+      exclusive:
+        # Allocate 60% of all L3 cache to the "exclusive" partition
+        l3Allocation: "60%"
         mbAllocation: ["100%"]
         classes:
           Guaranteed:
-            l2schema: "100%"
-            l3schema: "100%"
-            ## Specific settings for L3 CDP (Code and Data Prioritization). Note: need to
-            ## remove the "100%" shorthand above if enabling this
-            ## 'all' specificies the default value for all cache-ids
-            #  all:
-            #    unified: "100%"
-            #    code: "100%"
-            #    data: "80%"
-            ## Specify CacheId (typically corresponds to a CPU socket) specific setting
-            #  1: "80%"
-            ## MBA (Memory Bandwidth Allocation) for 'Guaranteed'
-            #mbschema:
-            #  all: [100%]
-            #  1-3: [80%, 10000MBps]
+            # Allocate all of the partitions cache lines to "Guaranteed"
+            l3Allocation: "100%"
+      shared:
+        # Allocate 40% L3 cache IDs to the "shared" partition
+        # These will NOT overlap with the cache lines allocated for "exclusive" partition
+        l3Allocation: "40%"
+        mbAllocation: ["50%"]
+        classes:
           Burstable:
-            l2schema: "66%"
-            l3schema:
-              all:
-                unified: "66%"
-                # Separate schema for L3 code and data paths specified
-                code: "100%"
-                data: "50%"
-            ## MBA (Memory Bandwidth Allocation) for 'Burstable'
-            ## 'all' may be omitted if no cache-id specific settings are required
-            #mbschema: [66%, 5000MBps]
+            # Allow "Burstable" to use all cache lines of the "shared" partition
+            l3Allocation: "100%"
           BestEffort:
-            l2schema: "60%"
-            l3schema: "33%"
-            ## MBA (Memory Bandwidth Allocation) for 'BestEffort'
-            #mbschema: [33%, 3000MBps]
-          ## Special class 'SYSTEM_DEFAULT'. Reserved name for configuring the "root"
-          ## resctrl group of the system
-          #SYSTEM_DEFAULT:
-          #  l2schema: "60%"
-          #  l3schema: "50%"
+            # Allow "Besteffort" to use only half of the L3 cache # lines of the "shared" partition.
+            # These will overlap with those used by "Burstable"
+            l3Allocation: "50%"
   dump: |+
     Config: full:.*,short:.*Stop.*,off:.*List.*
     File: /tmp/cri-selective-debug.dump
