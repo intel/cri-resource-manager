@@ -104,124 +104,52 @@ Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
 memory bandwidth whereas the other classes are throttled to 50%.
 
 ```yaml
-metadata:
-  name: cri-resmgr-config.default
-  namespace: kube-system
-data:
-...
-  rdt: |+
-    # Common options
-    options:
-      # One of Full, Discovery or Disabled
-      mode: Full
-      # Set to true to disable creation of monitoring groups
-      monitoringDisabled: false
-      l2:
-        # Make this false if L2 CAT must be available
-        optional: true
-      l3:
-        # Make this false if L3 CAT must be available
-        optional: true
-      mb:
-        # Make this false if MBA must be available
-        optional: true
-    partitions:
-      exclusive:
-        # Allocate 80% of all L2 cache IDs to the "exclusive" partition
-        l2Allocation: "80%"
-        # Allocate 60% of all L3 cache IDs to the "exclusive" partition
-        l3Allocation: "60%"
-        mbAllocation: ["100%"]
-        classes:
-          Guaranteed:
-            # Allocate all of the partitions cache lines to "Guaranteed"
-            l2Schema: "100%"
-            l3Schema: "100%"
-      shared:
-        # Allocate 20% of L2 and 40% L3 cache IDs to the "shared" partition
-        # These will NOT overlap with the cache lines allocated for "exclusive" partition
-        l2Allocation: "20%"
-        l3Allocation: "40%"
-        mbAllocation: ["50%"]
-        classes:
-          Burstable:
-            # Allow "Burstable" to use all cache lines of the "shared" partition
-            l2Schema: "100%"
-            l3Schema: "100%"
-          BestEffort:
-            # Allow "Besteffort" to use all L2 but only half of the L3 cache
-            # lines of the "shared" partition.
-            # These will overlap with those used by "Burstable"
-            l2Schema: "100%"
-            l3Schema: "50%"
+rdt:
+  # Common options
+  options:
+    # One of Full, Discovery or Disabled
+    mode: Full
+    # Set to true to disable creation of monitoring groups
+    monitoringDisabled: false
+    l3:
+      # Make this false if L3 CAT must be available
+      optional: true
+    mb:
+      # Make this false if MBA must be available
+      optional: true
+
+  # Configuration of classes
+  partitions:
+    exclusive:
+      # Allocate 60% of all L3 cache to the "exclusive" partition
+      l3Allocation: "60%"
+      mbAllocation: ["100%"]
+      classes:
+        Guaranteed:
+          # Allocate all of the partitions cache lines to "Guaranteed"
+          l3Allocation: "100%"
+    shared:
+      # Allocate 40% L3 cache IDs to the "shared" partition
+      # These will NOT overlap with the cache lines allocated for "exclusive" partition
+      l3Allocation: "40%"
+      mbAllocation: ["50%"]
+      classes:
+        Burstable:
+          # Allow "Burstable" to use all cache lines of the "shared" partition
+          l3Allocation: "100%"
+        BestEffort:
+          # Allow "Besteffort" to use only half of the L3 cache # lines of the "shared" partition.
+          # These will overlap with those used by "Burstable"
+          l3Allocation: "50%"
 ```
 
 The configuration also supports far more fine-grained control, e.g. per
 cache-ID configuration (i.e. different sockets having different allocation) and
 Code and Data Prioritization (CDP) allowing different cache allocation for code
-and data paths.
-
-```yaml
-...
-    partitions:
-      exclusive:
-        l3Allocation: "60%"
-        mbAllocation: ["100%"]
-        classes:
-          # Automatically gets 100% of what was allocated for the partition
-          Guaranteed:
-      shared:
-        l3Allocation:
-          # 'all' denotes the default and must be specified
-          all: "40%"
-          # Specific cache allocation for cache-ids 2 and 3
-          2-3: "20%"
-        mbAllocation: ["100%"]
-        classes:
-          Burstable:
-            l3Schema:
-              all:
-                unified: "100%"
-                code: "100%"
-                data: "80%"
-            mbSchema:
-              all: ["80%"]
-              2-3: ["50%"]
-...
-...
-```
-
-In addition, if the hardware details are known, raw bitmasks or bit numbers
+and data paths. If the hardware details are known, raw bitmasks or bit numbers
 ("0x1f" or 0-4) can be used instead of percentages in order to be able to
-configure cache allocations exactly as required. The bits in this case are
-corresponding to those in `/sys/fs/resctrl/` bitmasks. You can also mix relative
-(percentage) and absolute (bitmask) allocations. For cases where the resctrl
-filesystem is mounted with `-o mba_MBps` Memory bandwidth must be specifed in
-MegaBytes per second (MBps).
-
-```yaml
-...
-    partitions:
-      exclusive:
-        # Specify bitmask in bit numbers
-        l3Allocation: "8-19"
-        # MBps value takes effect when resctrl mount option mba_MBps is used
-        mbAllocation: ["100%", "100000MBps"]
-        classes:
-          # Automatically gets 100% of what was allocated for the partition
-          Guaranteed:
-      shared:
-        # Explicit bitmask
-        l3Allocation: "0xff"
-        mbAllocation: ["50%", "2000MBps"]
-        classes:
-          # Burstable gets 100% of what was allocated for the partition
-          Burstable:
-          BestEffort:
-            l3Schema: "50%"
-            # Besteffort gets 50% of the 50% (i.e. 25% of total) or 1000MBps
-            mbSchema: ["50%", "1000MBps"]
-```
+configure cache allocations exactly as required. For detailed description of the RDT configuration format with examples see the
+{{ '[goresctrl library documentation](https://github.com/intel/goresctrl/blob/{}/doc/rdt.md)'.format(goresctrl_version) }}
 
 See `rdt` in the [example ConfigMap spec](/sample-configs/cri-resmgr-configmap.example.yaml)
 for another example configuration.
