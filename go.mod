@@ -6,6 +6,7 @@ require (
 	contrib.go.opencensus.io/exporter/jaeger v0.1.0
 	contrib.go.opencensus.io/exporter/prometheus v0.1.1-0.20191218042359-6151c48ac7fa
 	github.com/cilium/ebpf v0.7.0
+	github.com/containerd/nri v0.1.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.7
@@ -45,8 +46,8 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/checkpoint-restore/go-criu/v5 v5.3.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
-	github.com/containerd/containerd v1.4.12 // indirect
-	github.com/containerd/ttrpc v1.0.2 // indirect
+	github.com/containerd/containerd v1.6.0 // indirect
+	github.com/containerd/ttrpc v1.1.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
@@ -129,6 +130,10 @@ require (
 )
 
 replace (
+	// Temporarily divert repo for updated/extended NRI.
+	github.com/containerd/nri => github.com/klihub/nri v0.0.0-20220601202555-929d59e54bbd
+	github.com/containerd/ttrpc v1.1.0 => github.com/containerd/ttrpc v0.0.0-20220421210857-74421d10189e
+
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0 => ./pkg/topology
 
 	go.opentelemetry.io/contrib => go.opentelemetry.io/contrib v0.20.0
