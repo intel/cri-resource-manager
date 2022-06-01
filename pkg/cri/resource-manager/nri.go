@@ -85,9 +85,12 @@ func (p *nriPlugin) onClose() {
 	os.Exit(0)
 }
 
-func (p *nriPlugin) Configure(data string) (stub.EventMask, error) {
-	p.dump("NRI-Configure", "data", data)
-	return stub.AllEvents, nil
+func (p *nriPlugin) Configure(cfg, runtime, version string) (stub.EventMask, error) {
+	p.dump("NRI-Configure", "data", cfg)
+	return api.MustParseEventMask(
+		"RunPodSandbox,StopPodSandbox,RemovePodSandbox",
+		"CreateContainer,StartContainer,UpdateContainer,StopContainer,RemoveContainer",
+	), nil
 }
 
 func (p *nriPlugin) syncWithNRI(pods []*api.PodSandbox, containers []*api.Container) ([]cache.Container, []cache.Container, error) {
@@ -204,9 +207,6 @@ func (p *nriPlugin) CreateContainer(pod *api.PodSandbox, container *api.Containe
 	return adjust, updates, nil
 }
 
-func (p *nriPlugin) PostCreateContainer(pod *api.PodSandbox, container *api.Container) {
-}
-
 func (p *nriPlugin) StartContainer(pod *api.PodSandbox, container *api.Container) {
 	p.dump("NRI-StartContainer", "pod", pod, "container", container)
 
@@ -221,17 +221,9 @@ func (p *nriPlugin) StartContainer(pod *api.PodSandbox, container *api.Container
 	}
 }
 
-func (p *nriPlugin) PostStartContainer(pod *api.PodSandbox, container *api.Container) {
-	p.dump("NRI-PostStartContainer", "pod", pod, "container", container)
-}
-
 func (p *nriPlugin) UpdateContainer(pod *api.PodSandbox, container *api.Container) ([]*api.ContainerUpdate, error) {
 	p.dump("NRI-UpdateContainer", "pod", pod, "container", container)
 	return nil, nil
-}
-
-func (p *nriPlugin) PostUpdateContainer(pod *api.PodSandbox, container *api.Container) {
-	p.dump("NRI-PostUpdateContainer", "pod", pod, "container", container)
 }
 
 func (p *nriPlugin) StopContainer(pod *api.PodSandbox, container *api.Container) ([]*api.ContainerUpdate, error) {
@@ -282,7 +274,6 @@ func (p *nriPlugin) getPendingCreate(container *api.Container) *api.ContainerAdj
 	a := &api.ContainerAdjustment{}
 	p.adjustDevices(a, container, c)
 	p.adjustResources(a, container, c)
-	p.adjustLabels(a, container, c)
 	p.adjustAnnotations(a, container, c)
 	p.adjustEnv(a, container, c)
 	p.adjustMounts(a, container, c)
@@ -422,19 +413,6 @@ func (p *nriPlugin) adjustEnv(a *api.ContainerAdjustment, c *api.Container, cc c
 		if v != "" {
 			a.AddEnv(k, v)
 		}
-	}
-}
-
-func (p *nriPlugin) adjustLabels(a *api.ContainerAdjustment, c *api.Container, cc cache.Container) {
-	old := c.GetLabels()
-	for k, v := range cc.GetLabels() {
-		if ov, ok := old[k]; ok {
-			if ov == v {
-				continue
-			}
-			a.RemoveLabel(k)
-		}
-		a.AddLabel(k, v)
 	}
 }
 
