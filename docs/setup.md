@@ -341,36 +341,11 @@ Starting from scratch:
    * [Cgroup and Kata containers](https://github.com/kata-containers/kata-containers/blob/stable-2.0.0/docs/design/host-cgroups.md)
 
 
-## Using Docker\* as the runtime
+## Running with Untested Runtimes
 
-If you must use `docker` as the runtime then the proxying setup is slightly
-more complex. Docker does not natively support the CRI API. Normally kubelet
-runs an internal protocol translator, `dockershim` to translate between CRI
-and the native docker API. To let CRI Resource Manager effectively proxy
-between kubelet and `docker` it needs to actually proxy between kubelet and
-`dockershim`. For this to be possible, you need to run two instances of
-kubelet:
-
-  1. The real instance, talking to CRI Resource Manager/CRI
-  2. The dockershim instance, acting as a CRI-docker protocol translator
-
-Run the real kubelet instance as you would normally with any other real CRI
-runtime, but specify the dockershim socket for the CRI Image Service, as
-shown below:
-
-```
-   kubelet <other-kubelet-options> --container-runtime=remote \
-     --container-runtime-endpoint=unix:///var/run/cri-resmgr/cri-resmgr.sock \
-     --image-service-endpoint=unix:///var/run/dockershim.sock
-```
-
-Run the dockershim instance as shown below, picking the cgroupfs driver
-according to the configuration of the real kubelet instance:
-
-```
-  kubelet --experimental-dockershim --port 11250 --cgroup-driver {systemd|cgroupfs}
-
-```
+CRI Resource Manager is tested with `containerd` and `CRI-O`. If any other runtime is
+detected during startup, `cri-resmgr` will refuse to start. This default behavior can
+be changed using the `--allow-untested-runtimes` command line option.
 
 ## Logging and debugging
 

@@ -31,6 +31,13 @@ import (
 	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+const (
+	fakeKubeAPIVersion    = "0.1.0"
+	fakeRuntimeName       = "fake-CRI-runtime"
+	fakeRuntimeVersion    = "v0.0.0"
+	fakeRuntimeAPIVersion = "v1"
+)
+
 type fakeCriServer struct {
 	t            *testing.T
 	socket       string
@@ -125,7 +132,16 @@ func (s *fakeCriServer) callHandler(ctx context.Context, request interface{}, de
 // Implementation of api.RuntimeServiceServer
 
 func (s *fakeCriServer) Version(ctx context.Context, req *api.VersionRequest) (*api.VersionResponse, error) {
-	response, err := s.callHandler(ctx, req, nil)
+	response, err := s.callHandler(ctx, req,
+		func(*fakeCriServer, context.Context, *api.VersionRequest) (*api.VersionResponse, error) {
+			return &api.VersionResponse{
+				Version:           fakeKubeAPIVersion,
+				RuntimeName:       fakeRuntimeName,
+				RuntimeVersion:    fakeRuntimeVersion,
+				RuntimeApiVersion: fakeRuntimeAPIVersion,
+			}, nil
+		},
+	)
 	return response.(*api.VersionResponse), err
 }
 

@@ -17,6 +17,7 @@ package resmgr
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	criapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
@@ -27,6 +28,15 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/cri/server"
 )
+
+const (
+	kubeAPIVersion = "0.1.0"
+)
+
+var knownRuntimes = []string{
+	"containerd",
+	"cri-o",
+}
 
 // setupRequestProcessing prepares the resource manager for CRI request processing.
 func (m *resmgr) setupRequestProcessing() error {
@@ -897,4 +907,31 @@ func (m *resmgr) sendCRIRequest(ctx context.Context, request interface{}) (inter
 	default:
 		return nil, resmgrError("sendCRIRequest: unhandled request type %T", request)
 	}
+}
+
+func (m *resmgr) checkRuntime(ctx context.Context) error {
+	version, err := m.relay.Client().Version(ctx, &criapi.VersionRequest{
+		Version: kubeAPIVersion,
+	})
+	if err != nil {
+		return resmgrError("failed to query runtime version: %v", err)
+	}
+
+	for _, name := range knownRuntimes {
+		if strings.HasPrefix(version.RuntimeName, name) {
+			return nil
+		}
+	}
+
+	if opt.AllowUntestedRuntimes {
+		m.Warnf("running with untested/unknown runtime %q", version.RuntimeName)
+		return nil
+	}
+
+	return rejectRuntimeError(version.RuntimeName)
+}
+
+func rejectRuntimeError(name string) error {
+	return resmgrError("rejecting untested runtime %s, use --%s to allow it",
+		name, allowUntestedRuntimesFlag)
 }
