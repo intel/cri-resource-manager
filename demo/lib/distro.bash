@@ -29,11 +29,14 @@ distro-setup-oneshot()      { distro-resolve "$@"; }
 distro-install-utils()      { distro-resolve "$@"; }
 distro-install-golang()     { distro-resolve "$@"; }
 distro-install-runc()       { distro-resolve "$@"; }
+distro-install-toml()       { distro-resolve "$@"; }
 distro-install-containerd() { distro-resolve "$@"; }
 distro-config-containerd()  { distro-resolve "$@"; }
+distro-reconfig-containerd(){ distro-resolve "$@"; }
 distro-restart-containerd() { distro-resolve "$@"; }
 distro-install-crio()       { distro-resolve "$@"; }
 distro-config-crio()        { distro-resolve "$@"; }
+distro-reconfig-crio()      { distro-resolve "$@"; }
 distro-restart-crio()       { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
 distro-install-kernel-dev() { distro-resolve "$@"; }
@@ -1002,9 +1005,20 @@ default-install-runc() {
     distro-install-pkg runc
 }
 
+default-install-toml() {
+    distro-install-pkg python3-pip
+    vm-command "pip3 install toml tomli_w"
+}
+
 default-install-containerd() {
     vm-command-q "[ -f /usr/bin/containerd ]" || {
         distro-install-pkg containerd
+
+	# We need toml python libs in order to modify containerd config.toml
+	# file when NRI is used.
+	if [ "$VM_NRI" == "1" ]; then
+	    distro-install-toml
+	fi
     }
 }
 
@@ -1022,8 +1036,29 @@ default-config-containerd() {
     vm-sed-file /etc/containerd/config.toml 's/SystemdCgroup = false/SystemdCgroup = true/g'
 }
 
+default-reconfig-containerd() {
+    if [ "$VM_NRI" == "1" ]; then
+	# Make sure NRI plugin will be there in the config file by removing the config file
+	# and then re-creating it with defaults that contain the NRI stuff.
+	vm-command "rm -f /etc/containerd/config.toml"
+	default-config-containerd
+
+	vm-put-file "containerd-nri-enable" "/usr/bin/containerd-nri-enable"
+	vm-command "containerd-nri-enable" ||
+	    command-error "failed to enable NRI in containerd"
+
+	if vm-command-q "[ ! -f /etc/nri/nri.conf ]"; then
+	    vm-command "mkdir -p /etc/nri"
+	    echo "disablePluginConnections: false" | vm-pipe-to-file "/etc/nri/nri.conf"
+	fi
+
+	distro-restart-containerd
+	sleep 2
+    fi
+}
+
 default-restart-containerd() {
-    vm-command "systemctl daemon-reload && systemctl restart containerd" ||
+    vm-command "systemctl daemon-reload && (killall containerd-shim-runc-v2; systemctl restart containerd)" ||
         command-error "failed to restart containerd systemd service"
 }
 

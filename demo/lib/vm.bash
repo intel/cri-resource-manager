@@ -849,6 +849,11 @@ vm-install-cri() {
             vm-command "systemctl enable --now crio"
         fi
     fi
+
+    # Make sure we have proper CRI version (either the distro one or the user specific one)
+    # running and then do the reconfig for it. Important if NRI is used with containerd in
+    # order to enable NRI support.
+    distro-reconfig-"$VM_CRI"
 }
 
 vm-install-containernetworking() {
@@ -1015,7 +1020,7 @@ vm-create-singlenode-cluster() {
 }
 
 vm-create-cluster() {
-    vm-command "kubeadm init --pod-network-cidr=$CNI_SUBNET --cri-socket ${k8scri_sock}"
+    vm-command "kubeadm init --pod-network-cidr=$CNI_SUBNET --cri-socket unix://${k8scri_sock}"
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
         command-error "kubeadm init failed"
     fi
