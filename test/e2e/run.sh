@@ -1281,7 +1281,14 @@ if [ "$binsrc" == "local" ]; then
     fi
 fi
 
-host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri"
+if [[ "$k8scri" == *"&cri-resmgr" ]]; then
+    # launch cri-resmgr as an NRI plugin to running container runtime
+    use_nri_plugin="1"
+else
+    use_nri_plugin="0"
+fi
+
+host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri" "$use_nri_plugin"
 
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
