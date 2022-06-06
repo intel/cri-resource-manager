@@ -1,5 +1,5 @@
 vm-command "grep isolcpus=8,9 /proc/cmdline" || {
-    vm-set-kernel-cmdline "isolcpus=8,9"
+    vm-add-kernel-cmdline-arg "isolcpus=8,9"
     vm-force-restart
     vm-command "grep isolcpus=8,9 /proc/cmdline" || {
         error "failed to set isolcpus kernel commandline parameter"
@@ -96,7 +96,7 @@ verify "disjoint_sets(set.union(cpus['pod7c0'], cpus['pod7c1'], cpus['pod7c2'], 
 
 # Cleanup kernel commandline, otherwise isolcpus will affect CPU
 # pinning and cause false negatives from other tests on this VM.
-vm-set-kernel-cmdline ""
+vm-del-kernel-cmdline-arg "isolcpus=8,9"
 vm-force-restart
 vm-command "grep isolcpus /proc/cmdline" && {
     error "failed to clean up isolcpus kernel commandline parameter"
