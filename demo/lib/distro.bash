@@ -48,6 +48,8 @@ distro-install-kernel-dev() { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
 distro-k8s-cni-subnet()     { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
+distro-add-kernel-cmdline-arg() { distro-resolve "$@"; }
+distro-del-kernel-cmdline-arg() { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
 distro-env-file-dir()       { distro-resolve "$@"; }
 
@@ -418,6 +420,7 @@ fedora-ssh-user() {
 
 fedora-install-utils() {
     distro-install-pkg /usr/bin/pidof
+    distro-install-pkg grubby
 }
 
 fedora-install-repo() {
@@ -605,6 +608,33 @@ EOF
 
 fedora-33-install-crio-pre() {
     fedora-install-crio-version 1.20
+}
+
+fedora-add-kernel-cmdline-arg() {
+    local e2e_opts="$*"
+
+    vm-command "grubby --args=\"$e2e_opts\" --update-kernel=DEFAULT" || {
+        command-error "adding new command line parameters failed"
+    }
+}
+
+fedora-del-kernel-cmdline-arg() {
+    local e2e_opts="$*"
+
+    vm-command "grubby --remove-args=\"$e2e_opts\" --update-kernel=DEFAULT" || {
+        command-error "removing new command line parameters failed"
+    }
+}
+
+fedora-set-kernel-cmdline() {
+    local e2e_defaults="$*"
+    vm-command "mkdir -p /etc/default; touch /etc/default/grub; sed -i '/e2e:fedora-set-kernel-cmdline/d' /etc/default/grub"
+    vm-command "echo 'GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} ${e2e_defaults}\" # by e2e:fedora-set-kernel-cmdline' >> /etc/default/grub" || {
+        command-error "writing new command line parameters failed"
+    }
+    vm-command "grub2-mkconfig -o /boot/grub2/grub.cfg" || {
+        command-error "updating grub failed"
+    }
 }
 
 ###########################################################################
@@ -1034,6 +1064,17 @@ default-install-utils() {
     # utilities, such as pidof and killall, that the test framework
     # and tests in general can expect to be found on VM.
     :
+}
+
+# For distros that do not have grubby, use the set-kernel-cmdline function.
+default-add-kernel-cmdline-arg() {
+    local e2e_opts="$*"
+
+    default-set-kernel-cmdline $e2e_opts
+}
+
+default-del-kernel-cmdline-arg() {
+    default-set-kernel-cmdline ""
 }
 
 default-k8s-cni() {

@@ -609,6 +609,32 @@ vm-set-kernel-cmdline() { # script API
     distro-set-kernel-cmdline "$@"
 }
 
+vm-add-kernel-cmdline-arg() { # script API
+    # Usage: vm-add-kernel-cmdline-arg E2E-DEFAULTS
+    #
+    # Adds E2E-DEFAULTS to kernel command line"
+    #
+    # Example:
+    #   vm-add-kernel-cmdline nr_cpus=4
+    #   vm-reboot
+    #   vm-command "cat /proc/cmdline"
+    #   launch cri-resmgr
+    distro-add-kernel-cmdline-arg "$@"
+}
+
+vm-del-kernel-cmdline-arg() { # script API
+    # Usage: vm-del-kernel-cmdline-arg E2E-DEFAULTS
+    #
+    # Remove E2E-DEFAULTS to kernel command line"
+    #
+    # Example:
+    #   vm-del-kernel-cmdline nr_cpus=4
+    #   vm-reboot
+    #   vm-command "cat /proc/cmdline"
+    #   launch cri-resmgr
+    distro-del-kernel-cmdline-arg "$@"
+}
+
 vm-reboot() { # script API
     # Usage: vm-reboot
     #
