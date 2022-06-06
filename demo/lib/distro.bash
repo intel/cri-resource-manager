@@ -123,6 +123,10 @@ ubuntu-21_04-image-url() {
     echo "https://cloud-images.ubuntu.com/releases/hirsute/release/ubuntu-21.04-server-cloudimg-amd64.img"
 }
 
+ubuntu-22_04-image-url() {
+    echo "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img"
+}
+
 debian-10-image-url() {
     echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
 }
