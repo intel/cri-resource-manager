@@ -1110,4 +1110,14 @@ vm-print-usage() {
     echo "- Delete VM:    govm delete $VM_NAME"
 }
 
+# Return cgroup version (1 or 2)
+vm-cgroup-version() {
+    vm-command-q "mount | grep -q cgroup2"
+    if [ $? -eq 0 ]; then
+	echo "2"
+    fi
+
+    echo "1"
+}
+
 vm-check-env || exit 1
