@@ -1405,7 +1405,7 @@ if vm-command-q "[ ! -f /var/lib/kubelet/config.yaml ]"; then
     fi
 else
     # Wait for kube-apiserver to launch (may be down if the VM was just booted)
-    vm-wait-process kube-apiserver
+    vm-wait-process --timeout 180 kube-apiserver
 fi
 
 # Start cri-resmgr-agent if not already running
