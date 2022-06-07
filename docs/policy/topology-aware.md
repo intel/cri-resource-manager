@@ -146,6 +146,12 @@ configuration options are
   - `PreferSharedCPUs`
     * whether shared allocation is preferred by default for workloads that
       would be otherwise eligible for exclusive CPU allocation
+  - `ReservedPoolNamespaces`
+    * list of extra namespaces (or glob patters) that will be allocated to reserved CPUs
+  - `ColocatePods`
+    * whether try to allocate containers in a pod to the same or close by topology pools
+  - `ColocateNamespaces`
+    * whether try to allocate containers in a namespace to the same or close by topology pools
 
 ## Policy CPU Allocation Preferences
 
@@ -299,6 +305,23 @@ metadata:
 Topology hint generation is globally enabled by default. Therefore, using the
 Pod annotation as opt in only has an effect when the whole pod is annotated to
 opt out from hint-aware pool selection.
+
+### Implicit Topological Co-location for Pods and Namespaces
+
+The `ColocatePods` or `ColocateNamespaces` configuration options control whether
+the policy will try to co-locate, that is allocate topologically close, containers
+within the same Pod or K8s namespace.
+
+Both of these options are false by default. Setting them to true is a shorthand
+for adding to each container an affinity of weight 10 for all other containers
+in the same pod or namespace.
+
+Containers with user-defined affinities are never extended with either of these
+co-location affinities. However, such containers can still have affinity effects
+on other containers that do get extended with co-location. Therefore mixing user-
+defined affinities with implicit co-location requires both careful consideration
+and a thorough understanding of affinity evaluation, or it should be avoided
+altogether.
 
 ## Cold Start
 
