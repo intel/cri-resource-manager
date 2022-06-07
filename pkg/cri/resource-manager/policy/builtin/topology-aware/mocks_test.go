@@ -703,7 +703,7 @@ func (m *mockCache) EvaluateAffinity(*cache.Affinity) map[string]int32 {
 		"fake key": 1,
 	}
 }
-func (m *mockCache) AddImplicitAffinities(map[string]*cache.ImplicitAffinity) error {
+func (m *mockCache) AddImplicitAffinities(map[string]cache.ImplicitAffinity) error {
 	return nil
 }
 func (m *mockCache) GetActivePolicy() string {

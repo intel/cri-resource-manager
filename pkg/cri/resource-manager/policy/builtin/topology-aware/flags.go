@@ -33,6 +33,10 @@ type options struct {
 	FakeHints fakehints `json:",omitempty"`
 	// ReservedPoolNamespaces is a list of namespace globs that will be allocated to reserved CPUs
 	ReservedPoolNamespaces []string `json:"ReservedPoolNamespaces,omitempty"`
+	// ColocatePods controls whether containers within a pod have affinity towards each other.
+	ColocatePods bool `json:"ColocatePods"`
+	// ColocateNamespaces controls whether containers within a namespace have affinity towards each other.
+	ColocateNamespaces bool `json:"ColocateNamespaces"`
 }
 
 // Our runtime configuration.

@@ -50,3 +50,39 @@ verify \
     'disjoint_sets(packages["pod3c0"], packages["pod3c1"])'
 
 kubectl delete pods --all --now
+
+# pod4: Test that with pod colocation enabled containers within a pod get
+# colocated (assigned topologically close to each other) as opposed to being
+# evenly spread out.
+terminate cri-resmgr
+cri_resmgr_cfg=$(COLOCATE_PODS=true instantiate cri-resmgr.cfg)
+launch cri-resmgr
+
+CONTCOUNT=4 CPU=100m create guaranteed
+report allowed
+verify \
+    'cpus["pod4c1"] == cpus["pod4c0"]' \
+    'cpus["pod4c2"] == cpus["pod4c0"]' \
+    'cpus["pod4c3"] == cpus["pod4c0"]'
+
+kubectl delete pods --all --now
+
+# pod{5,6,7}: Test that with namespace colocation enabled containers of pods
+# in the same namespace get colocated (assigned topologically close to each
+# other) as opposed to being evenly spread out.
+terminate cri-resmgr
+cri_resmgr_cfg=$(COLOCATE_NAMESPACES=true instantiate cri-resmgr.cfg)
+launch cri-resmgr
+
+kubectl create namespace test-ns
+
+CONTCOUNT=1 CPU=100m namespace=test-ns create guaranteed
+CONTCOUNT=1 CPU=100m namespace=test-ns create guaranteed
+CONTCOUNT=2 CPU=100m namespace=test-ns create guaranteed
+report allowed
+verify \
+    'cpus["pod6c0"] == cpus["pod5c0"]' \
+    'cpus["pod7c0"] == cpus["pod5c0"]' \
+    'cpus["pod7c1"] == cpus["pod5c0"]'
+
+kubectl delete pods --all --now

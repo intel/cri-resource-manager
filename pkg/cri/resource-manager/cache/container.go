@@ -760,7 +760,7 @@ func (c *container) GetAffinity() ([]*Affinity, error) {
 	if err != nil {
 		return nil, err
 	}
-	affinity = append(affinity, c.implicitAffinities()...)
+	affinity = append(affinity, c.implicitAffinities(len(affinity) > 0)...)
 	c.cache.Debug("affinity for container %s:", c.PrettyName())
 	for _, a := range affinity {
 		c.cache.Debug("  - %s", a.String())
@@ -973,15 +973,20 @@ func (c *container) DeleteTag(key string) (string, bool) {
 	return value, ok
 }
 
-func (c *container) implicitAffinities() []*Affinity {
-	implicit := []*Affinity{}
-	for name, ia := range c.cache.implicit {
-		if ia.Eligible == nil || ia.Eligible(c) {
-			c.cache.Debug("adding implicit affinity %s (%s)", name, ia.Affinity.String())
-			implicit = append(implicit, ia.Affinity)
+func (c *container) implicitAffinities(hasExplicit bool) []*Affinity {
+	affinities := []*Affinity{}
+	for name, generate := range c.cache.implicit {
+		implicit := generate(c, hasExplicit)
+		if implicit == nil {
+			c.cache.Debug("no implicit affinity %s for container %s",
+				name, c.PrettyName())
+			continue
 		}
+
+		c.cache.Debug("using implicit affinity %s for %s", name, c.PrettyName())
+		affinities = append(affinities, implicit)
 	}
-	return implicit
+	return affinities
 }
 
 func (c *container) String() string {

@@ -55,11 +55,8 @@ const (
 	DefaultWeight int32 = 1
 )
 
-// ImplicitAffinity is an affinity that gets implicitly added to all eligible containers.
-type ImplicitAffinity struct {
-	Eligible func(Container) bool // function to determine if Affinity is added to a Container
-	Affinity *Affinity            // the actual implicitly added Affinity
-}
+// ImplicitAffinity can implicitly inject affinities to containers.
+type ImplicitAffinity func(Container, bool) *Affinity
 
 // Validate checks the affinity for (obvious) invalidity.
 func (a *Affinity) Validate() error {
@@ -241,11 +238,10 @@ func GlobalAntiAffinity(key string, weight int32) *Affinity {
 }
 
 // AddImplicitAffinities registers a set of implicit affinities.
-func (cch *cache) AddImplicitAffinities(implicit map[string]*ImplicitAffinity) error {
+func (cch *cache) AddImplicitAffinities(implicit map[string]ImplicitAffinity) error {
 	for name := range implicit {
-		if existing, ok := cch.implicit[name]; ok {
-			return cacheError("implicit affinity %s already defined (%s)",
-				name, existing.Affinity.String())
+		if _, ok := cch.implicit[name]; ok {
+			return cacheError("implicit affinity %s already defined", name)
 		}
 	}
 	for name, a := range implicit {
