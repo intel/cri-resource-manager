@@ -111,6 +111,10 @@ func (e *Expression) Validate() error {
 func (e *Expression) Evaluate(subject Evaluable) bool {
 	log.Debug("evaluating %q @ %s...", *e, subject)
 
+	if e.Op == AlwaysTrue {
+		return true
+	}
+
 	value, ok := e.KeyValue(subject)
 	result := false
 
@@ -155,8 +159,6 @@ func (e *Expression) Evaluate(subject Evaluable) bool {
 		result = ok
 	case NotExist:
 		result = !ok
-	case AlwaysTrue:
-		result = true
 	}
 
 	log.Debug("%q @ %s => %v", *e, subject, result)
