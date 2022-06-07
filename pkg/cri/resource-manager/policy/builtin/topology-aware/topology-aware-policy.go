@@ -109,7 +109,7 @@ func createPolicy(opts *policyapi.BackendOptions, isAlias bool) policyapi.Backen
 		log.Fatal("failed to initialize %s policy: %v", PolicyName, err)
 	}
 
-	p.addImplicitAffinities()
+	p.registerImplicitAffinities()
 
 	config.GetModule(policyapi.ConfigPath).AddNotify(p.configNotify)
 
