@@ -15,6 +15,7 @@
 package topologyaware
 
 import (
+	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 )
 
@@ -81,6 +82,49 @@ func (p *policy) registerImplicitAffinities() error {
 					return cache.GlobalAffinity("tags/"+cache.TagAVX512, 5)
 				}
 				return cache.GlobalAntiAffinity("tags/"+cache.TagAVX512, 5)
+			},
+		},
+		{
+			name:     "colocate-pods",
+			disabled: !opt.ColocatePods,
+			affinity: func(c cache.Container, hasExplicit bool) *cache.Affinity {
+				if hasExplicit {
+					return nil
+				}
+				pod, ok := c.GetPod()
+				if !ok {
+					log.Error("failed to inject pod-colocation affinity, can't find pod")
+					return nil
+				}
+				return &cache.Affinity{
+					Scope: pod.ScopeExpression(),
+					Match: &resmgr.Expression{
+						Op: resmgr.AlwaysTrue,
+					},
+					Weight: 10,
+				}
+			},
+		},
+		{
+			name:     "colocate-namespaces",
+			disabled: !opt.ColocateNamespaces,
+			affinity: func(c cache.Container, hasExplicit bool) *cache.Affinity {
+				if hasExplicit {
+					return nil
+				}
+				return &cache.Affinity{
+					Scope: &resmgr.Expression{
+						Op: resmgr.AlwaysTrue,
+					},
+					Match: &resmgr.Expression{
+						Key: resmgr.KeyNamespace,
+						Op:  resmgr.Equals,
+						Values: []string{
+							c.GetNamespace(),
+						},
+					},
+					Weight: 10,
+				}
 			},
 		},
 	}
