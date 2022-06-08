@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cri-resmgr-config.default
+  namespace: kube-system
+data:
+  policy: |+
+    Active: balloons
+    AvailableResources:
+      CPU: ${AVAILABLE_CPU:-cpuset:0-15}
+    ReservedResources:
+      CPU: ${RESERVED_CPU:-1}
+
+    $([ -z "$IDLECPUCLASS" ] || echo "
+    IdleCPUClass: ${IDLECPUCLASS}
+    ")
+
+    balloons:
+      PinCPU: ${PINCPU:-true}
+      PinMemory: ${PINMEMORY:-true}
+      BalloonTypes:
+
+        $([ -n "$BTYPE0_SKIP" ] || echo "
+        - Name: btype0
+          MinCPUs: ${BTYPE0_MINCPUS:-2}
+          MaxCPUs: ${BTYPE0_MAXCPUS:-2}
+          AllocationPriority: ${BTYPE0_ALLOCATIONPRIORITY:-0}
+          CPUClass: ${BTYPE0_CPUCLASS:-classA}
+          PreferNewBalloons: ${BTYPE0_PREFERNEWBALLOONS:-true}
+          PreferSpreadingPods: ${BTYPE0_PREFERSPREADINGPODS:-false}
+        ")
+
+        $([ -n "$BTYPE1_SKIP" ] || echo "
+        - Name: btype1
+          Namespaces:
+            - ${BTYPE1_NAMESPACE0:-btype1ns0}
+          MinCPUs: ${BTYPE1_MINCPUS:-1}
+          AllocatorPriority: ${BTYPE1_ALLOCATIONPRIORITY:-1}
+          CPUClass: ${BTYPE1_CPUCLASS:-classB}
+          PreferNewBalloons: ${BTYPE1_PREFERNEWBALLOONS:-false}
+          PreferSpreadingPods: ${BTYPE1_PREFERSPREADINGPODS:-true}
+        ")
+
+        $([ -n "$BTYPE2_SKIP" ] || echo "
+        - Name: btype2
+          Namespaces:
+            - ${BTYPE2_NAMESPACE0:-btype2ns0}
+            - ${BTYPE2_NAMESPACE1:-btype2ns1}
+          MinCPUs: ${BTYPE2_MINCPUS:-4}
+          MaxCPUs: ${BTYPE2_MAXCPUS:-8}
+          MinBalloons: ${BTYPE2_MINBALLOONS:-1}
+          AllocatorPriority: ${BTYPE2_ALLOCATORPRIORITY:-2}
+          CPUClass: ${BTYPE2_CPUCLASS:-classC}
+          PreferNewBalloons: ${BTYPE2_PREFERNEWBALLOONS:-false}
+          PreferSpreadingPods: ${BTYPE2_PREFERSPREADINGPODS:-false}
+        ")
+
+  instrumentation: |+
+    HTTPEndpoint: :8891
+    PrometheusExport: true
+
+  logger: |+
+    Debug: policy
+
+  cpu: |+
+    classes:
+      default:
+        minFreq: ${CPU_DEFAULT_MIN:-800}
+        maxFreq: ${CPU_DEFAULT_MAX:-2800}
+      classA:
+        minFreq: ${CPU_CLASSA_MIN:-900}
+        maxFreq: ${CPU_CLASSA_MAX:-2900}
+      classB:
+        minFreq: ${CPU_CLASSB_MIN:-1000}
+        maxFreq: ${CPU_CLASSB_MAX:-3000}
+      classC:
+        minFreq: ${CPU_CLASSC_MIN:-1100}
+        maxFreq: ${CPU_CLASSC_MAX:-3100}
+        energyPerformancePreference: ${CPU_CLASSC_EPP:-1}
