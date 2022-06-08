@@ -712,19 +712,87 @@ func (p *balloons) getPodMilliCPU(podID string) int64 {
 	return cpuRequested
 }
 
+// changesBalloons returns true if two balloons policy configurations
+// may lead into different balloon instances or workload assignment.
+func changesBalloons(opts0, opts1 *BalloonsOptions) bool {
+	if opts0 == nil && opts1 == nil {
+		return false
+	}
+	if opts0 == nil || opts1 == nil {
+		return true
+	}
+	if len(opts0.BalloonDefs) != len(opts1.BalloonDefs) {
+		return true
+	}
+	o0 := opts0.DeepCopy()
+	o1 := opts1.DeepCopy()
+	// Ignore differences in CPU class names. Every other change
+	// potentially changes balloons or workloads.
+	o0.IdleCpuClass = ""
+	o1.IdleCpuClass = ""
+	for i := range o0.BalloonDefs {
+		o0.BalloonDefs[i].CpuClass = ""
+		o1.BalloonDefs[i].CpuClass = ""
+	}
+	return utils.DumpJSON(o0) != utils.DumpJSON(o1)
+}
+
+// changesCpuClasses returns true if two balloons policy
+// configurations can lead to using different CPU classes on
+// corresponding balloon instances. Calling changesCpuClasses(o0, o1)
+// makes sense only if changesBalloons(o0, o1) has returned false.
+func changesCpuClasses(opts0, opts1 *BalloonsOptions) bool {
+	if opts0 == nil && opts1 == nil {
+		return false
+	}
+	if opts0 == nil || opts1 == nil {
+		return true
+	}
+	if opts0.IdleCpuClass != opts1.IdleCpuClass {
+		return true
+	}
+	if len(opts0.BalloonDefs) != len(opts1.BalloonDefs) {
+		return true
+	}
+	for i := range opts0.BalloonDefs {
+		if opts0.BalloonDefs[i].CpuClass != opts1.BalloonDefs[i].CpuClass {
+			return true
+		}
+	}
+	return false
+}
+
 // configNotify applies new configuration.
 func (p *balloons) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
 	log.Info("configuration %s", event)
-	if err := p.setConfig(balloonsOptions); err != nil {
+	defer log.Debug("effective configuration:\n%s\n", utils.DumpJSON(p.bpoptions))
+	newBalloonsOptions := balloonsOptions.DeepCopy()
+	if !changesBalloons(&p.bpoptions, newBalloonsOptions) {
+		if !changesCpuClasses(&p.bpoptions, newBalloonsOptions) {
+			log.Info("no configuration changes")
+		} else {
+			log.Info("configuration changes only on CPU classes")
+			// Update new CPU classes to existing balloon
+			// definitions. The same BalloonDef instances
+			// must be kept in use, because each Balloon
+			// instance holds a direct reference to its
+			// BalloonDef.
+			for i := range p.bpoptions.BalloonDefs {
+				p.bpoptions.BalloonDefs[i].CpuClass = newBalloonsOptions.BalloonDefs[i].CpuClass
+			}
+			// (Re)configures all CPUs in balloons.
+			p.resetCpuClass()
+			for _, bln := range p.balloons {
+				p.useCpuClass(bln)
+			}
+		}
+		return nil
+	}
+	if err := p.setConfig(newBalloonsOptions); err != nil {
 		log.Error("config update failed: %v", err)
 		return err
 	}
 	log.Info("config updated successfully")
-	// TODO. Releasing and reallocating all assigned containers is
-	// overkill, and it should not be done unless balloon
-	// configuration has actually changed. It can do even harm by
-	// leading to misalignment of CPUs and memories of running
-	// containers.
 	p.Sync(p.cch.GetContainers(), p.cch.GetContainers())
 	return nil
 }
@@ -861,7 +929,6 @@ func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
 		log.Info("- balloon %d: %s", blnIdx, bln)
 	}
 	// No errors in balloon creation, take new configuration into use.
-	log.Debug("new %s configuration:\n%s", PolicyName, utils.DumpJSON(bpoptions))
 	p.balloons = balloons
 	p.bpoptions = *bpoptions
 	// (Re)configures all CPUs in balloons.

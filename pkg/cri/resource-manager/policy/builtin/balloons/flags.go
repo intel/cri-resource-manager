@@ -15,14 +15,18 @@
 package balloons
 
 import (
+	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 )
 
+type BalloonsOptions balloonsOptionsWrapped
+
 // BalloonsOptions contains configuration options specific to this policy.
-type BalloonsOptions struct {
+type balloonsOptionsWrapped struct {
 	// PinCPU controls pinning containers to CPUs.
 	PinCPU bool `json:"PinCPU,omitempty"`
 	// PinMemory controls pinning containers to memory nodes.
@@ -78,9 +82,29 @@ type BalloonDef struct {
 	PreferNewBalloons bool
 }
 
+// DeepCopy creates a deep copy of a BalloonsOptions
+func (bo *BalloonsOptions) DeepCopy() *BalloonsOptions {
+	outBo := *bo
+	outBo.ReservedPoolNamespaces = make([]string, len(bo.ReservedPoolNamespaces))
+	copy(outBo.ReservedPoolNamespaces, bo.ReservedPoolNamespaces)
+	outBo.BalloonDefs = make([]*BalloonDef, len(bo.BalloonDefs))
+	for i := range bo.BalloonDefs {
+		outBo.BalloonDefs[i] = bo.BalloonDefs[i].DeepCopy()
+	}
+	return &outBo
+}
+
 // String stringifies a BalloonDef
 func (bdef BalloonDef) String() string {
 	return bdef.Name
+}
+
+// DeepCopy creates a deep copy of a BalloonDef
+func (bdef *BalloonDef) DeepCopy() *BalloonDef {
+	outBdef := *bdef
+	outBdef.Namespaces = make([]string, len(bdef.Namespaces))
+	copy(outBdef.Namespaces, bdef.Namespaces)
+	return &outBdef
 }
 
 // defaultBalloonsOptions returns a new BalloonsOptions instance, all initialized to defaults.
@@ -94,6 +118,17 @@ func defaultBalloonsOptions() interface{} {
 
 // Our runtime configuration.
 var balloonsOptions = defaultBalloonsOptions().(*BalloonsOptions)
+
+// UnmarshalJSON makes sure all options from previous unmarshals get
+// cleared before unmarshaling new data to the same address.
+func (bo *BalloonsOptions) UnmarshalJSON(data []byte) error {
+	bow := balloonsOptionsWrapped{}
+	if err := json.Unmarshal(data, &bow); err != nil {
+		return err
+	}
+	*bo = BalloonsOptions(bow)
+	return nil
+}
 
 // Register us for configuration handling.
 func init() {
