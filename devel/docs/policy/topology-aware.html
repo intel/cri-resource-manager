@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.6.1rc1-44-gec11aa86 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.6.1rc1-49-gb811e963 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -54,6 +54,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#container-cpu-allocation-preference-annotations">Container CPU Allocation Preference Annotations</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#shared-exclusive-and-isolated-cpu-preference">Shared, Exclusive, and Isolated CPU Preference</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#implicit-hardware-topology-hints">Implicit Hardware Topology Hints</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#implicit-topological-co-location-for-pods-and-namespaces">Implicit Topological Co-location for Pods and Namespaces</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#cold-start">Cold Start</a></li>
@@ -294,6 +295,21 @@ eligible for exclusive CPU allocation</p></li>
 would be otherwise eligible for exclusive CPU allocation</p></li>
 </ul>
 </li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ReservedPoolNamespaces</span></code></p>
+<ul>
+<li><p>list of extra namespaces (or glob patters) that will be allocated to reserved CPUs</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ColocatePods</span></code></p>
+<ul>
+<li><p>whether try to allocate containers in a pod to the same or close by topology pools</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ColocateNamespaces</span></code></p>
+<ul>
+<li><p>whether try to allocate containers in a namespace to the same or close by topology pools</p></li>
+</ul>
+</li>
 </ul>
 </div>
 <div class="section" id="policy-cpu-allocation-preferences">
@@ -471,6 +487,21 @@ pool selection using the following Pod annotations.</p>
 <p>Topology hint generation is globally enabled by default. Therefore, using the
 Pod annotation as opt in only has an effect when the whole pod is annotated to
 opt out from hint-aware pool selection.</p>
+</div>
+<div class="section" id="implicit-topological-co-location-for-pods-and-namespaces">
+<h3>Implicit Topological Co-location for Pods and Namespaces<a class="headerlink" href="#implicit-topological-co-location-for-pods-and-namespaces" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">ColocatePods</span></code> or <code class="docutils literal notranslate"><span class="pre">ColocateNamespaces</span></code> configuration options control whether
+the policy will try to co-locate, that is allocate topologically close, containers
+within the same Pod or K8s namespace.</p>
+<p>Both of these options are false by default. Setting them to true is a shorthand
+for adding to each container an affinity of weight 10 for all other containers
+in the same pod or namespace.</p>
+<p>Containers with user-defined affinities are never extended with either of these
+co-location affinities. However, such containers can still have affinity effects
+on other containers that do get extended with co-location. Therefore mixing user-
+defined affinities with implicit co-location requires both careful consideration
+and a thorough understanding of affinity evaluation, or it should be avoided
+altogether.</p>
 </div>
 </div>
 <div class="section" id="cold-start">
