@@ -15,6 +15,7 @@
 package resmgr
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -151,6 +152,10 @@ func (m *resmgr) Start() error {
 
 	m.Lock()
 	defer m.Unlock()
+
+	if err := m.checkRuntime(context.Background()); err != nil {
+		return err
+	}
 
 	if err := m.startControllers(); err != nil {
 		return err

@@ -24,27 +24,32 @@ import (
 
 // Options captures our command line parameters.
 type options struct {
-	ImageSocket         string
-	RuntimeSocket       string
-	RelaySocket         string
-	RelayDir            string
-	AgentSocket         string
-	ConfigSocket        string
-	PidFile             string
-	ResctrlPath         string
-	FallbackConfig      string
-	ForceConfig         string
-	ForceConfigSignal   string
-	DisablePolicySwitch bool
-	ResetPolicy         bool
-	ResetConfig         bool
-	MetricsTimer        time.Duration
-	RebalanceTimer      time.Duration
-	DisableUI           bool
+	ImageSocket           string
+	RuntimeSocket         string
+	RelaySocket           string
+	RelayDir              string
+	AllowUntestedRuntimes bool
+	AgentSocket           string
+	ConfigSocket          string
+	PidFile               string
+	ResctrlPath           string
+	FallbackConfig        string
+	ForceConfig           string
+	ForceConfigSignal     string
+	DisablePolicySwitch   bool
+	ResetPolicy           bool
+	ResetConfig           bool
+	MetricsTimer          time.Duration
+	RebalanceTimer        time.Duration
+	DisableUI             bool
 }
 
 // Relay command line options.
 var opt = options{}
+
+const (
+	allowUntestedRuntimesFlag = "allow-untested-runtimes"
+)
 
 // Register us for command line option processing.
 func init() {
@@ -56,6 +61,9 @@ func init() {
 		"Unix domain socket path where the resource manager should serve requests on.")
 	flag.StringVar(&opt.RelayDir, "relay-dir", "/var/lib/cri-resmgr",
 		"Permanent storage directory path for the resource manager to store its state in.")
+	flag.BoolVar(&opt.AllowUntestedRuntimes, allowUntestedRuntimesFlag, false,
+		"Allow proxying for untested CRI runtimes. Usually this is not a good idea.")
+
 	flag.StringVar(&opt.AgentSocket, "agent-socket", sockets.ResourceManagerAgent,
 		"local socket of the cri-resmgr agent to connect")
 	flag.StringVar(&opt.ConfigSocket, "config-socket", sockets.ResourceManagerConfig,
