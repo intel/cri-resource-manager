@@ -94,8 +94,14 @@ if getenv('VERSIONS_MENU'):
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['myst_parser', 'sphinx_markdown_tables']
+myst_enable_extensions = ['substitution']
 source_suffix = {'.rst': 'restructuredtext','.md': 'markdown'}
 
+# Substitution variables
+myst_substitutions = {
+   # TODO: add code to parse this from go.mod
+  'goresctrl_version': 'v0.2.0'
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
