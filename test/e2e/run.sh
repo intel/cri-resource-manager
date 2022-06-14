@@ -120,6 +120,8 @@ usage() {
     echo "             The default is \"cri-resmgr|containerd\"."
     echo "    k8scni:  The container network interface plugin to install. Options are:"
     echo "             \"cilium\" (the default), \"flannel\", \"weavenet\"."
+    echo "    k8smaster: Name of the existing vm whose cluster this vm will join."
+    echo "             If empty (default), this vm forms its own single-node cluster."
     echo "    crio_version: Version of cri-o to try to pull in, if cri-o is"
     echo "                  not being installed from sources."
     echo "    setup_proxies: Setup proxies even if not using govm based VM."
@@ -1001,7 +1003,7 @@ test-user-code() {
 }
 
 # Validate parameters
-input_var_names="mode user_script_file distro k8scri vm cgroups speed binsrc reinstall_all reinstall_containerd reinstall_crio reinstall_cri_resmgr reinstall_k8s reinstall_oneshot outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
+input_var_names="mode user_script_file distro k8scri k8smaster vm cgroups speed binsrc reinstall_all reinstall_containerd reinstall_crio reinstall_cri_resmgr reinstall_k8s reinstall_oneshot outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
 
 INTERACTIVE_MODE=0
 mode=$1
@@ -1009,6 +1011,7 @@ user_script_file=$2
 distro=${distro:=$DEFAULT_DISTRO}
 k8s=${k8s:=}
 k8scri=${k8scri:="cri-resmgr|containerd"}
+k8smaster=${k8smaster:=}
 cri_resmgr_pidfile="/var/run/cri-resmgr*.pid"
 cri_resmgr_sock="/var/run/cri-resmgr/cri-resmgr.sock"
 cri_resmgr_agent_sock="/var/run/cri-resmgr/cri-resmgr-agent.sock"
@@ -1340,7 +1343,11 @@ if [ "$reinstall_k8s" == "1" ]; then
 fi
 
 if vm-command-q "[ ! -f /var/lib/kubelet/config.yaml ]"; then
-    screen-create-singlenode-cluster
+    if [ -n "$k8smaster" ]; then
+        vm-join "$k8smaster"
+    else
+        screen-create-singlenode-cluster
+    fi
 else
     # Wait for kube-apiserver to launch (may be down if the VM was just booted)
     vm-wait-process kube-apiserver
