@@ -891,7 +891,6 @@ func (n *node) MemoryInfo() (*MemInfo, error) {
 		map[string]interface{}{
 			"MemTotal:": &buf.MemTotal,
 			"MemFree:":  &buf.MemFree,
-			"MemUsed:":  &buf.MemUsed,
 		},
 		func(line string) (string, string, error) {
 			fields := strings.Fields(strings.TrimSpace(line))
@@ -910,6 +909,23 @@ func (n *node) MemoryInfo() (*MemInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	//
+	// On some HW and kernel combinations we've seen more free than total
+	// memory being reported. This causes exorbitant usage of memory being
+	// reported which later can cause failures in policies which trust and
+	// rely on this information.
+	//
+	// Give here a clear(er) error about that. This should also prevent us
+	// immediately from starting up.
+	//
+	if buf.MemFree > buf.MemTotal {
+		return nil, sysfsError(meminfo, "System reports more free than total memory. "+
+			"This can be caused by a kernel bug. Please update your kernel.")
+	}
+
+	buf.MemUsed = buf.MemTotal - buf.MemFree
+
 	return buf, nil
 }
 
