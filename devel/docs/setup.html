@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Setup and Usage &mdash; CRI Resource Manager 0.6.1rc1-36-gcd52d30d documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <title>Setup and Usage &mdash; CRI Resource Manager 0.6.1rc1-38-gf140ae9d documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
@@ -59,7 +59,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#reference">Reference</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#using-docker-as-the-runtime">Using Docker* as the runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-with-untested-runtimes">Running with Untested Runtimes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#logging-and-debugging">Logging and debugging</a></li>
 </ul>
 </li>
@@ -406,33 +406,11 @@ follow this <a class="reference external" href="https://github.com/kata-containe
 </ul>
 </div>
 </div>
-<div class="section" id="using-docker-as-the-runtime">
-<h2>Using Docker* as the runtime<a class="headerlink" href="#using-docker-as-the-runtime" title="Permalink to this headline">¶</a></h2>
-<p>If you must use <code class="docutils literal notranslate"><span class="pre">docker</span></code> as the runtime then the proxying setup is slightly
-more complex. Docker does not natively support the CRI API. Normally kubelet
-runs an internal protocol translator, <code class="docutils literal notranslate"><span class="pre">dockershim</span></code> to translate between CRI
-and the native docker API. To let CRI Resource Manager effectively proxy
-between kubelet and <code class="docutils literal notranslate"><span class="pre">docker</span></code> it needs to actually proxy between kubelet and
-<code class="docutils literal notranslate"><span class="pre">dockershim</span></code>. For this to be possible, you need to run two instances of
-kubelet:</p>
-<ol class="simple">
-<li><p>The real instance, talking to CRI Resource Manager/CRI</p></li>
-<li><p>The dockershim instance, acting as a CRI-docker protocol translator</p></li>
-</ol>
-<p>Run the real kubelet instance as you would normally with any other real CRI
-runtime, but specify the dockershim socket for the CRI Image Service, as
-shown below:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>   <span class="n">kubelet</span> <span class="o">&lt;</span><span class="n">other</span><span class="o">-</span><span class="n">kubelet</span><span class="o">-</span><span class="n">options</span><span class="o">&gt;</span> <span class="o">--</span><span class="n">container</span><span class="o">-</span><span class="n">runtime</span><span class="o">=</span><span class="n">remote</span> \
-     <span class="o">--</span><span class="n">container</span><span class="o">-</span><span class="n">runtime</span><span class="o">-</span><span class="n">endpoint</span><span class="o">=</span><span class="n">unix</span><span class="p">:</span><span class="o">///</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">.</span><span class="n">sock</span> \
-     <span class="o">--</span><span class="n">image</span><span class="o">-</span><span class="n">service</span><span class="o">-</span><span class="n">endpoint</span><span class="o">=</span><span class="n">unix</span><span class="p">:</span><span class="o">///</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">dockershim</span><span class="o">.</span><span class="n">sock</span>
-</pre></div>
-</div>
-<p>Run the dockershim instance as shown below, picking the cgroupfs driver
-according to the configuration of the real kubelet instance:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">kubelet</span> <span class="o">--</span><span class="n">experimental</span><span class="o">-</span><span class="n">dockershim</span> <span class="o">--</span><span class="n">port</span> <span class="mi">11250</span> <span class="o">--</span><span class="n">cgroup</span><span class="o">-</span><span class="n">driver</span> <span class="p">{</span><span class="n">systemd</span><span class="o">|</span><span class="n">cgroupfs</span><span class="p">}</span>
-
-</pre></div>
-</div>
+<div class="section" id="running-with-untested-runtimes">
+<h2>Running with Untested Runtimes<a class="headerlink" href="#running-with-untested-runtimes" title="Permalink to this headline">¶</a></h2>
+<p>CRI Resource Manager is tested with <code class="docutils literal notranslate"><span class="pre">containerd</span></code> and <code class="docutils literal notranslate"><span class="pre">CRI-O</span></code>. If any other runtime is
+detected during startup, <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> will refuse to start. This default behavior can
+be changed using the <code class="docutils literal notranslate"><span class="pre">--allow-untested-runtimes</span></code> command line option.</p>
 </div>
 <div class="section" id="logging-and-debugging">
 <h2>Logging and debugging<a class="headerlink" href="#logging-and-debugging" title="Permalink to this headline">¶</a></h2>
