@@ -804,6 +804,48 @@ $py_assertion
     return 0
 }
 
+kubectl-force-delete() { # script API
+    # Usage: kubectl-force-delete RESOURCE NAME
+    #
+    # Force-deleting a "Terminating" namespace clears finalizers that
+    # have failed to finish. Therefore there may be resources left in the
+    # namespace NAME. Following command prints them.
+    #
+    #     kubectl api-resources --verbs=list --namespaced -o name | \
+    #       xargs -n 1 kubectl get --show-kind --ignore-not-found -n NAME
+    #
+    # Example: delete a namespace that is stuck in the "Terminating" phase
+    #
+    #     kubectl-force-delete namespace my-namespace
+
+    if [ -z "$1" ]; then
+        error "missing RESOURCE"
+        return 1
+    fi
+
+    if [ -z "$2" ]; then
+        error "missing resource NAME"
+        return 1
+    fi
+
+    if [[ "$1" == "namespace" ]] || [[ "$1" == "ns" ]]; then
+        local ns="$2"
+        vm-command "
+            kubectl get namespace $ns -o json > force-delete-ns.json || exit 0
+            (
+              grep -E phase.*Terminating force-delete-ns.json || exit 0
+              tr -d '\n' < force-delete-ns.json \
+              | sed 's/\"finalizers\": \[[^]]\+\]/\"finalizers\": []/' \
+              | kubectl replace --raw /api/v1/namespaces/$ns/finalize -f -
+            )
+            rm -f force-delete-ns.json
+            "
+    else
+        error "unsupported force-delete resource: $1"
+        return 1
+    fi
+}
+
 kubectl() { # script API
     # Usage: kubectl parameters
     #
