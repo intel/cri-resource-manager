@@ -1,0 +1,9 @@
+policy:
+  Active: topology-aware
+  ReservedResources:
+    cpu: 0
+  topology-aware:
+    ColocatePods: $(echo ${COLOCATE_PODS:-false})
+    ColocateNamespaces: $(echo ${COLOCATE_NAMESPACES:-false})
+logger:
+  Debug: cri-resmgr,resource-manager,cache,policy
