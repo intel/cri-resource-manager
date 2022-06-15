@@ -230,7 +230,7 @@ DISTRO_PACKAGE := $(shell echo $(DISTRO_ID) | tr -d ' \t' | \
 Q := @
 
 # Default target: just build everything.
-all: build
+all: build update-workflows
 
 #
 # Generic targets: build, install, clean, build images.
@@ -659,6 +659,13 @@ install-git-hooks:
 	    echo "done."; \
 	fi
 
+# Rules for updating github workflows.
+update-workflows: .github/workflows/verify.yml
+
+.github/workflows/verify.yml: go.mod
+	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
+        sed -E -i "s/go-version:.*$$/go-version: $${golang}/g" $@
+
 #
 # go dependencies for our binaries (careful with that axe, Eugene...)
 #
@@ -749,8 +756,8 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 # phony targets
 .PHONY: all build install clean test images images-push release-tests e2e-tests \
 	format vet cyclomatic-check lint golangci-lint \
-	cross-packages cross-rpm cross-deb
-
+	cross-packages cross-rpm cross-deb \
+        update-workflows
 
 #
 # Rules for documentation
