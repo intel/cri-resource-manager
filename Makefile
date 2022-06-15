@@ -61,7 +61,7 @@ ifdef IMAGE_REPO
 endif
 
 # List of our active go modules.
-GO_MODULES = $(shell $(GO_CMD) list ./... | grep -v vendor/)
+GO_LIST_MODULES := $(GO_CMD) list ./... | grep -v vendor/
 GO_PKG_SRC = $(shell find pkg -name \*.go)
 
 # List of visualizer collateral files to go generate.
@@ -356,7 +356,7 @@ format:
 	fi
 
 vet:
-	$(Q)$(GO_VET) $(GO_MODULES)
+	$(Q)$(GO_VET) $(shell $(GO_LIST_MODULES))
 
 cyclomatic-check:
 	$(Q)report=`$(GO_CYCLO) -over 15 cmd pkg`; \
@@ -390,7 +390,7 @@ shellcheck:
 test:
 ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
-	    $(GO_MODULES)
+	    $(shell $(GO_LIST_MODULES))
 else
 	$(Q)if [ -n '$(TESTS)' ]; then \
 	        run="-run $(TESTS)"; \
@@ -406,7 +406,7 @@ endif
 race-test racetest:
 ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
-	    $(GO_MODULES)
+	    $(shell $(GO_LIST_MODULES))
 else
 	$(Q)cd $(WHAT) && \
 	    $(GO_TEST) -race -coverprofile=cover.out -covermode=atomic || rc=1; \
