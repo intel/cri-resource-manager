@@ -1,16 +1,17 @@
 # pull in base + a minimal set of useful packages
-FROM debian:sid as debian-sid-build
+FROM ubuntu:21.04 as ubuntu-21.04-build
 
-ARG GOLANG_VERSION=1.17
+ARG GOLANG_VERSION=x.yz
 ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG CREATE_USER="test"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
+ENV DEBIAN_FRONTEND noninteractive
 
-# pull in stuff for cgo
+# pull in stuff for building
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential fakeroot devscripts \
+        tzdata build-essential fakeroot devscripts \
         bash git make sed debhelper wget ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 

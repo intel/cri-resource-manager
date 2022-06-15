@@ -1,20 +1,16 @@
 # pull in base + a minimal set of useful packages
-FROM centos:7 as centos-7-build
+FROM centos:8 as centos-8-build
 
-ARG GOLANG_VERSION=1.17
+ARG GOLANG_VERSION=x.yz
 ARG GOLANG_URLDIR=https://dl.google.com/go
-ARG GIT_VERSION=2.27.0
-ARG GIT_URLDIR=https://github.com/git/git/archive
 ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-RUN yum install -y --nogpgcheck rpm-build \
+RUN dnf install -y rpm-build \
     kernel-devel clang gcc \
-    curl-devel zlib-devel openssl-devel expat-devel \
-    make wget
+    git-core make wget
 
-# fetch and build go from sources
 RUN arch="$(rpm --eval %{_arch})"; \
     case "${arch}" in \
         x86_64) goarch=linux-amd64;; \
@@ -30,13 +26,6 @@ RUN arch="$(rpm --eval %{_arch})"; \
     export PATH="/usr/local/go/bin:$PATH" && \
     echo "PATH=/usr/local/go/bin:$PATH" > /etc/profile.d/go.sh && \
     go version
-
-# fetch and build a recent git from sources, anything below 1.9.5 is known to not work for us
-RUN mkdir /git && cd /git && wget $GIT_URLDIR/v$GIT_VERSION.tar.gz && \
-    tar -xvzf v$GIT_VERSION.tar.gz && cd git-$GIT_VERSION && \
-    make -j8 NO_TCLTK=1 NO_GETTEXT=1 prefix=/usr all && \
-    yum remove -y git && \
-    make -j8 NO_TCLTK=1 NO_GETTEXT=1 prefix=/usr install
 
 RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
     useradd -m -s /bin/bash $CREATE_USER $USER_OPTIONS

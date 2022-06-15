@@ -636,6 +636,10 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
 	scripts/build/docker-build-image $$distro-build --container $(DOCKER_OPTIONS)
 
+dockerfiles/cross-build/Dockerfile.%: dockerfiles/cross-build/Dockerfile.%.in go.mod
+	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
+        sed -E "s/^ARG GOLANG_VERSION=.*$$/ARG GOLANG_VERSION=$${golang}/g" $< > $@
+
 # Rule for recompiling a changed protobuf.
 %.pb.go: %.proto
 	$(Q)if [ -n "$(PROTOC)" -o ! -e "$@" ]; then \
