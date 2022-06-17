@@ -85,4 +85,10 @@ verify \
     'cpus["pod7c0"] == cpus["pod5c0"]' \
     'cpus["pod7c1"] == cpus["pod5c0"]'
 
-kubectl delete pods --all --now
+kubectl delete pods -n test-ns --all --now
+kubectl delete namespace test-ns
+
+# Restore default test configuration, restart cri-resmgr.
+terminate cri-resmgr
+cri_resmgr_cfg=$(instantiate cri-resmgr.cfg)
+launch cri-resmgr
