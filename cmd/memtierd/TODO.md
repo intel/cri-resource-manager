@@ -1,6 +1,11 @@
 Features
 --------
 
+- Add stats table on mover statistics: how many tasks there are in the
+  queue, how many tasks have been handled.
+
+- Add Ratio policy! Use-all-DRAM-then-push-to-PMEM policy: numasize...
+
 - memtierd prometheus export.
 
 - Refactor cri-rm memorytiering to use pkg/memtier.
