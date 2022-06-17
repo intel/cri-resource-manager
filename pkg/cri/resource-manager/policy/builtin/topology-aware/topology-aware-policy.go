@@ -546,6 +546,10 @@ func (p *policy) checkConstraints() error {
 		p.reserved = cset
 	}
 
+	if p.reserved.IsEmpty() {
+		return policyError("cannot start without CPU reservation")
+	}
+
 	return nil
 }
 
