@@ -1045,7 +1045,7 @@ func (p *balloons) dismissContainer(c cache.Container, bln *Balloon) {
 
 // pinCpuMem pins container to CPUs and memory nodes if flagged
 func (p *balloons) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems idset.IDSet) {
-	if p.bpoptions.PinCPU {
+	if p.bpoptions.PinCPU == nil || *p.bpoptions.PinCPU {
 		log.Debug("  - pinning %s to cpuset: %s", c.PrettyName(), cpus)
 		c.SetCpusetCpus(cpus.String())
 		if reqCpu, ok := c.GetResourceRequirements().Requests[corev1.ResourceCPU]; ok {
@@ -1053,7 +1053,7 @@ func (p *balloons) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems idset.I
 			c.SetCPUShares(int64(cache.MilliCPUToShares(mCpu)))
 		}
 	}
-	if p.bpoptions.PinMemory {
+	if p.bpoptions.PinMemory == nil || *p.bpoptions.PinMemory {
 		log.Debug("  - pinning %s to memory %s", c.PrettyName(), mems)
 		c.SetCpusetMems(mems.String())
 	}

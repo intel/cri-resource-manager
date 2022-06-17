@@ -28,9 +28,9 @@ type BalloonsOptions balloonsOptionsWrapped
 // BalloonsOptions contains configuration options specific to this policy.
 type balloonsOptionsWrapped struct {
 	// PinCPU controls pinning containers to CPUs.
-	PinCPU bool `json:"PinCPU,omitempty"`
+	PinCPU *bool `json:"PinCPU,omitempty"`
 	// PinMemory controls pinning containers to memory nodes.
-	PinMemory bool `json:"PinMemory,omitempty"`
+	PinMemory *bool `json:"PinMemory,omitempty"`
 	// IdleCpuClass controls how unusded CPUs outside any a
 	// balloons are (re)configured.
 	IdleCpuClass string `json:"IdleCPUClass",omitempty"`
@@ -82,6 +82,9 @@ type BalloonDef struct {
 	PreferNewBalloons bool
 }
 
+var defaultPinCPU bool = true
+var defaultPinMemory bool = true
+
 // DeepCopy creates a deep copy of a BalloonsOptions
 func (bo *BalloonsOptions) DeepCopy() *BalloonsOptions {
 	outBo := *bo
@@ -111,8 +114,8 @@ func (bdef *BalloonDef) DeepCopy() *BalloonDef {
 func defaultBalloonsOptions() interface{} {
 	return &BalloonsOptions{
 		ReservedPoolNamespaces: []string{metav1.NamespaceSystem},
-		PinCPU:                 true,
-		PinMemory:              true,
+		PinCPU:                 &defaultPinCPU,
+		PinMemory:              &defaultPinMemory,
 	}
 }
 
