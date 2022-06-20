@@ -227,6 +227,11 @@ get-py-allowed() {
         command-error "error fetching res_allowed from $VM_NAME"
     }
     echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
+    # Validate res_allowed_file. Error out if there is same container
+    # name with two different sets of allowed CPUs or memories.
+    awk -F "[ /]" '{if (pod[$1]!=0 && pod[$1]!=""$3""$4){print "error: ambiguous allowed resources for name "$1; exit(1)};pod[$1]=""$3""$4}' "$res_allowed_file" || {
+        error "container/process name collision: test environment needs cleanup."
+    }
     py_allowed="
 import re
 allowed=$("$DEMO_LIB_DIR/topology.py" -t "$topology_dump_file" -r "$res_allowed_file" res_allowed -o json)
