@@ -3,6 +3,7 @@
 VOLUMES=(-v /sys:/sys -v /home:/mnt/host/home)
 IMAGE=$1
 DOCKERFILE=dockerfiles/cross-build/Dockerfile.${IMAGE%-build}
+PULL=''
 shift
 
 while [ -n "$1" ]; do
@@ -20,6 +21,10 @@ while [ -n "$1" ]; do
             fi
             shift
             ;;
+         --pull|-p)
+            PULL=1
+            shift
+            ;;
         *)
             PASSTHROUGH=("${PASSTHROUGH[@]}" "$1")
             shift
@@ -33,6 +38,11 @@ echo "  - image name: $IMAGE"
 echo "  - container : $CONTAINER"
 echo "  - volumes   : " "${VOLUMES[@]}"
 echo "  - options   : " "${PASSTHROUGH[@]}"
+
+if [ -n "$PULL" ]; then
+    FROM_IMAGE=$(grep '^FROM ' "$DOCKERFILE" | head -1 | cut -d ' ' -f 2)
+    docker pull "$FROM_IMAGE"
+fi
 
 docker build . \
        -f "$DOCKERFILE" -t "$IMAGE" \
