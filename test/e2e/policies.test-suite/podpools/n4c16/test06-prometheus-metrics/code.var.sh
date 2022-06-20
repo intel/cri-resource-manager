@@ -1,7 +1,11 @@
 # Test reporting Prometheus metrics from podpools
 
+cleanup() {
+    vm-command "kubectl get pods -A | grep -E ' pod[0-9]' | while read namespace pod rest; do kubectl -n \$namespace delete pod \$pod --now; done"
+}
+
 parse-commandoutput-log_pool_cpuset() {
-    log_pool_cpuset=$(awk -F[:,] "{print \$6}" <<< "$COMMAND_OUTPUT")
+    log_pool_cpuset=$(awk -F 'cpus:|, ' "{print \$2}" <<< "$COMMAND_OUTPUT")
     out "parsed: log_pool_cpuset=$log_pool_cpuset"
 }
 
@@ -84,7 +88,7 @@ out "### Multicontainer pod, no annotations. Runs on shared CPUs."
 CPUREQ="" CPULIM=""
 CONTCOUNT=2 create podpools-busybox
 report allowed
-vm-command "curl --silent $metrics_url"
+vm-command "curl --silent $metrics_url | grep -v ^cgroup_"
 verify-log-vs-metrics pod4:pod4c1 0 20
 
 out ""
@@ -92,5 +96,7 @@ out "### Multicontainer pod in kube-system namespace. Runs on reserved CPUs."
 CPUREQ="" CPULIM=""
 namespace=kube-system CONTCOUNT=3 create podpools-busybox
 report allowed
-vm-command "curl --silent $metrics_url"
+vm-command "curl --silent $metrics_url | grep -v ^cgroup_"
 verify-log-vs-metrics pod5:pod5c1 0 20
+
+cleanup
