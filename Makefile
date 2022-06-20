@@ -634,7 +634,7 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	$(Q)distro=$(patsubst docker/cross-build/%,%,$@) && \
 	echo "Building cross-build docker image for $$distro..." && \
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
-	scripts/build/docker-build-image $$distro-build --container $(DOCKER_OPTIONS)
+	scripts/build/docker-build-image $$distro-build --pull --container $(DOCKER_OPTIONS)
 
 dockerfiles/cross-build/Dockerfile.%: dockerfiles/cross-build/Dockerfile.%.in go.mod
 	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
