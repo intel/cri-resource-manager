@@ -57,9 +57,9 @@ spec:
           periodSeconds: 30
 
       nodeSelector:
-        node-role.kubernetes.io/master: ""
+        node-role.kubernetes.io/control-plane: ""
       tolerations:
-        - key: "node-role.kubernetes.io/master"
+        - key: "node-role.kubernetes.io/control-plane"
           operator: "Equal"
           value: ""
           effect: "NoSchedule"
@@ -83,4 +83,3 @@ spec:
   - port: 443
     targetPort: 8443
     protocol: TCP
-
