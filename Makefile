@@ -61,7 +61,7 @@ ifdef IMAGE_REPO
 endif
 
 # List of our active go modules.
-GO_MODULES = $(shell $(GO_CMD) list ./... | grep -v vendor/)
+GO_LIST_MODULES := $(GO_CMD) list ./... | grep -v vendor/
 GO_PKG_SRC = $(shell find pkg -name \*.go)
 
 # List of visualizer collateral files to go generate.
@@ -230,7 +230,7 @@ DISTRO_PACKAGE := $(shell echo $(DISTRO_ID) | tr -d ' \t' | \
 Q := @
 
 # Default target: just build everything.
-all: build
+all: build update-workflows
 
 #
 # Generic targets: build, install, clean, build images.
@@ -356,7 +356,7 @@ format:
 	fi
 
 vet:
-	$(Q)$(GO_VET) $(GO_MODULES)
+	$(Q)$(GO_VET) $(shell $(GO_LIST_MODULES))
 
 cyclomatic-check:
 	$(Q)report=`$(GO_CYCLO) -over 15 cmd pkg`; \
@@ -390,7 +390,7 @@ shellcheck:
 test:
 ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
-	    $(GO_MODULES)
+	    $(shell $(GO_LIST_MODULES))
 else
 	$(Q)if [ -n '$(TESTS)' ]; then \
 	        run="-run $(TESTS)"; \
@@ -406,7 +406,7 @@ endif
 race-test racetest:
 ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
-	    $(GO_MODULES)
+	    $(shell $(GO_LIST_MODULES))
 else
 	$(Q)cd $(WHAT) && \
 	    $(GO_TEST) -race -coverprofile=cover.out -covermode=atomic || rc=1; \
@@ -636,6 +636,10 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
 	scripts/build/docker-build-image $$distro-build --container $(DOCKER_OPTIONS)
 
+dockerfiles/cross-build/Dockerfile.%: dockerfiles/cross-build/Dockerfile.%.in go.mod
+	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
+        sed -E "s/^ARG GOLANG_VERSION=.*$$/ARG GOLANG_VERSION=$${golang}/g" $< > $@
+
 # Rule for recompiling a changed protobuf.
 %.pb.go: %.proto
 	$(Q)if [ -n "$(PROTOC)" -o ! -e "$@" ]; then \
@@ -654,6 +658,13 @@ install-git-hooks:
 	    touch .git-hooks.redirected && \
 	    echo "done."; \
 	fi
+
+# Rules for updating github workflows.
+update-workflows: .github/workflows/verify.yml
+
+.github/workflows/verify.yml: go.mod
+	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
+        sed -E -i "s/go-version:.*$$/go-version: $${golang}/g" $@
 
 #
 # go dependencies for our binaries (careful with that axe, Eugene...)
@@ -745,8 +756,8 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 # phony targets
 .PHONY: all build install clean test images images-push release-tests e2e-tests \
 	format vet cyclomatic-check lint golangci-lint \
-	cross-packages cross-rpm cross-deb
-
+	cross-packages cross-rpm cross-deb \
+        update-workflows
 
 #
 # Rules for documentation

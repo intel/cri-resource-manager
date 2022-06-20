@@ -18,8 +18,8 @@ Although not recommended, you can install CRI Resource Manager from sources:
   - get the sources: `git clone https://github.com/intel/cri-resource-manager`
   - build and install: `cd cri-resource-manager; make build && sudo make install`
 
-You will need at least `git`, `golang 1.14` or newer, `GNU make`, `bash`,
-`find`, `sed`, `head`, `date`, and `install` to be able to build and install
+You will need at least `git`, {{ '`golang '+ '{}'.format(golang_version) + '`' }} or newer,
+`GNU make`, `bash`, `find`, `sed`, `head`, `date`, and `install` to be able to build and install
 from sources.
 
 ## Building packages for the distro of your host

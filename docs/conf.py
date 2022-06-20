@@ -17,6 +17,7 @@ from docutils import nodes
 from os.path import isdir, isfile, join, basename, dirname
 from os import makedirs, getenv
 from shutil import copyfile
+from subprocess import run, STDOUT
 
 # -- Project information -----------------------------------------------------
 
@@ -98,9 +99,27 @@ myst_enable_extensions = ['substitution']
 source_suffix = {'.rst': 'restructuredtext','.md': 'markdown'}
 
 # Substitution variables
+def module_version(module, version):
+    version=version.split('-', 1)[0]
+    if module == 'github.com/intel/goresctrl':
+        version = '.'.join(version.split('.')[0:2]) + '.0'
+    return version
+
+def gomod_versions(modules):
+    versions = {}
+    gocmd = run(['go', 'list', '-m', '-f', '{{.GoVersion}}'],
+                check=True, capture_output=True, universal_newlines=True)
+    versions['golang'] = gocmd.stdout.strip()
+    for m in modules:
+        gocmd = run(['go', 'list', '-m', '-f', '{{.Version}}', '%s' % m],
+                    check=True, capture_output=True, universal_newlines=True)
+        versions[m] = module_version(m, gocmd.stdout.strip())
+    return versions
+
+mod_versions = gomod_versions(['github.com/intel/goresctrl'])
 myst_substitutions = {
-   # TODO: add code to parse this from go.mod
-  'goresctrl_version': 'v0.2.0'
+    'golang_version': mod_versions['golang'],
+    'goresctrl_version': mod_versions['github.com/intel/goresctrl']
 }
 
 # Add any paths that contain templates here, relative to this directory.

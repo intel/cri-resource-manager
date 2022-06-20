@@ -2,13 +2,16 @@
 
 WORKFLOWS=".github/workflows/verify.yml"
 
-gomod=$(git diff --cached go.mod | grep '^+go ' | sed 's/^.* //g')
-[ -z "$gomod" ] && exit 0
+if git diff --cached go.mod | grep -q '^+go '; then
+    gomod=$(go list -m -f '{{.GoVersion}}')
+else
+    exit 0
+fi
 
 status=0
 for wf in $WORKFLOWS; do
-    workflow=$(grep 'go-version:' .github/workflows/verify.yml | sed 's/^.*: //')
-    if [ "gomod" != "$workflow" ]; then
+    workflow=$(grep 'go-version:' $wf | sed 's/^.*: //')
+    if [ "$gomod" != "$workflow" ]; then
         echo >&2 "ERROR: inconsistent golang versions, $gomod in go.mod but $workflow in $wf..."
         status=1
     fi
