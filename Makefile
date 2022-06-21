@@ -183,15 +183,15 @@ DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` \
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
-    grep -l 'apt-get ' dockerfiles/cross-build/Dockerfile.* | \
+    grep -l 'apt-get ' dockerfiles/cross-build/Dockerfile.*.in | \
     egrep -v '((~)|(swp))$$' | \
-    sed 's:^.*Dockerfile.::g')
+    sed 's:^.*Dockerfile.::g;s:.in$$::g')
 
 # Supported distros with rpm native packaging format.
 SUPPORTED_RPM_DISTROS := $(shell \
-    egrep -l '(dnf )|(yum )|(zypper )' dockerfiles/cross-build/Dockerfile.* | \
+    egrep -l '(dnf )|(yum )|(zypper )' dockerfiles/cross-build/Dockerfile.*.in | \
     egrep -v '((~)|(swp))$$' | \
-    sed 's:^.*Dockerfile.::g')
+    sed 's:^.*Dockerfile.::g;s:.in$$::g')
 
 # Directory to leave built distro packages and collateral in.
 PACKAGES_DIR := packages
