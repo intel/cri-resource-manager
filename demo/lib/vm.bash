@@ -48,6 +48,29 @@ vm-ssh-user() {
     fi
 }
 
+
+vm-is-govm() { # script API
+    local name="${1:-$VM_NAME}"
+    # Usage: vm-is-govm [name]
+    #
+    # Check if the given name (or $VM_NAME if omitted) corresponds to
+    # a govm-managed virtual machine. Returns 0 if it does. Returns 1
+    # if it does not. Returns 2 if govm is not installed.
+
+    if ! type -f govm >& /dev/null; then
+        return 2
+    fi
+    if [ -z "$name" ]; then
+        return 1
+    fi
+
+    if govm ls | cut -d ' ' -f 2 | grep -q "^$name$"; then
+       return 0
+    fi
+
+    return 1
+}
+
 vm-check-env() {
     # If VM IP address is already defined, govm is not needed.
     if [ -n "$VM_IP" ]; then
@@ -581,6 +604,24 @@ vm-reboot() { # script API
     vm-command "reboot"
     sleep 5
     host-wait-vm-ssh-server
+}
+
+vm-force-restart() { # script API
+    # Usage: vm-force-restart
+    #
+    # Give the virtual machine a chance to shut itself down, then
+    # forcibly restart it using govm stop/start. Wait for the ssh
+    # server to start responding again after restarting. If VM_NAME
+    # is not set assume the target machine to not be govm-managed
+    # and fall back to vm-reboot instead.
+    if vm-is-govm; then
+        vm-command "shutdown -h now"
+        sleep 10
+        vm-monitor system_reset
+        host-wait-vm-ssh-server
+    else
+      vm-reboot
+    fi
 }
 
 vm-setup-proxies() {
