@@ -134,6 +134,9 @@ DOCKER := docker
 # Extra options to pass to docker (for instance --network host).
 DOCKER_OPTIONS =
 
+# Set this to empty to prevent 'docker build' from trying to pull all image refs.
+DOCKER_PULL := --pull
+
 # Docker boilerplate/commands to build debian/ubuntu packages.
 DOCKER_DEB_BUILD := \
     cd /build && \
@@ -634,7 +637,7 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	$(Q)distro=$(patsubst docker/cross-build/%,%,$@) && \
 	echo "Building cross-build docker image for $$distro..." && \
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
-	scripts/build/docker-build-image $$distro-build --container $(DOCKER_OPTIONS)
+	scripts/build/docker-build-image $$distro-build --container $(DOCKER_PULL) $(DOCKER_OPTIONS)
 
 dockerfiles/cross-build/Dockerfile.%: dockerfiles/cross-build/Dockerfile.%.in go.mod
 	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
