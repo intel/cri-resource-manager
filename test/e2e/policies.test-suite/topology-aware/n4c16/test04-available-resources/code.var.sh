@@ -39,8 +39,15 @@ test-and-verify-allowed() {
     reset counters
 }
 
-CRIRM_CGROUP=/sys/fs/cgroup/cpuset/cri-resmgr-test-05-1
-vm-command "rm -rf $CRIRM_CGROUP; mkdir $CRIRM_CGROUP; echo 1-4,11 > $CRIRM_CGROUP/cpuset.cpus"
+if vm-command "[ -d /sys/fs/cgroup/cpuset ]"; then
+    # cgroup v1
+    CGROUP_CPUSET=/sys/fs/cgroup/cpuset
+else
+    # cgroup v2
+    CGROUP_CPUSET=/sys/fs/cgroup
+fi
+CRIRM_CGROUP=$CGROUP_CPUSET/cri-resmgr-test-05-1
+vm-command "rmdir $CRIRM_CGROUP; mkdir $CRIRM_CGROUP; echo 1-4,11 > $CRIRM_CGROUP/cpuset.cpus"
 
 terminate cri-resmgr
 AVAILABLE_CPU="\"$CRIRM_CGROUP\""
@@ -49,8 +56,8 @@ launch cri-resmgr
 test-and-verify-allowed 1 2 3 4
 vm-command "rmdir $CRIRM_CGROUP || true"
 
-CRIRM_CGROUP=/sys/fs/cgroup/cpuset/cri-resmgr-test-05-2
-vm-command "rm -rf $CRIRM_CGROUP; mkdir $CRIRM_CGROUP; echo 5-8,11 > $CRIRM_CGROUP/cpuset.cpus"
+CRIRM_CGROUP=$CGROUP_CPUSET/cri-resmgr-test-05-2
+vm-command "rmdir $CRIRM_CGROUP; mkdir $CRIRM_CGROUP; echo 5-8,11 > $CRIRM_CGROUP/cpuset.cpus"
 
 terminate cri-resmgr
 AVAILABLE_CPU="\"${CRIRM_CGROUP#/sys/fs/cgroup/cpuset}\""
