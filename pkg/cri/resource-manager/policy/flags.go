@@ -16,7 +16,9 @@ package policy
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -121,6 +123,9 @@ func (cs *ConstraintSet) parseCPU(value string) error {
 	} else {
 		spec = value
 	}
+	if len(spec) == 0 {
+		return policyError("missing CPU constraint value")
+	}
 
 	switch {
 	case kind == "cgroup" || spec[0] == '/':
@@ -163,11 +168,25 @@ func (cs *ConstraintSet) parseCPUQuantity(value string) error {
 }
 
 func (cs *ConstraintSet) parseCPUFromCgroup(dir string) error {
-	cpusetDir := cgroups.Cpuset.Path()
-	if !strings.HasPrefix(dir, cpusetDir+"/") {
-		dir = filepath.Join(cpusetDir, dir)
+	pathToCpuset := func(outPath *string, fragments ...string) bool {
+		*outPath = filepath.Join(filepath.Join(fragments...), "cpuset.cpus")
+		_, err := os.Stat(*outPath)
+		return !errors.Is(err, os.ErrNotExist)
 	}
-	path := filepath.Join(dir, "cpuset.cpus")
+	path := ""
+	switch {
+	case len(dir) == 0:
+		return policyError("empty CPU cgroup constraint")
+	case dir[0] == '/' && pathToCpuset(&path, dir):
+		// dir is a direct, absolute path to an existing cgroup
+	case pathToCpuset(&path, cgroups.GetMountDir(), dir):
+		// dir is a relative path starting from the cgroup mount point
+	case pathToCpuset(&path, cgroups.Cpuset.Path(), dir):
+		// dir is a relative path starting from the cpuset controller (cgroup v1)
+	default:
+		// dir is none of the previous
+		return policyError("failed to find cpuset.cpus for CPU cgroup constraint %q", dir)
+	}
 	bytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return policyError("failed read CPU cpuset cgroup constraint %q: %v",
