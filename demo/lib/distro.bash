@@ -332,6 +332,13 @@ centos-7-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
 }
 
+centos-8-install-pkg-pre() {
+    vm-command "[ -f /etc/yum.repos.d/.fixup ]" && return 0
+    vm-command 'sed -i "s/mirrorlist/#mirrorlist/g" /etc/yum.repos.d/CentOS-*' && \
+    vm-command 'sed -i "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*' && \
+    vm-command 'touch /etc/yum.repos.d/.fixup'
+}
+
 centos-8-install-crio-pre() {
     if [ -z "$crio_src" ]; then
         local os=CentOS_8
@@ -490,6 +497,10 @@ EOF
     else
         k8sverparam=""
     fi
+
+    vm-command 'grep -iq centos-[78] /etc/os-release' && \
+        vm-command "sed -i 's/gpgcheck=1/gpgcheck=0/g' $repo"
+
     distro-install-pkg iproute-tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
     vm-command "systemctl enable --now kubelet" ||
         command-error "failed to enable kubelet"
