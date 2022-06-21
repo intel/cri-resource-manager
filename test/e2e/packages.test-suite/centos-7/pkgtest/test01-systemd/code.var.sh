@@ -1,3 +1,7 @@
+# Reconfigure journald to allow very verbose logging.
+vm-command "sed -i 's/^#RateLimit/RateLimit/g;s/Burst=.*$/Burst=10000/g' /etc/systemd/journald.conf"
+vm-command "systemctl restart systemd-journald"
+
 # Clear cri-resmgr output from previous runs.
 vm-command "journalctl --vacuum-time=1s"
 
