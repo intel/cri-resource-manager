@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Topology-Aware Policy &mdash; CRI Resource Manager 0.7.0 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Static-Pools (STP) Policy" href="static-pools.html" />
+    <link rel="prev" title="Policies" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> CRI Resource Manager
+          </a>
+              <div class="version">
+                0.7.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Policies</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Topology-Aware Policy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#background">Background</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#features">Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#activating-the-policy">Activating the Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-the-policy">Configuring the Policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#policy-cpu-allocation-preferences">Policy CPU Allocation Preferences</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#container-cpu-allocation-preference-annotations">Container CPU Allocation Preference Annotations</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#shared-exclusive-and-isolated-cpu-preference">Shared, Exclusive, and Isolated CPU Preference</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#implicit-hardware-topology-hints">Implicit Hardware Topology Hints</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#implicit-topological-co-location-for-pods-and-namespaces">Implicit Topological Co-location for Pods and Namespaces</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#cold-start">Cold Start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dynamic-page-demotion">Dynamic Page Demotion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#container-memory-requests-and-limits">Container memory requests and limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#reserved-pool-namespaces">Reserved pool namespaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#reserved-cpu-annotations">Reserved CPU annotations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="balloons.html">Balloons Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="podpools.html">Podpools Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cpu-allocator.html">CPU Allocator</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Policies</a> &raquo;</li>
+      <li>Topology-Aware Policy</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/docs/policy/topology-aware.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="tex2jax_ignore mathjax_ignore section" id="topology-aware-policy">
+<h1>Topology-Aware Policy<a class="headerlink" href="#topology-aware-policy" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="background">
+<h2>Background<a class="headerlink" href="#background" title="Permalink to this headline">¶</a></h2>
+<p>On server-grade hardware the CPU cores, I/O devices and other peripherals
+form a rather complex network together with the memory controllers, the
+I/O bus hierarchy and the CPU interconnect. When a combination of these
+resources are allocated to a single workload, the performance of that
+workload can vary greatly, depending on how efficiently data is transferred
+between them or, in other words, on how well the resources are aligned.</p>
+<p>There are a number of inherent architectural hardware properties that,
+unless properly taken into account, can cause resource misalignment and
+workload performance degradation. There are a multitude of CPU cores
+available to run workloads. There are a multitude of memory controllers
+these workloads can use to store and retrieve data from main memory. There
+are a multitude of I/O devices attached to a number of I/O buses the same
+workloads can access. The CPU cores can be divided into a number of groups,
+with each group having different access latency and bandwidth to each
+memory controller and I/O device.</p>
+<p>If a workload is not assigned to run with a properly aligned set of CPU,
+memory and devices, it will not be able to achieve optimal performance.
+Given the idiosyncrasies of hardware, allocating a properly aligned set
+of resources for optimal workload performance requires identifying and
+understanding the multiple dimensions of access latency locality present
+in hardware or, in other words, hardware topology awareness.</p>
+</div>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy automatically builds a tree of pools based on the
+detected hardware topology. Each pool has a set of CPUs and memory zones
+assigned as their resources. Resource allocation for workloads happens by
+first picking the pool which is considered to fit the best the resource
+requirements of the workload and then assigning CPU and memory from this pool.</p>
+<p>The pool nodes at various depths from bottom to top represent the NUMA nodes,
+dies, sockets, and finally the whole of the system at the root node. Leaf NUMA
+nodes are assigned the memory behind their controllers / zones and CPU cores
+with the smallest distance / access penalty to this memory. If the machine
+has multiple types of memory separately visible to both the kernel and user
+space, for instance both DRAM and <a class="reference external" href="https://www.intel.com/content/www/us/en/products/memory-storage/optane-dc-persistent-memory.html">PMEM</a>, each zone of special type of memory
+is assigned to the closest NUMA node pool.</p>
+<p>Each non-leaf pool node in the tree is assigned the union of the resources of
+its children. So in practice, dies nodes end up containing all the CPU cores
+and the memory zones in the corresponding die, sockets nodes end up containing
+the CPU cores and memory zones in the corresponding socket’s dies, and the root
+ends up containing all CPU cores and memory zones in all sockets.</p>
+<p>With this setup, each pool in the tree has a topologically aligned set of CPU
+and memory resources. The amount of available resources gradually increases in
+the tree from bottom to top, while the strictness of alignment is gradually
+relaxed. In other words, as one moves from bottom to top in the tree, it is
+getting gradually easier to fit in a workload, but the price paid for this is
+a gradually increasing maximum potential cost or penalty for memory access and
+data transfer between CPU cores.</p>
+<p>Another property of this setup is that the resource sets of sibling pools at
+the same depth in the tree are disjoint while the resource sets of descendant
+pools along the same path in the tree partially overlap, with the intersection
+decreasing as the the distance between pools increases. This makes it easy to
+isolate workloads from each other. As long as workloads are assigned to pools
+which has no other common ancestor than the root, the resources of these
+workloads should be as well isolated from each other as possible on the given
+hardware.</p>
+<p>With such an arrangement, this policy should handle topology-aware alignment
+of resources without any special or extra configuration. When allocating
+resources, the policy</p>
+<ul class="simple">
+<li><p>filters out all pools with insufficient free capacity</p></li>
+<li><p>runs a scoring algorithm for the remaining ones</p></li>
+<li><p>picks the one with the best score</p></li>
+<li><p>assigns resources to the workload from there</p></li>
+</ul>
+<p>Although the details of the scoring algorithm are subject to change as the
+implementation evolves, its basic principles are roughly</p>
+<ul class="simple">
+<li><p>prefer pools lower in the tree, IOW stricter alignment and lower latency</p></li>
+<li><p>prefer idle pools over busy ones, IOW more remaining free capacity and
+fewer workloads</p></li>
+<li><p>prefer pools with better overall device alignment</p></li>
+</ul>
+</div>
+<div class="section" id="features">
+<h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy has the following features:</p>
+<ul class="simple">
+<li><p>topologically aligned allocation of CPU and memory</p>
+<ul>
+<li><p>assign CPU and memory to workloads with tightest available alignment</p></li>
+</ul>
+</li>
+<li><p>aligned allocation of devices</p>
+<ul>
+<li><p>pick pool for workload based on locality of devices already assigned</p></li>
+</ul>
+</li>
+<li><p>shared allocation of CPU cores</p>
+<ul>
+<li><p>assign workload to shared subset of pool CPUs</p></li>
+</ul>
+</li>
+<li><p>exclusive allocation of CPU cores</p>
+<ul>
+<li><p>dynamically slice off CPU cores from shared subset and assign to workload</p></li>
+</ul>
+</li>
+<li><p>mixed allocation of CPU cores</p>
+<ul>
+<li><p>assign both exclusive and shared CPU cores to workload</p></li>
+</ul>
+</li>
+<li><p>discovering and using kernel-isolated CPU cores (<a class="reference external" href="https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html#cpu-lists">‘isolcpus’</a>)</p>
+<ul>
+<li><p>use kernel-isolated CPU cores for exclusively assigned CPU cores</p></li>
+</ul>
+</li>
+<li><p>exposing assigned resources to workloads</p></li>
+<li><p>notifying workloads about changes in resource assignment</p></li>
+<li><p>dynamic relaxation of memory alignment to prevent OOM</p>
+<ul>
+<li><p>dynamically widen workload memory set to avoid pool/workload OOM</p></li>
+</ul>
+</li>
+<li><p>multi-tier memory allocation</p>
+<ul>
+<li><p>assign workloads to memory zones of their preferred type</p></li>
+<li><p>the policy knows about three kinds of memory:</p>
+<ul>
+<li><p>DRAM is regular system main memory</p></li>
+<li><p>PMEM is large-capacity memory, such as
+<a class="reference external" href="https://www.intel.com/content/www/us/en/products/memory-storage/optane-dc-persistent-memory.html">Intel® Optane™ memory</a></p></li>
+<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/High_Bandwidth_Memory">HBM</a> is high speed memory,
+typically found on some special-purpose computing systems</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>cold start</p>
+<ul>
+<li><p>pin workload exclusively to PMEM for an initial warm-up period</p></li>
+</ul>
+</li>
+<li><p>dynamic page demotion</p>
+<ul>
+<li><p>forcibly migrate read-only and idle container memory pages to PMEM</p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="activating-the-policy">
+<h2>Activating the Policy<a class="headerlink" href="#activating-the-policy" title="Permalink to this headline">¶</a></h2>
+<p>You can activate the <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy by using the following configuration
+fragment in the configuration for <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+  <span class="nt">Active</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">topology-aware</span>
+  <span class="nt">ReservedResources</span><span class="p">:</span>
+    <span class="nt">CPU</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">750m</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuring-the-policy">
+<h2>Configuring the Policy<a class="headerlink" href="#configuring-the-policy" title="Permalink to this headline">¶</a></h2>
+<p>The policy has a number of configuration options which affect its default behavior.
+These options can be supplied as part of the
+<a class="reference external" href="../setup.html#using-cri-resource-manager-agent-and-a-configmap">dynamic configuration</a>
+received via the <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc"><code class="docutils literal notranslate"><span class="pre">node</span> <span class="pre">agent</span></code></span></a>, or in a fallback or forced
+<a class="reference external" href="../setup.html#using-a-local-configuration-from-a-file">configuration file</a>. These
+configuration options are</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">PinCPU</span></code></p>
+<ul>
+<li><p>whether to pin workloads to assigned pool CPU sets</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PinMemory</span></code></p>
+<ul>
+<li><p>whether to pin workloads to assigned pool memory zones</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferIsolatedCPUs</span></code></p>
+<ul>
+<li><p>whether isolated CPUs are preferred by default for workloads that are
+eligible for exclusive CPU allocation</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferSharedCPUs</span></code></p>
+<ul>
+<li><p>whether shared allocation is preferred by default for workloads that
+would be otherwise eligible for exclusive CPU allocation</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ReservedPoolNamespaces</span></code></p>
+<ul>
+<li><p>list of extra namespaces (or glob patters) that will be allocated to reserved CPUs</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ColocatePods</span></code></p>
+<ul>
+<li><p>whether try to allocate containers in a pod to the same or close by topology pools</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ColocateNamespaces</span></code></p>
+<ul>
+<li><p>whether try to allocate containers in a namespace to the same or close by topology pools</p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="policy-cpu-allocation-preferences">
+<h2>Policy CPU Allocation Preferences<a class="headerlink" href="#policy-cpu-allocation-preferences" title="Permalink to this headline">¶</a></h2>
+<p>There are a number of workload properties this policy actively checks to decide
+if the workload could potentially benefit from extra resource allocation
+optimizations. Unless configured differently, containers fulfilling certain
+corresponding criteria are considered eligible for these optimizations. This
+will be reflected in the assigned resources whenever that is possible at the
+time the container’s creation / resource allocation request hits the policy.</p>
+<p>The set of these extra optimizations consist of</p>
+<ul class="simple">
+<li><p>assignment of <code class="docutils literal notranslate"><span class="pre">kube-reserved</span></code> CPUs</p></li>
+<li><p>assignment of exclusively allocated CPU cores</p></li>
+<li><p>usage of kernel-isolated CPU cores (for exclusive allocation)</p></li>
+</ul>
+<p>The policy uses a combination of the QoS class and the resource requirements of
+the container to decide if any of these extra allocation preferences should be
+applied. Containers are divided into five groups, with each group having a
+slightly different set of criteria for eligibility.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">kube-system</span></code> group</p>
+<ul>
+<li><p>all containers in the <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> namespace</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">low-priority</span></code> group</p>
+<ul>
+<li><p>containers in the <code class="docutils literal notranslate"><span class="pre">BestEffort</span></code> or <code class="docutils literal notranslate"><span class="pre">Burstable</span></code> QoS class</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sub-core</span></code> group</p>
+<ul>
+<li><p>Guaranteed QoS class containers with <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">request</span> <span class="pre">&lt;</span> <span class="pre">1</span> <span class="pre">CPU</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mixed</span></code> group</p>
+<ul>
+<li><p>Guaranteed QoS class containers with <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">&lt;=</span> <span class="pre">CPU</span> <span class="pre">request</span> <span class="pre">&lt;</span> <span class="pre">2</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">multi-core</span></code> group</p>
+<ul>
+<li><p>Guaranteed QoS class containers with <code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">request</span> <span class="pre">&gt;=</span> <span class="pre">2</span></code></p></li>
+</ul>
+</li>
+</ul>
+<p>The eligibility rules for extra optimization are slightly different among these
+groups.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">kube-system</span></code></p>
+<ul>
+<li><p>not eligible for extra optimizations</p></li>
+<li><p>eligible to run on <code class="docutils literal notranslate"><span class="pre">kube-reserved</span></code> CPU cores</p></li>
+<li><p>always run on shared CPU cores</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">low-priority</span></code></p>
+<ul>
+<li><p>not eligible for extra optimizations</p></li>
+<li><p>always run on shared CPU cores</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sub-core</span></code></p>
+<ul>
+<li><p>not eligible for extra optimizations</p></li>
+<li><p>always run on shared CPU cores</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mixed</span></code></p>
+<ul>
+<li><p>by default eligible for exclusive and isolated allocation</p></li>
+<li><p>not eligible for either if <code class="docutils literal notranslate"><span class="pre">PreferSharedCPUs</span></code> is set to true</p></li>
+<li><p>not eligible for either if annotated to opt out from exclusive allocation</p></li>
+<li><p>not eligible for isolated allocation if annotated to opt out</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">multi-core</span></code></p>
+<ul>
+<li><p>CPU request fractional (<code class="docutils literal notranslate"><span class="pre">(CPU</span> <span class="pre">request</span> <span class="pre">%</span> <span class="pre">1000</span> <span class="pre">milli-CPU)</span> <span class="pre">!=</span> <span class="pre">0</span></code>):</p>
+<ul>
+<li><p>by default not eligible for extra optimizations</p></li>
+<li><p>eligible for exclusive and isolated allocation if annotated to opt in</p></li>
+</ul>
+</li>
+<li><p>CPU request not fractional:</p>
+<ul>
+<li><p>by default eligible for exclusive allocation</p></li>
+<li><p>by default not eligible for isolated allocation</p></li>
+<li><p>not eligible for exclusive allocation if annotated to opt out</p></li>
+<li><p>eligible for isolated allocation if annotated to opt in</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>Eligibility for kube-reserved CPU core allocation should always be possible to
+honor. If this is not the case, it is probably due to an incorrect configuration
+which underdeclares <code class="docutils literal notranslate"><span class="pre">ReservedResources</span></code>. In that case, ordinary shared CPU cores
+will be used instead of kube-reserved ones.</p>
+<p>Eligibility for exclusive CPU allocation should always be possible to honor.
+Eligibility for isolated core allocation is only honored if there are enough
+isolated cores available to fulfill the exclusive part of the container’s CPU
+request with isolated cores alone. Otherwise ordinary CPUs will be allocated,
+by slicing them off for exclusive usage from the shared subset of CPU cores in
+the container’s assigned pool.</p>
+<p>Containers in the kube-system group are pinned to share all kube-reserved CPU
+cores. Containers in the low-priority or sub-core groups, and containers which
+are only eligible for shared CPU core allocation in the mixed and multi-core
+groups, are all pinned to run on the shared subset of CPU cores in the
+container’s assigned pool. This shared subset can and usually does change
+dynamically as exclusive CPU cores are allocated and released in the pool.</p>
+</div>
+<div class="section" id="container-cpu-allocation-preference-annotations">
+<h2>Container CPU Allocation Preference Annotations<a class="headerlink" href="#container-cpu-allocation-preference-annotations" title="Permalink to this headline">¶</a></h2>
+<p>Containers can be annotated to diverge from the default CPU allocation
+preferences the policy would otherwise apply to them. These Pod annotations
+can be given both with per pod and per container resolution. If for any
+container both of these exist, the container-specific one takes precedence.</p>
+<div class="section" id="shared-exclusive-and-isolated-cpu-preference">
+<h3>Shared, Exclusive, and Isolated CPU Preference<a class="headerlink" href="#shared-exclusive-and-isolated-cpu-preference" title="Permalink to this headline">¶</a></h3>
+<p>A container can opt in to or opt out from shared CPU allocation using the
+following Pod annotation.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="c1"># opt in container C1 to shared CPU core allocation</span>
+    <span class="nt">prefer-shared-cpus.cri-resource-manager.intel.com/container.C1</span><span class="p">:</span> <span class="s">&quot;true&quot;</span>
+    <span class="c1"># opt in the whole pod to shared CPU core allocation</span>
+    <span class="nt">prefer-shared-cpus.cri-resource-manager.intel.com/pod</span><span class="p">:</span> <span class="s">&quot;true&quot;</span>
+    <span class="c1"># selectively opt out container C2 from shared CPU core allocation</span>
+    <span class="nt">prefer-shared-cpus.cri-resource-manager.intel.com/container.C2</span><span class="p">:</span> <span class="s">&quot;false&quot;</span>
+</pre></div>
+</div>
+<p>Opting in to exclusive allocation happens by opting out from shared allocation,
+and opting out from exclusive allocation happens by opting in to shared
+allocation.</p>
+<p>A container can opt in to or opt out from isolated exclusive CPU core
+allocation using the following Pod annotation.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="c1"># opt in container C1 to isolated exclusive CPU core allocation</span>
+    <span class="nt">prefer-isolated-cpus.cri-resource-manager.intel.com/container.C1</span><span class="p">:</span> <span class="s">&quot;true&quot;</span>
+    <span class="c1"># opt in the whole pod to isolated exclusive CPU core allocation</span>
+    <span class="nt">prefer-isolated-cpus.cri-resource-manager.intel.com/pod</span><span class="p">:</span> <span class="s">&quot;true&quot;</span>
+    <span class="c1"># selectively opt out container C2 from isolated exclusive CPU core allocation</span>
+    <span class="nt">prefer-isolated-cpus.cri-resource-manager.intel.com/container.C2</span><span class="p">:</span> <span class="s">&quot;false&quot;</span>
+</pre></div>
+</div>
+<p>These Pod annotations have no effect on containers which are not eligible for
+exclusive allocation.</p>
+</div>
+<div class="section" id="implicit-hardware-topology-hints">
+<h3>Implicit Hardware Topology Hints<a class="headerlink" href="#implicit-hardware-topology-hints" title="Permalink to this headline">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">CRI</span> <span class="pre">Resource</span> <span class="pre">Manager</span></code> automatically generates HW <code class="docutils literal notranslate"><span class="pre">Topology</span> <span class="pre">Hints</span></code> for devices
+assigned to a container, prior to handing the container off to the active policy
+for resource allocation. The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy is hint-aware and normally
+takes topology hints into account when picking the best pool to allocate
+resources. Hints indicate optimal <code class="docutils literal notranslate"><span class="pre">HW</span> <span class="pre">locality</span></code> for device access and they can
+alter significantly which pool gets picked for a container.</p>
+<p>Since device topology hints are implicitly generated, there are cases where one
+would like the policy to disregard them altogether. For instance, when a local
+volume is used by a container but not in any performance critical manner.</p>
+<p>Containers can be annotated to opt out from and selectively opt in to hint-aware
+pool selection using the following Pod annotations.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="c1"># only disregard hints for container C1</span>
+    <span class="nt">topologyhints.cri-resource-manager.intel.com/container.C1</span><span class="p">:</span> <span class="s">&quot;false&quot;</span>
+    <span class="c1"># disregard hints for all containers by default</span>
+    <span class="nt">topologyhints.cri-resource-manager.intel.com/pod</span><span class="p">:</span> <span class="s">&quot;false&quot;</span>
+    <span class="c1"># but take hints into account for container C2</span>
+    <span class="nt">topologyhints.cri-resource-manager.intel.com/container.C2</span><span class="p">:</span> <span class="s">&quot;true&quot;</span>
+</pre></div>
+</div>
+<p>Topology hint generation is globally enabled by default. Therefore, using the
+Pod annotation as opt in only has an effect when the whole pod is annotated to
+opt out from hint-aware pool selection.</p>
+</div>
+<div class="section" id="implicit-topological-co-location-for-pods-and-namespaces">
+<h3>Implicit Topological Co-location for Pods and Namespaces<a class="headerlink" href="#implicit-topological-co-location-for-pods-and-namespaces" title="Permalink to this headline">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">ColocatePods</span></code> or <code class="docutils literal notranslate"><span class="pre">ColocateNamespaces</span></code> configuration options control whether
+the policy will try to co-locate, that is allocate topologically close, containers
+within the same Pod or K8s namespace.</p>
+<p>Both of these options are false by default. Setting them to true is a shorthand
+for adding to each container an affinity of weight 10 for all other containers
+in the same pod or namespace.</p>
+<p>Containers with user-defined affinities are never extended with either of these
+co-location affinities. However, such containers can still have affinity effects
+on other containers that do get extended with co-location. Therefore mixing user-
+defined affinities with implicit co-location requires both careful consideration
+and a thorough understanding of affinity evaluation, or it should be avoided
+altogether.</p>
+</div>
+</div>
+<div class="section" id="cold-start">
+<h2>Cold Start<a class="headerlink" href="#cold-start" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy supports “cold start” functionality. When cold start
+is enabled and the workload is allocated to a topology node with both DRAM and
+PMEM memory, the initial memory controller is only the PMEM controller. DRAM
+controller is added to the workload only after the cold start timeout is
+done. The effect of this is that allocated large unused memory areas of
+memory don’t need to be migrated to PMEM, because it was allocated there to
+begin with. Cold start is configured like this in the pod metadata:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="nt">memory-type.cri-resource-manager.intel.com/container.container1</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">dram,pmem</span>
+    <span class="nt">cold-start.cri-resource-manager.intel.com/container.container1</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">duration: 60s</span>
+</pre></div>
+</div>
+<p>Again, alternatively you can use the following deprecated Pod annotation syntax
+to achieve the same, but support for this syntax is subject to be dropped in a
+future release:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="nt">cri-resource-manager.intel.com/memory-type</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">container1: dram,pmem</span>
+    <span class="nt">cri-resource-manager.intel.com/cold-start</span><span class="p">:</span> <span class="p p-Indicator">|</span>
+      <span class="no">container1:</span>
+        <span class="no">duration: 60s</span>
+</pre></div>
+</div>
+<p>In the above example, <code class="docutils literal notranslate"><span class="pre">container1</span></code> would be initially granted only PMEM
+memory controller, but after 60 seconds the DRAM controller would be
+added to the container memset.</p>
+</div>
+<div class="section" id="dynamic-page-demotion">
+<h2>Dynamic Page Demotion<a class="headerlink" href="#dynamic-page-demotion" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology-aware</span></code> policy also supports dynamic page demotion. With dynamic
+demotion enabled, rarely-used pages are periodically moved from DRAM to PMEM
+for those workloads which are assigned to use both DRAM and PMEM memory types.
+The configuration for this feature is done using three configuration keys:
+<code class="docutils literal notranslate"><span class="pre">DirtyBitScanPeriod</span></code>, <code class="docutils literal notranslate"><span class="pre">PageMovePeriod</span></code>, and <code class="docutils literal notranslate"><span class="pre">PageMoveCount</span></code>. All of these
+parameters need to be set to non-zero values in order for dynamic page demotion
+to get enabled. See this configuration file fragment as an example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+  <span class="nt">Active</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">topology-aware</span>
+  <span class="nt">topology-aware</span><span class="p">:</span>
+    <span class="nt">DirtyBitScanPeriod</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">10s</span>
+    <span class="nt">PageMovePeriod</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2s</span>
+    <span class="nt">PageMoveCount</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1000</span>
+</pre></div>
+</div>
+<p>In this setup, every pid in every container in every non-system pod
+fulfilling the memory container requirements would have their page ranges
+scanned for non-accessed pages every ten seconds. The result of the scan
+would be fed to a page-moving loop, which would attempt to move 1000 pages
+every two seconds from DRAM to PMEM.</p>
+</div>
+<div class="section" id="container-memory-requests-and-limits">
+<h2>Container memory requests and limits<a class="headerlink" href="#container-memory-requests-and-limits" title="Permalink to this headline">¶</a></h2>
+<p>Due to inaccuracies in how <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> calculates memory requests for
+pods in QoS class <code class="docutils literal notranslate"><span class="pre">Burstable</span></code>, you should either use <code class="docutils literal notranslate"><span class="pre">Limit</span></code> for setting
+the amount of memory for containers in <code class="docutils literal notranslate"><span class="pre">Burstable</span></code> pods or run the
+<a class="reference internal" href="../webhook.html"><span class="doc std std-doc">resource-annotating webhook</span></a> to provide <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> with
+an exact copy of the resource requirements from the Pod Spec as an extra
+Pod annotation.</p>
+</div>
+<div class="section" id="reserved-pool-namespaces">
+<h2>Reserved pool namespaces<a class="headerlink" href="#reserved-pool-namespaces" title="Permalink to this headline">¶</a></h2>
+<p>User is able to mark certain namespaces to have a reserved CPU allocation.
+Containers belonging to such namespaces will only run on CPUs set aside
+according to the global CPU reservation, as configured by the ReservedResources
+configuration option in the policy section.
+The <code class="docutils literal notranslate"><span class="pre">ReservedPoolNamespaces</span></code> option is a list of namespace globs that will be
+allocated to reserved CPU class.</p>
+<p>For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+  <span class="nt">Active</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">topology-aware</span>
+  <span class="nt">topology-aware</span><span class="p">:</span>
+    <span class="nt">ReservedPoolNamespaces</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;my-pool&quot;</span><span class="p p-Indicator">,</span><span class="s">&quot;reserved-*&quot;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>In this setup, all the workloads in <code class="docutils literal notranslate"><span class="pre">my-pool</span></code> namespace and those namespaces
+starting with <code class="docutils literal notranslate"><span class="pre">reserved-</span></code> string are allocated to reserved CPU class.
+The workloads in <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> are automatically assigned to reserved CPU
+class so no need to mention <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> in this list.</p>
+</div>
+<div class="section" id="reserved-cpu-annotations">
+<h2>Reserved CPU annotations<a class="headerlink" href="#reserved-cpu-annotations" title="Permalink to this headline">¶</a></h2>
+<p>User is able to mark certain pods and containers to have a reserved CPU allocation
+by using annotations. Containers having a such annotation will only run on CPUs set
+aside according to the global CPU reservation, as configured by the ReservedResources
+configuration option in the policy section.</p>
+<p>For example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
+  <span class="nt">annotations</span><span class="p">:</span>
+    <span class="nt">prefer-reserved-cpus.cri-resource-manager.intel.com/pod</span><span class="p">:</span> <span class="s">&quot;true&quot;</span>
+    <span class="nt">prefer-reserved-cpus.cri-resource-manager.intel.com/container.special</span><span class="p">:</span> <span class="s">&quot;false&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Policies" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="static-pools.html" class="btn btn-neutral float-right" title="Static-Pools (STP) Policy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, various.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.7
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>

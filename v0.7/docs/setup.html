@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setup and Usage &mdash; CRI Resource Manager 0.7.0 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Policies" href="policy/index.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> CRI Resource Manager
+          </a>
+              <div class="version">
+                0.7.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Setup and Usage</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime">Setting up kubelet to use CRI Resource Manager as the runtime</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#setting-up-cri-resource-manager">Setting up CRI Resource Manager</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#using-a-local-configuration-from-a-file">Using a local configuration from a file</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-cri-resource-manager-agent-and-a-configmap">Using CRI Resource Manager Agent and a ConfigMap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#changing-the-active-policy">Changing the active policy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#container-adjustments">Container adjustments</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#commands-for-declaring-creating-deleting-and-examining-adjustments">Commands for declaring, creating, deleting, and examining adjustments</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#using-cri-resource-manager-as-a-message-dumper">Using CRI Resource Manager as a message dumper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#kata-containers">Kata Containers</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#reference">Reference</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#running-with-untested-runtimes">Running with Untested Runtimes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#logging-and-debugging">Logging and debugging</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="policy/index.html">Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">CRI Resource Manager</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Setup and Usage</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/docs/setup.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="tex2jax_ignore mathjax_ignore section" id="setup-and-usage">
+<h1>Setup and Usage<a class="headerlink" href="#setup-and-usage" title="Permalink to this headline">¶</a></h1>
+<p>If you want to give CRI Resource Manager a try, here is the list of things
+you need to do, assuming you already have a Kubernetes* cluster up and
+running, using either <code class="docutils literal notranslate"><span class="pre">containerd</span></code> or <code class="docutils literal notranslate"><span class="pre">cri-o</span></code> as the runtime.</p>
+<ol class="simple">
+<li><p><a class="reference internal" href="installation.html"><span class="doc std std-doc">Install</span></a> CRI Resource Manager.</p></li>
+<li><p>Set up kubelet to use CRI Resource Manager as the runtime.</p></li>
+<li><p>Set up CRI Resource Manager to use the runtime with a policy.</p></li>
+</ol>
+<p>For kubelet you do this by altering its command line options like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>   <span class="n">kubelet</span> <span class="o">&lt;</span><span class="n">other</span><span class="o">-</span><span class="n">kubelet</span><span class="o">-</span><span class="n">options</span><span class="o">&gt;</span> <span class="o">--</span><span class="n">container</span><span class="o">-</span><span class="n">runtime</span><span class="o">=</span><span class="n">remote</span> \
+     <span class="o">--</span><span class="n">container</span><span class="o">-</span><span class="n">runtime</span><span class="o">-</span><span class="n">endpoint</span><span class="o">=</span><span class="n">unix</span><span class="p">:</span><span class="o">///</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">.</span><span class="n">sock</span>
+</pre></div>
+</div>
+<p>For CRI Resource Manager, you need to provide a configuration file, and also
+a socket path if you don’t use <code class="docutils literal notranslate"><span class="pre">containerd</span></code> or you run it with a different
+socket path.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>   <span class="c1"># for containerd with default socket path</span>
+   <span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span> <span class="o">--</span><span class="n">force</span><span class="o">-</span><span class="n">config</span> <span class="o">&lt;</span><span class="n">config</span><span class="o">-</span><span class="n">file</span><span class="o">&gt;</span> <span class="o">--</span><span class="n">runtime</span><span class="o">-</span><span class="n">socket</span> <span class="n">unix</span><span class="p">:</span><span class="o">///</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">containerd</span><span class="o">/</span><span class="n">containerd</span><span class="o">.</span><span class="n">sock</span>
+   <span class="c1"># for cri-o</span>
+   <span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span> <span class="o">--</span><span class="n">force</span><span class="o">-</span><span class="n">config</span> <span class="o">&lt;</span><span class="n">config</span><span class="o">-</span><span class="n">file</span><span class="o">&gt;</span> <span class="o">--</span><span class="n">runtime</span><span class="o">-</span><span class="n">socket</span> <span class="n">unix</span><span class="p">:</span><span class="o">///</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">crio</span><span class="o">/</span><span class="n">crio</span><span class="o">.</span><span class="n">sock</span>
+</pre></div>
+</div>
+<p>The choice of policy to use along with any potential parameters specific to
+that policy are taken from the configuration file. You can take a look at the
+<span class="xref myst">sample configurations</span> for some minimal/trivial examples.
+For instance, you can use
+<span class="xref myst">sample-configs/topology-aware-policy.cfg</span>
+as <code class="docutils literal notranslate"><span class="pre">&lt;config-file&gt;</span></code> to activate the topology aware policy with memory
+tiering support.</p>
+<p><strong>NOTE</strong>: Currently, the available policies are a work in progress.</p>
+<div class="section" id="setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime">
+<h2>Setting up kubelet to use CRI Resource Manager as the runtime<a class="headerlink" href="#setting-up-kubelet-to-use-cri-resource-manager-as-the-runtime" title="Permalink to this headline">¶</a></h2>
+<p>To let CRI Resource Manager act as a proxy between kubelet and the CRI
+runtime, you need to configure kubelet to connect to CRI Resource Manager
+instead of the runtime. You do this by passing extra command line options to
+kubelet as shown below:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>   <span class="n">kubelet</span> <span class="o">&lt;</span><span class="n">other</span><span class="o">-</span><span class="n">kubelet</span><span class="o">-</span><span class="n">options</span><span class="o">&gt;</span> <span class="o">--</span><span class="n">container</span><span class="o">-</span><span class="n">runtime</span><span class="o">=</span><span class="n">remote</span> \
+     <span class="o">--</span><span class="n">container</span><span class="o">-</span><span class="n">runtime</span><span class="o">-</span><span class="n">endpoint</span><span class="o">=</span><span class="n">unix</span><span class="p">:</span><span class="o">///</span><span class="n">var</span><span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">/</span><span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span><span class="o">.</span><span class="n">sock</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="setting-up-cri-resource-manager">
+<h2>Setting up CRI Resource Manager<a class="headerlink" href="#setting-up-cri-resource-manager" title="Permalink to this headline">¶</a></h2>
+<p>Setting up CRI Resource Manager involves pointing it to your runtime and
+providing it with a configuration. Pointing to the runtime is done using
+the <code class="docutils literal notranslate"><span class="pre">--runtime-socket</span> <span class="pre">&lt;path&gt;</span></code> and, optionally, the <code class="docutils literal notranslate"><span class="pre">--image-socket</span> <span class="pre">&lt;path&gt;</span></code>.</p>
+<p>For providing a configuration there are two options:</p>
+<ol class="simple">
+<li><p>use a local configuration YAML file</p></li>
+<li><p>use the <a class="reference internal" href="node-agent.html"><span class="doc std std-doc">CRI Resource Manager Node Agent</span></a> and a <code class="docutils literal notranslate"><span class="pre">ConfigMap</span></code></p></li>
+</ol>
+<p>The former is easier to set up and it is also the preferred way to run CRI
+Resource Manager for development, and in some cases testing. Setting up the
+latter is a bit more involved but it allows you to</p>
+<ul class="simple">
+<li><p>manage policy configuration for your cluster as a single source, and</p></li>
+<li><p>dynamically update that configuration</p></li>
+</ul>
+<div class="section" id="using-a-local-configuration-from-a-file">
+<h3>Using a local configuration from a file<a class="headerlink" href="#using-a-local-configuration-from-a-file" title="Permalink to this headline">¶</a></h3>
+<p>This is the easiest way to run CRI Resource Manager for development or
+testing. You can do it with the following command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>   <span class="n">cri</span><span class="o">-</span><span class="n">resmgr</span> <span class="o">--</span><span class="n">force</span><span class="o">-</span><span class="n">config</span> <span class="o">&lt;</span><span class="n">config</span><span class="o">-</span><span class="n">file</span><span class="o">&gt;</span> <span class="o">--</span><span class="n">runtime</span><span class="o">-</span><span class="n">socket</span> <span class="o">&lt;</span><span class="n">path</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>When started this way, CRI Resource Manager reads its configuration from the
+given file. It does not fetch external configuration from the node agent and
+also disables the config interface for receiving configuration updates.</p>
+</div>
+<div class="section" id="using-cri-resource-manager-agent-and-a-configmap">
+<h3>Using CRI Resource Manager Agent and a ConfigMap<a class="headerlink" href="#using-cri-resource-manager-agent-and-a-configmap" title="Permalink to this headline">¶</a></h3>
+<p>This setup requires an extra component, the
+<a class="reference internal" href="node-agent.html"><span class="doc std std-doc">CRI Resource Manager Node Agent</span></a>,
+to monitor and fetch configuration from the ConfigMap and pass it on to CRI
+Resource Manager. By default, CRI Resource Manager automatically tries to
+use the agent to acquire configuration, unless you override this by forcing
+a static local configuration using the <code class="docutils literal notranslate"><span class="pre">--force-config</span> <span class="pre">&lt;config-file&gt;</span></code> option.
+When using the agent, it is also possible to provide an initial fallback for
+configuration using the <code class="docutils literal notranslate"><span class="pre">--fallback-config</span> <span class="pre">&lt;config-file&gt;</span></code>. This file is
+used before the very first configuration is successfully acquired from the
+agent.</p>
+<p>Whenever a new configuration is acquired from the agent and successfully
+taken into use, this configuration is stored in the cache and becomes
+the default configuration to take into use the next time CRI Resource
+Manager is restarted (unless that time the –force-config option is used).
+While CRI Resource Manager is shut down, any cached configuration can be
+cleared from the cache using the –reset-config command line option.</p>
+<p>See the <a class="reference internal" href="node-agent.html"><span class="doc std std-doc">Node Agent</span></a> about how to set up and configure the agent.</p>
+</div>
+<div class="section" id="changing-the-active-policy">
+<h3>Changing the active policy<a class="headerlink" href="#changing-the-active-policy" title="Permalink to this headline">¶</a></h3>
+<p>Currently, CRI Resource Manager disables changing the active policy using
+the <a class="reference internal" href="node-agent.html"><span class="doc std std-doc">agent</span></a>. That is, once the active policy is recorded in the cache,
+any configuration received through the agent that requests a different policy
+is rejected. This limitation will be removed in a future version of
+CRI Resource Manager.</p>
+<p>However, by default CRI Resource Manager allows you to change policies during
+its startup phase. If you want to disable this, you can pass the command line
+option <code class="docutils literal notranslate"><span class="pre">--disable-policy-switch</span></code> to CRI Resource Manager.</p>
+<p>If you run CRI Resource Manager with disabled policy switching, you can still
+switch policies by clearing any policy-specific data stored in the cache while
+CRI Resource Manager is shut down. You can do this by using the command line
+option <code class="docutils literal notranslate"><span class="pre">--reset-policy</span></code>. The whole sequence of switching policies this way is</p>
+<ul class="simple">
+<li><p>stop cri-resmgr (<code class="docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">stop</span> <span class="pre">cri-resource-manager</span></code>)</p></li>
+<li><p>reset policy data (<code class="docutils literal notranslate"><span class="pre">cri-resmgr</span> <span class="pre">--reset-policy</span></code>)</p></li>
+<li><p>change policy (<code class="docutils literal notranslate"><span class="pre">$EDITOR</span> <span class="pre">/etc/cri-resource-manager/fallback.cfg</span></code>)</p></li>
+<li><p>start cri-resmgr (<code class="docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">start</span> <span class="pre">cri-resource-manager</span></code>)</p></li>
+</ul>
+</div>
+<div class="section" id="container-adjustments">
+<h3>Container adjustments<a class="headerlink" href="#container-adjustments" title="Permalink to this headline">¶</a></h3>
+<p>When the <a class="reference internal" href="node-agent.html"><span class="doc std std-doc">agent</span></a> is in use, it is also possible to <code class="docutils literal notranslate"><span class="pre">adjust</span></code> container
+<code class="docutils literal notranslate"><span class="pre">resource</span> <span class="pre">assignments</span></code> externally, using dedicated <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code>
+<code class="docutils literal notranslate"><span class="pre">Custom</span> <span class="pre">Resources</span></code> in the <code class="docutils literal notranslate"><span class="pre">adjustments.criresmgr.intel.com</span></code> group. You can
+use the <span class="xref myst">provided schema</span>
+to define the <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code> resource. Then you can copy and modify the
+<span class="xref myst">sample adjustment CR</span> as a
+starting point to test some overrides.</p>
+<p>An <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code> consists of the following:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">scope</span></code>:</p>
+<ul>
+<li><p>the nodes and containers to which the adjustment applies</p></li>
+</ul>
+</li>
+<li><p>adjustment data:</p>
+<ul>
+<li><p>updated native/compute resources (<code class="docutils literal notranslate"><span class="pre">cpu</span></code>/<code class="docutils literal notranslate"><span class="pre">memory</span></code> <code class="docutils literal notranslate"><span class="pre">requests</span></code> and <code class="docutils literal notranslate"><span class="pre">limits</span></code>)</p></li>
+<li><p>updated <code class="docutils literal notranslate"><span class="pre">RDT</span></code> and/or <code class="docutils literal notranslate"><span class="pre">Block</span> <span class="pre">I/O</span></code> class</p></li>
+<li><p>updated top tier (practically now DRAM) memory limit</p></li>
+</ul>
+</li>
+</ul>
+<p>All adjustment data is optional. An adjustment can choose to set any or all
+of them as necessary. The current handling of adjustment update updates the
+resource assignments of containers, marks all existing containers as having
+pending changes in all controller domains, and then triggers a rebalancing in
+the active policy. This causes all containers to be updated.</p>
+<p>The scope defines to which containers on what nodes the adjustment applies.
+Nodes are currently matched/picked by name, but a trailing wildcard (<code class="docutils literal notranslate"><span class="pre">*</span></code>) is
+allowed and matches all nodes with the given prefix in their names.</p>
+<p>Containers are matched by expressions. These are exactly the same as the
+expressions for defining <a class="reference internal" href="policy/container-affinity.html"><span class="doc std std-doc">affinity scopes</span></a>. A
+single adjustment can specify multiple node/container match pairs. An
+adjustment applies to all containers in its scope. If an adjustment/update
+results in conflicts for some container, that is at least one container is
+in the scope of multiple adjustments, the adjustment is rejected and the
+whole update is ignored.</p>
+<div class="section" id="commands-for-declaring-creating-deleting-and-examining-adjustments">
+<h4>Commands for declaring, creating, deleting, and examining adjustments<a class="headerlink" href="#commands-for-declaring-creating-deleting-and-examining-adjustments" title="Permalink to this headline">¶</a></h4>
+<p>You can declare the custom resource for adjustments with this command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">apply</span> <span class="o">-</span><span class="n">f</span> <span class="n">pkg</span><span class="o">/</span><span class="n">apis</span><span class="o">/</span><span class="n">resmgr</span><span class="o">/</span><span class="n">v1alpha1</span><span class="o">/</span><span class="n">adjustment</span><span class="o">-</span><span class="n">schema</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>You can then add adjustments with a command like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">apply</span> <span class="o">-</span><span class="n">f</span> <span class="n">sample</span><span class="o">-</span><span class="n">configs</span><span class="o">/</span><span class="n">external</span><span class="o">-</span><span class="n">adjustment</span><span class="o">.</span><span class="n">yaml</span>
+</pre></div>
+</div>
+<p>You can list existing adjustments with the following command. Use the correct
+<code class="docutils literal notranslate"><span class="pre">-n</span> <span class="pre">namespace</span></code> option according to the namespace you use for the agent, for
+the configuration, and in your adjustment specifications.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">get</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span>
+</pre></div>
+</div>
+<p>You can examine the contents of a single adjustment with these commands:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">describe</span> <span class="n">adjustments</span> <span class="n">external</span><span class="o">-</span><span class="n">adjustment</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span>
+<span class="n">kubectl</span> <span class="n">get</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/&lt;</span><span class="n">adjustment</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span> <span class="o">-</span><span class="n">oyaml</span>
+</pre></div>
+</div>
+<p>Or you can examine the contents of all adjustments using this command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">get</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span> <span class="o">-</span><span class="n">oyaml</span>
+</pre></div>
+</div>
+<p>Finally, you can delete an adjustment with commands like these:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kubectl</span> <span class="n">delete</span> <span class="o">-</span><span class="n">f</span> <span class="n">sample</span><span class="o">-</span><span class="n">configs</span><span class="o">/</span><span class="n">external</span><span class="o">-</span><span class="n">adjustment</span><span class="o">.</span><span class="n">yaml</span>
+<span class="n">kubectl</span> <span class="n">delete</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span><span class="o">/&lt;</span><span class="n">adjustment</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span>
+</pre></div>
+</div>
+<p>The status of adjustment updates is propagated back to the <code class="docutils literal notranslate"><span class="pre">Adjustment</span></code>
+<code class="docutils literal notranslate"><span class="pre">Custom</span> <span class="pre">Resources</span></code>, more specifically into their <code class="docutils literal notranslate"><span class="pre">Status</span></code> fields. With the
+help of <code class="docutils literal notranslate"><span class="pre">jq</span></code>, you can easily examine the status of external adjustments
+using a command like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kli</span><span class="nd">@r640</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="o">~&gt;</span> <span class="n">kubectl</span> <span class="n">get</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span> <span class="o">-</span><span class="n">ojson</span> <span class="o">|</span> <span class="n">jq</span> <span class="s1">&#39;.items[].status&#39;</span>
+<span class="p">{</span>
+  <span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">&quot;r640-1&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;errors&quot;</span><span class="p">:</span> <span class="p">{}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+<span class="p">{</span>
+  <span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">&quot;r640-1&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;errors&quot;</span><span class="p">:</span> <span class="p">{}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The above response is what you get for adjustments applied without conflicts
+or errors. You can see here that only node <em>r640-1</em> is in the scope of both
+of your existing adjustments and those applied without errors.</p>
+<p>If your adjustments resulted in errors, the output will look something like
+this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">klitkey1</span><span class="nd">@r640</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="o">~&gt;</span> <span class="n">kubectl</span> <span class="n">get</span> <span class="o">-</span><span class="n">n</span> <span class="n">kube</span><span class="o">-</span><span class="n">system</span> <span class="n">adjustments</span><span class="o">.</span><span class="n">criresmgr</span><span class="o">.</span><span class="n">intel</span><span class="o">.</span><span class="n">com</span> <span class="o">-</span><span class="n">ojson</span> <span class="o">|</span> <span class="n">jq</span> <span class="s1">&#39;.items[].status&#39;</span>
+<span class="p">{</span>
+  <span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">&quot;r640-1&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;errors&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;b71a93523e58cb4ba0310aa225b2e2a329cef895ca4b96fcd9d12b375337ea35&quot;</span><span class="p">:</span> <span class="s2">&quot;cache: conflicting adjustments for my-pod-r640-1:my-container: adjustment-1,adjustment-2&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+<span class="p">{</span>
+  <span class="s2">&quot;nodes&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="s2">&quot;r640-1&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;errors&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;b71a93523e58cb4ba0310aa225b2e2a329cef895ca4b96fcd9d12b375337ea35&quot;</span><span class="p">:</span> <span class="s2">&quot;cache: conflicting adjustments for my-pod-r640-1:my-container: adjustment-1,adjustment-2&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>In the sample above, you can see that on node <em>r640-1</em> the container with
+<code class="docutils literal notranslate"><span class="pre">ID</span></code><em>b71a93523e58cb4ba0310aa225b2e2a329cef895ca4b96fcd9d12b375337ea35</em>, or
+<em>my-container</em> of <em>my-pod-r640-1</em>, had a conflict. Moreover you can see that
+the reason of the conflict is that the container is in the scope of both
+<em>adjustment-1</em> and <em>adjustment-2</em>.</p>
+<p>You can now fix those adjustments to resolve/remove the conflict, then
+reapply the adjustments, and finally verify that the conflicts are gone.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>kli@r640-1:~&gt; $EDITOR adjustment-1.yaml adjustment-2.yaml
+kli@r640-1:~&gt; kubectl apply -f adjustment-1.yaml &amp;&amp; kubectl apply -f adjustment-1.yaml &amp;&amp; sleep 2
+kli@r640-1:~&gt; kubectl get -n kube-system adjustments.criresmgr.intel.com -ojson | jq &#39;.items[].status&#39;
+{
+  &quot;nodes&quot;: {
+    &quot;r640-1&quot;: {
+      &quot;errors&quot;: {}
+    }
+  }
+}
+{
+  &quot;nodes&quot;: {
+    &quot;r640-1&quot;: {
+      &quot;errors&quot;: {}
+    }
+  }
+}
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="using-cri-resource-manager-as-a-message-dumper">
+<h2>Using CRI Resource Manager as a message dumper<a class="headerlink" href="#using-cri-resource-manager-as-a-message-dumper" title="Permalink to this headline">¶</a></h2>
+<p>You can use CRI Resource Manager to simply inspect all proxied CRI requests
+and responses without applying any policy. Run CRI Resource Manager with the
+provided <span class="xref myst">sample configuration</span>
+for doing this.</p>
+</div>
+<div class="section" id="kata-containers">
+<h2>Kata Containers<a class="headerlink" href="#kata-containers" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://katacontainers.io/">Kata Containers</a> is an open source container
+runtime, building lightweight virtual machines that seamlessly plug into the
+containers ecosystem.</p>
+<p>In order to enable Kata Containers in a Kubernetes-CRI-RM stack, both
+Kubernetes and the Container Runtime need to be aware of the new runtime
+environment:</p>
+<ul class="simple">
+<li><p>The Container Runtime can only be CRI-O or containerd, and needs to
+have the runtimes enabled in their configuration files.</p></li>
+<li><p>Kubernetes must be made aware of the CRI-O/containerd runtimes via a
+“RuntimeClass”
+<a class="reference external" href="https://kubernetes.io/docs/concepts/containers/runtime-class/">resource</a></p></li>
+</ul>
+<p>After these prerequisites are satisfied, the configuration file for the
+target  Kata Container, must have the flag “SandboxCgroupOnly” set to true.
+As of Kata 2.0 this is the only way Kata Containers can work with the
+Kubernetes cgroup naming conventions.</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="p">...</span>
+<span class="c1"># If enabled, the runtime will add all the kata processes inside one dedicated cgroup.</span>
+<span class="c1"># The container cgroups in the host are not created, just one single cgroup per sandbox.</span>
+<span class="c1"># The runtime caller is free to restrict or collect cgroup stats of the overall Kata sandbox.</span>
+<span class="c1"># The sandbox cgroup path is the parent cgroup of a container with the PodSandbox annotation.</span>
+<span class="c1"># The sandbox cgroup is constrained if there is no container type annotation.</span>
+<span class="c1"># See: https://godoc.org/github.com/kata-containers/runtime/virtcontainers#ContainerType</span>
+<span class="n">sandbox_cgroup_only</span><span class="o">=</span><span class="kc">true</span>
+<span class="p">...</span>
+</pre></div>
+</div>
+<div class="section" id="reference">
+<h3>Reference<a class="headerlink" href="#reference" title="Permalink to this headline">¶</a></h3>
+<p>If you have a pre-existing Kubernetes cluster, for an easy deployement
+follow this <a class="reference external" href="https://github.com/kata-containers/packaging/blob/master/kata-deploy/README.md#kubernetes-quick-start">document</a>.</p>
+<p>Starting from scratch:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/kata-containers/kata-containers/tree/2.0-dev/docs/install#manual-installation">Kata installation guide</a></p></li>
+<li><p><a class="reference external" href="https://github.com/kata-containers/documentation/blob/master/how-to/run-kata-with-k8s.md">Kata Containers + CRI-O</a></p></li>
+<li><p><a class="reference external" href="https://github.com/kata-containers/documentation/blob/master/how-to/containerd-kata.md">Kata Containers + containerd</a></p></li>
+<li><p><a class="reference external" href="https://kubernetes.io/docs/concepts/containers/runtime-class/">Kubernetes Runtime Class</a></p></li>
+<li><p><a class="reference external" href="https://github.com/kata-containers/kata-containers/blob/stable-2.0.0/docs/design/host-cgroups.md">Cgroup and Kata containers</a></p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="running-with-untested-runtimes">
+<h2>Running with Untested Runtimes<a class="headerlink" href="#running-with-untested-runtimes" title="Permalink to this headline">¶</a></h2>
+<p>CRI Resource Manager is tested with <code class="docutils literal notranslate"><span class="pre">containerd</span></code> and <code class="docutils literal notranslate"><span class="pre">CRI-O</span></code>. If any other runtime is
+detected during startup, <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> will refuse to start. This default behavior can
+be changed using the <code class="docutils literal notranslate"><span class="pre">--allow-untested-runtimes</span></code> command line option.</p>
+</div>
+<div class="section" id="logging-and-debugging">
+<h2>Logging and debugging<a class="headerlink" href="#logging-and-debugging" title="Permalink to this headline">¶</a></h2>
+<p>You can control logging with the klog command line options or by setting the
+corresponding environment variables. You can get the name of the environment
+variable for a command line option by prepending the <code class="docutils literal notranslate"><span class="pre">LOGGER_</span></code> prefix to the
+capitalized option name without any leading dashes. For instance, setting the
+environment variable <code class="docutils literal notranslate"><span class="pre">LOGGER_SKIP_HEADERS=true</span></code> has the same effect as using
+the <code class="docutils literal notranslate"><span class="pre">-skip_headers</span></code> command line option.</p>
+<p>Additionally, the <code class="docutils literal notranslate"><span class="pre">LOGGER_DEBUG</span></code> environment variable controls debug logs.
+These are globally disabled by default. You can turn on full debugging by
+setting <code class="docutils literal notranslate"><span class="pre">LOGGER_DEBUG='*'</span></code>.</p>
+<p>When using environment variables, be careful which configuration you pass to
+CRI Resource Manager using a file or ConfigMap. The environment is treated
+as default configuration but a file or a ConfigMap has higher precedence.
+If something is configured in both, the environment will only be in effect
+until the configuration is applied. However, in such a case if you later
+push an updated configuration to CRI Resource Manager with the overlapping
+settings removed, the original ones from the environment will be in effect
+again.</p>
+<p>For debug logs, the settings from the configuration are applied in addition
+to any settings in the environment. That said, if you turn something on in
+the environment but off in the configuration, it will be turned off
+eventually.</p>
+<!-- Links -->
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="policy/index.html" class="btn btn-neutral float-right" title="Policies" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, various.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.7
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>

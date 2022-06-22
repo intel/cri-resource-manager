@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>End-to-End tests &mdash; CRI Resource Manager 0.7.0 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Demos" href="../demos/index.html" />
+    <link rel="prev" title="CRI Validation" href="cri-test.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> CRI Resource Manager
+          </a>
+              <div class="version">
+                0.7.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../policy/index.html">Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Developer’s Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy-writers-guide.html">Policy Writer’s Guide</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="testing.html">Testing</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="unit-test.html">Unit tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cri-test.html">CRI Validation</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">End-to-End tests</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#test-phases">Test phases</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#test-modes">Test modes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#running-from-scratch-and-quick-rerun-in-existing-virtual-machine">Running from scratch and quick rerun in existing virtual machine</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#testing-locally-built-cri-resmgr-and-cri-resmgr-from-github">Testing locally built cri-resmgr and cri-resmgr from github</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#custom-tests">Custom tests</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#custom-topologies">Custom topologies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#test-output">Test output</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#manual-testing-and-debugging">Manual testing and debugging</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="index.html">Developer’s Guide</a> &raquo;</li>
+          <li><a href="testing.html">Testing</a> &raquo;</li>
+      <li>End-to-End tests</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/docs/developers-guide/e2e-test.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="tex2jax_ignore mathjax_ignore section" id="end-to-end-tests">
+<h1>End-to-End tests<a class="headerlink" href="#end-to-end-tests" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
+<p>Install:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">docker</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">govm</span></code>
+In case of errors in building <code class="docutils literal notranslate"><span class="pre">govm</span></code> with <code class="docutils literal notranslate"><span class="pre">go</span> <span class="pre">get</span></code>, or creating a virtual machine (<code class="docutils literal notranslate"><span class="pre">Error</span> <span class="pre">when</span> <span class="pre">creating</span> <span class="pre">the</span> <span class="pre">new</span> <span class="pre">VM:</span> <span class="pre">repository</span> <span class="pre">name</span> <span class="pre">must</span> <span class="pre">be</span> <span class="pre">canonical</span></code>), these are the workarounds:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GO111MODULE=off go get -d github.com/govm-project/govm &amp;&amp; cd $GOPATH/src/github.com/govm-project/govm &amp;&amp; go mod tidy &amp;&amp; go mod download &amp;&amp; go install &amp;&amp; cd .. &amp;&amp; docker build govm -f govm/Dockerfile -t govm/govm:latest
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+<div class="section" id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+<p>Run policy tests:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">VAR</span><span class="o">=</span><span class="n">VALUE</span><span class="o">...</span><span class="p">]</span> <span class="o">./</span><span class="n">run_tests</span><span class="o">.</span><span class="n">sh</span> <span class="n">policies</span>
+</pre></div>
+</div>
+<p>Run tests only on certain policy, topology, or only selected test:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">VAR</span><span class="o">=</span><span class="n">VALUE</span><span class="o">...</span><span class="p">]</span> <span class="o">./</span><span class="n">run_tests</span><span class="o">.</span><span class="n">sh</span> <span class="n">policies</span><span class="p">[</span><span class="o">/</span><span class="n">POLICY</span><span class="p">[</span><span class="o">/</span><span class="n">TOPOLOGY</span><span class="p">[</span><span class="o">/</span><span class="n">testNN</span><span class="o">-*</span><span class="p">]]]</span>
+</pre></div>
+</div>
+<p>Run custom tests:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">VAR</span><span class="o">=</span><span class="n">VALUE</span><span class="o">...</span><span class="p">]</span> <span class="o">./</span><span class="n">run</span><span class="o">.</span><span class="n">sh</span> <span class="n">MODE</span>
+</pre></div>
+</div>
+<p>Get help on available <code class="docutils literal notranslate"><span class="pre">VAR=VALUE</span></code>’s with <code class="docutils literal notranslate"><span class="pre">./run.sh</span> <span class="pre">help</span></code>. <code class="docutils literal notranslate"><span class="pre">run_tests.sh</span></code> calls <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> in order to execute selected
+tests. Therefore the same <code class="docutils literal notranslate"><span class="pre">VAR=VALUE</span></code> definitions apply both scripts.</p>
+</div>
+<div class="section" id="test-phases">
+<h2>Test phases<a class="headerlink" href="#test-phases" title="Permalink to this headline">¶</a></h2>
+<p>In the <em>setup phase</em> <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> creates a virtual machine unless it
+already exists. When it is running, tests create a single-node cluster
+and launches <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> on it, unless they are already running.</p>
+<p>In the <em>test phase</em> <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> runs a test script, or gives a prompt
+(<code class="docutils literal notranslate"><span class="pre">run.sh&gt;</span> </code>) asking a user to run test script commands in the
+<code class="docutils literal notranslate"><span class="pre">interactive</span></code> mode. <em>Test scripts</em> are <code class="docutils literal notranslate"><span class="pre">bash</span></code> scripts that can use
+helper functions for running commands and observing the status of the
+virtual machine and software running on it.</p>
+<p>In the <em>tear down phase</em> <code class="docutils literal notranslate"><span class="pre">run.sh</span></code> copies logs from the virtual machine
+and finally stops or deletes the virtual machine, if that is wanted.</p>
+</div>
+<div class="section" id="test-modes">
+<h2>Test modes<a class="headerlink" href="#test-modes" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">test</span></code> mode runs fast and reports <code class="docutils literal notranslate"><span class="pre">Test</span> <span class="pre">verdict:</span> <span class="pre">PASS</span></code> or
+<code class="docutils literal notranslate"><span class="pre">FAIL</span></code>. The exit status is zero if and only if a test passed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">play</span></code> mode runs the same phases and scripts as the <code class="docutils literal notranslate"><span class="pre">test</span></code> mode, but
+slower. This is good for following and demonstrating what is
+happening.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">interactive</span></code> mode runs the setup and tear down phases, but instead
+of executing a test script it gives an interactive prompt.</p></li>
+</ul>
+<p>Print help to see clean up, execution speed and other options for all
+modes.</p>
+</div>
+<div class="section" id="running-from-scratch-and-quick-rerun-in-existing-virtual-machine">
+<h2>Running from scratch and quick rerun in existing virtual machine<a class="headerlink" href="#running-from-scratch-and-quick-rerun-in-existing-virtual-machine" title="Permalink to this headline">¶</a></h2>
+<p>The test will use <code class="docutils literal notranslate"><span class="pre">govm</span></code>-managed virtual machine named in the <code class="docutils literal notranslate"><span class="pre">vm</span></code>
+environment variable. The default is <code class="docutils literal notranslate"><span class="pre">crirm-test-e2e</span></code>. If a virtual
+machine with that name exists, the test will be run on it. Otherwise
+the test will create a virtual machine with that name from
+scratch. You can delete a virtual machine with <code class="docutils literal notranslate"><span class="pre">govm</span> <span class="pre">delete</span> <span class="pre">NAME</span></code>.</p>
+<p>If you want rerun the test many times, possibly with different test
+inputs or against different versions of <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code>, either use the
+<code class="docutils literal notranslate"><span class="pre">play</span></code> mode or set <code class="docutils literal notranslate"><span class="pre">cleanup=0</span></code> in order to keep the virtual machine
+after each run. Then tests will run in the same single node cluster,
+and the test script will only delete running pods before launching new
+ones.</p>
+</div>
+<div class="section" id="testing-locally-built-cri-resmgr-and-cri-resmgr-from-github">
+<h2>Testing locally built cri-resmgr and cri-resmgr from github<a class="headerlink" href="#testing-locally-built-cri-resmgr-and-cri-resmgr-from-github" title="Permalink to this headline">¶</a></h2>
+<p>If you make changes to <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> sources and rebuild it, you can
+force the test script to reinstall newly built <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> to
+existing virtual machine before rerunning the test:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>cri-resource-manager$ make
+cri-resource-manager$ cd test/e2e
+e2e$ reinstall_cri_resmgr=1 speed=1000 ./run.sh play
+</pre></div>
+</div>
+<p>You can also let the test script build <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> from the github
+master branch. This takes place inside the virtual machine, so your
+local git sources will not be affected:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>e2e$ reinstall_cri_resmgr=1 binsrc=github ./run.sh play
+</pre></div>
+</div>
+</div>
+<div class="section" id="custom-tests">
+<h2>Custom tests<a class="headerlink" href="#custom-tests" title="Permalink to this headline">¶</a></h2>
+<p>You can run a custom test script in a virtual machine that runs
+single-node Kubernetes* cluster. Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cat &gt; myscript.sh &lt;&lt; EOF
+# create two pods, each requesting two CPUs
+CPU=2 n=2 create guaranteed
+# create four pods, no resource requests
+n=4 create besteffort
+# show pods
+kubectl get pods
+# check that the first two pods are not allowed to use the same CPUs
+verify &#39;cpus[&quot;pod0c0&quot;].isdisjoint(cpus[&quot;pod1c0&quot;])&#39;
+EOF
+$ ./run.sh test myscript.sh
+</pre></div>
+</div>
+</div>
+<div class="section" id="custom-topologies">
+<h2>Custom topologies<a class="headerlink" href="#custom-topologies" title="Permalink to this headline">¶</a></h2>
+<p>If you change NUMA node topology of an existing virtual machine, you
+must delete the virtual machine first. Otherwise the <code class="docutils literal notranslate"><span class="pre">topology</span></code> variable
+is ignored and the test will run in the existing NUMA
+configuration.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">topology</span></code> variable is a JSON array of objects. Each object
+defines one or more NUMA nodes. Keys in objects:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s2">&quot;mem&quot;</span>                 <span class="n">mem</span> <span class="p">(</span><span class="n">RAM</span><span class="p">)</span> <span class="n">size</span> <span class="n">on</span> <span class="n">each</span> <span class="n">NUMA</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">this</span> <span class="n">group</span><span class="o">.</span>
+                      <span class="n">The</span> <span class="n">default</span> <span class="ow">is</span> <span class="s2">&quot;0G&quot;</span><span class="o">.</span>
+<span class="s2">&quot;nvmem&quot;</span>               <span class="n">nvmem</span> <span class="p">(</span><span class="n">non</span><span class="o">-</span><span class="n">volatile</span> <span class="n">RAM</span><span class="p">)</span> <span class="n">size</span> <span class="n">on</span> <span class="n">each</span> <span class="n">NUMA</span> <span class="n">node</span>
+                      <span class="ow">in</span> <span class="n">this</span> <span class="n">group</span><span class="o">.</span> <span class="n">The</span> <span class="n">default</span> <span class="ow">is</span> <span class="s2">&quot;0G&quot;</span><span class="o">.</span>
+<span class="s2">&quot;cores&quot;</span>               <span class="n">number</span> <span class="n">of</span> <span class="n">CPU</span> <span class="n">cores</span> <span class="n">on</span> <span class="n">each</span> <span class="n">NUMA</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">this</span> <span class="n">group</span><span class="o">.</span>
+                      <span class="n">The</span> <span class="n">default</span> <span class="ow">is</span> <span class="mf">0.</span>
+<span class="s2">&quot;threads&quot;</span>             <span class="n">number</span> <span class="n">of</span> <span class="n">threads</span> <span class="n">on</span> <span class="n">each</span> <span class="n">CPU</span> <span class="n">core</span><span class="o">.</span>
+                      <span class="n">The</span> <span class="n">default</span> <span class="ow">is</span> <span class="mf">2.</span>
+<span class="s2">&quot;nodes&quot;</span>               <span class="n">number</span> <span class="n">of</span> <span class="n">NUMA</span> <span class="n">nodes</span> <span class="n">on</span> <span class="n">each</span> <span class="n">die</span><span class="o">.</span>
+                      <span class="n">The</span> <span class="n">default</span> <span class="ow">is</span> <span class="mf">1.</span>
+<span class="s2">&quot;dies&quot;</span>                <span class="n">number</span> <span class="n">of</span> <span class="n">dies</span> <span class="n">on</span> <span class="n">each</span> <span class="n">package</span><span class="o">.</span>
+                      <span class="n">The</span> <span class="n">default</span> <span class="ow">is</span> <span class="mf">1.</span>
+<span class="s2">&quot;packages&quot;</span>            <span class="n">number</span> <span class="n">of</span> <span class="n">packages</span><span class="o">.</span>
+                      <span class="n">The</span> <span class="n">default</span> <span class="ow">is</span> <span class="mf">1.</span>
+</pre></div>
+</div>
+<p>Example:</p>
+<p>Run the test in a VM with two NUMA nodes. There are 4 CPUs (two cores, two
+threads per core by default) and 4G RAM in each node</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>e2e$ govm delete my2x4 ; vm=my2x4 topology=&#39;[{&quot;mem&quot;:&quot;4G&quot;,&quot;cores&quot;:2,&quot;nodes&quot;:2}]&#39; ./run.sh play
+</pre></div>
+</div>
+<p>Run the test in a VM with 32 CPUs in total: there are two packages
+(sockets) in the system, each containing two dies. Each die containing
+two NUMA nodes, each node containing 2 CPU cores, each core containing
+two threads. And with a NUMA node with 16G of non-volatile memory
+(NVRAM) but no CPUs.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>e2e$ vm=mynvram topology=&#39;[{&quot;mem&quot;:&quot;4G&quot;,&quot;cores&quot;:2,&quot;nodes&quot;:2,&quot;dies&quot;:2,&quot;packages&quot;:2},{&quot;nvmem&quot;:&quot;16G&quot;}]&#39; ./run.sh play
+</pre></div>
+</div>
+</div>
+<div class="section" id="test-output">
+<h2>Test output<a class="headerlink" href="#test-output" title="Permalink to this headline">¶</a></h2>
+<p>All test output is saved under the directory in the environment
+variable <code class="docutils literal notranslate"><span class="pre">outdir</span></code>. The default is <code class="docutils literal notranslate"><span class="pre">./output</span></code>.</p>
+<p>Executed commands with their output, exit status and timestamps are
+saved under the <code class="docutils literal notranslate"><span class="pre">output/commands</span></code> directory.</p>
+<p>You can find Qemu output from Docker* logs. For instance, output of the
+most recent Qemu launced by <code class="docutils literal notranslate"><span class="pre">govm</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ docker logs $(docker ps | awk &#39;/govm/{print $1; exit}&#39;)
+</pre></div>
+</div>
+</div>
+<div class="section" id="manual-testing-and-debugging">
+<h2>Manual testing and debugging<a class="headerlink" href="#manual-testing-and-debugging" title="Permalink to this headline">¶</a></h2>
+<p>Interactive mode helps developing and debugging scripts:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ ./run.sh interactive
+...
+run.sh&gt; CPU=2 n=2 create guaranteed
+</pre></div>
+</div>
+<p>You can get help on functions available in test scripts with <code class="docutils literal notranslate"><span class="pre">./run.sh</span> <span class="pre">help</span> <span class="pre">script</span></code>, or with <code class="docutils literal notranslate"><span class="pre">help</span></code> and <code class="docutils literal notranslate"><span class="pre">help</span> <span class="pre">FUNCTION</span></code> when in the
+interactive mode.</p>
+<p>If a test has stopped to a failing <code class="docutils literal notranslate"><span class="pre">verify</span></code>, you can inspect
+<code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> cache and allowed OS resources in Python* after the test
+run:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ PYTHONPATH=&lt;TEST-OUTPUT-DIR&gt; python3
+&gt;&gt;&gt; from pyexec_state import *
+&gt;&gt;&gt; pp(allowed) # allowed OS resources
+&gt;&gt;&gt; pp(pods[&quot;pod0&quot;]) # pod entry in cache
+&gt;&gt;&gt; pp(containers[&quot;pod0c0&quot;])) # container entry in cache
+</pre></div>
+</div>
+<p>If you want to get the interactive prompt in the middle of a test run
+wherever a <code class="docutils literal notranslate"><span class="pre">verify</span></code> or <code class="docutils literal notranslate"><span class="pre">create</span></code> fails, you can set a <code class="docutils literal notranslate"><span class="pre">on_FUNC_fail</span></code> hook to
+either or both of them. Example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ on_verify_fail=interactive ./run.sh myscript.sh
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cri-test.html" class="btn btn-neutral float-left" title="CRI Validation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../demos/index.html" class="btn btn-neutral float-right" title="Demos" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, various.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.7
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>
