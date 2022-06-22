@@ -241,13 +241,16 @@ all: build update-workflows
 
 build: $(BUILD_BINS)
 
+build-static:
+	$(MAKE) STATIC=1 build
+
 install: $(BUILD_BINS) $(foreach dir,$(BUILD_DIRS),install-bin-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-systemd-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-sysconf-$(dir)) \
     $(foreach dir,$(BUILD_DIRS),install-config-$(dir))
 
 
-clean: $(foreach dir,$(BUILD_DIRS),clean-$(dir)) clean-spec clean-deb clean-ui-assets clean-html
+clean: clean-bin clean-spec clean-deb clean-ui-assets clean-html
 
 images: $(foreach dir,$(IMAGE_DIRS),image-$(dir))
 
@@ -272,12 +275,25 @@ libexec/%.o: elf/%.c
 	$(Q)mkdir -p libexec
 	$(Q)$(CLANG) -nostdinc -D __KERNEL__ $(KERNEL_INCLUDES) -O2 -Wall -target bpf -c $< -o $@
 
-bin/%:
+bin/%: .static.%.$(STATIC)
 	$(Q)bin=$(notdir $@); src=cmd/$$bin; \
-	echo "Building $@ (version $(BUILD_VERSION), build $(BUILD_BUILDID))..."; \
+	echo "Building $$([ -n "$(STATIC)" ] && echo 'static ')$@ (version $(BUILD_VERSION), build $(BUILD_BUILDID))..."; \
 	mkdir -p bin && \
 	cd $$src && \
 	    $(GO_BUILD) $(BUILD_TAGS) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
+
+.static.%.$(STATIC):
+	$(Q)if [ ! -f "$@" ]; then \
+	    touch "$@"; \
+	fi; \
+	old="$@"; old="$${old%.*}"; \
+        if [ -n "$(STATIC)" ]; then \
+	    rm -f "$$old."; \
+	else \
+	    rm -f "$$old.1"; \
+	fi
+
+.PRECIOUS: $(foreach dir,$(BUILD_DIRS),.static.$(dir).1 .static.$(dir).)
 
 install-bin-%: bin/%
 	$(Q)bin=$(patsubst install-bin-%,%,$@); dir=cmd/$$bin; \
@@ -329,6 +345,9 @@ install-minimal-docs:
 	    df=$${f##*/}; \
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(DOCDIR)/$${df}; \
 	done
+
+clean-bin: $(foreach dir,$(BUILD_DIRS),clean-$(dir))
+	$(Q)rm -f .static.*
 
 clean-%:
 	$(Q)bin=$(patsubst clean-%,%,$@); src=cmd/$$bin; \
@@ -514,12 +533,12 @@ vendored-dist: dist
 	$(GZIP) vendored-$$tarball && \
 	rm -fr $$tardir
 
-binary-dist: build
+binary-dist:
 	$(Q)tarball=$(OUTPUT)cri-resource-manager-$(TAR_VERSION).$$(uname -m).tar; \
 	echo "Creating binary dist tarball $$tarball..."; \
 	tardir=binary-dist; \
 	rm -fr $$tarball* $$tardir && \
-	$(MAKE) DESTDIR=$$tardir \
+	$(MAKE) STATIC=1 DESTDIR=$$tardir \
 	        BUILD_DIRS=cri-resmgr \
 	        PREFIX=/opt/intel \
 	        DEFAULTDIR=/etc/default \
