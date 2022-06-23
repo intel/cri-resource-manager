@@ -1,6 +1,6 @@
-ARG BUILDER_BASE=golang:1.17.8-bullseye
+ARG GO_VERSION=1.18
 
-FROM ${BUILDER_BASE} as builder
+FROM golang:${GO_VERSION}-bullseye as builder
 
 WORKDIR /go/build
 
