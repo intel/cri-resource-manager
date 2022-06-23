@@ -359,7 +359,10 @@ clean-gen:
 
 image-%:
 	$(Q)bin=$(patsubst image-%,%,$@); \
-		$(DOCKER) build . -f "cmd/$$bin/Dockerfile" -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
+	    go_version=`$(GO_CMD) list -m -f '{{.GoVersion}}'`; \
+	    $(DOCKER) build . -f "cmd/$$bin/Dockerfile" \
+	    --build-arg GO_VERSION=$${go_version} \
+	    -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
 image-push-%: image-%
 	$(Q)bin=$(patsubst image-push-%,%,$@); \
