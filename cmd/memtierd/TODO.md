@@ -1,6 +1,9 @@
 Features
 --------
 
+- Add combined-tracker that allows combining and reporting data from
+  softdirty and idlepage trackers, for instance.
+
 - Add stats table on mover statistics: how many tasks there are in the
   queue, how many tasks have been handled.
 
