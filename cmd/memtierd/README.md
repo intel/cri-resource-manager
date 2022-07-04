@@ -365,3 +365,5 @@ trackers, what they detect and their dependencies.
   - Userspace interface:
     - `/proc/PID/clear_refs`
     - `/proc/PID/pagemap`
+- multi:
+  - Combination of trackers.

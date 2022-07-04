@@ -164,6 +164,121 @@ func (tcs *TrackerCounters) String() string {
 	return strings.Join(lines, "\n")
 }
 
+func flattenDefaultCut(tc0 TrackerCounter, ar *AddrRange) TrackerCounter {
+	startAddr := tc0.AR.Ranges()[0].Addr()
+	if ar.Addr() > startAddr {
+		startAddr = ar.Addr()
+	}
+	endAddr := tc0.AR.Ranges()[0].EndAddr()
+	if ar.EndAddr() < endAddr {
+		endAddr = ar.EndAddr()
+	}
+	return TrackerCounter{
+		Accesses: tc0.Accesses,
+		Reads:    tc0.Reads,
+		Writes:   tc0.Writes,
+		AR:       NewAddrRanges(tc0.AR.Pid(), *NewAddrRange(startAddr, endAddr)),
+	}
+}
+
+func flattenDefaultUnion(tc0, tc1 TrackerCounter) TrackerCounter {
+	return TrackerCounter{
+		Accesses: tc0.Accesses + tc1.Accesses,
+		Reads:    tc0.Reads + tc1.Reads,
+		Writes:   tc0.Writes + tc1.Writes,
+		AR:       NewAddrRanges(tc0.AR.Pid(), tc0.AR.Ranges()...),
+	}
+}
+
+// Flattened returns tracker counters with overlapping parts squashed.
+// Parameters:
+//   cut - returns new tc that is a cut from the address range part of tc0.
+//   union - returns new tc that represents union of tc0 and tc1.
+func (tcs *TrackerCounters) Flattened(cut func(tc0 TrackerCounter, ar *AddrRange) TrackerCounter, union func(tc0, tc1 TrackerCounter) TrackerCounter) *TrackerCounters {
+	tcs.SortByAddr()
+	// Invariants:
+	// - flatTcs is sorted by pid, then by start address, then by end address
+	// - flatTcs has no overlapping addresses.
+	// - the last end address in flatTcs is the end addr of the last item.
+	if cut == nil {
+		cut = flattenDefaultCut
+	}
+	if union == nil {
+		union = flattenDefaultUnion
+	}
+	flatTcs := TrackerCounters{}
+	for _, tc := range *tcs {
+		tcStartAddr := tc.AR.Ranges()[0].Addr()
+		tcEndAddr := tc.AR.Ranges()[0].EndAddr()
+
+		if len(flatTcs) == 0 ||
+			flatTcs[len(flatTcs)-1].AR.Pid() != tc.AR.Pid() ||
+			flatTcs[len(flatTcs)-1].AR.Ranges()[0].EndAddr() <= tcStartAddr {
+			flatTcs = append(flatTcs, tc)
+			continue
+		}
+
+		// oltci indexes flattened TrackerCounters that
+		// overlap with tc.
+		// Walk backwards to find the first overlapping TrackerCounter.
+		oltci := len(flatTcs) - 1
+		for oltci >= 0 {
+			prevEndAddr := flatTcs[oltci].AR.Ranges()[0].EndAddr()
+			if prevEndAddr < tcStartAddr {
+				// No overlap at this index, the
+				// previous index was the last one.
+				oltci++
+				break
+			}
+			oltci--
+		}
+		if oltci < 0 {
+			oltci = 0
+		}
+		oldFlatTcsTail := flatTcs[oltci:]
+		newFlatTcsTail := make(TrackerCounters, 0, len(oldFlatTcsTail)+1)
+		// Walk forward from the first overlapping
+		// TrackerConter. oltc is the overlapping tracker
+		// counter being handled.
+		for oltci <= len(flatTcs)-1 {
+			oltc := flatTcs[oltci]
+			oltcStartAddr := oltc.AR.Ranges()[0].Addr()
+			oltcEndAddr := oltc.AR.Ranges()[0].EndAddr()
+			if oltcStartAddr < tcStartAddr {
+				handledOltc := cut(oltc, NewAddrRange(oltcStartAddr, tcStartAddr))
+				oltc = cut(oltc, NewAddrRange(tcStartAddr, oltcEndAddr))
+				oltcStartAddr = tcStartAddr
+				newFlatTcsTail = append(newFlatTcsTail, handledOltc)
+			}
+			if oltcStartAddr > tcStartAddr {
+				panic("trackercounters flatten assertion error: not sorted by addresses")
+			}
+			switch {
+			case oltcEndAddr < tcEndAddr:
+				handledTc := cut(tc, NewAddrRange(tcStartAddr, oltcEndAddr))
+				newFlatTcsTail = append(newFlatTcsTail, union(oltc, handledTc))
+				tc = cut(tc, NewAddrRange(oltcEndAddr, tcEndAddr))
+				tcStartAddr = oltcEndAddr
+			case oltcEndAddr == tcEndAddr:
+				newFlatTcsTail = append(newFlatTcsTail, union(oltc, tc))
+				tcStartAddr = tcEndAddr
+			case oltcEndAddr > tcEndAddr:
+				handledOltc := cut(oltc, NewAddrRange(oltcStartAddr, tcEndAddr))
+				newFlatTcsTail = append(newFlatTcsTail, union(handledOltc, tc))
+				oltc = cut(oltc, NewAddrRange(tcEndAddr, oltcEndAddr))
+				newFlatTcsTail = append(newFlatTcsTail, oltc)
+				tcStartAddr = tcEndAddr
+			}
+			oltci++
+		}
+		if tcStartAddr < tcEndAddr {
+			newFlatTcsTail = append(newFlatTcsTail, cut(tc, NewAddrRange(tcStartAddr, tcEndAddr)))
+		}
+		flatTcs = append(flatTcs[:len(flatTcs)-len(oldFlatTcsTail)], newFlatTcsTail...)
+	}
+	return &flatTcs
+}
+
 func (tcs *TrackerCounters) RegionsMerged() *TrackerCounters {
 	tcs.SortByAddr()
 	mergedTcs := &TrackerCounters{}
