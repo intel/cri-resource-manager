@@ -1,0 +1,49 @@
+policy:
+  name: age
+  config: |
+    intervalms: 5000
+    cgroups:
+      - /sys/fs/cgroup/track-me
+    tracker:
+      # The multi tracker is configured with a list of trackers,
+      # each of them separately configured.
+      #
+      # This example runs (heavy) idlepage tracking every 20 seconds,
+      # and (lightweight) softdirty tracking every 5 seconds.
+      #
+      # Example:
+      #
+      # 1. Launch memory exerciser with disjoint read and write ranges
+      #
+      # $ mkdir -p /sys/fs/cgroup/track-me
+      #
+      # $ meme -bwc 1 -bws 200M -bwo 800M -brc 1 -brs 400M -bs 2G & \
+      #   echo $! > /sys/fs/cgroup/meme/cgroup/track-me/cgroup.procs ; fg
+      #
+      # 2. Start printing latest memory access times by
+      #    echoing policy dump command to the memtierd prompt in a loop.
+      #
+      # $ (while true; do sleep 5; echo "policy -dump accessed 0,10s,1m,1h"; done) | memtierd -config memtierd-age-multi-trackonly.yaml
+      #
+      # Notice the following:
+      #   - Written portion of memory stays in 0..10 seconds report region,
+      #     because the softdirty scans memory often, and therefore finds
+      #     written pages every time.
+      #   - Read portion of memory is between 0..10 and 10..60 seconds regions,
+      #     depending on how long a time ago idlepage scanner was ran.
+      #   - The rest of the memory drops down to 1 minute..1 hour slot, as
+      #     neither of the trackers can observe any usage of it.
+      #
+      name: multi
+      config: |
+        trackers:
+          - name: idlepage
+            config: |
+              pagesinregion: 512
+              maxcountperregion: 1
+              scanintervalms: 20000
+          - name: softdirty
+            config: |
+              pagesinregion: 512
+              maxcountperregion: 1
+              scanintervalms: 5000
