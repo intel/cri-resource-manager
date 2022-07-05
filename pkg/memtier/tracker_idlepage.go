@@ -192,7 +192,7 @@ func (t *TrackerIdlePage) Start() error {
 		return fmt.Errorf("sampler already running")
 	}
 	if n, err := procReadInt("/proc/sys/kernel/numa_balancing"); err != nil || n != 0 {
-		log.Warnf("unreliable idlepage trackcing: /proc/sys/kernel/numa_balancing is not 0")
+		log.Warnf("unreliable idlepage tracking: /proc/sys/kernel/numa_balancing is not 0")
 	}
 	t.toSampler = make(chan byte, 1)
 	t.setIdleBits()
