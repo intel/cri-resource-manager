@@ -16,7 +16,10 @@ type Stats struct {
 	pidMadvices mapIntPStatsPidMadviced
 	pidMoves    mapIntPStatsPidMoved
 	pidScans    mapIntPStatsPidScanned
+	recMoves    *[]*StatsMoved
 }
+
+var recMovesBufSize int = 1024 * 256
 
 type StatsPidMadviced struct {
 	sumSyscalls     uint64
@@ -165,6 +168,9 @@ func (s *Stats) Store(entry interface{}) {
 			spm.lastMoveWithError = v
 		}
 		spm.lastMove = v
+		if s.recMoves != nil {
+			*s.recMoves = append(*s.recMoves, &v)
+		}
 	case StatsPageScan:
 		sps, ok := s.pidScans[v.pid]
 		if !ok {
@@ -200,6 +206,38 @@ func (s *Stats) LastMoveWithError(pid int) *StatsMoved {
 		return nil
 	}
 	return &spm.lastMoveWithError
+}
+
+func (s *Stats) Dump(args []string) string {
+	s.Lock()
+	defer s.Unlock()
+	if len(args) == 0 ||
+		args[0] != "moves" ||
+		args[0] == "moves" && len(args) != 2 {
+		return "Usage: dump moves <start|new|stop>"
+	}
+	switch args[1] {
+	case "start":
+		recMoves := make([]*StatsMoved, 0, recMovesBufSize)
+		s.recMoves = &recMoves
+		return "recording moves started"
+	case "stop":
+		s.recMoves = nil
+		return "recording moves stopped"
+	case "new":
+		if s.recMoves == nil {
+			return "error: not recording"
+		}
+		movesStrings := make([]string, 0, len(*s.recMoves))
+		for _, sm := range *s.recMoves {
+			movesStrings = append(movesStrings, sm.String())
+		}
+		movesString := strings.Join(movesStrings, "\n")
+		*s.recMoves = (*s.recMoves)[:0]
+		return movesString
+	default:
+		return fmt.Sprintf("invalid dump moves parameter: %q", args[1])
+	}
 }
 
 func (s *Stats) Summarize() string {

@@ -616,9 +616,11 @@ func (p *Prompt) cmdMover(args []string) commandStatus {
 func (p *Prompt) cmdStats(args []string) commandStatus {
 	lm := p.f.Int("lm", -1, "show latest move in PID")
 	le := p.f.Int("le", -1, "show latest move with error in PID")
+	dump := p.f.Bool("dump", false, "dump stats internals")
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
+	remainder := p.f.Args()
 	if *lm != -1 {
 		p.output("%s\n",
 			memtier.GetStats().LastMove(*lm))
@@ -627,6 +629,11 @@ func (p *Prompt) cmdStats(args []string) commandStatus {
 	if *le != -1 {
 		p.output("%s\n",
 			memtier.GetStats().LastMoveWithError(*le))
+		return csOk
+	}
+	if *dump {
+		p.output("%s\n",
+			memtier.GetStats().Dump(remainder))
 		return csOk
 	}
 	p.output(memtier.GetStats().Summarize() + "\n")
