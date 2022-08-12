@@ -472,6 +472,11 @@ func (m *resmgr) setupRelay() error {
 		RuntimeSocket: opt.RuntimeSocket,
 		QualifyReqFn:  m.disambiguate,
 	}
+
+	options.ImageSocket = strings.TrimPrefix(options.ImageSocket, "unix://")
+	options.RuntimeSocket = strings.TrimPrefix(options.RuntimeSocket, "unix://")
+	options.RelaySocket = strings.TrimPrefix(options.RelaySocket, "unix://")
+
 	if m.relay, err = relay.NewRelay(options); err != nil {
 		return resmgrError("failed to create CRI relay: %v", err)
 	}
