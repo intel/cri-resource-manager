@@ -1,0 +1,37 @@
+# This memtierd configuration file demonstrates tracing what heat
+# forecaster gets as input.
+#
+# Heat forecaster is a component that
+# 1. receives all heatmaps from the heat policy in policy interval
+# 2. communicates a forecast of expected heats in order to trigger
+#    predictivie memory moves.
+
+policy:
+  name: heat
+  config: |
+    intervalms: 10000
+
+    pids:
+      - $(pidof meme)
+
+    heatmap:
+      heatmax: 0.01
+      heatretention: 0.8
+      heatclasses: 4
+
+    forecaster:
+      name: trace
+      config: |
+        file: /tmp/heat-forecast-requests.txt
+        # Uncomment following line to hide memory with heat 0.0
+        # hideheatzero: true
+
+    tracker:
+      name: softdirty
+      config: |
+        pagesinregion: 512
+        scanintervalms: 5000
+
+    mover:
+      intervalms: 20
+      bandwidth: 200

@@ -48,12 +48,16 @@ var HeatmapConfigDefaults string = `{"HeatMax":1.0,"HeatRetention":0.9513,"HeatC
 type Heatmap struct {
 	config *HeatmapConfig
 	mutex  sync.Mutex
-	// pidHeatRanges contains heats seen for each range.
+	// pidHrs (pid-heatranges map) contains heats seen for each range.
 	// - Array of HeatRanges is sorted by addr.
 	// - Address ranges never overlap. That is,
 	//   hr[i].addr + hr[i].length*PAGESIZE <= hr[i+1].addr
-	pidHrs map[int]*HeatRanges
+	pidHrs Heats
 }
+
+type Heats map[int]*HeatRanges
+
+type HeatRanges []*HeatRange
 
 type HeatRange struct {
 	addr    uint64
@@ -62,8 +66,6 @@ type HeatRange struct {
 	created int64
 	updated int64
 }
-
-type HeatRanges []*HeatRange
 
 func NewCounterHeatmap() *Heatmap {
 	heatmap := &Heatmap{
@@ -316,9 +318,9 @@ func (h *Heatmap) HeatRangeAt(pid int, addr uint64) *HeatRange {
 }
 
 // ForEachRange iterates over heatranges of a pid in ascending address order.
-// - handleRange(*HeatRange) is called for every range.
-//       0 (continue): ForEachRange continues iteration from the next range
-//       -1 (break):   ForEachRange returns immediately.
+//   - handleRange(*HeatRange) is called for every range.
+//     0 (continue): ForEachRange continues iteration from the next range
+//     -1 (break):   ForEachRange returns immediately.
 func (h *Heatmap) ForEachRange(pid int, handleRange func(*HeatRange) int) {
 	hrs, ok := h.pidHrs[pid]
 	if !ok {

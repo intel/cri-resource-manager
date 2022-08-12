@@ -23,9 +23,10 @@ import (
 )
 
 type PolicyHeatConfig struct {
-	Tracker TrackerConfig
-	Heatmap HeatmapConfig
-	Mover   MoverConfig
+	Tracker    TrackerConfig
+	Heatmap    HeatmapConfig
+	Forecaster *HeatForecasterConfig
+	Mover      MoverConfig
 	// Cgroups is a list of cgroup paths in the filesystem. The
 	// policy manages processes in listed cgroups and recursively
 	// in their subgroups.
@@ -58,6 +59,7 @@ type PolicyHeat struct {
 	heatmap      *Heatmap
 	pidAddrDatas map[int]*AddrDatas
 	mover        *Mover
+	forecaster   HeatForecaster
 	numaUsed     map[Node]int // used capacity (in pages) on each NUMA node
 	numaSize     map[Node]int // total capacity (in pages) on each NUMA node
 }
@@ -135,6 +137,15 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 	if err = p.mover.SetConfig(&config.Mover); err != nil {
 		return fmt.Errorf("configuring mover failed: %s", err)
 	}
+	if config.Forecaster != nil {
+		p.forecaster, err = NewHeatForecaster(config.Forecaster.Name)
+		if err != nil || p.forecaster == nil {
+			return fmt.Errorf("creating heat forecaster %q failed: %s", config.Forecaster.Name, err)
+		}
+		if err = p.forecaster.SetConfigJson(config.Forecaster.Config); err != nil {
+			return fmt.Errorf("configuring heat forecaster %q failed: %s", config.Forecaster.Name, err)
+		}
+	}
 	p.switchToTracker(newTracker)
 	p.numaUsed = newNumaUsed
 	p.numaSize = newNumaSize
@@ -172,9 +183,15 @@ func (p *PolicyHeat) Tracker() Tracker {
 }
 
 func (p *PolicyHeat) Dump(args []string) string {
-	dumpHelp := "dump <heatmap|heatgram [CLASSES]|numa>"
+	dumpHelp := "dump <forecast [PARAMS]|heatmap|heatgram [CLASSES]|numa>"
 	if len(args) == 0 {
 		return dumpHelp
+	}
+	if args[0] == "forecast" {
+		if p.forecaster == nil {
+			return "no forecaster"
+		}
+		return p.forecaster.Dump(args[1:])
 	}
 	if args[0] == "heatmap" {
 		lines := []string{}
@@ -326,8 +343,27 @@ func (p *PolicyHeat) loop() {
 		p.tracker.ResetCounters()
 		log.Debugf("PolicyHeat: updating heatmap with %d address ranges\n", len(*newCounters))
 		p.heatmap.UpdateFromCounters(newCounters, timestamp)
+
+		// If we get a heat forecast, make memory moves based on that
+		// and restore real heats after moves have been created.
+		var realHeats Heats
+		if p.forecaster != nil {
+			heatForecast, err := p.forecaster.Forecast(&p.heatmap.pidHrs)
+			if err != nil {
+				stats.Store(StatsHeartbeat{fmt.Sprintf("forecaster %q error: %s", p.config.Forecaster, err)})
+			}
+			if heatForecast != nil {
+				realHeats = p.heatmap.pidHrs
+				p.heatmap.pidHrs = *heatForecast
+				stats.Store(StatsHeartbeat{"use forecast"})
+			}
+		}
 		if p.mover.TaskCount() == 0 {
 			p.startMoves(timestamp)
+		}
+		if realHeats != nil {
+			stats.Store(StatsHeartbeat{"rollback from forecast"})
+			p.heatmap.pidHrs = realHeats
 		}
 		n += 1
 		select {
