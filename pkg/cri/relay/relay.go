@@ -27,6 +27,8 @@ import (
 const (
 	// DisableService is used to mark a socket/service to not be connected.
 	DisableService = client.DontConnect
+	// DefaultImageSocket uses the runtime socket for the image servie, too.
+	DefaultImageSocket = "default"
 )
 
 // Options contains the configurable options of our CRI relay.
@@ -73,8 +75,13 @@ func NewRelay(options Options) (Relay, error) {
 		options: options,
 	}
 
+	imageSocket := r.options.ImageSocket
+	if imageSocket == DefaultImageSocket {
+		imageSocket = r.options.RuntimeSocket
+	}
+
 	cltopts := client.Options{
-		ImageSocket:   r.options.ImageSocket,
+		ImageSocket:   imageSocket,
 		RuntimeSocket: r.options.RuntimeSocket,
 		DialNotify:    r.dialNotify,
 	}

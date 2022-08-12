@@ -18,6 +18,7 @@ import (
 	"flag"
 	"time"
 
+	"github.com/intel/cri-resource-manager/pkg/cri/relay"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 	"github.com/intel/cri-resource-manager/pkg/pidfile"
 )
@@ -53,10 +54,10 @@ const (
 
 // Register us for command line option processing.
 func init() {
-	flag.StringVar(&opt.ImageSocket, "image-socket", sockets.Containerd,
-		"Unix domain socket path where CRI image service requests should be relayed to.")
 	flag.StringVar(&opt.RuntimeSocket, "runtime-socket", sockets.Containerd,
 		"Unix domain socket path where CRI runtime service requests should be relayed to.")
+	flag.StringVar(&opt.ImageSocket, "image-socket", relay.DefaultImageSocket,
+		"CRI image service socket, defaults to the value used for --runtime-socket.")
 	flag.StringVar(&opt.RelaySocket, "relay-socket", sockets.ResourceManagerRelay,
 		"Unix domain socket path where the resource manager should serve requests on.")
 	flag.StringVar(&opt.RelayDir, "relay-dir", "/var/lib/cri-resmgr",
