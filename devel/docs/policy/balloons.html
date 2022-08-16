@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-2-gc99270ed documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-4-g883c0e98 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -48,14 +48,18 @@
 <li class="toctree-l2"><a class="reference internal" href="static-pools.html">Static-Pools (STP) Policy</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Balloons Policy</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-it-works">How It Works</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#deployment">Deployment</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#install-cri-resmgr">Install cri-resmgr</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#debugging">Debugging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#parameters">Parameters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#example">Example</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#assigning-a-container-to-a-balloon">Assigning a Container to a Balloon</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#metrics-and-debugging">Metrics and Debugging</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="podpools.html">Podpools Policy</a></li>
@@ -105,11 +109,45 @@
 <div class="section" id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
 <p>The balloons policy implements workload placement into “balloons” that
-are pools of exclusive CPUs. A balloon can be inflated and deflated,
-that is CPUs added and removed, based on the CPU resource requests of
-the workloads in the balloon. The policy supports both static and
-dynamically created and popped balloons. The balloons policy enables
-configuring balloon-specific CPU classes.</p>
+are disjoint CPU pools. Balloons can be inflated and deflated, that is
+CPUs added and removed, based on the CPU resource requests of
+containers. Balloons can be static or dynamically created and
+destroyed. CPUs in balloons can be configured, for example, by setting
+min and max frequencies on CPU cores and uncore.</p>
+</div>
+<div class="section" id="how-it-works">
+<h2>How It Works<a class="headerlink" href="#how-it-works" title="Permalink to this headline">¶</a></h2>
+<ol class="simple">
+<li><p>User configures balloon types from which the policy instantiates
+balloons.</p></li>
+<li><p>A balloon has a set of CPUs and a set of containers that run on the
+CPUs.</p></li>
+<li><p>Every container is assigned to exactly one balloon. A container is
+allowed to use all CPUs of its balloon and no other CPUs.</p></li>
+<li><p>Every logical CPU belongs to at most one balloon. There can be CPUs
+that do not belong to any balloon.</p></li>
+<li><p>The number of CPUs in a balloon can change during the lifetime of
+the balloon. If a balloon inflates, that is CPUs are added to it,
+all containers in the balloon are allowed to use more CPUs. If a
+balloon deflates, the opposite is true.</p></li>
+<li><p>When a new container is created on a Kubernetes node, the policy
+first decides the type of the balloon that will run the
+container. The decision is based on annotations of the pod, or the
+namespace if annotations are not given.</p></li>
+<li><p>Next the policy decides which balloon of the decided type will run
+the container. Options are:</p>
+<ul class="simple">
+<li><p>an existing balloon that already has enough CPUs to run its
+current and new containers</p></li>
+<li><p>an existing balloon that can be inflated to fit its current and
+new containers</p></li>
+<li><p>new balloon.</p></li>
+</ul>
+</li>
+<li><p>When a CPU is added to a balloon or removed from it, the CPU is
+reconfigured based on balloon’s CPU class attributes, or idle CPU
+class attributes.</p></li>
+</ol>
 </div>
 <div class="section" id="deployment">
 <h2>Deployment<a class="headerlink" href="#deployment" title="Permalink to this headline">¶</a></h2>
@@ -125,24 +163,130 @@ configuring balloon-specific CPU classes.</p>
 system of CRI-RM. See <a class="reference external" href="../setup.html#setting-up-cri-resource-manager">setup and
 usage</a> for more details
 on managing the configuration.</p>
+<div class="section" id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Permalink to this headline">¶</a></h3>
+<p>Balloons policy parameters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">PinCPU</span></code> controls pinning a container to CPUs of its balloon. The
+default is <code class="docutils literal notranslate"><span class="pre">true</span></code>: the container cannot use other CPUs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PinMemory</span></code> controls pinning a container to the memories that are
+closest to the CPUs of its balloon. Pinning memory disallows using
+memory from other NUMA nodes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">IdleCPUClass</span></code> specifies the CPU class of those CPUs that do not
+belong to any balloon.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ReservedPoolNamespaces</span></code> is a list of namespaces (wildcards allowed)
+that are assigned to the special reserved balloon, that is, will run
+on reserved CPUs. This always includes the <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> namespace.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">BalloonTypes</span></code> is a list of balloon type definitions. Each type can
+be configured with the following parameters:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">Name</span></code> of the balloon type. This is used in pod annotations to
+assign containers to balloons of this type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Namespaces</span></code> is a list of namespaces (wildcards allowed) whose
+pods should be assigned to this balloon type, unless overridden by
+pod annotations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MinBalloons</span></code> is the minimum number of balloons of this type that
+is always present, even if the balloons would not have any
+containers. The default is 0: if a balloon has no containers, it
+can be destroyed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MaxCPUs</span></code> specifies the maximum number of CPUs in any balloon of
+this type. Balloons will not be inflated larger than this. 0 means
+unlimited.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MinCPUs</span></code> specifies the minimum number of CPUs in any balloon of
+this type. When a balloon is created or deflated, it will always
+have at least this many CPUs, even if containers in the balloon
+request less.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CpuClass</span></code> specifies the name of the CPU class according to which
+CPUs of balloons are configured.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferSpreadingPods</span></code>: if <code class="docutils literal notranslate"><span class="pre">true</span></code>, containers of the same pod
+should be spread to different balloons of this type. The default
+is <code class="docutils literal notranslate"><span class="pre">false</span></code>: prefer placing containers of the same pod to the same
+balloon(s).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferPerNamespaceBalloon</span></code>: if <code class="docutils literal notranslate"><span class="pre">true</span></code>, containers in the same
+namespace will be placed in the same balloon(s). On the other
+hand, containers in different namespaces are preferrably placed in
+different balloons. The default is <code class="docutils literal notranslate"><span class="pre">false</span></code>: namespace has no
+effect on choosing the balloon of this type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferNewBalloons</span></code>: if <code class="docutils literal notranslate"><span class="pre">true</span></code>, prefer creating new balloons over
+placing containers to existing balloons. This results in
+preferring exclusive CPUs, as long as there are enough free
+CPUs. The default is <code class="docutils literal notranslate"><span class="pre">false</span></code>: prefer filling and inflating
+existing balloons over creating new ones.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AllocatorPriority</span></code> (0: High, 1: Normal, 2: Low, 3: None). CPU
+allocator parameter, used when creating new or resizing existing
+balloons. If there are balloon types with pre-created balloons
+(<code class="docutils literal notranslate"><span class="pre">MinBalloons</span></code> &gt; 0), balloons of the type with the highest
+<code class="docutils literal notranslate"><span class="pre">AllocatorPriority</span></code> are created first.</p></li>
+</ul>
+</li>
+</ul>
+<p>Related configuration parameters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">policy.ReservedResources.CPU</span></code> specifies the (number of) CPUs in the
+special <code class="docutils literal notranslate"><span class="pre">reserved</span></code> balloon. By default all containers in the
+<code class="docutils literal notranslate"><span class="pre">kube-system</span></code> namespace are assigned to the reserved balloon.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cpu.classes</span></code> defines CPU classes and their parameters (such as
+<code class="docutils literal notranslate"><span class="pre">minFreq</span></code>, <code class="docutils literal notranslate"><span class="pre">maxFreq</span></code>, <code class="docutils literal notranslate"><span class="pre">uncoreMinFreq</span></code> and <code class="docutils literal notranslate"><span class="pre">uncoreMaxFreq</span></code>).</p></li>
+</ul>
+</div>
+<div class="section" id="example">
+<h3>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h3>
 <p>Example configuration that runs all pods in balloons of 1-4 CPUs.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
   <span class="nt">Active</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">balloons</span>
   <span class="nt">ReservedResources</span><span class="p">:</span>
     <span class="nt">CPU</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
   <span class="nt">balloons</span><span class="p">:</span>
+    <span class="nt">PinCPU</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+    <span class="nt">PinMemory</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+    <span class="nt">IdleCPUClass</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">lowpower</span>
     <span class="nt">BalloonTypes</span><span class="p">:</span>
       <span class="p p-Indicator">-</span> <span class="nt">Name</span><span class="p">:</span> <span class="s">&quot;quad&quot;</span>
         <span class="nt">MinCpus</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
         <span class="nt">MaxCPUs</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">4</span>
+        <span class="nt">CPUClass</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">dynamic</span>
         <span class="nt">Namespaces</span><span class="p">:</span>
           <span class="p p-Indicator">-</span> <span class="s">&quot;*&quot;</span>
+<span class="nt">cpu</span><span class="p">:</span>
+  <span class="nt">classes</span><span class="p">:</span>
+    <span class="nt">lowpower</span><span class="p">:</span>
+      <span class="nt">minFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">800</span>
+      <span class="nt">maxFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">800</span>
+    <span class="nt">dynamic</span><span class="p">:</span>
+      <span class="nt">minFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">800</span>
+      <span class="nt">maxFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">3600</span>
+    <span class="nt">turbo</span><span class="p">:</span>
+      <span class="nt">minFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">3000</span>
+      <span class="nt">maxFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">3600</span>
+      <span class="nt">uncoreMinFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2000</span>
+      <span class="nt">uncoreMaxFreq</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2400</span>
 </pre></div>
 </div>
 <p>See the <span class="xref myst">sample configmap</span> for a
 complete example.</p>
-<div class="section" id="debugging">
-<h3>Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+<div class="section" id="assigning-a-container-to-a-balloon">
+<h2>Assigning a Container to a Balloon<a class="headerlink" href="#assigning-a-container-to-a-balloon" title="Permalink to this headline">¶</a></h2>
+<p>The balloon type of a container can be defined in pod annotations. In
+the example below, the first annotation sets the balloon type (<code class="docutils literal notranslate"><span class="pre">BT</span></code>)
+of a single container (<code class="docutils literal notranslate"><span class="pre">CONTAINER_NAME</span></code>). The last two annotations set
+the default balloon type for all containers in the pod.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">balloon.balloons.cri-resource-manager.intel.com/container.CONTAINER_NAME</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BT</span>
+<span class="nt">balloon.balloons.cri-resource-manager.intel.com/pod</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BT</span>
+<span class="nt">balloon.balloons.cri-resource-manager.intel.com</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BT</span>
+</pre></div>
+</div>
+<p>If a pod has no annotations, its namespace is matched to the
+<code class="docutils literal notranslate"><span class="pre">Namespaces</span></code> of balloon types. The first matching balloon type is
+used.</p>
+<p>If the namespace does not match, the container is assigned to the
+special <code class="docutils literal notranslate"><span class="pre">default</span></code> balloon, that means reserved CPUs unless <code class="docutils literal notranslate"><span class="pre">MinCPUs</span></code>
+or <code class="docutils literal notranslate"><span class="pre">MaxCPUs</span></code> of the <code class="docutils literal notranslate"><span class="pre">default</span></code> balloon type are explicitely defined in
+the <code class="docutils literal notranslate"><span class="pre">BalloonTypes</span></code> configuration.</p>
+</div>
+<div class="section" id="metrics-and-debugging">
+<h2>Metrics and Debugging<a class="headerlink" href="#metrics-and-debugging" title="Permalink to this headline">¶</a></h2>
 <p>In order to enable more verbose logging and metrics exporting from the
 balloons policy, enable instrumentation and policy debugging from the
 CRI-RM global config:</p>
@@ -155,7 +299,6 @@ CRI-RM global config:</p>
 <span class="nt">logger</span><span class="p">:</span>
   <span class="nt">Debug</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">policy</span>
 </pre></div>
-</div>
 </div>
 </div>
 </div>
