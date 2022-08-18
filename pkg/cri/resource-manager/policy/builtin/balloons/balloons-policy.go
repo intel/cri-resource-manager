@@ -484,8 +484,12 @@ func (p *balloons) forgetCpuClass(bln *Balloon) {
 func (p *balloons) newBalloon(blnDef *BalloonDef, confCpus bool) (*Balloon, error) {
 	var cpus cpuset.CPUSet
 	var err error
-	// Find the first unused balloon instance index.
 	blnsOfDef := p.balloonsByDef(blnDef)
+	// Allowed to create new balloon instance from blnDef?
+	if blnDef.MaxBalloons > 0 && blnDef.MaxBalloons <= len(blnsOfDef) {
+		return nil, balloonsError("cannot create new %q balloon, MaxBalloons limit (%d) reached", blnDef.Name, blnDef.MaxBalloons)
+	}
+	// Find the first unused balloon instance index.
 	freeInstance := 0
 	for freeInstance = 0; freeInstance < len(blnsOfDef); freeInstance++ {
 		isFree := true
@@ -895,6 +899,9 @@ func (p *balloons) applyBalloonDef(balloons *[]*Balloon, blnDef *BalloonDef, fre
 				if err != nil {
 					return err
 				}
+				if newBln == nil {
+					return balloonsError("failed to create balloon '%s[%d]' as required by MinBalloons=%d", blnDef.Name, blnIdx, blnDef.MinBalloons)
+				}
 				*balloons = append(*balloons, newBln)
 			}
 		}
@@ -921,7 +928,7 @@ func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
 		MinBalloons:       1,
 		AllocatorPriority: 3,
 	}
-	balloons := []*Balloon{}
+	p.balloons = []*Balloon{}
 	p.freeCpus = p.allowed.Clone()
 	p.freeCpus = p.freeCpus.Difference(p.reserved)
 	// Instantiate built-in reserved and default balloons.
@@ -929,19 +936,19 @@ func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
 	if err != nil {
 		return err
 	}
-	balloons = append(balloons, reservedBalloon)
+	p.balloons = append(p.balloons, reservedBalloon)
 	defaultBalloon, err := p.newBalloon(p.defaultBalloonDef, false)
 	if err != nil {
 		return err
 	}
-	balloons = append(balloons, defaultBalloon)
+	p.balloons = append(p.balloons, defaultBalloon)
 	// First apply customizations to built-in balloons: "reserved"
 	// and "default".
 	for _, blnDef := range bpoptions.BalloonDefs {
 		if blnDef.Name != reservedBalloonDefName && blnDef.Name != defaultBalloonDefName {
 			continue
 		}
-		if err := p.applyBalloonDef(&balloons, blnDef, &p.freeCpus); err != nil {
+		if err := p.applyBalloonDef(&p.balloons, blnDef, &p.freeCpus); err != nil {
 			return err
 		}
 	}
@@ -951,21 +958,20 @@ func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
 		if blnDef.Name == reservedBalloonDefName || blnDef.Name == defaultBalloonDefName {
 			continue
 		}
-		if err := p.applyBalloonDef(&balloons, blnDef, &p.freeCpus); err != nil {
+		if err := p.applyBalloonDef(&p.balloons, blnDef, &p.freeCpus); err != nil {
 			return err
 		}
 	}
 	// Finish balloon instance initialization.
 	log.Info("%s policy balloons:", PolicyName)
-	for blnIdx, bln := range balloons {
+	for blnIdx, bln := range p.balloons {
 		log.Info("- balloon %d: %s", blnIdx, bln)
 	}
 	// No errors in balloon creation, take new configuration into use.
-	p.balloons = balloons
 	p.bpoptions = *bpoptions
 	// (Re)configures all CPUs in balloons.
 	p.resetCpuClass()
-	for _, bln := range balloons {
+	for _, bln := range p.balloons {
 		p.useCpuClass(bln)
 	}
 	return nil

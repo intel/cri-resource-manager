@@ -71,6 +71,10 @@ type BalloonDef struct {
 	// of instances will be created before assigning any
 	// containers.
 	MinBalloons int `json:"MinBalloons"`
+	// MaxBalloons is the maximum number of balloon instances that
+	// is allowed to co-exist. If reached, new balloons cannot be
+	// created anymore.
+	MaxBalloons int `json:"MaxBalloons"`
 	// PreferSpreadingPods: containers of the same pod may be
 	// placed on separate balloons. The default is false: prefer
 	// placing containers of a pod to the same balloon(s).
