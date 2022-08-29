@@ -12,7 +12,7 @@ RUN go mod download
 # Build webhook, fully statically linked binary
 COPY . .
 
-RUN CGO_ENABLED=0 make BUILD_DIRS=cri-resmgr-webhook
+RUN CGO_ENABLED=0 make build-static BUILD_DIRS=cri-resmgr-webhook
 
 FROM scratch as final
 
