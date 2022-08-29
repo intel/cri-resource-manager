@@ -276,11 +276,10 @@ libexec/%.o: elf/%.c
 	$(Q)$(CLANG) -nostdinc -D __KERNEL__ $(KERNEL_INCLUDES) -O2 -Wall -target bpf -c $< -o $@
 
 bin/%: .static.%.$(STATIC)
-	$(Q)bin=$(notdir $@); src=cmd/$$bin; \
+	$(Q)bin=$(notdir $@); src=./cmd/$$bin; \
 	echo "Building $$([ -n "$(STATIC)" ] && echo 'static ')$@ (version $(BUILD_VERSION), build $(BUILD_BUILDID))..."; \
 	mkdir -p bin && \
-	cd $$src && \
-	    $(GO_BUILD) $(BUILD_TAGS) $(LDFLAGS) $(GCFLAGS) -o ../../bin/$$bin
+	$(GO_BUILD) $(BUILD_TAGS) $(LDFLAGS) $(GCFLAGS) -o bin/ $$src
 
 .static.%.$(STATIC):
 	$(Q)if [ ! -f "$@" ]; then \
