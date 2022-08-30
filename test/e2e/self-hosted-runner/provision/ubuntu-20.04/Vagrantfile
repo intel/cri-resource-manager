@@ -1,0 +1,41 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
+#ENV['VAGRANT_EXPERIMENTAL'] = 'disks'
+
+REQUIRED_PLUGINS = %w(vagrant-proxyconf vagrant-libvirt)
+exit unless REQUIRED_PLUGINS.all? do |plugin|
+  Vagrant.has_plugin?(plugin) || (
+    puts "The #{plugin} plugin is required. Please install it with:"
+    puts "$ vagrant plugin install #{plugin}"
+    false
+  )
+end
+
+Dotenv.load("../../env")
+
+Vagrant.configure("2") do |config|
+  config.vm.define "provision"
+  config.vm.box = "generic/ubuntu2004"
+  #config.vm.disk :disk, size: "#{ENV['VM_DISK_SIZE']}", primary: true
+  config.vm.box_check_update = false
+
+  # Do not replace the insecure keys in this base box. This allows us to
+  # create a new box that is based on this one, and then ssh to the new box.
+  config.ssh.insert_key = false
+
+  if Vagrant.has_plugin?("vagrant-proxyconf")
+    config.proxy.http     = "#{ENV['HTTP_PROXY']}"
+    config.proxy.https    = "#{ENV['HTTPS_PROXY']}"
+    config.proxy.no_proxy = "#{ENV['NO_PROXY']}"
+  end
+
+  config.vm.provider "libvirt" do |v|
+    v.memory = "#{ENV['VM_MEMORY']}".to_i
+  end
+
+  config.vm.provision :root_user, type: "shell", path: "provision_root.sh", env: {"DNS_SEARCH_DOMAIN" => "#{ENV['DNS_SEARCH_DOMAIN']}", "DNS_NAMESERVER" => "#{ENV['DNS_NAMESERVER']}", "REPO_PATH_CACHED_PACKAGES" => "#{ENV['REPO_PATH_CACHED_PACKAGES']}"}
+  config.vm.provision :vagrant_user, type: "shell", privileged: false, env: {"GHA_RUNNER_VERSION" => "#{ENV['GHA_RUNNER_VERSION']}"}, path: "provision_nonroot.sh"
+
+end

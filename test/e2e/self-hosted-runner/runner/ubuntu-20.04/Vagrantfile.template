@@ -1,0 +1,38 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+ENV['VAGRANT_DEFAULT_PROVIDER'] = 'libvirt'
+
+REQUIRED_PLUGINS = %w(vagrant-proxyconf vagrant-libvirt)
+exit unless REQUIRED_PLUGINS.all? do |plugin|
+  Vagrant.has_plugin?(plugin) || (
+    puts "The #{plugin} plugin is required. Please install it with:"
+    puts "$ vagrant plugin install #{plugin}"
+    false
+  )
+end
+
+Dotenv.load("../../env")
+
+Vagrant.configure("2") do |config|
+  config.vm.define "runner"
+  config.vm.hostname = "runner"
+
+  # We use the provisioned runner box we created earlier
+  config.vm.box = "runner"
+  config.vm.box_url = "file://PROVISIONED-BOX-FILE"
+  config.vm.disk :disk, size: "#{ENV['VM_DISK_SIZE']}", primary: true
+  config.vm.box_check_update = false
+  config.nfs.functional = false
+
+  if Vagrant.has_plugin?("vagrant-proxyconf")
+    config.proxy.http     = "#{ENV['HTTP_PROXY']}"
+    config.proxy.https    = "#{ENV['HTTPS_PROXY']}"
+    config.proxy.no_proxy = "#{ENV['NO_PROXY']}"
+  end
+
+  config.vm.provider "libvirt" do |virt|
+    virt.memory = "#{ENV['VM_MEMORY']}".to_i
+  end
+
+end
