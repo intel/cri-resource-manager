@@ -442,7 +442,7 @@ endif
 
 release-tests: e2e-tests
 
-e2e-tests: build
+e2e-tests: build-static
 	$(Q)tests="$(if $(E2E_TESTS),$(E2E_TESTS),test/e2e/policies.test-suite)"; \
 	$(E2E_RUN) $$tests; \
 	if [ "$$?" != "0" ]; then \
