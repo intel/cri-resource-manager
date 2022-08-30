@@ -1,0 +1,32 @@
+# Run cri-resource-manager e2e tests
+
+name: CRI Resource Manager CI
+
+# Controls when the workflow will run
+on:
+  pull_request:
+    branches: [ "main" ]
+#  schedule:
+#    - cron: '0 12 * * *'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    runs-on: self-hosted
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      - name: Update vendoring data
+        run: go mod vendor
+
+      - name: Build binaries
+        run: make
+
+      - name: Run topology-aware e2e tests
+        run: test/e2e/run_ci.sh policies.test-suite/topology-aware/n4c16/
+
+      - name: Run balloon e2e tests
+        run: test/e2e/run_ci.sh policies.test-suite/balloons/n4c16/
