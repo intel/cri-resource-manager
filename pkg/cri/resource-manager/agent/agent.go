@@ -31,8 +31,14 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 )
 
+const (
+	SocketDisabled = "disabled"
+)
+
 // Interface describe interfaces of cri-resource-manager agent
 type Interface interface {
+	IsDisabled() bool
+
 	GetNode(time.Duration) (core_v1.Node, error)
 	PatchNode([]*agent_v1.JsonPatch, time.Duration) error
 	UpdateNodeCapacity(map[string]string, time.Duration) error
@@ -55,13 +61,20 @@ type Interface interface {
 
 // agentInterface implements Interface
 type agentInterface struct {
-	cli agent_v1.AgentClient
+	socket string
+	cli    agent_v1.AgentClient
 }
 
 // NewAgentInterface connects to cri-resource-manager-agent gRPC server
 // and return a new Interface
 func NewAgentInterface(socket string) (Interface, error) {
-	a := &agentInterface{}
+	a := &agentInterface{
+		socket: socket,
+	}
+
+	if a.IsDisabled() {
+		return a, nil
+	}
 
 	dialOpts := []grpc.DialOption{
 		//		grpc.WithBlock(),
@@ -81,7 +94,16 @@ func NewAgentInterface(socket string) (Interface, error) {
 	return a, nil
 }
 
+// IsDisabled returns true if the agent interface is disabled.
+func (a *agentInterface) IsDisabled() bool {
+	return a.socket == SocketDisabled || a.socket == ""
+}
+
 func (a *agentInterface) GetNode(timeout time.Duration) (core_v1.Node, error) {
+	if a.IsDisabled() {
+		return core_v1.Node{}, agentError("agent interface is disabled")
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -101,6 +123,10 @@ func (a *agentInterface) GetNode(timeout time.Duration) (core_v1.Node, error) {
 }
 
 func (a *agentInterface) PatchNode(patches []*agent_v1.JsonPatch, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -116,6 +142,10 @@ func (a *agentInterface) PatchNode(patches []*agent_v1.JsonPatch, timeout time.D
 }
 
 func (a *agentInterface) UpdateNodeCapacity(caps map[string]string, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -130,6 +160,10 @@ func (a *agentInterface) UpdateNodeCapacity(caps map[string]string, timeout time
 }
 
 func (a *agentInterface) GetConfig(timeout time.Duration) (*config.RawConfig, error) {
+	if a.IsDisabled() {
+		return nil, agentError("agent interface is disabled")
+	}
+
 	ctx, cancel, callOpts := prepareCall(timeout)
 	defer cancel()
 
@@ -167,6 +201,10 @@ func taintPatchPath(idx int) string {
 }
 
 func (a *agentInterface) GetLabels(timeout time.Duration) (map[string]string, error) {
+	if a.IsDisabled() {
+		return nil, agentError("agent interface is disabled")
+	}
+
 	node, err := a.GetNode(timeout)
 	if err != nil {
 		return nil, err
@@ -176,6 +214,10 @@ func (a *agentInterface) GetLabels(timeout time.Duration) (map[string]string, er
 }
 
 func (a *agentInterface) SetLabels(labels map[string]string, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	if len(labels) == 0 {
 		return nil
 	}
@@ -205,6 +247,10 @@ func (a *agentInterface) SetLabels(labels map[string]string, timeout time.Durati
 }
 
 func (a *agentInterface) RemoveLabels(keys []string, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	if len(keys) == 0 {
 		return nil
 	}
@@ -233,6 +279,10 @@ func (a *agentInterface) RemoveLabels(keys []string, timeout time.Duration) erro
 }
 
 func (a *agentInterface) GetAnnotations(timeout time.Duration) (map[string]string, error) {
+	if a.IsDisabled() {
+		return nil, agentError("agent interface is disabled")
+	}
+
 	node, err := a.GetNode(timeout)
 	if err != nil {
 		return nil, err
@@ -241,6 +291,10 @@ func (a *agentInterface) GetAnnotations(timeout time.Duration) (map[string]strin
 }
 
 func (a *agentInterface) SetAnnotations(annotations map[string]string, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	if len(annotations) == 0 {
 		return nil
 	}
@@ -268,6 +322,10 @@ func (a *agentInterface) SetAnnotations(annotations map[string]string, timeout t
 }
 
 func (a *agentInterface) RemoveAnnotations(keys []string, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	if len(keys) == 0 {
 		return nil
 	}
@@ -297,6 +355,10 @@ func (a *agentInterface) RemoveAnnotations(keys []string, timeout time.Duration)
 }
 
 func (a *agentInterface) GetTaints(timeout time.Duration) ([]core_v1.Taint, error) {
+	if a.IsDisabled() {
+		return nil, agentError("agent interface is disabled")
+	}
+
 	node, err := a.GetNode(timeout)
 	if err != nil {
 		return nil, err
@@ -305,6 +367,10 @@ func (a *agentInterface) GetTaints(timeout time.Duration) ([]core_v1.Taint, erro
 }
 
 func (a *agentInterface) SetTaints(taints []core_v1.Taint, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	if len(taints) == 0 {
 		return nil
 	}
@@ -343,6 +409,10 @@ func (a *agentInterface) SetTaints(taints []core_v1.Taint, timeout time.Duration
 }
 
 func (a *agentInterface) RemoveTaints(taints []core_v1.Taint, timeout time.Duration) error {
+	if a.IsDisabled() {
+		return agentError("agent interface is disabled")
+	}
+
 	if len(taints) == 0 {
 		return nil
 	}
