@@ -997,7 +997,7 @@ vm-create-singlenode-cluster() {
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/control-plane-"
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
     vm-install-cni-"$(distro-k8s-cni)"
-    if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=120s"; then
+    if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=240s"; then
         command-error "kubectl waiting for node readiness timed out"
     fi
 }
