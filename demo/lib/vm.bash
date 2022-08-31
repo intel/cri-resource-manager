@@ -1007,14 +1007,19 @@ vm-create-cluster() {
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
         command-error "kubeadm init failed"
     fi
-    vm-command "mkdir -p \$HOME/.kube"
-    vm-command "cp /etc/kubernetes/admin.conf \$HOME/.kube/config"
+
+    user="$(vm-ssh-user)"
+
+    vm-command "mkdir -p ~$user/.kube"
+    vm-command "cp /etc/kubernetes/admin.conf ~$user/.kube/config"
+    vm-command "chown -R $user:$user ~$user/.kube"
     vm-command "mkdir -p ~root/.kube"
     vm-command "cp /etc/kubernetes/admin.conf ~root/.kube/config"
 }
 
 vm-destroy-cluster() {
-    vm-command "yes | kubeadm reset; rm -f \$HOME/.kube/config ~root/.kube/config /etc/kubernetes"
+    user="$(vm-ssh-user)"
+    vm-command "yes | kubeadm reset; rm -f ~$user/.kube/config ~root/.kube/config /etc/kubernetes"
 }
 
 vm-install-cni-cilium() {
