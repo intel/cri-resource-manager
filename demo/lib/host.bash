@@ -304,3 +304,35 @@ host-is-encrypted-ssh-key() {
         return 1
     fi
 }
+
+host-mount-vm() {
+    # Usage: host-mount-vm
+    #
+    # Mount VM / to VM data directory on host.
+    # host-get-vm-config NAME must be run first.
+    local mountpoint="${HOST_VM_DATA_DIR}/sshfs"
+    local vm_sftp_server=""
+    local vm_sftp_server_candidates=(/usr/lib/openssh/sftp-server /usr/libexec/sftp-server)
+    local vm_sftp_server_candidate
+    command -v sshfs >/dev/null || {
+        error "host-mount-vm: missing sshfs"
+    }
+    if mount | grep "${mountpoint}"; then
+        echo "host-mount-vm: already mounted"
+        return 0
+    fi
+    for vm_sftp_server_candidate in "${vm_sftp_server_candidates[@]}"; do
+        if vm-command-q "command -v ${vm_sftp_server_candidate} >/dev/null"; then
+            vm_sftp_server="${vm_sftp_server_candidate}"
+            break
+        fi
+    done
+    if [ -z "${vm_sftp_server}" ]; then
+        error "cannot find sftp-server from vm"
+    fi
+    mkdir -p "${mountpoint}"
+    sshfs "${VM_SSH_USER}@${VM_IP}:/" "${mountpoint}" -o sftp_server="/usr/bin/sudo ${vm_sftp_server}" $SSH_OPTS || {
+        error "sshfs mount failed"
+    }
+    echo "host-mount-vm: mounted ${VM_NAME}:/ to ${mountpoint}"
+}
