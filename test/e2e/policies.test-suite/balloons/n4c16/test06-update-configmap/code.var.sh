@@ -27,7 +27,7 @@ launch cri-resmgr-agent
 kubectl create namespace $testns
 kubectl create namespace btype1ns0
 
-AVAILABLE_CPU="cpuset:0,4-15" BTYPE2_NAMESPACE0='"*"' apply-configmap
+AVAILABLE_CPU="cpuset:0,4-15" BTYPE2_NAMESPACE0='"*"' BTYPE1_MAXCPUS='unlimited' apply-configmap
 sleep 3
 
 # pod0 in btype0, annotation

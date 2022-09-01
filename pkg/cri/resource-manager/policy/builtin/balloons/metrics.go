@@ -83,7 +83,7 @@ func (p *balloons) PollMetrics() policy.Metrics {
 		bm.DefName = bln.Def.Name
 		bm.CpuClass = bln.Def.CpuClass
 		bm.MinCpus = bln.Def.MinCpus
-		bm.MaxCpus = bln.Def.MaxCpus
+		bm.MaxCpus = int(bln.Def.MaxCpus)
 		bm.PrettyName = bln.PrettyName()
 		bm.Cpus = bln.Cpus
 		bm.Mems = bln.Mems.String()

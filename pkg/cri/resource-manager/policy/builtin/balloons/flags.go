@@ -52,7 +52,7 @@ type BalloonDef struct {
 	// MaxCpus specifies the maximum number of CPUs exclusively
 	// usable by containers in a balloon. Balloon size will not be
 	// inflated larger than MaxCpus.
-	MaxCpus int `json:"MaxCPUs"`
+	MaxCpus Limit `json:"MaxCPUs"`
 	// MinCpus specifies the minimum number of CPUs exclusively
 	// usable by containers in a balloon. When new balloon is created,
 	// this will be the number of CPUs reserved for it even if a container
@@ -74,7 +74,7 @@ type BalloonDef struct {
 	// MaxBalloons is the maximum number of balloon instances that
 	// is allowed to co-exist. If reached, new balloons cannot be
 	// created anymore.
-	MaxBalloons int `json:"MaxBalloons"`
+	MaxBalloons Limit `json:"MaxBalloons"`
 	// PreferSpreadingPods: containers of the same pod may be
 	// placed on separate balloons. The default is false: prefer
 	// placing containers of a pod to the same balloon(s).
