@@ -397,8 +397,8 @@ vm-monitor() { # script API
 vm-wait-process() { # script API
     # Usage: vm-wait-process [--timeout TIMEOUT] [--pidfile PIDFILE] PROCESS
     #
-    # Wait for a PROCESS (string) to appear in process list (ps -A output).
-    # If pidfile parameter is given, we also check that the process has the file open.
+    # Wait for a PROCESS (string) to appear in process list (pidof output).
+    # If pidfile parameter is given, we also check that the process has that file open.
     # The default TIMEOUT is 30 seconds.
     local process timeout pidfile invalid
     timeout=30
@@ -423,7 +423,7 @@ vm-wait-process() { # script API
         return 1
     fi
     process="$1"
-    vm-run-until --timeout "$timeout" "ps -A | grep -q \"$process\"" || error "timeout while waiting $process"
+    vm-run-until --timeout "$timeout" "pidof -q \"$process\"" || error "timeout while waiting $process"
 
     # As we first wait for the process, and then wait for the pidfile (if enabled)
     # we might wait longer than expected. Accept that anomaly atm.
