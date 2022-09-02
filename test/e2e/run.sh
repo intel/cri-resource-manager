@@ -905,14 +905,14 @@ create() { # script API
     #   namespace: namespace to which instances are created
     #   wait: condition to be waited for (see kubectl wait --for=condition=).
     #         If empty (""), skip waiting. The default is wait="Ready".
-    #   wait_t: wait timeout. The default is wait_t=60s.
+    #   wait_t: wait timeout. The default is wait_t=240s.
     local template_file
     template_file=$(resolve-template "$1.yaml" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
     local namespace_args
     local template_kind
     template_kind=$(awk '/kind/{print tolower($2)}' < "$template_file")
     local wait=${wait-Ready}
-    local wait_t=${wait_t-60s}
+    local wait_t=${wait_t-240s}
     local images
     local image
     local tag
