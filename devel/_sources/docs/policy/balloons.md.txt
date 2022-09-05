@@ -84,6 +84,9 @@ Balloons policy parameters:
     is always present, even if the balloons would not have any
     containers. The default is 0: if a balloon has no containers, it
     can be destroyed.
+  - `MaxBalloons` is the maximum number of balloons of this type that
+    is allowed to co-exist. The default is 0: creating new balloons is
+    not limited by the number of existing balloons.
   - `MaxCPUs` specifies the maximum number of CPUs in any balloon of
 	this type. Balloons will not be inflated larger than this. 0 means
 	unlimited.

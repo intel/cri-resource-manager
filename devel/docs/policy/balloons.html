@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-24-g9494f675 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-26-gfe6c0f65 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
@@ -189,6 +189,9 @@ pod annotations.</p></li>
 is always present, even if the balloons would not have any
 containers. The default is 0: if a balloon has no containers, it
 can be destroyed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MaxBalloons</span></code> is the maximum number of balloons of this type that
+is allowed to co-exist. The default is 0: creating new balloons is
+not limited by the number of existing balloons.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">MaxCPUs</span></code> specifies the maximum number of CPUs in any balloon of
 this type. Balloons will not be inflated larger than this. 0 means
 unlimited.</p></li>
