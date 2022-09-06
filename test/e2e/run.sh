@@ -98,6 +98,9 @@ usage() {
     echo "  VM configuration VARs: (effective when vm is not already configured)"
     echo "    topology: JSON to override NUMA node list used in tests."
     echo "             See: python3 ${DEMO_LIB_DIR}/topology2qemuopts.py --help"
+    echo "    qemu_cpumem: direct CPU and memory parameters to pass to qemu."
+    echo "             Should include at least -m MEMORY and -smp CPUCORES."
+    echo "             This parameter is mutually exclusive with topology."
     echo "    distro:  Linux distribution to be / already installed on vm."
     echo "             Supported values: centos-7, centos-8, debian-10, debian-sid"
     echo "                 fedora, fedora-33, opensuse-tumbleweed,"
@@ -1152,11 +1155,17 @@ omit_agent=${omit_agent:-0}
 omit_cri_resmgr=${omit_cri_resmgr:-0}
 use_host_images=${use_host_images:-0}
 py_consts="${py_consts:-''}"
-topology=${topology:-'[
-    {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
-    {"nvmem": "8G", "node-dist": {"5": 28, "0": 17}},
-    {"nvmem": "8G", "node-dist": {"2": 17}}
-    ]'}
+if [ -z "$topology" ]; then
+    if [ -n "$qemu_cpumem" ]; then
+        VM_QEMU_CPUMEM="$qemu_cpumem"
+    else
+        topology='[
+            {"mem": "1G", "cores": 1, "nodes": 2, "packages": 2, "node-dist": {"4": 28, "5": 28}},
+            {"nvmem": "8G", "node-dist": {"5": 28, "0": 17}},
+            {"nvmem": "8G", "node-dist": {"2": 17}}
+        ]'
+    fi
+fi
 code=${code:-"
 CPU=1 create guaranteed # creates pod 0, 1 CPU taken
 report allowed
