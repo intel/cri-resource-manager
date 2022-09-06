@@ -1,3 +1,10 @@
+cleanup() {
+    vm-command "kubectl delete pods --all --now"
+    return 0
+}
+
+cleanup
+
 terminate cri-resmgr
 cri_resmgr_cfg=${TEST_DIR}/balloons-maxballoons.cfg launch cri-resmgr
 
@@ -53,6 +60,8 @@ if ! grep -q 'no suitable balloon instance available' <<< "$COMMAND_OUTPUT"; the
     error "could not find 'no suitable balloon instance available' in pod6 description"
 fi
 vm-command "kubectl delete pod pod5 --now"
+
+cleanup
 
 # Try starting cri-resmgr with a configuration where MinBalloons and
 # MaxBalloons of the same balloon type contradict.
