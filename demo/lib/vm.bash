@@ -395,17 +395,22 @@ vm-monitor() { # script API
 }
 
 vm-wait-process() { # script API
-    # Usage: vm-wait-process [--timeout TIMEOUT] PROCESS
+    # Usage: vm-wait-process [--timeout TIMEOUT] [--pidfile PIDFILE] PROCESS
     #
-    # Wait for a PROCESS (string) to appear in process list (ps -A output).
+    # Wait for a PROCESS (string) to appear in process list (pidof output).
+    # If pidfile parameter is given, we also check that the process has that file open.
     # The default TIMEOUT is 30 seconds.
-    local process timeout invalid
+    local process timeout pidfile invalid
     timeout=30
     while [ "${1#-}" != "$1" ] && [ -n "$1" ]; do
         case "$1" in
             --timeout)
                 timeout="$2"
-                shift; shift
+                shift 2
+                ;;
+            --pidfile)
+                pidfile="$2"
+                shift 2
                 ;;
             *)
                 invalid="${invalid}${invalid:+,}\"$1\""
@@ -418,7 +423,14 @@ vm-wait-process() { # script API
         return 1
     fi
     process="$1"
-    vm-run-until --timeout "$timeout" "ps -A | grep -q \"$process\""
+    vm-run-until --timeout "$timeout" "pidof -q \"$process\"" || error "timeout while waiting $process"
+
+    # As we first wait for the process, and then wait for the pidfile (if enabled)
+    # we might wait longer than expected. Accept that anomaly atm.
+    if [ ! -z "$pidfile" ]; then
+	vm-run-until --timeout $timeout "[ ! -z \"\$(fuser $pidfile 2>/dev/null)\" ]" || error "timeout while waiting $pidfile"
+	vm-run-until --timeout $timeout "[ \$(fuser $pidfile 2>/dev/null) -eq \$(pidof $process) ]" || error "timeout while waiting $process and $pidfile"
+    fi
 }
 
 vm-run-until() { # script API
@@ -997,7 +1009,7 @@ vm-create-singlenode-cluster() {
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/control-plane-"
     vm-command "kubectl taint nodes --all node-role.kubernetes.io/master-"
     vm-install-cni-"$(distro-k8s-cni)"
-    if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=120s"; then
+    if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=240s"; then
         command-error "kubectl waiting for node readiness timed out"
     fi
 }
@@ -1007,14 +1019,19 @@ vm-create-cluster() {
     if ! grep -q "initialized successfully" <<< "$COMMAND_OUTPUT"; then
         command-error "kubeadm init failed"
     fi
-    vm-command "mkdir -p \$HOME/.kube"
-    vm-command "cp /etc/kubernetes/admin.conf \$HOME/.kube/config"
+
+    user="$(vm-ssh-user)"
+
+    vm-command "mkdir -p ~$user/.kube"
+    vm-command "cp /etc/kubernetes/admin.conf ~$user/.kube/config"
+    vm-command "chown -R $user:$user ~$user/.kube"
     vm-command "mkdir -p ~root/.kube"
     vm-command "cp /etc/kubernetes/admin.conf ~root/.kube/config"
 }
 
 vm-destroy-cluster() {
-    vm-command "yes | kubeadm reset; rm -f \$HOME/.kube/config ~root/.kube/config /etc/kubernetes"
+    user="$(vm-ssh-user)"
+    vm-command "yes | kubeadm reset; rm -f ~$user/.kube/config ~root/.kube/config /etc/kubernetes"
 }
 
 vm-install-cni-cilium() {

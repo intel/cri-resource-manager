@@ -530,9 +530,10 @@ launch() { # script API
                 cri_resmgr_mode="-use-nri-plugin"
             fi
             launch_cmd="cri-resmgr $cri_resmgr_mode $cri_resmgr_config_option $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
+            vm-command-q "rm -f $cri_resmgr_pidfile"
             vm-command-q "echo '$launch_cmd' > cri-resmgr.launch.sh ; rm -f cri-resmgr.output.txt"
             vm-command "$launch_cmd  >cri-resmgr.output.txt 2>&1 &"
-            sleep 2 >/dev/null 2>&1
+            vm-wait-process --timeout 30 --pidfile "$cri_resmgr_pidfile" cri-resmgr
             vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
                 command-error "launching cri-resmgr failed with FATAL ERROR"
             }
@@ -550,7 +551,7 @@ launch() { # script API
             launch_cmd="NODE_NAME=\$(hostname) cri-resmgr-agent -kubeconfig /root/.kube/config $cri_resmgr_agent_extra_args"
             vm-command-q "echo '$launch_cmd' >cri-resmgr-agent.launch.sh; rm -f cri-resmgr-agent.output.txt"
             vm-command "$launch_cmd >cri-resmgr-agent.output.txt 2>&1 &"
-            sleep 2 >/dev/null 2>&1
+            vm-wait-process --timeout 30 cri-resmgr-agent
             vm-command "grep 'FATAL ERROR' cri-resmgr-agent.output.txt" >/dev/null 2>&1 &&
                 command-error "launching cri-resmgr-agent failed with FATAL ERROR"
             vm-command "fuser ${cri_resmgr_agent_sock}" >/dev/null 2>&1 ||
@@ -563,7 +564,7 @@ launch() { # script API
             vm-command "cp \"$(basename "$cri_resmgr_cfg")\" /etc/cri-resmgr/fallback.cfg"
             vm-command "systemctl daemon-reload ; systemctl start cri-resource-manager" ||
                 command-error "systemd failed to start cri-resource-manager"
-            sleep 5
+            vm-wait-process --timeout 30 cri-resmgr
             vm-command "systemctl is-active cri-resource-manager" || {
                 vm-command "systemctl status cri-resource-manager"
                 command-error "cri-resource-manager did not become active after systemctl start"
@@ -904,14 +905,14 @@ create() { # script API
     #   namespace: namespace to which instances are created
     #   wait: condition to be waited for (see kubectl wait --for=condition=).
     #         If empty (""), skip waiting. The default is wait="Ready".
-    #   wait_t: wait timeout. The default is wait_t=60s.
+    #   wait_t: wait timeout. The default is wait_t=240s.
     local template_file
     template_file=$(resolve-template "$1.yaml" "$TEST_DIR" "$TOPOLOGY_DIR" "$POLICY_DIR" "$SCRIPT_DIR")
     local namespace_args
     local template_kind
     template_kind=$(awk '/kind/{print tolower($2)}' < "$template_file")
     local wait=${wait-Ready}
-    local wait_t=${wait_t-60s}
+    local wait_t=${wait_t-240s}
     local images
     local image
     local tag
