@@ -234,7 +234,11 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 	m.Lock()
 	defer m.Unlock()
 
-	pod := m.cache.InsertPod(podID, request, nil)
+	pod, err := m.cache.InsertPod(podID, request, nil)
+	if err != nil {
+		m.Error("%s: failed to insert new pod to cache: %v", method, err)
+		return nil, resmgrError("%s: failed to insert new pod to cache: %v", method, err)
+	}
 	m.updateIntrospection()
 
 	// search for any lingering old version and clean up if found

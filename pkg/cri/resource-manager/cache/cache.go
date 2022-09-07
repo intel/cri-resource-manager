@@ -518,7 +518,7 @@ type Cachable interface {
 // itself upon startup.
 type Cache interface {
 	// InsertPod inserts a pod into the cache, using a runtime request or reply.
-	InsertPod(id string, msg interface{}, status *PodStatus) Pod
+	InsertPod(id string, msg interface{}, status *PodStatus) (Pod, error)
 	// DeletePod deletes a pod from the cache.
 	DeletePod(id string) Pod
 	// LookupPod looks up a pod in the cache.
@@ -853,7 +853,7 @@ func (cch *cache) createCacheID(c *container) string {
 }
 
 // Insert a pod into the cache.
-func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) Pod {
+func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) (Pod, error) {
 	var err error
 
 	p := &pod{cache: cch, ID: id}
@@ -869,14 +869,14 @@ func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) Pod {
 
 	if err != nil {
 		cch.Error("failed to insert pod %s: %v", id, err)
-		return nil
+		return nil, err
 	}
 
 	cch.Pods[p.ID] = p
 
 	cch.Save()
 
-	return p
+	return p, nil
 }
 
 // Delete a pod from the cache.
@@ -1030,8 +1030,13 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string
 		valid[item.Id] = struct{}{}
 		if _, ok := cch.Pods[item.Id]; !ok {
 			cch.Debug("inserting discovered pod %s...", item.Id)
-			pod := cch.InsertPod(item.Id, item, status[item.Id])
-			add = append(add, pod)
+			pod, err := cch.InsertPod(item.Id, item, status[item.Id])
+			if err != nil {
+				cch.Error("failed to insert discovered pod %s to cache: %v",
+					item.Id, err)
+			} else {
+				add = append(add, pod)
+			}
 		}
 	}
 
