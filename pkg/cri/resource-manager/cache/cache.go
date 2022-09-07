@@ -504,7 +504,6 @@ func (pm *PageMigrate) Clone() *PageMigrate {
 	return c
 }
 
-//
 // Cachable is an interface opaque cachable data must implement.
 type Cachable interface {
 	// Set value (via a pointer receiver) to the object.
@@ -513,7 +512,6 @@ type Cachable interface {
 	Get() interface{}
 }
 
-//
 // Cache is the primary interface exposed for tracking pods and containers.
 //
 // Cache tracks pods and containers in the runtime, mostly by processing CRI
