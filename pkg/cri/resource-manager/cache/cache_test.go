@@ -107,7 +107,11 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 	fp.podCfg = req.Config
 
 	cch.(*cache).Debug("*** => creating Pod: %+v\n", *req)
-	p := cch.InsertPod(fp.id, req, nil)
+	p, err := cch.InsertPod(fp.id, req, nil)
+	if err != nil {
+		cch.(*cache).Debug("*** <= created Pod FAILED: %+v\n", err)
+		return nil, err
+	}
 	cch.(*cache).Debug("*** <= created Pod: %+v\n", *p.(*pod))
 	return p, nil
 }
