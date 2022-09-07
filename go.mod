@@ -6,6 +6,7 @@ require (
 	contrib.go.opencensus.io/exporter/jaeger v0.2.1
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
 	github.com/cilium/ebpf v0.7.0
+	github.com/containerd/nri v0.2.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.9
@@ -36,7 +37,7 @@ require (
 	cloud.google.com/go/compute v1.12.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.1 // indirect
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab // indirect
-	github.com/Microsoft/go-winio v0.5.1 // indirect
+	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/aws/aws-sdk-go v1.38.49 // indirect
@@ -79,7 +80,7 @@ require (
 	github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989 // indirect
 	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
-	github.com/moby/sys/mountinfo v0.6.0 // indirect
+	github.com/moby/sys/mountinfo v0.6.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mrunalp/fileutils v0.5.0 // indirect
@@ -127,7 +128,11 @@ require (
 )
 
 replace (
+	// Temporarily divert repo for updated/extended NRI.
+	github.com/containerd/nri => github.com/klihub/nri v0.0.0-20221114172412-30d37d9e0aa3
+
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0 => ./pkg/topology
+	github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
 
 	go.opentelemetry.io/contrib => go.opentelemetry.io/contrib v0.20.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0
