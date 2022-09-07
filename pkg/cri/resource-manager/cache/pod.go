@@ -75,7 +75,12 @@ func (p *pod) fromListResponse(pod *cri.PodSandbox, status *PodStatus) error {
 	p.State = PodState(int32(pod.State))
 	p.Labels = pod.Labels
 	p.Annotations = pod.Annotations
-	p.CgroupParent = status.CgroupParent
+
+	if status == nil {
+		p.cache.Error("pod %s has no associated status query data", p.ID)
+	} else {
+		p.CgroupParent = status.CgroupParent
+	}
 
 	if err := p.discoverQOSClass(); err != nil {
 		p.cache.Error("%v", err)
@@ -306,7 +311,8 @@ func (p *pod) GetCgroupParentDir() string {
 // discover a pod's QoS class by parsing the cgroup parent directory.
 func (p *pod) discoverQOSClass() error {
 	if p.CgroupParent == "" {
-		return cacheError("%s: unknown cgroup parent ", p.ID)
+		p.QOSClass = v1.PodQOSBestEffort
+		return cacheError("%s: unknown cgroup parent/QoS class", p.ID)
 	}
 
 	dirs := strings.Split(p.CgroupParent[1:], "/")

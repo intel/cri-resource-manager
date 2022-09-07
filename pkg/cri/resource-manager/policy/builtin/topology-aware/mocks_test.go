@@ -656,7 +656,7 @@ type mockCache struct {
 	returnValue2ForLookupContainer bool
 }
 
-func (m *mockCache) InsertPod(string, interface{}, *cache.PodStatus) cache.Pod {
+func (m *mockCache) InsertPod(string, interface{}, *cache.PodStatus) (cache.Pod, error) {
 	panic("unimplemented")
 }
 func (m *mockCache) DeletePod(string) cache.Pod {
