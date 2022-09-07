@@ -26,11 +26,16 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config/api/v1"
+	v1 "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config/api/v1"
 	"github.com/intel/cri-resource-manager/pkg/log"
 
 	"encoding/json"
+
 	extapi "github.com/intel/cri-resource-manager/pkg/apis/resmgr/v1alpha1"
+)
+
+const (
+	SocketDisabled = "disabled"
 )
 
 // SetConfigCb is a callback function for a SetConfig request.
@@ -48,6 +53,7 @@ type Server interface {
 // server implements Server.
 type server struct {
 	log.Logger
+	socket          string          // configured socket
 	sync.Mutex                      // lock for concurrent per-request goroutines.
 	server          *grpc.Server    // gRPC server instance
 	setConfigCb     SetConfigCb     // configuration update notification callback
@@ -66,6 +72,11 @@ func NewConfigServer(configCb SetConfigCb, adjustmentCb SetAdjustmentCb) (Server
 
 // Start runs server instance.
 func (s *server) Start(socket string) error {
+	if socket == SocketDisabled || socket == "" {
+		s.Info("config-server is disabled...,")
+		return nil
+	}
+
 	// Make sure we have a directory for the socket
 	if err := os.MkdirAll(filepath.Dir(socket), 0700); err != nil {
 		return serverError("failed to create directory for socket %s: %v",

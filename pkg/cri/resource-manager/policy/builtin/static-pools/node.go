@@ -48,7 +48,7 @@ func newNodeUpdater(agent agent.Interface) *nodeUpdater {
 func (u *nodeUpdater) start() error {
 	u.Info("starting node updater")
 
-	if u.agent == nil {
+	if u.agent == nil || u.agent.IsDisabled() {
 		return stpError("cri-resmgr-agent connection required")
 	}
 
