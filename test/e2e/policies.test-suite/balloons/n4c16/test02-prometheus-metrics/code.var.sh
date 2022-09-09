@@ -1,5 +1,12 @@
 # This test verifies prometheus metrics from the balloons policy.
 
+cleanup() {
+    vm-command "kubectl delete pods --all --now"
+    return 0
+}
+
+cleanup
+
 # Launch cri-resmgr with wanted metrics update interval and a
 # configuration that opens the instrumentation http server.
 terminate cri-resmgr
@@ -74,3 +81,5 @@ verify-metrics-has-line 'balloon="fast-dualcore\[0\]".*pod5c0.* 4'
 # # Re-launch cri-resmgr with test suite default parameters
 # terminate cri-resmgr
 # launch cri-resmgr
+
+cleanup
