@@ -763,6 +763,10 @@ bin/memtierd: $(wildcard cmd/memtierd/*.go) \
 
 bin/meme: scripts/testing/meme.go
 	$(GO_BUILD) $(GCFLAGS) -o $@ $<
+
+bin/shmeme: scripts/testing/shmeme.c
+	$(CC) -o0 -g -static -o $@ $<
+
 #
 # rules to run go generators
 #
