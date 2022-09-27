@@ -40,7 +40,7 @@
         }                                                               \
     }                                                                   \
     if (strcmp(cmd, #const_name) == 0) {                                \
-        SHOWVAR(fmt, const_name);                                       \
+        printf(#const_name ": " fmt "\n", const_name);                  \
         cmd_handled = 1;                                                \
     }                                                                   \
     if (cmd_handled) { cmd_handled = 0; continue; }
