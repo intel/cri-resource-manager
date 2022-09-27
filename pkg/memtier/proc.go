@@ -382,15 +382,15 @@ func (f *procPagemapFile) SetReadahead(pages int) {
 // every matching page in the address range.
 //
 // Parameters:
-// - addressRanges includes the address ranges from which pages
-//   are searched from.
-// - pageAttributes defines attributes that found pages must or must
-//   not have. Value 0 matches all pages.
-// - handlePage(pagemapBits, pageAddr) is called for
-//   matching pages. It returns an integer:
-//       0 (continue): ForEachPage continues reading the next page attributes.
-//       -1 (break):   ForEachPage returns immediately.
-//       n > 0 (skip): ForEachPage will skip reading next n pages.
+//   - addressRanges includes the address ranges from which pages
+//     are searched from.
+//   - pageAttributes defines attributes that found pages must or must
+//     not have. Value 0 matches all pages.
+//   - handlePage(pagemapBits, pageAddr) is called for
+//     matching pages. It returns an integer:
+//     0 (continue): ForEachPage continues reading the next page attributes.
+//     -1 (break):   ForEachPage returns immediately.
+//     n > 0 (skip): ForEachPage will skip reading next n pages.
 func (f *procPagemapFile) ForEachPage(addressRanges []AddrRange, pageAttributes uint64, handlePage func(uint64, uint64) int) error {
 	// Filter pages based on pagemap bits without calling handlePage.
 	// TODO: this is not complete!
@@ -477,6 +477,7 @@ func (f *procPagemapFile) ForEachPage(addressRanges []AddrRange, pageAttributes 
 func procMaps(pid int) ([]AddrRange, error) {
 	pageCanBeInAnonymous := true
 	pageCanBeInHeap := true
+	pageCanBeInFile := false // TODO: should be configurable
 
 	addressRanges := make([]AddrRange, 0)
 	sPid := strconv.Itoa(pid)
@@ -524,6 +525,11 @@ func procMaps(pid int) ([]AddrRange, error) {
 		// 55d74cf13000 default file=/usr/bin/python3.8 anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
 		// 55d74e76d000 default heap anon=471 dirty=471 active=0 N0=471 kernelpagesize_kB=4
 		// 7f3bcfe69000 default anon=524289 dirty=524289 active=0 N0=257944 N1=266345 kernelpagesize_kB=4
+		// // next from: shmget(IPC_PRIVATE, 1000000, IPC_CREAT|IPC_EXCL|SHM_HUGETLB|0600) = 10
+		// 7f0ca5000000 default file=/SYSV00000000\040(deleted) huge dirty=1 N1=1 kernelpagesize_kB=2048
+		// // next from: shmget(IPC_PRIVATE, 10000000, IPC_CREAT|SHM_HUGETLB|0600) = 11
+		// 7f0ca4600000 default file=/SYSV00000000\040(deleted) huge dirty=5 N1=5 kernelpagesize_kB=2048
+
 		tokens := strings.Split(line, " ")
 		if len(tokens) < 3 {
 			continue
@@ -540,7 +546,8 @@ func procMaps(pid int) ([]AddrRange, error) {
 		// to AddrRange{} structs so that they can be filtered later on
 		// for instance ar.IsDirty().OnNodes(2, 3)
 		if !(pageCanBeInHeap && strings.Contains(attrs, "heap") ||
-			pageCanBeInAnonymous && strings.Contains(attrs, "anon=")) {
+			pageCanBeInAnonymous && strings.Contains(attrs, "anon=") ||
+			pageCanBeInFile && strings.Contains(attrs, "file=")) {
 			continue
 		}
 		startAddr, err := strconv.ParseUint(tokens[0], 16, 64)
