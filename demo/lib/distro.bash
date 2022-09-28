@@ -923,7 +923,7 @@ default-setup-proxies() {
         return 0
     fi
 
-    local file scope="" append="--append" hn
+    local file scope="" append="--append" hn ext_no_proxy
     hn="$(vm-command-q hostname)"
 
     local master_node_ip_comma=""
@@ -933,16 +933,18 @@ default-setup-proxies() {
         master_node_ip_comma=${master_user_ip/*@},
     fi
 
+    ext_no_proxy="$master_node_ip_comma$VM_IP,10.0.0.0/8,$CNI_SUBNET,$hn,.svc,.internal,192.168.0.0/16"
+
     for file in /etc/environment /etc/profile.d/proxy.sh; do
         cat <<EOF |
 ${scope}http_proxy=$http_proxy
 ${scope}https_proxy=$https_proxy
 ${scope}ftp_proxy=$ftp_proxy
-${scope}no_proxy=$no_proxy,$master_node_ip_comma$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
+${scope}no_proxy=$no_proxy,$ext_no_proxy
 ${scope}HTTP_PROXY=$http_proxy
 ${scope}HTTPS_PROXY=$https_proxy
 ${scope}FTP_PROXY=$ftp_proxy
-${scope}NO_PROXY=$no_proxy,$master_node_ip_comma$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
+${scope}NO_PROXY=$no_proxy,$ext_no_proxy
 EOF
       vm-pipe-to-file $append $file
       scope="export "
@@ -954,7 +956,7 @@ EOF
 [Service]
 Environment=HTTP_PROXY=$http_proxy
 Environment=HTTPS_PROXY=$https_proxy
-Environment=NO_PROXY=$no_proxy,$master_node_ip_comma$VM_IP,10.96.0.0/12,$CNI_SUBNET,$hn,.svc
+Environment=NO_PROXY=$no_proxy,$ext_no_proxy
 EOF
         vm-pipe-to-file $file
     done
@@ -966,7 +968,7 @@ EOF
         "default": {
             "httpProxy": "$http_proxy",
             "httpsProxy": "$https_proxy",
-            "noProxy": "$no_proxy,$master_node_ip_comma$VM_IP,$hn"
+            "noProxy": "$no_proxy,$ext_no_proxy"
         }
     }
 }
