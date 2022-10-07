@@ -24,7 +24,7 @@ import (
 
 	"github.com/intel/goresctrl/pkg/rdt"
 
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
+	resmgr "github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 
@@ -43,9 +43,21 @@ func main() {
 
 	printConfig := flag.Bool("print-config", false, "Print configuration and exit.")
 	listPolicies := flag.Bool("list-policies", false, "List available policies.")
+	checkConfig := flag.String("check-config", "", "Check configuration and exit.")
 	flag.Parse()
 
 	switch {
+	case *checkConfig != "":
+		if err := config.SetConfigFromFile(*checkConfig); err != nil {
+			fmt.Printf("validation error: %s\n", err)
+			os.Exit(1)
+		}
+		if *printConfig {
+			config.Print(nil)
+		}
+		fmt.Println("config ok")
+		os.Exit(0)
+
 	case *printConfig:
 		config.Print(nil)
 		os.Exit(0)
