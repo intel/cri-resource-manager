@@ -25,6 +25,7 @@ import (
 
 // Options captures our command line parameters.
 type options struct {
+	HostRoot              string
 	ImageSocket           string
 	RuntimeSocket         string
 	RelaySocket           string
@@ -54,6 +55,9 @@ const (
 
 // Register us for command line option processing.
 func init() {
+	flag.StringVar(&opt.HostRoot, "host-root", "",
+		"Directory prefix under which the host's sysfs, etc. are mounted.")
+
 	flag.StringVar(&opt.RuntimeSocket, "runtime-socket", sockets.Containerd,
 		"Unix domain socket path where CRI runtime service requests should be relayed to.")
 	flag.StringVar(&opt.ImageSocket, "image-socket", relay.DefaultImageSocket,
