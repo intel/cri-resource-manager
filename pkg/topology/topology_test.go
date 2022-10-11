@@ -31,9 +31,9 @@ func setupTestEnv(t *testing.T) func() {
 	if path, err := filepath.EvalSymlinks(pwd); err == nil {
 		pwd = path
 	}
-	mockRoot = pwd + "/testdata"
+	SetSysRoot(pwd + "/testdata")
 	teardown := func() {
-		mockRoot = ""
+		SetSysRoot("")
 	}
 	return teardown
 }
@@ -163,7 +163,7 @@ func TestGetDevicesFromVirtual(t *testing.T) {
 		{
 			name:        "vfio",
 			input:       "/sys/devices/virtual/vfio/42",
-			output:      []string{mockRoot + "/sys/devices/pci0000:00/0000:00:02.0"},
+			output:      []string{sysRoot + "/sys/devices/pci0000:00/0000:00:02.0"},
 			expectedErr: false,
 		},
 		{
@@ -281,10 +281,10 @@ func TestNewTopologyHints(t *testing.T) {
 		},
 		{
 			name:  "pci card1",
-			input: mockRoot + "/sys/devices/pci0000:00/0000:00:02.0/drm/card1",
+			input: sysRoot + "/sys/devices/pci0000:00/0000:00:02.0/drm/card1",
 			output: Hints{
-				mockRoot + "/sys/devices/pci0000:00/0000:00:02.0": Hint{
-					Provider: mockRoot + "/sys/devices/pci0000:00/0000:00:02.0",
+				sysRoot + "/sys/devices/pci0000:00/0000:00:02.0": Hint{
+					Provider: sysRoot + "/sys/devices/pci0000:00/0000:00:02.0",
 					CPUs:     "0-7",
 					NUMAs:    "",
 					Sockets:  ""},
