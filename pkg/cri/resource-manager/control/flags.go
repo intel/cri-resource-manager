@@ -127,5 +127,5 @@ func (o *options) Validate() error {
 
 // Register us for configuration handling.
 func init() {
-	config.Register("resource-manager.control", "Resource control.", opt, defaultOptions)
+	config.Register("resource-manager.control", opt)
 }

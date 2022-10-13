@@ -328,5 +328,5 @@ func (c *config) Validate() error {
 // Register us as a controller.
 func init() {
 	control.Register(CPUController, "CPU controller", getCPUController())
-	pkgcfg.Register(ConfigModuleName, "CPU control", getCPUController().config, getCPUController().defaultOptions)
+	pkgcfg.Register(ConfigModuleName, getCPUController().config)
 }

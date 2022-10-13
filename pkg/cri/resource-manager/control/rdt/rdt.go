@@ -409,5 +409,5 @@ func (c *config) Validate() error {
 // Register us as a controller.
 func init() {
 	control.Register(RDTController, "RDT controller", getRDTController())
-	pkgcfg.Register(ConfigModuleName, "RDT control", getRDTController().opt, getRDTController().defaultOptions)
+	pkgcfg.Register(ConfigModuleName, getRDTController().opt)
 }

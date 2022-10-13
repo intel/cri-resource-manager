@@ -57,5 +57,5 @@ func (o *options) Validate() error {
 
 // Register us for configuration handling.
 func init() {
-	config.Register(PageMigrationConfigPath, PageMigrationDescription, opt, defaultOptions)
+	config.Register(PageMigrationConfigPath, opt)
 }
