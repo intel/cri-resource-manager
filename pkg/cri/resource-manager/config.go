@@ -20,6 +20,7 @@ import (
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	config "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 )
 
 const (
@@ -136,9 +137,32 @@ func (m *resmgr) activateConfig(kind string, v interface{}) error {
 		return resmgrError("%s configuration rejected: %w", kind, err)
 	}
 
-	err = m.policy.UpdateConfig()
-	if err != nil {
-		return resmgrError("failed to activate %s configuration: %w", kind, err)
+	picked := policy.ActivePolicy()
+	active := m.cache.GetActivePolicy()
+
+	if picked != active && active != "" {
+		if opt.DisablePolicySwitch {
+			return resmgrError("can't switch policy from %q to %q: switching disabled",
+				active, picked)
+		}
+
+		if err := m.cache.ResetActivePolicy(); err != nil {
+			return resmgrError("failed to reset cached policy %q: %w", active, err)
+		}
+
+		if err := m.policy.SwitchPolicy(); err != nil {
+			return resmgrError("failed to switch from %s to %s: %w",
+				active, picked, err)
+		}
+
+		m.cache.SetActivePolicy(picked)
+
+		m.Info("policy switched from %q to %q", active, picked)
+	} else {
+		err = m.policy.UpdateConfig()
+		if err != nil {
+			return resmgrError("failed to activate %s configuration: %w", kind, err)
+		}
 	}
 
 	err = m.control.UpdateConfig()

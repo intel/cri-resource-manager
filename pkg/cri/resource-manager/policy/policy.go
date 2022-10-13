@@ -142,10 +142,14 @@ type Backend interface {
 
 // Policy is the exposed interface for container resource allocations decision making.
 type Policy interface {
+	// ActivePolicy returns the name of the currently ative policy.
+	ActivePolicy() string
 	// Start starts up policy, prepare for serving resource management requests.
 	Start([]cache.Container, []cache.Container) error
 	// Stop the policy.
 	Stop()
+	// SwitchPolicy switches the active policy.
+	SwitchPolicy() error
 	// Sync synchronizes the state of the active policy.
 	Sync([]cache.Container, []cache.Container) error
 	// UpdateConfig activates an updated configuration.
@@ -201,11 +205,6 @@ var log logger.Logger = logger.NewLogger("policy")
 // Registered backends.
 var backends = make(map[string]*backend)
 
-// ActivePolicy returns the name of the policy to be activated.
-func ActivePolicy() string {
-	return opt.Policy
-}
-
 // NewPolicy creates a policy instance using the selected backend.
 func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 	sys, err := system.DiscoverSystem()
@@ -219,33 +218,19 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 		options: *o,
 	}
 
-	active, ok := backends[opt.Policy]
-	if !ok {
-		return nil, policyError("unknown policy '%s' requested", opt.Policy)
-	}
-
-	log.Info("activating '%s' policy...", active.name)
-
-	if len(opt.Available) != 0 {
-		log.Info("  with available resources:")
-		for n, r := range opt.Available {
-			log.Info("    - %s=%s", n, ConstraintToString(r))
-		}
-	}
-	if len(opt.Reserved) != 0 {
-		log.Info("  with reserved resources:")
-		for n, r := range opt.Reserved {
-			log.Info("    - %s=%s", n, ConstraintToString(r))
-		}
-	}
-
-	if log.DebugEnabled() {
-		logger.Get(opt.Policy).EnableDebug(true)
-	}
-
-	p.active = active.create(p)
+	p.createPolicy()
 
 	return p, nil
+}
+
+func (p *policy) SwitchPolicy() error {
+	p.active.Stop()
+	p.active = nil
+	p.createPolicy()
+
+	containers := p.cache.GetContainers()
+	cache.SortContainers(containers)
+	return p.Start(containers, containers)
 }
 
 func (p *policy) GetSystem() system.System {
@@ -448,6 +433,50 @@ func (p *policy) DescribeMetrics() []*prometheus.Desc {
 // CollectMetrics generates prometheus metrics from cached/polled policy-specific metrics data.
 func (p *policy) CollectMetrics(m Metrics) ([]prometheus.Metric, error) {
 	return p.active.CollectMetrics(m)
+}
+
+// ActivePolicy returns the name of the active policy.
+func (p *policy) ActivePolicy() string {
+	if p.active == nil {
+		return ""
+	}
+
+	return p.active.Name()
+}
+
+func (p *policy) createPolicy() error {
+	active, ok := backends[opt.Policy]
+	if !ok {
+		return policyError("unknown policy '%s' requested", opt.Policy)
+	}
+
+	log.Info("activating '%s' policy...", active.name)
+
+	if len(opt.Available) != 0 {
+		log.Info("  with available resources:")
+		for n, r := range opt.Available {
+			log.Info("    - %s=%s", n, ConstraintToString(r))
+		}
+	}
+	if len(opt.Reserved) != 0 {
+		log.Info("  with reserved resources:")
+		for n, r := range opt.Reserved {
+			log.Info("    - %s=%s", n, ConstraintToString(r))
+		}
+	}
+
+	if log.DebugEnabled() {
+		logger.Get(opt.Policy).EnableDebug(true)
+	}
+
+	p.active = active.create(p)
+
+	return nil
+}
+
+// ActivePolicy returns the name of the policy to be activated.
+func ActivePolicy() string {
+	return opt.Policy
 }
 
 // Register registers a policy backend.
