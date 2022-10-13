@@ -186,9 +186,22 @@ func defaultOptions() interface{} {
 	return o
 }
 
-// configNotify updates our runtime configuration.
-func (o *options) configNotify(event config.Event, source config.Source) error {
-	log.Info("message dumper configuration %v", event)
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = "message dumper" // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	o = &options{Config: DefaultConfig}
+	o.rules.parse(DefaultConfig)
+}
+
+func (o *options) Validate() error {
+	log.Info("new message dumper configuration")
 	log.Info(" * config: %s", o.Config)
 
 	rules := ruleset{}
@@ -210,6 +223,5 @@ func (o *options) configNotify(event config.Event, source config.Source) error {
 // Register us for command line parsing and configuration handling.
 func init() {
 	opt.rules.parse(opt.Config)
-	config.Register("dump", configHelp, opt, defaultOptions,
-		config.WithNotify(opt.configNotify))
+	config.Register("dump", configHelp, opt, defaultOptions)
 }

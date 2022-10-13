@@ -147,7 +147,7 @@ func (ft *filterTest) setup(train bool) *testlog {
 
 	// trigger reconfiguration
 	opt.Config = ft.config
-	opt.configNotify(config.UpdateEvent, config.ConfigFile)
+	opt.Validate(config.UpdateEvent, config.ConfigFile)
 
 	return logger
 }

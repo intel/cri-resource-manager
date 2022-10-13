@@ -44,6 +44,25 @@ func defaultOptions() interface{} {
 	return &options{}
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = "Block I/O class control" // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	*o = options{}
+}
+
+func (o *options) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
+}
+
 func init() {
 	pkgcfg.Register(ConfigModuleName, "Block I/O class control", opt, defaultOptions)
 }

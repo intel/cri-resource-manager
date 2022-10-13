@@ -171,39 +171,6 @@ func (m srcmap) clone() srcmap {
 	return o
 }
 
-// configNotify is the configuration change notification callback for options.
-func (o *options) configNotify(event pkgcfg.Event, src pkgcfg.Source) error {
-	deflog.Info("logger configuration %v", event)
-	deflog.Info(" * debugging: %s", o.Debug.String())
-	deflog.Info(" * log source: %v", o.LogSource)
-	deflog.InfoBlock(" * klog: ", "%s", o.Klog.String())
-
-	// On the first configuration update event, we record the current values
-	// of klog flags as the runtime defaults. Effectively this allows one to
-	// override the built-in defaults using klog command line options (or
-	// environment variables as interpreted by klogcontrol). The recorded
-	// defaults will also reflect any potential programmatic changes done by
-	// (mis-)using flag.Set() but there's not much we can do about that.
-	if defaultKlogFlags == nil {
-		defaultKlogFlags = klogctl.CurrentOptions()
-	}
-
-	if o.Klog == nil {
-		o.Klog = make(klogcontrol.Options)
-	}
-
-	// The behavior of the options.Klog map across updates is difficult
-	// to understand. To make it more user friendly we fill in runtime
-	// defaults for each unset entry (klog flags) here.
-	for flag, value := range defaultKlogFlags {
-		if _, ok := o.Klog[flag]; !ok {
-			o.Klog[flag] = value
-		}
-	}
-
-	return o.apply()
-}
-
 // apply applies the options to logging.
 func (o *options) apply() error {
 	log.Lock()
@@ -236,6 +203,58 @@ func defaultOptions() interface{} {
 	return o
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = "logging control" // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	*o = options{}
+
+	o.Debug.cloneFrom(defaultDebugFlags)
+	if defaultKlogFlags != nil {
+		o.Klog.CloneFrom(defaultKlogFlags)
+	} else {
+		o.Klog = klogctl.CurrentOptions()
+	}
+}
+
+func (o *options) Validate() error {
+	deflog.Info("new logger configuration")
+	deflog.Info(" * debugging: %s", o.Debug.String())
+	deflog.Info(" * log source: %v", o.LogSource)
+	deflog.InfoBlock(" * klog: ", "%s", o.Klog.String())
+
+	// On the first configuration update event, we record the current values
+	// of klog flags as the runtime defaults. Effectively this allows one to
+	// override the built-in defaults using klog command line options (or
+	// environment variables as interpreted by klogcontrol). The recorded
+	// defaults will also reflect any potential programmatic changes done by
+	// (mis-)using flag.Set() but there's not much we can do about that.
+	if defaultKlogFlags == nil {
+		defaultKlogFlags = klogctl.CurrentOptions()
+	}
+
+	if o.Klog == nil {
+		o.Klog = make(klogcontrol.Options)
+	}
+
+	// The behavior of the options.Klog map across updates is difficult
+	// to understand. To make it more user friendly we fill in runtime
+	// defaults for each unset entry (klog flags) here.
+	for flag, value := range defaultKlogFlags {
+		if _, ok := o.Klog[flag]; !ok {
+			o.Klog[flag] = value
+		}
+	}
+
+	return o.apply()
+}
+
 // Set up klog control, set pkg/config logger, register us for configuration handling.
 func init() {
 	klogctl = klogcontrol.Get()
@@ -265,6 +284,5 @@ func init() {
 		}
 	}
 
-	pkgcfg.Register(configModule, "logging control", opt, defaultOptions,
-		pkgcfg.WithNotify(opt.configNotify))
+	pkgcfg.Register(configModule, "log control", opt, defaultOptions)
 }

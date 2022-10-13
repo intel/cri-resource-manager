@@ -38,10 +38,10 @@ const (
 	// Testing is a trace configuration for testing.
 	Testing Sampling = 1.0
 
-	// defaultSampling is the default sampling frequency.
-	defaultSampling = "0"
+	// defaultSampling is the default sampling rate
+	defaultSampling = Disabled
 	// defaultReportPeriod is the default report period
-	defaultReportPeriod = "15s"
+	defaultReportPeriod = 15 * time.Second
 	// defaultJaegerCollector is the default Jaeger collector endpoint.
 	defaultJaegerCollector = ""
 	// defaultJaegerAgent is the default Jaeger agent endpoint.
@@ -49,7 +49,7 @@ const (
 	// defaultHTTPEndpoint is the default HTTP endpoint serving Prometheus /metrics.
 	defaultHTTPEndpoint = ""
 	// defaultPrometheusExport is the default state for Prometheus exporting.
-	defaultPrometheusExport = "false"
+	defaultPrometheusExport = false
 )
 
 // options encapsulates our configurable instrumentation parameters.
@@ -164,65 +164,65 @@ func parseEnv(name, defval string, parsefn func(string) error) {
 // defaultOptions returns a new options instance, all initialized to defaults.
 func defaultOptions() interface{} {
 	o := &options{}
-
-	type param struct {
-		defval  string
-		parsefn func(string) error
-	}
-
-	params := map[string]param{
-		"JAEGER_COLLECTOR": {
-			defaultJaegerCollector,
-			func(v string) error { o.JaegerCollector = v; return nil },
-		},
-		"JAEGER_AGENT": {
-			defaultJaegerAgent,
-			func(v string) error { o.JaegerAgent = v; return nil },
-		},
-		"HTTP_ENDPOINT": {
-			defaultHTTPEndpoint,
-			func(v string) error { o.HTTPEndpoint = v; return nil },
-		},
-		"PROMETHEUS_EXPORT": {
-			defaultPrometheusExport,
-			func(v string) error {
-				enabled, err := utils.ParseEnabled(v)
-				if err != nil {
-					return err
-				}
-				o.PrometheusExport = enabled
-				return nil
-			},
-		},
-		"SAMPLING_FREQUENCY": {
-			defaultSampling,
-			func(v string) error { return o.Sampling.Parse(v) },
-		},
-		"REPORT_PERIOD": {
-			defaultReportPeriod,
-			func(v string) error {
-				d, err := time.ParseDuration(v)
-				if err != nil {
-					return err
-				}
-				o.ReportPeriod = d
-				return nil
-			},
-		},
-	}
-
-	for envvar, p := range params {
-		parseEnv(envvar, p.defval, p.parsefn)
-	}
+	o.Reset()
 
 	return o
 }
 
-// configNotify is our configuration udpate notification handler.
-func configNotify(event config.Event, source config.Source) error {
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = "Instrumentation for traces and metrics." // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	*o = options{
+		JaegerCollector:  defaultJaegerCollector,
+		JaegerAgent:      defaultJaegerAgent,
+		HTTPEndpoint:     defaultHTTPEndpoint,
+		PrometheusExport: defaultPrometheusExport,
+		Sampling:         defaultSampling,
+		ReportPeriod:     defaultReportPeriod,
+	}
+
+	if v := os.Getenv("JAEGER_COLLECTOR"); v != "" {
+		o.JaegerCollector = v
+	}
+
+	if v := os.Getenv("HTTP_ENDPOINT"); v != "" {
+		o.HTTPEndpoint = v
+	}
+
+	if v := os.Getenv("PROMETHEUS_EXPORT"); v != "" {
+		if enabled, err := utils.ParseEnabled(v); err != nil {
+			log.Warn("invalid PROMETHEUS_EXPORT=%s: %v", v, err)
+		} else {
+			o.PrometheusExport = enabled
+		}
+	}
+
+	if v := os.Getenv("SAMPLING_FREQUENCY"); v != "" {
+		if err := o.Sampling.Parse(v); err != nil {
+			log.Warn("invalid SAMPLING_FREQUENCY=%s: %v", v, err)
+			o.Sampling = defaultSampling
+		}
+	}
+
+	if v := os.Getenv("REPORT_PERIOD"); v != "" {
+		if d, err := time.ParseDuration(v); err != nil {
+			log.Warn("invalid REPORT_PERIOD=%s: %v", err)
+		} else {
+			o.ReportPeriod = d
+		}
+	}
+}
+
+func (o *options) Validate() error {
 	log.Info("instrumentation configuration is now %v", opt)
 
-	log.Info("reconfiguring...")
 	if err := svc.reconfigure(); err != nil {
 		log.Error("failed to restart instrumentation: %v", err)
 	}
@@ -232,6 +232,5 @@ func configNotify(event config.Event, source config.Source) error {
 
 // Register us for for configuration handling.
 func init() {
-	config.Register("instrumentation", "Instrumentation for traces and metrics.",
-		opt, defaultOptions, config.WithNotify(configNotify))
+	config.Register("instrumentation", ConfigDescription, opt, defaultOptions)
 }
