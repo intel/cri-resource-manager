@@ -139,5 +139,5 @@ var podpoolsOptions = defaultPodpoolsOptions().(*PodpoolsOptions)
 
 // Register us for configuration handling.
 func init() {
-	pkgcfg.Register(PolicyPath, PolicyDescription, podpoolsOptions, defaultPodpoolsOptions)
+	pkgcfg.Register(PolicyPath, podpoolsOptions)
 }

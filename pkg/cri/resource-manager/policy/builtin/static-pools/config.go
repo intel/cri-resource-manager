@@ -270,5 +270,5 @@ func (c *config) Validate() error {
 
 // Register us for command line option processing and configuration management.
 func init() {
-	pkgcfg.Register(PolicyPath, PolicyDescription, conf, defaultConfig)
+	pkgcfg.Register(PolicyPath, conf)
 }

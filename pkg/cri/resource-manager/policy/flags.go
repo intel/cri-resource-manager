@@ -276,5 +276,5 @@ func (o *options) Validate() error {
 
 // Register us for configuration handling.
 func init() {
-	config.Register(ConfigPath, "Generic policy layer.", opt, defaultOptions)
+	config.Register(ConfigPath, opt)
 }

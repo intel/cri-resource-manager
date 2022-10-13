@@ -92,6 +92,6 @@ func (o *options) Reset() {
 
 // Register us for configuration handling.
 func init() {
-	config.Register(PolicyPath, PolicyDescription, opt, defaultOptions)
-	config.Register(AliasPath, PolicyDescription, aliasOpt, defaultOptions)
+	config.Register(PolicyPath, opt)
+	config.Register(AliasPath, aliasOpt)
 }

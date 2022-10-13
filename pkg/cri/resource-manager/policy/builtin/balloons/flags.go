@@ -169,5 +169,5 @@ func (bo *BalloonsOptions) UnmarshalJSON(data []byte) error {
 
 // Register us for configuration handling.
 func init() {
-	pkgcfg.Register(PolicyPath, PolicyDescription, balloonsOptions, defaultBalloonsOptions)
+	pkgcfg.Register(PolicyPath, balloonsOptions)
 }

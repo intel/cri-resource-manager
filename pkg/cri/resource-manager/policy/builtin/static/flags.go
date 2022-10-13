@@ -115,5 +115,5 @@ func (o *options) Validate() error {
 
 // Register us for configuration handling.
 func init() {
-	config.Register(PolicyPath, PolicyDescription, opt, defaultOptions)
+	config.Register(PolicyPath, opt)
 }
