@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/blockio"
-	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/rdt"
@@ -67,24 +66,23 @@ type Options struct {
 	SendEvent SendEventFn
 }
 
-// BackendOptions describes the options for a policy backend instance
-type BackendOptions struct {
-	// System provides system/HW/topology information
-	System system.System
-	// System state/cache
-	Cache cache.Cache
-	// Resource availibility constraint
-	Available ConstraintSet
-	// Resource reservation constraint
-	Reserved ConstraintSet
-	// Client interface to cri-resmgr agent
-	AgentCli agent.Interface
-	// SendEvent is the function for delivering events up to the resource manager.
-	SendEvent SendEventFn
+type BackendServices interface {
+	// GetSystem provides system/HW/topology information for backends.
+	GetSystem() system.System
+	// GetCache returns the resource manager cache in use.
+	GetCache() cache.Cache
+	// GetAvailableResources returns the resources available for the policy.
+	GetAvailableResources() ConstraintSet
+	// GetReservedResources returns the resources reserved for kube-system.
+	GetReservedResources() ConstraintSet
+	// GetAgentClient returns the interface for interacting with the agent.
+	GetAgentClient() agent.Interface
+	// SendEvent sends a policy-sepcific event up to the resource manager.
+	SendEvent(interface{}) error
 }
 
 // CreateFn is the type for functions used to create a policy instance.
-type CreateFn func(*BackendOptions) Backend
+type CreateFn func(BackendServices) Backend
 
 // SendEventFn is the type for a function to send events back to the resource manager.
 type SendEventFn func(interface{}) error
@@ -104,7 +102,6 @@ const (
 //
 // A backends operates in a set of policy domains. Currently each policy domain
 // corresponds to some particular hardware resource (CPU, memory, cache, etc).
-//
 type Backend interface {
 	// Name gets the well-known name of this policy.
 	Name() string
@@ -202,9 +199,6 @@ var log logger.Logger = logger.NewLogger("policy")
 // Registered backends.
 var backends = make(map[string]*backend)
 
-// Options passed to created/activated backend.
-var backendOpts = &BackendOptions{}
-
 // ActivePolicy returns the name of the policy to be activated.
 func ActivePolicy() string {
 	return opt.Policy
@@ -250,17 +244,34 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 			logger.Get(opt.Policy).EnableDebug(true)
 		}
 
-		backendOpts.Cache = p.cache
-		backendOpts.System = p.system
-		backendOpts.Available = opt.Available
-		backendOpts.Reserved = opt.Reserved
-		backendOpts.AgentCli = o.AgentCli
-		backendOpts.SendEvent = o.SendEvent
-
-		p.active = active.create(backendOpts)
+		p.active = active.create(p)
 	}
 
 	return p, nil
+}
+
+func (p *policy) GetSystem() system.System {
+	return p.system
+}
+
+func (p *policy) GetCache() cache.Cache {
+	return p.cache
+}
+
+func (p *policy) GetAvailableResources() ConstraintSet {
+	return opt.Available
+}
+
+func (p *policy) GetReservedResources() ConstraintSet {
+	return opt.Reserved
+}
+
+func (p *policy) GetAgentClient() agent.Interface {
+	return p.options.AgentCli
+}
+
+func (p *policy) SendEvent(e interface{}) error {
+	return p.options.SendEvent(e)
 }
 
 // Start starts up policy, preparing it for resving requests.
@@ -490,12 +501,4 @@ func ConstraintToString(value Constraint) string {
 	default:
 		return fmt.Sprintf("<???(type:%T)>", value)
 	}
-}
-
-// configNotify is the configuration change notification callback for the genric policy layer.
-func configNotify(event config.Event, src config.Source) error {
-	// let the active policy know of changes
-	backendOpts.Available = opt.Available
-	backendOpts.Reserved = opt.Reserved
-	return nil
 }

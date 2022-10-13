@@ -32,6 +32,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
@@ -58,8 +59,9 @@ const (
 
 // podpools contains configuration and runtime attributes of the podpools policy
 type podpools struct {
-	options         *policyapi.BackendOptions // configuration common to all policies
+	services        policy.BackendServices    // backend policy interface
 	ppoptions       PodpoolsOptions           // podpools-specific configuration
+	system          system.System             // system/HW info
 	cch             cache.Cache               // cri-resmgr cache
 	allowed         cpuset.CPUSet             // bounding set of CPUs we're allowed to use
 	reserved        cpuset.CPUSet             // system-/kube-reserved CPUs
@@ -110,10 +112,11 @@ func (pool Pool) PrettyName() string {
 }
 
 // CreatePodpoolsPolicy creates a new policy instance.
-func CreatePodpoolsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
+func CreatePodpoolsPolicy(services policy.BackendServices) policy.Backend {
 	p := &podpools{
-		options: policyOptions,
-		cch:     policyOptions.Cache,
+		services: services,
+		system:   services.GetSystem(),
+		cch:      services.GetCache(),
 		reservedPoolDef: &PoolDef{
 			Name:    reservedPoolDefName,
 			MaxPods: 0,
@@ -123,20 +126,20 @@ func CreatePodpoolsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
 			MaxPods: 0,
 		},
 		podMaxMilliCPU: make(map[string]int64),
-		cpuAllocator:   cpuallocator.NewCPUAllocator(policyOptions.System),
+		cpuAllocator:   cpuallocator.NewCPUAllocator(services.GetSystem()),
 	}
 	log.Info("creating %s policy...", PolicyName)
 	// Handle common policy options: AvailableResources and ReservedResources.
 	// p.allowed: CPUs available for the policy
-	if allowed, ok := policyOptions.Available[policyapi.DomainCPU]; ok {
+	if allowed, ok := services.GetAvailableResources()[policyapi.DomainCPU]; ok {
 		p.allowed = allowed.(cpuset.CPUSet)
 	} else {
 		// Available CPUs not specified, default to all on-line CPUs.
-		p.allowed = policyOptions.System.CPUSet().Difference(policyOptions.System.Offlined())
+		p.allowed = p.system.CPUSet().Difference(p.system.Offlined())
 	}
 	// p.reserved: CPUs reserved for kube-system pods, subset of p.allowed.
 	p.reserved = cpuset.NewCPUSet()
-	if reserved, ok := p.options.Reserved[policyapi.DomainCPU]; ok {
+	if reserved, ok := p.services.GetReservedResources()[policyapi.DomainCPU]; ok {
 		switch v := reserved.(type) {
 		case cpuset.CPUSet:
 			p.reserved = p.allowed.Intersection(v)
@@ -631,7 +634,7 @@ func (p *podpools) setConfig(ppoptions *PodpoolsOptions) error {
 // that run on given CPUs
 func (p *podpools) closestMems(cpus cpuset.CPUSet) idset.IDSet {
 	mems := idset.NewIDSet()
-	sys := p.options.System
+	sys := p.system
 	for _, nodeID := range sys.NodeIDs() {
 		if !cpus.Intersection(sys.Node(nodeID).CPUSet()).IsEmpty() {
 			mems.Add(nodeID)

@@ -246,6 +246,28 @@ func parseCPUListName(name string) ([]uint, error) {
 	return cpus, nil
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = PolicyDescription // XXX TODO
+)
+
+func (c *config) Describe() string {
+	return PolicyDescription
+}
+
+func (c *config) Reset() {
+	*c = config{
+		Pools:       make(pools),
+		ConfDirPath: "/etc/cmk",
+	}
+}
+
+func (c *config) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
+}
+
 // Register us for command line option processing and configuration management.
 func init() {
 	pkgcfg.Register(PolicyPath, PolicyDescription, conf, defaultConfig)

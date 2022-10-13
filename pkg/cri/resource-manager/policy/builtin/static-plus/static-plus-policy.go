@@ -60,12 +60,13 @@ type Allocations map[string]*Assignment
 // static-plus policy runtime state.
 type staticplus struct {
 	logger.Logger
+	services     policy.BackendServices    // backend policy interface
 	offline      cpuset.CPUSet             // offlined cpus
 	available    cpuset.CPUSet             // bounding set of cpus available for us
 	reserved     cpuset.CPUSet             // pool (primarily) for system-/kube-tasks
 	isolated     cpuset.CPUSet             // primary pool for exclusive allocations
 	allocations  Allocations               // container cpu allocations
-	sys          sysfs.System              // system/topologu information
+	sys          sysfs.System              // system/topology information
 	cache        cache.Cache               // system state/cache
 	shared       cpuset.CPUSet             // pool for fractional and shared allocations
 	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
@@ -75,17 +76,18 @@ type staticplus struct {
 var _ policy.Backend = &staticplus{}
 
 // CreateStaticPlusPolicy creates a new policy instance.
-func CreateStaticPlusPolicy(opts *policy.BackendOptions) policy.Backend {
+func CreateStaticPlusPolicy(services policy.BackendServices) policy.Backend {
 	p := &staticplus{
 		Logger:       logger.NewLogger(PolicyName),
-		cache:        opts.Cache,
-		sys:          opts.System,
-		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
+		services:     services,
+		cache:        services.GetCache(),
+		sys:          services.GetSystem(),
+		cpuAllocator: cpuallocator.NewCPUAllocator(services.GetSystem()),
 	}
 
 	p.Info("creating policy...")
 
-	if err := p.setupPools(opts.Available, opts.Reserved); err != nil {
+	if err := p.setupPools(); err != nil {
 		p.Fatal("failed to set up cpu pools: %v", err)
 	}
 
@@ -246,7 +248,10 @@ func policyError(format string, args ...interface{}) error {
 }
 
 // setupPools sets up the pools we allocate resources from.
-func (p *staticplus) setupPools(available, reserved policy.ConstraintSet) error {
+func (p *staticplus) setupPools() error {
+	available := p.services.GetAvailableResources()
+	reserved := p.services.GetReservedResources()
+
 	// Set up three disjoint CPU pools for allocating CPU to containers. These
 	// three pools are:
 	//

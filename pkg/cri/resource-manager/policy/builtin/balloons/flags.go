@@ -133,6 +133,29 @@ func defaultBalloonsOptions() interface{} {
 // Our runtime configuration.
 var balloonsOptions = defaultBalloonsOptions().(*BalloonsOptions)
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = PolicyDescription // XXX TODO:
+)
+
+func (bo *BalloonsOptions) Describe() string {
+	return PolicyDescription
+}
+
+func (bo *BalloonsOptions) Reset() {
+	*bo = BalloonsOptions{
+		ReservedPoolNamespaces: []string{metav1.NamespaceSystem},
+		PinCPU:                 &defaultPinCPU,
+		PinMemory:              &defaultPinMemory,
+	}
+}
+
+func (bo *BalloonsOptions) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
+}
+
 // UnmarshalJSON makes sure all options from previous unmarshals get
 // cleared before unmarshaling new data to the same address.
 func (bo *BalloonsOptions) UnmarshalJSON(data []byte) error {

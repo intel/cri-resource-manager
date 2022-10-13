@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
-	"github.com/intel/cri-resource-manager/pkg/config"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -47,7 +46,7 @@ const (
 
 type static struct {
 	logger.Logger
-
+	services      policy.BackendServices    // backend policy interface
 	available     policy.ConstraintSet      // resource availability constraints
 	reserved      policy.ConstraintSet      // system/kube-reservation constraints
 	reservedCpus  cpuset.CPUSet             // CPUs reserved for system- and kube-tasks
@@ -60,7 +59,10 @@ type static struct {
 }
 
 // Make sure static implements the policy backend interface.
-var _ policy.Backend = &static{}
+var (
+	_   policy.Backend = &static{}
+	log                = logger.NewLogger(PolicyName)
+)
 
 const (
 	// keyPreferIsolated is the annotation used to mark pods preferring isolated CPUs.
@@ -68,14 +70,15 @@ const (
 )
 
 // NewStaticPolicy creates a new policy instance.
-func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
+func NewStaticPolicy(services policy.BackendServices) policy.Backend {
 	s := &static{
-		Logger:       logger.NewLogger(PolicyName),
-		state:        opts.Cache,
-		sys:          opts.System,
-		available:    opts.Available,
-		reserved:     opts.Reserved,
-		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
+		Logger:       log,
+		services:     services,
+		state:        services.GetCache(),
+		sys:          services.GetSystem(),
+		available:    services.GetAvailableResources(),
+		reserved:     services.GetReservedResources(),
+		cpuAllocator: cpuallocator.NewCPUAllocator(services.GetSystem()),
 	}
 
 	s.Info("creating policy...")
@@ -85,8 +88,6 @@ func NewStaticPolicy(opts *policy.BackendOptions) policy.Backend {
 	if err := s.checkConstraints(); err != nil {
 		s.Fatal("cannot start with given constraints: %v", err)
 	}
-
-	config.GetModule(PolicyPath).AddNotify(s.configNotify)
 
 	return s
 }
@@ -135,13 +136,15 @@ func (s *static) Sync(add []cache.Container, del []cache.Container) error {
 }
 
 // UpdateConfig activates an updated configuration.
-func (*static) UpdateConfig() error {
-	return nil
+func (s *static) UpdateConfig() error {
+	s.Info("configuration updated")
+	return s.reconfigure()
 }
 
 // RevertConfig reverts configuration after a failed update.
-func (*static) RevertConfig() error {
-	return nil
+func (s *static) RevertConfig() error {
+	s.Info("configuration reverted")
+	return s.reconfigure()
 }
 
 // AllocateResources is a resource allocation request for this policy.
@@ -229,9 +232,7 @@ func (p *static) CollectMetrics(policy.Metrics) ([]prometheus.Metric, error) {
 	return nil, nil
 }
 
-func (s *static) configNotify(event config.Event, source config.Source) error {
-	s.Info("configuration %s", event)
-
+func (s *static) reconfigure() error {
 	if opt.RelaxedIsolation {
 		s.Info("isolated exclusive CPUs: globally preferred (all pods)")
 	} else {

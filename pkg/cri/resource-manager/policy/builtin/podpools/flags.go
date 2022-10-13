@@ -112,6 +112,28 @@ func defaultPodpoolsOptions() interface{} {
 	}
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = PolicyDescription // XXX TODO
+)
+
+func (o *PodpoolsOptions) Describe() string {
+	return PolicyDescription
+}
+
+func (o *PodpoolsOptions) Reset() {
+	*o = PodpoolsOptions{
+		PinCPU:    true,
+		PinMemory: true,
+	}
+}
+
+func (o *PodpoolsOptions) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
+}
+
 // Our runtime configuration.
 var podpoolsOptions = defaultPodpoolsOptions().(*PodpoolsOptions)
 

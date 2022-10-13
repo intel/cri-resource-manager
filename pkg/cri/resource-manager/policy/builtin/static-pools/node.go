@@ -23,7 +23,7 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
-	"github.com/intel/cri-resource-manager/pkg/log"
+	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
 
 const (
@@ -32,14 +32,14 @@ const (
 )
 
 type nodeUpdater struct {
-	log.Logger
+	logger.Logger
 	agent agent.Interface
 	conf  chan config
 }
 
 func newNodeUpdater(agent agent.Interface) *nodeUpdater {
 	return &nodeUpdater{
-		Logger: log.NewLogger("static-pools-nu"),
+		Logger: logger.NewLogger("static-pools-nu"),
 		agent:  agent,
 		conf:   make(chan config, 1),
 	}

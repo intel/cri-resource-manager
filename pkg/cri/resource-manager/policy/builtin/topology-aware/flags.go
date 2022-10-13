@@ -70,6 +70,26 @@ func defaultOptions() interface{} {
 	}
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = PolicyDescription // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	*o = options{
+		PinCPU:                 true,
+		PinMemory:              true,
+		PreferIsolated:         true,
+		PreferShared:           false,
+		FakeHints:              make(fakehints),
+		ReservedPoolNamespaces: []string{"kube-system"},
+	}
+}
+
 // Register us for configuration handling.
 func init() {
 	config.Register(PolicyPath, PolicyDescription, opt, defaultOptions)

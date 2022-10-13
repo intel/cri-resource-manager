@@ -68,23 +68,28 @@ const (
 type stp struct {
 	logger.Logger
 
-	conf        *config      // STP policy configuration
-	nodeUpdater *nodeUpdater // node updater thread
-	state       cache.Cache  // state cache
+	services    policy.BackendServices // backend policy interface
+	conf        *config                // STP policy configuration
+	nodeUpdater *nodeUpdater           // node updater thread
+	state       cache.Cache            // state cache
 }
 
-var _ policy.Backend = &stp{}
+var (
+	_   policy.Backend = &stp{}
+	log                = logger.NewLogger(PolicyName)
+)
 
 //
 // Policy backend implementation
 //
 
 // CreateStpPolicy creates a new policy instance.
-func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
+func CreateStpPolicy(services policy.BackendServices) policy.Backend {
 	stp := &stp{
-		Logger:      logger.NewLogger(PolicyName),
-		state:       opts.Cache,
-		nodeUpdater: newNodeUpdater(opts.AgentCli),
+		Logger:      log,
+		services:    services,
+		state:       services.GetCache(),
+		nodeUpdater: newNodeUpdater(services.GetAgentClient()),
 	}
 
 	stp.Info("creating policy...")

@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
@@ -30,7 +31,38 @@ import (
 var globalPolicy *policy
 var mutex sync.Mutex
 
-func sendEvent(param interface{}) error {
+type mockServices struct {
+	cache     cache.Cache
+	system    system.System
+	reserved  policyapi.ConstraintSet
+	available policyapi.ConstraintSet
+	allowed   policyapi.ConstraintSet
+	agentCli  agent.Interface
+}
+
+var _ policyapi.BackendServices = &mockServices{}
+
+func (s *mockServices) GetSystem() system.System {
+	return s.system
+}
+
+func (s mockServices) GetCache() cache.Cache {
+	return s.cache
+}
+
+func (s *mockServices) GetAvailableResources() policyapi.ConstraintSet {
+	return s.available
+}
+
+func (s *mockServices) GetReservedResources() policyapi.ConstraintSet {
+	return s.reserved
+}
+
+func (s *mockServices) GetAgentClient() agent.Interface {
+	return s.agentCli
+}
+
+func (s *mockServices) SendEvent(param interface{}) error {
 	// Simulate event synchronization in the upper levels.
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -88,6 +120,7 @@ func TestColdStart(t *testing.T) {
 				sys: &mockSystem{
 					nodes: tc.numaNodes,
 				},
+				services: &mockServices{},
 				cache: &mockCache{
 					returnValue1ForLookupContainer: tc.container,
 					returnValue2ForLookupContainer: true,
@@ -95,10 +128,8 @@ func TestColdStart(t *testing.T) {
 				allocations: allocations{
 					grants: make(map[string]Grant, 0),
 				},
-				options: &policyapi.BackendOptions{},
 			}
 			policy.allocations.policy = policy
-			policy.options.SendEvent = sendEvent
 
 			if err := policy.buildPoolsByTopology(); err != nil {
 				t.Errorf("failed to build topology pool")
@@ -127,7 +158,7 @@ func TestColdStart(t *testing.T) {
 
 			globalPolicy = policy
 
-			policy.options.SendEvent(&events.Policy{
+			policy.services.SendEvent(&events.Policy{
 				Type: events.ContainerStarted,
 				Data: tc.container,
 			})

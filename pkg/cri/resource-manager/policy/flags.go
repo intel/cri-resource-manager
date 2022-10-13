@@ -242,8 +242,39 @@ func defaultOptions() interface{} {
 	}
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = "generic policy layer configuration" // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	*o = options{
+		Policy:    NonePolicy,
+		Available: ConstraintSet{},
+		Reserved:  ConstraintSet{},
+	}
+}
+
+func (o *options) Validate() error {
+	if o.Policy != "" {
+		if _, ok := backends[o.Policy]; !ok {
+			return policyError("unknown policy %q", o.Policy)
+		}
+	}
+
+	log.Info("validated policy configuration:")
+	log.Info("  - active policy: %s", o.Policy)
+	log.Info("  - available resources: %s", o.Available.String())
+	log.Info("  - reserved resources: %s", o.Reserved.String())
+
+	return nil
+}
+
 // Register us for configuration handling.
 func init() {
-	config.Register(ConfigPath, "Generic policy layer.", opt, defaultOptions,
-		config.WithNotify(configNotify))
+	config.Register(ConfigPath, "Generic policy layer.", opt, defaultOptions)
 }

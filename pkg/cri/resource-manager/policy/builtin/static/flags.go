@@ -92,6 +92,27 @@ func defaultOptions() interface{} {
 	return &options{Rdt: TristateAuto}
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = PolicyDescription // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return PolicyDescription
+}
+
+func (o *options) Reset() {
+	*o = options{
+		Rdt: TristateAuto,
+	}
+}
+
+func (o *options) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
+}
+
 // Register us for configuration handling.
 func init() {
 	config.Register(PolicyPath, PolicyDescription, opt, defaultOptions)

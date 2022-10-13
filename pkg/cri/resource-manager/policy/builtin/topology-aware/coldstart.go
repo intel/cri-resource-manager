@@ -46,7 +46,7 @@ func (p *policy) triggerColdStart(c cache.Container) error {
 			Source: PolicyName,
 			Data:   c.GetID(),
 		}
-		if err := p.options.SendEvent(e); err != nil {
+		if err := p.services.SendEvent(e); err != nil {
 			// we should retry this later, the channel is probably full...
 			log.Error("Ouch... we'should retry this later.")
 		}

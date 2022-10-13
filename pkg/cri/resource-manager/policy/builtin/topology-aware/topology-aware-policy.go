@@ -56,7 +56,7 @@ type allocations struct {
 
 // policy is our runtime state for this policy.
 type policy struct {
-	options      *policyapi.BackendOptions // options we were created or reconfigured with
+	services     policyapi.BackendServices // backend policy interface
 	cache        cache.Cache               // pod/container cache
 	sys          system.System             // system/HW topology info
 	allowed      cpuset.CPUSet             // bounding set of CPUs we're allowed to use
@@ -81,22 +81,22 @@ var _ policyapi.Backend = &policy{}
 var coldStartOff bool
 
 // CreateTopologyAwarePolicy creates a new policy instance.
-func CreateTopologyAwarePolicy(opts *policyapi.BackendOptions) policyapi.Backend {
-	return createPolicy(opts, false)
+func CreateTopologyAwarePolicy(services policyapi.BackendServices) policyapi.Backend {
+	return createPolicy(services, false)
 }
 
 // CreateMemtierPolicy creates a new policy instance, aliased as 'memtier'.
-func CreateMemtierPolicy(opts *policyapi.BackendOptions) policyapi.Backend {
-	return createPolicy(opts, true)
+func CreateMemtierPolicy(services policyapi.BackendServices) policyapi.Backend {
+	return createPolicy(services, true)
 }
 
 // createPolicy creates a new policy instance.
-func createPolicy(opts *policyapi.BackendOptions, isAlias bool) policyapi.Backend {
+func createPolicy(services policyapi.BackendServices, isAlias bool) policyapi.Backend {
 	p := &policy{
-		cache:        opts.Cache,
-		sys:          opts.System,
-		options:      opts,
-		cpuAllocator: cpuallocator.NewCPUAllocator(opts.System),
+		services:     services,
+		cache:        services.GetCache(),
+		sys:          services.GetSystem(),
+		cpuAllocator: cpuallocator.NewCPUAllocator(services.GetSystem()),
 		isAlias:      isAlias,
 	}
 
@@ -414,12 +414,12 @@ func (p *policy) reconfigure(isRevert bool) error {
 	var allowed, reserved cpuset.CPUSet
 	var reinit bool
 
-	if cpus, ok := p.options.Available[policyapi.DomainCPU]; ok {
+	if cpus, ok := p.services.GetAvailableResources()[policyapi.DomainCPU]; ok {
 		if cset, ok := cpus.(cpuset.CPUSet); ok {
 			allowed = cset
 		}
 	}
-	if cpus, ok := p.options.Reserved[policyapi.DomainCPU]; ok {
+	if cpus, ok := p.services.GetReservedResources()[policyapi.DomainCPU]; ok {
 		switch v := cpus.(type) {
 		case cpuset.CPUSet:
 			reserved = v
@@ -512,7 +512,7 @@ func (p *policy) initialize() error {
 
 // Check the constraints passed to us.
 func (p *policy) checkConstraints() error {
-	if c, ok := p.options.Available[policyapi.DomainCPU]; ok {
+	if c, ok := p.services.GetAvailableResources()[policyapi.DomainCPU]; ok {
 		p.allowed = c.(cpuset.CPUSet)
 	} else {
 		// default to all online cpus
@@ -521,7 +521,7 @@ func (p *policy) checkConstraints() error {
 
 	p.isolated = p.sys.Isolated().Intersection(p.allowed)
 
-	c, ok := p.options.Reserved[policyapi.DomainCPU]
+	c, ok := p.services.GetReservedResources()[policyapi.DomainCPU]
 	if !ok {
 		return policyError("cannot start without CPU reservation")
 	}

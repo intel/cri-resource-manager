@@ -32,6 +32,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
+	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
@@ -53,8 +54,9 @@ const (
 
 // balloons contains configuration and runtime attributes of the balloons policy
 type balloons struct {
-	options   *policyapi.BackendOptions // configuration common to all policies
+	services  policyapi.BackendServices // backend policy interface
 	bpoptions BalloonsOptions           // balloons-specific configuration
+	system    system.System             // system/HW info
 	cch       cache.Cache               // cri-resmgr cache
 	allowed   cpuset.CPUSet             // bounding set of CPUs we're allowed to use
 	reserved  cpuset.CPUSet             // system-/kube-reserved CPUs
@@ -126,24 +128,25 @@ func (bln Balloon) MaxAvailMilliCpus() int {
 }
 
 // CreateBalloonsPolicy creates a new policy instance.
-func CreateBalloonsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
+func CreateBalloonsPolicy(services policy.BackendServices) policy.Backend {
 	p := &balloons{
-		options:      policyOptions,
-		cch:          policyOptions.Cache,
-		cpuAllocator: cpuallocator.NewCPUAllocator(policyOptions.System),
+		services:     services,
+		system:       services.GetSystem(),
+		cch:          services.GetCache(),
+		cpuAllocator: cpuallocator.NewCPUAllocator(services.GetSystem()),
 	}
 	log.Info("creating %s policy...", PolicyName)
 	// Handle common policy options: AvailableResources and ReservedResources.
 	// p.allowed: CPUs available for the policy
-	if allowed, ok := policyOptions.Available[policyapi.DomainCPU]; ok {
+	if allowed, ok := p.services.GetAvailableResources()[policyapi.DomainCPU]; ok {
 		p.allowed = allowed.(cpuset.CPUSet)
 	} else {
 		// Available CPUs not specified, default to all on-line CPUs.
-		p.allowed = policyOptions.System.CPUSet().Difference(policyOptions.System.Offlined())
+		p.allowed = p.system.CPUSet().Difference(p.system.Offlined())
 	}
 	// p.reserved: CPUs reserved for kube-system pods, subset of p.allowed.
 	p.reserved = cpuset.NewCPUSet()
-	if reserved, ok := p.options.Reserved[policyapi.DomainCPU]; ok {
+	if reserved, ok := p.services.GetReservedResources()[policyapi.DomainCPU]; ok {
 		switch v := reserved.(type) {
 		case cpuset.CPUSet:
 			p.reserved = p.allowed.Intersection(v)
@@ -990,7 +993,7 @@ func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
 // that run on given CPUs
 func (p *balloons) closestMems(cpus cpuset.CPUSet) idset.IDSet {
 	mems := idset.NewIDSet()
-	sys := p.options.System
+	sys := p.system
 	for _, nodeID := range sys.NodeIDs() {
 		if !cpus.Intersection(sys.Node(nodeID).CPUSet()).IsEmpty() {
 			mems.Add(nodeID)

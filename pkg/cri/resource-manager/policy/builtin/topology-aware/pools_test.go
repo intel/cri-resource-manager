@@ -374,16 +374,16 @@ func TestPoolCreation(t *testing.T) {
 			}
 
 			reserved, _ := resapi.ParseQuantity("750m")
-			policyOptions := &policyapi.BackendOptions{
-				Cache:  &mockCache{},
-				System: sys,
-				Reserved: policyapi.ConstraintSet{
+			services := &mockServices{
+				cache:  &mockCache{},
+				system: sys,
+				reserved: policyapi.ConstraintSet{
 					policyapi.DomainCPU: reserved,
 				},
 			}
 
 			log.EnableDebug(true)
-			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(services).(*policy)
 			log.EnableDebug(false)
 
 			if policy.root.GetSupply().SharableCPUs().Size()+policy.root.GetSupply().IsolatedCPUs().Size()+policy.root.GetSupply().ReservedCPUs().Size() != tc.expectedRootNodeCPUs {
@@ -509,16 +509,16 @@ func TestWorkloadPlacement(t *testing.T) {
 			}
 
 			reserved, _ := resapi.ParseQuantity("750m")
-			policyOptions := &policyapi.BackendOptions{
-				Cache:  &mockCache{},
-				System: sys,
-				Reserved: policyapi.ConstraintSet{
+			services := &mockServices{
+				cache:  &mockCache{},
+				system: sys,
+				reserved: policyapi.ConstraintSet{
 					policyapi.DomainCPU: reserved,
 				},
 			}
 
 			log.EnableDebug(true)
-			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(services).(*policy)
 			log.EnableDebug(false)
 
 			scores, filteredPools := policy.sortPoolsByScore(tc.req, tc.affinities)
@@ -661,16 +661,16 @@ func TestContainerMove(t *testing.T) {
 			}
 
 			reserved, _ := resapi.ParseQuantity("750m")
-			policyOptions := &policyapi.BackendOptions{
-				Cache:  &mockCache{},
-				System: sys,
-				Reserved: policyapi.ConstraintSet{
+			services := &mockServices{
+				cache:  &mockCache{},
+				system: sys,
+				reserved: policyapi.ConstraintSet{
 					policyapi.DomainCPU: reserved,
 				},
 			}
 
 			log.EnableDebug(true)
-			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(services).(*policy)
 			log.EnableDebug(false)
 
 			grant1, err := policy.allocatePool(tc.container1, "")
@@ -932,16 +932,16 @@ func TestAffinities(t *testing.T) {
 			}
 
 			reserved, _ := resapi.ParseQuantity("750m")
-			policyOptions := &policyapi.BackendOptions{
-				Cache:  &mockCache{},
-				System: sys,
-				Reserved: policyapi.ConstraintSet{
+			services := &mockServices{
+				cache:  &mockCache{},
+				system: sys,
+				reserved: policyapi.ConstraintSet{
 					policyapi.DomainCPU: reserved,
 				},
 			}
 
 			log.EnableDebug(true)
-			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
+			policy := CreateTopologyAwarePolicy(services).(*policy)
 			log.EnableDebug(false)
 
 			affinities := map[int]int32{}
