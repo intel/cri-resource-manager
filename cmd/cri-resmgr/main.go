@@ -24,7 +24,7 @@ import (
 
 	"github.com/intel/goresctrl/pkg/rdt"
 
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
+	resmgr "github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 
@@ -47,7 +47,7 @@ func main() {
 
 	switch {
 	case *printConfig:
-		config.Print(nil)
+		config.Print()
 		os.Exit(0)
 
 	case *listPolicies:
