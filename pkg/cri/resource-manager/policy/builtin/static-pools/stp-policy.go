@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
@@ -90,8 +89,6 @@ func CreateStpPolicy(opts *policy.BackendOptions) policy.Backend {
 
 	stp.Info("creating policy...")
 
-	pkgcfg.GetModule(PolicyPath).AddNotify(stp.configNotify)
-
 	return stp
 }
 
@@ -142,6 +139,16 @@ func (stp *stp) Sync(add []cache.Container, del []cache.Container) error {
 	}
 
 	return nil
+}
+
+// UpdateConfig activates an updated configuration.
+func (stp *stp) UpdateConfig() error {
+	return stp.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (stp *stp) RevertConfig() error {
+	return stp.reconfigure(true)
 }
 
 // AllocateResources is a resource allocation request for this policy.
@@ -267,14 +274,15 @@ func (p *stp) CollectMetrics(policy.Metrics) ([]prometheus.Metric, error) {
 	return nil, nil
 }
 
-func (stp *stp) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+func (stp *stp) reconfigure(isRevert bool) error {
+	event := map[bool]string{false: "update", true: "revert"}[isRevert]
 	stp.Info("configuration %s", event)
 
 	if err := stp.setConfig(conf); err != nil {
 		return err
 	}
 
-	stp.Info("config updated successfully")
+	stp.Info("config %s successful", event)
 
 	return nil
 }

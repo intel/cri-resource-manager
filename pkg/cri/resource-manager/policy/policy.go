@@ -110,10 +110,14 @@ type Backend interface {
 	Name() string
 	// Description gives a verbose description about the policy implementation.
 	Description() string
-	// Start up and sycnhronizes the policy, using the given cache and resource constraints.
+	// Start up and sycnhronize the policy, using the given cache and resource constraints.
 	Start([]cache.Container, []cache.Container) error
 	// Sync synchronizes the policy, allocating/releasing the given containers.
 	Sync([]cache.Container, []cache.Container) error
+	// UpdateConfig activates an updated configuration.
+	UpdateConfig() error
+	// RevertConfig reverts configuration after a failed update.
+	RevertConfig() error
 	// AllocateResources allocates resources to/for a container.
 	AllocateResources(cache.Container) error
 	// ReleaseResources release resources of a container.
@@ -143,6 +147,10 @@ type Policy interface {
 	Start([]cache.Container, []cache.Container) error
 	// Sync synchronizes the state of the active policy.
 	Sync([]cache.Container, []cache.Container) error
+	// UpdateConfig activates an updated configuration.
+	UpdateConfig() error
+	// RevertConfig reverts configuration after a failed update.
+	RevertConfig() error
 	// AllocateResources allocates resources to a container.
 	AllocateResources(cache.Container) error
 	// ReleaseResources releases resources of a container.
@@ -273,6 +281,16 @@ func (p *policy) Bypassed() bool {
 // Sync synchronizes the active policy state.
 func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
 	return p.active.Sync(add, del)
+}
+
+// UpdateConfig activates an updated configuration.
+func (p *policy) UpdateConfig() error {
+	return p.active.UpdateConfig()
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (p *policy) RevertConfig() error {
+	return p.active.RevertConfig()
 }
 
 // AllocateResources allocates resources for a container.

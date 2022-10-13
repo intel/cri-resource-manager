@@ -66,6 +66,16 @@ func (n *none) Sync(add []cache.Container, del []cache.Container) error {
 	return nil
 }
 
+// UpdateConfig activates an updated configuration.
+func (*none) UpdateConfig() error {
+	return nil
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (*none) RevertConfig() error {
+	return nil
+}
+
 // AllocateResources is a resource allocation request for this policy.
 func (n *none) AllocateResources(c cache.Container) error {
 	n.Debug("(not) allocating container %s...", c.PrettyName())

@@ -130,6 +130,16 @@ func (p *staticplus) Sync(add []cache.Container, del []cache.Container) error {
 	return nil
 }
 
+// UpdateConfig activates an updated configuration.
+func (*staticplus) UpdateConfig() error {
+	return nil
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (*staticplus) RevertConfig() error {
+	return nil
+}
+
 // AllocateResources allocates resources for the given container.
 func (p *staticplus) AllocateResources(c cache.Container) error {
 	var a *Assignment

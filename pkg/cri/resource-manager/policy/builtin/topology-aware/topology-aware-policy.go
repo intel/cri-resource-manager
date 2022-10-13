@@ -22,7 +22,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
@@ -111,8 +110,6 @@ func createPolicy(opts *policyapi.BackendOptions, isAlias bool) policyapi.Backen
 
 	p.registerImplicitAffinities()
 
-	config.GetModule(policyapi.ConfigPath).AddNotify(p.configNotify)
-
 	return p
 }
 
@@ -154,6 +151,16 @@ func (p *policy) Sync(add []cache.Container, del []cache.Container) error {
 	}
 
 	return nil
+}
+
+// UpdateConfig activates an updated configuration.
+func (p *policy) UpdateConfig() error {
+	return p.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (p *policy) RevertConfig() error {
+	return p.reconfigure(true)
 }
 
 // AllocateResources is a resource allocation request for this policy.
@@ -389,12 +396,14 @@ func (p *policy) reallocateResources(containers []cache.Container, pools map[str
 	return nil
 }
 
-func (p *policy) configNotify(event config.Event, source config.Source) error {
+func (p *policy) reconfigure(isRevert bool) error {
 	policyName := PolicyName
 	if p.isAlias {
 		policyName = AliasName
 		*opt = *aliasOpt
 	}
+
+	event := map[bool]string{false: "update", true: "revert"}[isRevert]
 	log.Info("%s configuration %s:", policyName, event)
 	log.Info("  - pin containers to CPUs: %v", opt.PinCPU)
 	log.Info("  - pin containers to memory: %v", opt.PinMemory)

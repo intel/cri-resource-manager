@@ -24,7 +24,6 @@ import (
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
-	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
@@ -160,8 +159,6 @@ func CreatePodpoolsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
 		log.Fatal("failed to create %s policy: %v", PolicyName, err)
 	}
 
-	pkgcfg.GetModule(PolicyPath).AddNotify(p.configNotify)
-
 	return p
 }
 
@@ -191,6 +188,16 @@ func (p *podpools) Sync(add []cache.Container, del []cache.Container) error {
 		p.AllocateResources(c)
 	}
 	return nil
+}
+
+// UpdateConfig activates an updated configuration.
+func (p *podpools) UpdateConfig() error {
+	return p.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (p *podpools) RevertConfig() error {
+	return p.reconfigure(true)
 }
 
 // AllocateResources is a resource allocation request for this policy.
@@ -415,14 +422,16 @@ func (p *podpools) getPodMilliCPU(podID string) int64 {
 	return cpuRequested
 }
 
-// configNotify applies new configuration.
-func (p *podpools) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+// reconfigure applies new configuration.
+func (p *podpools) reconfigure(isRevert bool) error {
+	event := map[bool]string{false: "update", true: "revert"}[isRevert]
 	log.Info("configuration %s", event)
+
 	if err := p.setConfig(podpoolsOptions); err != nil {
-		log.Error("config update failed: %v", err)
+		log.Error("config %s failed: %v", event, err)
 		return err
 	}
-	log.Info("config updated successfully")
+	log.Info("config %s successful", event)
 	p.Sync(p.cch.GetContainers(), nil)
 	return nil
 }

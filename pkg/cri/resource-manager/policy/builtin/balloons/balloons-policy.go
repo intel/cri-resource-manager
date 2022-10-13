@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
-	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	cpucontrol "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/cpu"
@@ -167,8 +166,6 @@ func CreateBalloonsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
 		log.Fatal("failed to create %s policy: %v", PolicyName, err)
 	}
 
-	pkgcfg.GetModule(PolicyPath).AddNotify(p.configNotify)
-
 	return p
 }
 
@@ -199,6 +196,16 @@ func (p *balloons) Sync(add []cache.Container, del []cache.Container) error {
 		p.AllocateResources(c)
 	}
 	return nil
+}
+
+// UpdateConfig activates an updated configuration.
+func (b *balloons) UpdateConfig() error {
+	return b.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (b *balloons) RevertConfig() error {
+	return b.reconfigure(true)
 }
 
 // AllocateResources is a resource allocation request for this policy.
@@ -798,9 +805,11 @@ func changesCpuClasses(opts0, opts1 *BalloonsOptions) bool {
 	return false
 }
 
-// configNotify applies new configuration.
-func (p *balloons) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+// reconfigure applies new configuration.
+func (p *balloons) reconfigure(isRevert bool) error {
+	event := map[bool]string{false: "update", true: "revert"}[isRevert]
 	log.Info("configuration %s", event)
+
 	defer log.Debug("effective configuration:\n%s\n", utils.DumpJSON(p.bpoptions))
 	newBalloonsOptions := balloonsOptions.DeepCopy()
 	if !changesBalloons(&p.bpoptions, newBalloonsOptions) {
@@ -825,10 +834,10 @@ func (p *balloons) configNotify(event pkgcfg.Event, source pkgcfg.Source) error 
 		return nil
 	}
 	if err := p.setConfig(newBalloonsOptions); err != nil {
-		log.Error("config update failed: %v", err)
+		log.Error("config %s failed: %v", event, err)
 		return err
 	}
-	log.Info("config updated successfully")
+	log.Info("config %s successful", event)
 	p.Sync(p.cch.GetContainers(), p.cch.GetContainers())
 	return nil
 }
