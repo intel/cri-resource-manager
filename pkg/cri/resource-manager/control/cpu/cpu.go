@@ -31,7 +31,6 @@ import (
 const (
 	// ConfigModuleName is the configuration section for the CPU controller.
 	ConfigModuleName = "cpu"
-
 	// CPUController is the name of the CPU controller.
 	CPUController = cache.CPU
 )
@@ -91,9 +90,6 @@ func (ctl *cpuctl) Start(cache cache.Cache, client client.Client) error {
 		log.Error("failed apply /cpuinitial configuration: %v", err)
 	}
 
-	// TODO: We probably could just remove this and the hooks if they are not used
-	pkgcfg.GetModule(ConfigModuleName).AddNotify(getCPUController().configNotify)
-
 	ctl.started = true
 
 	return nil
@@ -126,6 +122,16 @@ func (ctl *cpuctl) PostUpdateHook(c cache.Container) error {
 // PostStopHook handler for the CPU controller.
 func (ctl *cpuctl) PostStopHook(c cache.Container) error {
 	return nil
+}
+
+// UpdateConfig activates an updated configuration.
+func (ctl *cpuctl) UpdateConfig() error {
+	return ctl.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (ctl *cpuctl) RevertConfig() error {
+	return ctl.reconfigure(true)
 }
 
 // enforceCpufreq enforces a class-specific cpufreq configuration to a cpuset
@@ -275,15 +281,16 @@ func (ctl *cpuctl) configure() error {
 	return nil
 }
 
-// Callback for runtime configuration notifications.
-func (ctl *cpuctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+// reconfigure controller.
+func (ctl *cpuctl) reconfigure(isRevert bool) error {
+	event := map[bool]string{false: "updated", true: "reverted"}[isRevert]
 	if !ctl.started {
 		// We don't want to configure until the controller has been fully
 		// started and initialized. We will configure on Start(), anyway.
 		return nil
 	}
 
-	log.Info("configuration update, applying new config")
+	log.Info("configuration %s, applying new config", event)
 	return ctl.configure()
 }
 
@@ -297,6 +304,25 @@ func (c *config) getClasses() map[string]Class {
 		ret[k] = v
 	}
 	return ret
+}
+
+const (
+	// ConfigDescription is the configuration fragment description for the CPU controller.
+	ConfigDescription = "CPU control" // XXX TODO
+)
+
+func (c *config) Describe() string {
+	return ConfigDescription
+}
+
+func (c *config) Reset() {
+	*c = config{}
+}
+
+func (c *config) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
 }
 
 // Register us as a controller.

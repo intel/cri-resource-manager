@@ -115,6 +115,16 @@ func (ctl *memctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+// UpdateConfig activates an updated configuration.
+func (ctl *memctl) UpdateConfig() error {
+	return nil
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (ctl *memctl) RevertConfig() error {
+	return nil
+}
+
 // Check if memory cgroup controller supports top tier soft limits.
 func (ctl *memctl) checkToptierLimitSupport() bool {
 	_, err := os.Stat(memoryCgroupPath + "/" + toptierSoftLimitControl)

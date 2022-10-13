@@ -144,6 +144,16 @@ func (m *migration) PostStopHook(cc cache.Container) error {
 	return nil
 }
 
+// UpdateConfig activates an updated configuration.
+func (m *migration) UpdateConfig() error {
+	return nil
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (m *migration) RevertConfig() error {
+	return nil
+}
+
 // syncWithCache synchronizes tracked containers with the cache.
 func (m *migration) syncWithCache() {
 	m.Lock()

@@ -145,6 +145,16 @@ func (ctl *crictl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+// UpdateConfig activates an updated configuration.
+func (ctl *crictl) UpdateConfig() error {
+	return nil
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (ctl *crictl) RevertConfig() error {
+	return nil
+}
+
 // criError creates an CRI-controller-specific formatted error message.
 func criError(format string, args ...interface{}) error {
 	return fmt.Errorf("cri: "+format, args...)

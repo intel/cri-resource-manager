@@ -99,8 +99,6 @@ func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
 		log.Error("failed register rdt collector: %v", err)
 	}
 
-	pkgcfg.GetModule(ConfigModuleName).AddNotify(getRDTController().configNotify)
-
 	return nil
 }
 
@@ -154,6 +152,16 @@ func (ctl *rdtctl) PostStopHook(c cache.Container) error {
 		return rdtError("%q: failed to remove monitoring group: %v", c.PrettyName(), err)
 	}
 	return nil
+}
+
+// UpdateConfig activates an updated configuration.
+func (ctl *rdtctl) UpdateConfig() error {
+	return ctl.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (ctl *rdtctl) RevertConfig() error {
+	return ctl.reconfigure(true)
 }
 
 // assign assigns all processes/threads in a container to the correct class
@@ -355,9 +363,10 @@ func (ctl *rdtctl) configure() error {
 	return nil
 }
 
-// configNotify is our runtime configuration notification callback.
-func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
-	log.Info("configuration update, applying new config")
+// reconfigure RDT classes.
+func (ctl *rdtctl) reconfigure(isRevert bool) error {
+	event := map[bool]string{false: "updated", true: "reverted"}[isRevert]
+	log.Info("configuration %s, applying new config", event)
 	return ctl.configure()
 }
 
@@ -375,6 +384,26 @@ func GetClasses() []rdt.CtrlGroup {
 // rdtError creates an RDT-controller-specific formatted error message.
 func rdtError(format string, args ...interface{}) error {
 	return fmt.Errorf("rdt: "+format, args...)
+}
+
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = "RDT control" // XXX TODO
+)
+
+func (c *config) Describe() string {
+	return ConfigDescription
+}
+
+func (c *config) Reset() {
+	*c = config{}
+	c.Options.Mode = OperatingModeFull
+}
+
+func (c *config) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
 }
 
 // Register us as a controller.

@@ -36,6 +36,25 @@ func defaultOptions() interface{} {
 	return &options{}
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = PageMigrationDescription // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	*o = options{}
+}
+
+func (o *options) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
+}
+
 // Register us for configuration handling.
 func init() {
 	config.Register(PageMigrationConfigPath, PageMigrationDescription, opt, defaultOptions)

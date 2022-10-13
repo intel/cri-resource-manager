@@ -17,8 +17,9 @@ package control
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/intel/cri-resource-manager/pkg/config"
 	"strings"
+
+	"github.com/intel/cri-resource-manager/pkg/config"
 )
 
 // Options captures our runtime configuration.
@@ -52,15 +53,6 @@ func (o *options) ControllerMode(name string) mode {
 	}
 
 	return Default
-}
-
-// configNotify is our configuration update notification callback.
-func (o *options) configNotify(event config.Event, source config.Source) error {
-	log.Info("configuration updated")
-	for name, controller := range controllers {
-		controller.mode = o.ControllerMode(name)
-	}
-	return nil
 }
 
 // String returns the string representation of a mode.
@@ -112,8 +104,28 @@ func defaultOptions() interface{} {
 	return &options{Controllers: make(map[string]mode)}
 }
 
+const (
+	// ConfigDescription describes our configuration fragment.
+	ConfigDescription = "resource controllers" // XXX TODO
+)
+
+func (o *options) Describe() string {
+	return ConfigDescription
+}
+
+func (o *options) Reset() {
+	*o = options{
+		Controllers: make(map[string]mode),
+	}
+}
+
+func (o *options) Validate() error {
+	// XXX TODO
+	log.Warn("*** Implement semantic validation for %q, or remove this.", ConfigDescription)
+	return nil
+}
+
 // Register us for configuration handling.
 func init() {
-	config.Register("resource-manager.control", "Resource control.", opt, defaultOptions,
-		config.WithNotify(opt.configNotify))
+	config.Register("resource-manager.control", "Resource control.", opt, defaultOptions)
 }

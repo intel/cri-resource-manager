@@ -779,7 +779,7 @@ func (m *resmgr) setConfig(v interface{}) error {
 
 	if !(m.policy == nil || m.policy.Bypassed()) {
 		// synchronize state of controllers with new configuration
-		if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+		if err = m.control.UpdateConfig(); err != nil {
 			m.Error("failed to synchronize controllers with new configuration: %v", err)
 			return resmgrError("failed to synchronize controllers with new configuration: %v", err)
 		}

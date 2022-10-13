@@ -20,7 +20,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/intel/cri-resource-manager/pkg/blockio"
-	"github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
@@ -108,6 +107,16 @@ func (ctl *blockioctl) PostStopHook(c cache.Container) error {
 	return nil
 }
 
+// UpdateConfig activates an updated configuration.
+func (ctl *blockioctl) UpdateConfig() error {
+	return ctl.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (ctl *blockioctl) RevertConfig() error {
+	return ctl.reconfigure(true)
+}
+
 // isImplicitlyDisabled checks if we run without any classes confiured
 func (ctl *blockioctl) isImplicitlyDisabled() bool {
 	if ctl.idle != nil {
@@ -143,10 +152,9 @@ func (ctl *blockioctl) assign(c cache.Container) error {
 	return nil
 }
 
-// configNotify is blockio class mapping and class definition configuration callback
-func (ctl *blockioctl) configNotify(event config.Event, source config.Source) error {
-	ignoreErrors := (event == config.RevertEvent)
-	err := blockio.UpdateOciConfig(ignoreErrors)
+// reconfigure blockio class mapping.
+func (ctl *blockioctl) reconfigure(isRevert bool) error {
+	err := blockio.UpdateOciConfig(isRevert)
 	if err != nil {
 		return err
 	}
@@ -185,5 +193,4 @@ func blockioError(format string, args ...interface{}) error {
 // init registers this controller and sets configuration change handling.
 func init() {
 	control.Register(BlockIOController, "Block I/O controller", getBlockIOController())
-	config.GetModule(blockio.ConfigModuleName).AddNotify(getBlockIOController().configNotify)
 }

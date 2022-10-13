@@ -27,7 +27,7 @@ import (
 // Control is the interface for triggering controller-/domain-specific post-decision actions.
 type Control interface {
 	// StartStopControllers starts/stops all controllers according to configuration.
-	StartStopControllers(cache.Cache, client.Client) error
+	Start(cache.Cache, client.Client) error
 	// PreCreateHooks runs the pre-create hooks of all registered controllers.
 	RunPreCreateHooks(cache.Container) error
 	// RunPreStartHooks runs the pre-start hooks of all registered controllers.
@@ -38,6 +38,10 @@ type Control interface {
 	RunPostUpdateHooks(cache.Container) error
 	// RunPostStopHooks runs the post-stop hooks of all registered controllers.
 	RunPostStopHooks(cache.Container) error
+	// UpdateConfig activates an updated configuration.
+	UpdateConfig() error
+	// RevertConfig reverts configuration after a failed update.
+	RevertConfig() error
 }
 
 // Controller is the interface all resource controllers must implement.
@@ -56,6 +60,10 @@ type Controller interface {
 	PostUpdateHook(cache.Container) error
 	// PostStopHook is the controller's post-stop hook.
 	PostStopHook(cache.Container) error
+	// UpdateConfig activates an updated configuration.
+	UpdateConfig() error
+	// RevertConfig reverts configuration after a failed update.
+	RevertConfig() error
 }
 
 // control encapsulates our controller-agnostic runtime state.
@@ -104,55 +112,12 @@ func NewControl() (Control, error) {
 	return c, nil
 }
 
-// StartStopController starts/stops all controllers according to configuration.
-func (c *control) StartStopControllers(cache cache.Cache, client client.Client) error {
+// Start starts up all enabled controllers.
+func (c *control) Start(cache cache.Cache, client client.Client) error {
 	c.cache = cache
 	c.client = client
 
-	log.Info("syncing controllers with configuration...")
-
-	for _, controller := range c.controllers {
-		if controller.mode == Disabled {
-			if controller.running {
-				controller.c.Stop()
-				controller.running = false
-			}
-			log.Info("controller %s: disabled", controller.name)
-			continue
-		}
-
-		if controller.running {
-			log.Info("controller %s: running", controller.name)
-			continue
-		}
-
-		err := controller.c.Start(cache, client)
-
-		if err != nil {
-			log.Error("controller %s: failed to start: %v", controller.name, err)
-			controller.running = false
-			switch controller.mode {
-			case Required:
-				return controlError("%s failed to start: %v", controller.name, err)
-			case Optional, Relaxed:
-				log.Warn("disabling %s, failed to start: %v", controller.name, err)
-				controller.mode = Disabled
-			}
-		} else {
-			controller.running = true
-			if controller.mode == Optional {
-				controller.mode = Required
-			}
-		}
-	}
-
-	for _, controller := range c.controllers {
-		state := map[bool]string{false: "inactive", true: "running"}
-		log.Info("controller %s is now %s, mode %s",
-			controller.name, state[controller.running], controller.mode)
-	}
-
-	return nil
+	return c.reconfigure(false)
 }
 
 // RunPreCreateHooks runs all registered controllers' PreCreate hooks.
@@ -202,6 +167,70 @@ func (c *control) RunPostStopHooks(container cache.Container) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// UpdateConfig activates an updated configuration.
+func (c *control) UpdateConfig() error {
+	return c.reconfigure(false)
+}
+
+// RevertConfig reverts configuration after a failed update.
+func (c *control) RevertConfig() error {
+	return c.reconfigure(true)
+}
+
+// reconfigure our controllers.
+func (c *control) reconfigure(isRevert bool) error {
+	event := map[bool]string{false: "updated", true: "reverted"}[isRevert]
+
+	log.Info("syncing controllers with %s configuration...", event)
+
+	for name, controller := range controllers {
+		controller.mode = opt.ControllerMode(name)
+
+		if controller.mode == Disabled {
+			if controller.running {
+				controller.c.Stop()
+				controller.running = false
+			}
+			log.Info("controller %s: disabled", controller.name)
+			continue
+		}
+
+		if controller.running {
+			log.Info("controller %s: running", controller.name)
+			continue
+		}
+
+		err := controller.c.Start(c.cache, c.client)
+
+		if err != nil {
+			log.Error("controller %s: failed to start: %v", controller.name, err)
+			controller.running = false
+			switch controller.mode {
+			case Required:
+				if !isRevert {
+					return err
+				}
+			case Optional, Relaxed:
+				log.Warn("disabling %s, failed to start: %v", controller.name, err)
+				controller.mode = Disabled
+			}
+		} else {
+			controller.running = true
+			if controller.mode == Optional {
+				controller.mode = Required
+			}
+		}
+	}
+
+	for _, controller := range c.controllers {
+		state := map[bool]string{false: "inactive", true: "running"}
+		log.Info("controller %s is now %s, mode %s",
+			controller.name, state[controller.running], controller.mode)
+	}
+
 	return nil
 }
 
