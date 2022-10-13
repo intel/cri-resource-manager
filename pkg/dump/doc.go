@@ -28,10 +28,10 @@ package dump
 // The dump targets are: 'off', 'name', 'full', 'count' by default.
 //
 
-var configHelp = `
-Dump CRI gRPC method calls as YAML.
+const configHelp = `
+CRI protocol gRPC request/response dumping..
 
-This package implements configurable message dumping of CRI gRPC
+This configuration controls message dumping details of CRI gRPC
 method calls. Both requests and the resulting replies or errors
 can be dumped. Messages can be both logged and dumped to a given
 file.

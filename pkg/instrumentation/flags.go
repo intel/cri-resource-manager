@@ -232,5 +232,5 @@ func (o *options) Validate() error {
 
 // Register us for for configuration handling.
 func init() {
-	config.Register("instrumentation", ConfigDescription, opt, defaultOptions)
+	config.Register("instrumentation", opt)
 }

@@ -21,8 +21,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/intel/cri-resource-manager/pkg/config"
 )
 
 // TestConfigParsing test parsing of dump configuration strings.
@@ -147,7 +145,7 @@ func (ft *filterTest) setup(train bool) *testlog {
 
 	// trigger reconfiguration
 	opt.Config = ft.config
-	opt.Validate(config.UpdateEvent, config.ConfigFile)
+	opt.Validate()
 
 	return logger
 }

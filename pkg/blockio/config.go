@@ -64,5 +64,5 @@ func (o *options) Validate() error {
 }
 
 func init() {
-	pkgcfg.Register(ConfigModuleName, "Block I/O class control", opt, defaultOptions)
+	pkgcfg.Register(ConfigModuleName, opt)
 }

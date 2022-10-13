@@ -188,7 +188,7 @@ func defaultOptions() interface{} {
 
 const (
 	// ConfigDescription describes our configuration fragment.
-	ConfigDescription = "message dumper" // XXX TODO
+	ConfigDescription = configHelp // XXX TODO
 )
 
 func (o *options) Describe() string {
@@ -223,5 +223,5 @@ func (o *options) Validate() error {
 // Register us for command line parsing and configuration handling.
 func init() {
 	opt.rules.parse(opt.Config)
-	config.Register("dump", configHelp, opt, defaultOptions)
+	config.Register("dump", opt)
 }

@@ -261,17 +261,6 @@ func init() {
 	opt = defaultOptions().(*options)
 	opt.apply()
 
-	cfglog := log.get("config")
-	pkgcfg.SetLogger(pkgcfg.Logger{
-		DebugEnabled: cfglog.DebugEnabled,
-		Debug:        cfglog.Debug,
-		Info:         cfglog.Info,
-		Warning:      cfglog.Warn,
-		Error:        cfglog.Error,
-		Fatal:        cfglog.Fatal,
-		Panic:        cfglog.Panic,
-	})
-
 	defaultDebugFlags = make(srcmap)
 	if value, ok := os.LookupEnv(debugEnvVar); ok {
 		if err := defaultDebugFlags.parse(value); err != nil {
@@ -284,5 +273,5 @@ func init() {
 		}
 	}
 
-	pkgcfg.Register(configModule, "log control", opt, defaultOptions)
+	pkgcfg.Register(configModule, opt)
 }
