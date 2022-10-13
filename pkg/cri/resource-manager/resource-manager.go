@@ -21,11 +21,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"golang.org/x/sys/unix"
 
-	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/relay"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/agent"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -103,7 +101,7 @@ func NewResourceManager() (ResourceManager, error) {
 		return nil, err
 	}
 
-	if err := m.loadConfig(); err != nil {
+	if err := m.loadInitialConfig(); err != nil {
 		return nil, err
 	}
 
@@ -223,7 +221,7 @@ func (m *resmgr) Stop() {
 // SetConfig pushes new configuration to the resource manager.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	m.Info("applying new configuration from agent...")
-	return m.setConfig(conf)
+	return m.updateConfig(conf)
 }
 
 // SetAdjustment pushes new external adjustments to the resource manager.
@@ -233,12 +231,6 @@ func (m *resmgr) SetAdjustment(adjustment *config.Adjustment) map[string]error {
 	m.Lock()
 	defer m.Unlock()
 	return m.setAdjustment(adjustment)
-}
-
-// setConfigFromFile pushes new configuration to the resource manager from a file.
-func (m *resmgr) setConfigFromFile(path string) error {
-	m.Info("applying new configuration from file %s...", path)
-	return m.setConfig(path)
 }
 
 // setAdjustments pushes new external policies to the resource manager.
@@ -334,66 +326,6 @@ func (m *resmgr) checkOpts() error {
 	return nil
 }
 
-// loadConfig tries to pick and load (initial) configuration from a number of sources.
-func (m *resmgr) loadConfig() error {
-	//
-	// We try to load initial configuration from a number of sources:
-	//
-	//    1. use forced configuration file if we were given one
-	//    2. use configuration from agent, if we can fetch it and it applies
-	//    3. use last configuration stored in cache, if we have one and it applies
-	//    4. use fallback configuration file if we were given one
-	//    5. use empty/builtin default configuration, whatever that is...
-	//
-	// Notes/TODO:
-	//   If the agent is already running at this point, the initial configuration is
-	//   obtained by polling the agent via GetConfig(). Unlike for the latter updates
-	//   which are pushed by the agent, there is currently no way to report problems
-	//   about polled configuration back to the agent. If/once the agent will have a
-	//   mechanism to propagate configuration errors back to the origin, this might
-	//   become a problem that we'll need to solve.
-	//
-
-	if opt.ForceConfig != "" {
-		m.Info("using forced configuration %s...", opt.ForceConfig)
-		if err := pkgcfg.SetConfigFromFile(opt.ForceConfig); err != nil {
-			return resmgrError("failed to load forced configuration %s: %v",
-				opt.ForceConfig, err)
-		}
-		return m.setupConfigSignal(opt.ForceConfigSignal)
-	}
-
-	m.Info("trying configuration from agent...")
-	if conf, err := m.agent.GetConfig(1 * time.Second); err == nil {
-		if err = pkgcfg.SetConfig(conf.Data); err == nil {
-			m.conf = conf // schedule storing in cache if we ever manage to start up
-			return nil
-		}
-		m.Error("configuration from agent failed to apply: %v", err)
-	}
-
-	m.Info("trying last cached configuration...")
-	if conf := m.cache.GetConfig(); conf != nil {
-		err := pkgcfg.SetConfig(conf.Data)
-		if err == nil {
-			return nil
-		}
-		m.Error("failed to activate cached configuration: %v", err)
-	}
-
-	if opt.FallbackConfig != "" {
-		m.Info("using fallback configuration %s...", opt.FallbackConfig)
-		if err := pkgcfg.SetConfigFromFile(opt.FallbackConfig); err != nil {
-			return resmgrError("failed to load fallback configuration %s: %v",
-				opt.FallbackConfig, err)
-		}
-		return nil
-	}
-
-	m.Warn("no initial configuration found")
-	return nil
-}
-
 // setupConfigSignal sets up a signal handler for reloading forced configuration.
 func (m *resmgr) setupConfigSignal(signame string) error {
 	if signame == "" || strings.HasPrefix(strings.ToLower(signame), "disable") {
@@ -421,7 +353,7 @@ func (m *resmgr) setupConfigSignal(signame string) error {
 
 			m.Info("reloading forced configuration %s...", opt.ForceConfig)
 
-			if err := m.setConfigFromFile(opt.ForceConfig); err != nil {
+			if err := m.updateConfig(opt.ForceConfig); err != nil {
 				m.Error("failed to reload forced configuration %s: %v",
 					opt.ForceConfig, err)
 			}
