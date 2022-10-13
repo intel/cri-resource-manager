@@ -66,8 +66,6 @@ type Server interface {
 	RegisterRuntimeService(api.RuntimeServiceServer) error
 	// RegisterInterceptors registers the given interceptors with the server.
 	RegisterInterceptors(map[string]Interceptor) error
-	// SetBypassCheckFn sets a function to check if interception should be bypassed.
-	SetBypassCheckFn(func() bool)
 	// Start starts the request processing loop (goroutine) of the server.
 	Start() error
 	// Stop stops the request processing loop (goroutine) of the server.

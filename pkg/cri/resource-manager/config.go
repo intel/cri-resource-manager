@@ -136,21 +136,19 @@ func (m *resmgr) activateConfig(kind string, v interface{}) error {
 		return resmgrError("%s configuration rejected: %w", kind, err)
 	}
 
-	if m.policy != nil && !m.policy.Bypassed() {
-		err = m.policy.UpdateConfig()
-		if err != nil {
-			return resmgrError("failed to activate %s configuration: %w", kind, err)
-		}
+	err = m.policy.UpdateConfig()
+	if err != nil {
+		return resmgrError("failed to activate %s configuration: %w", kind, err)
+	}
 
-		err = m.control.UpdateConfig()
-		if err != nil {
-			return resmgrError("failed to activate %s configuration: %w", kind, err)
-		}
+	err = m.control.UpdateConfig()
+	if err != nil {
+		return resmgrError("failed to activate %s configuration: %w", kind, err)
+	}
 
-		err = m.runPostUpdateHooks(context.Background(), "updateConfig")
-		if err != nil {
-			return resmgrError("post-update hooks failed for %s configuration: %w", kind, err)
-		}
+	err = m.runPostUpdateHooks(context.Background(), "updateConfig")
+	if err != nil {
+		return resmgrError("post-update hooks failed for %s configuration: %w", kind, err)
 	}
 
 	if cfg, ok := v.(*config.RawConfig); ok {

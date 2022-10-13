@@ -32,10 +32,6 @@ import (
 )
 
 const (
-	// NullPolicy is the reserved name for disabling policy altogether.
-	NullPolicy = "null"
-	// NullPolicyDescription is the description for the null policy.
-	NullPolicyDescription = "A policy to bypass local policy processing."
 	// NonePolicy is the name of the built-in none policy.
 	NonePolicy = "none"
 	// ConfigPath is the configuration module path for the generic policy layer.
@@ -226,10 +222,6 @@ func AvailablePolicies() []*AvailablePolicy {
 			Description: be.description,
 		})
 	}
-	policies = append(policies, &AvailablePolicy{
-		Name:        NullPolicy,
-		Description: NullPolicyDescription,
-	})
 	sort.Slice(policies, func(i, j int) bool { return policies[i].Name < policies[j].Name })
 
 	return policies
