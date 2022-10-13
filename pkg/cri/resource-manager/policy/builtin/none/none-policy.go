@@ -25,7 +25,7 @@ import (
 
 const (
 	// PolicyName is the name used to activate this policy implementation.
-	PolicyName = "none"
+	PolicyName = policy.NonePolicy
 	// PolicyDescription is a short description of this policy.
 	PolicyDescription = "A no-op policy, doing pretty much nothing."
 )
