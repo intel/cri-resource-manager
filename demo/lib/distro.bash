@@ -237,6 +237,14 @@ debian-install-golang() {
     debian-install-pkg golang git-core
 }
 
+debian-install-kernel-dev() {
+    distro-refresh-pkg-db
+    distro-install-pkg git-core build-essential linux-source bc kmod cpio flex libncurses5-dev libelf-dev libssl-dev dwarves bison
+    vm-command "[ -d linux ] || git clone https://github.com/torvalds/linux"
+    vm-command '[ -f linux/.config ] || cp -v /boot/config-$(uname -r) linux/.config'
+    # Ready to build kernel deb packages: cd linux; make menuconfig; make -j$(nproc) bindep-pkg
+}
+
 debian-10-install-containerd-pre() {
     debian-install-repo-key https://download.docker.com/linux/debian/gpg
     debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
