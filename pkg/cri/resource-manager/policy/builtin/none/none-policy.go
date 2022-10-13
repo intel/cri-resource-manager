@@ -60,6 +60,11 @@ func (n *none) Start(add []cache.Container, del []cache.Container) error {
 	return nil
 }
 
+// Stop this policy.
+func (n *none) Stop() {
+	n.Debug("got stopped...")
+}
+
 // Sync synchronizes the active policy state.
 func (n *none) Sync(add []cache.Container, del []cache.Container) error {
 	n.Debug("(not) synchronizing policy state")

@@ -41,6 +41,11 @@ func (p *policy) triggerColdStart(c cache.Container) error {
 	// the timer elapses.
 	duration := coldStart
 	timer := time.AfterFunc(duration, func() {
+		p.stopLock.Lock()
+		defer p.stopLock.Unlock()
+		if p.stopped {
+			return
+		}
 		e := &events.Policy{
 			Type:   ColdStartDone,
 			Source: PolicyName,

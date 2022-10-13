@@ -133,6 +133,11 @@ func (stp *stp) Start(add []cache.Container, del []cache.Container) error {
 	return nil
 }
 
+// Stop this policy.
+func (stp *stp) Stop() {
+	stp.Debug("stopped...")
+}
+
 // Sync synchronizes the state of this policy.
 func (stp *stp) Sync(add []cache.Container, del []cache.Container) error {
 	stp.Debug("synchronizing state...")

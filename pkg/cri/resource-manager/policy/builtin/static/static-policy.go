@@ -122,6 +122,11 @@ func (s *static) Start(add []cache.Container, del []cache.Container) error {
 	return s.Sync(add, del)
 }
 
+// Stop this policy.
+func (s *static) Stop() {
+	s.Debug("stopped...")
+}
+
 // Sync synchronizes the active policy state.
 func (s *static) Sync(add []cache.Container, del []cache.Container) error {
 	s.Debug("synchronizing state...")

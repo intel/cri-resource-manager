@@ -109,6 +109,8 @@ type Backend interface {
 	Description() string
 	// Start up and sycnhronize the policy, using the given cache and resource constraints.
 	Start([]cache.Container, []cache.Container) error
+	// Stop the policy.
+	Stop()
 	// Sync synchronizes the policy, allocating/releasing the given containers.
 	Sync([]cache.Container, []cache.Container) error
 	// UpdateConfig activates an updated configuration.
@@ -142,6 +144,8 @@ type Backend interface {
 type Policy interface {
 	// Start starts up policy, prepare for serving resource management requests.
 	Start([]cache.Container, []cache.Container) error
+	// Stop the policy.
+	Stop()
 	// Sync synchronizes the state of the active policy.
 	Sync([]cache.Container, []cache.Container) error
 	// UpdateConfig activates an updated configuration.
@@ -272,6 +276,12 @@ func (p *policy) SendEvent(e interface{}) error {
 func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	log.Info("starting policy '%s'...", p.active.Name())
 	return p.active.Start(add, del)
+}
+
+// Stop stops the active policy.
+func (p *policy) Stop() {
+	log.Info("shutting down policy '%s'...", p.active.Name())
+	p.active.Stop()
 }
 
 // Sync synchronizes the active policy state.

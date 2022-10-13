@@ -189,6 +189,11 @@ func (p *balloons) Start(add []cache.Container, del []cache.Container) error {
 	return p.Sync(p.cch.GetContainers(), nil)
 }
 
+// Stop this policy.
+func (p *balloons) Stop() {
+	log.Info("%s policy stopped", PolicyName)
+}
+
 // Sync synchronizes the active policy state.
 func (p *balloons) Sync(add []cache.Container, del []cache.Container) error {
 	log.Debug("synchronizing state...")

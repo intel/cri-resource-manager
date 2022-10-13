@@ -119,6 +119,11 @@ func (p *staticplus) Start(add []cache.Container, del []cache.Container) error {
 	return p.Sync(add, del)
 }
 
+// Stop this policy.
+func (p *staticplus) Stop() {
+	p.Debug("stopped...")
+}
+
 // Sync synchronizes the state ofd this policy.
 func (p *staticplus) Sync(add []cache.Container, del []cache.Container) error {
 	p.Debug("synchronizing state...")
@@ -722,16 +727,14 @@ func (ca *cachedAllocations) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-//
 // Functions for calculating CFS cpu.shares and cpu.cfs_quota_us.
 //
-//   Notes: These functions are almost verbatim taken from the kubelet
-//   code (from k8s.io/kubernetes/pkg/kubelet/cm/helpers_linux.go).
-//   Since these are exported there, we could try to import them, set the
-//   related feature gates (kubefeatures.CPUCFSQuotaPeriod) for ourselves
-//   into the desired positions (disabled most probably for now) and use
-//   the imported code.
-//
+//	Notes: These functions are almost verbatim taken from the kubelet
+//	code (from k8s.io/kubernetes/pkg/kubelet/cm/helpers_linux.go).
+//	Since these are exported there, we could try to import them, set the
+//	related feature gates (kubefeatures.CPUCFSQuotaPeriod) for ourselves
+//	into the desired positions (disabled most probably for now) and use
+//	the imported code.
 const (
 	MinShares     = 2
 	SharesPerCPU  = 1024

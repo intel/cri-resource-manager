@@ -181,6 +181,11 @@ func (p *podpools) Start(add []cache.Container, del []cache.Container) error {
 	return p.Sync(add, del)
 }
 
+// Stop this policy.
+func (p *podpools) Stop() {
+	log.Info("%s policy stopped", PolicyName)
+}
+
 // Sync synchronizes the active policy state.
 func (p *podpools) Sync(add []cache.Container, del []cache.Container) error {
 	log.Debug("synchronizing state...")

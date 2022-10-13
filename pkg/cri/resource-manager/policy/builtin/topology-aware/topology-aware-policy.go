@@ -15,6 +15,8 @@
 package topologyaware
 
 import (
+	"sync"
+
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -72,6 +74,8 @@ type policy struct {
 	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
 	coldstartOff bool                      // coldstart forced off (have movable PMEM zones)
 	isAlias      bool                      // whether started by referencing AliasName
+	stopped      bool
+	stopLock     sync.Mutex
 }
 
 // Make sure policy implements the policy.Backend interface.
@@ -133,11 +137,22 @@ func (p *policy) Start(add []cache.Container, del []cache.Container) error {
 	// Note that although this can change dynamically we only check it
 	// during startup and trust users to either not fiddle with memory
 	// or restart us if they do.
+	p.stopped = false
 	p.checkColdstartOff()
 
 	p.root.Dump("<post-start>")
 
 	return p.Sync(add, del)
+}
+
+// Stop this policy.
+func (p *policy) Stop() {
+	// let any running coldstart timers deactivate themselves
+	p.stopLock.Lock()
+	defer p.stopLock.Unlock()
+	p.stopped = true
+
+	log.Debug("stopped...")
 }
 
 // Sync synchronizes the state of this policy.
