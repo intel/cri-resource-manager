@@ -242,7 +242,9 @@ debian-install-kernel-dev() {
     distro-install-pkg git-core build-essential linux-source bc kmod cpio flex libncurses5-dev libelf-dev libssl-dev dwarves bison
     vm-command "[ -d linux ] || git clone https://github.com/torvalds/linux"
     vm-command '[ -f linux/.config ] || cp -v /boot/config-$(uname -r) linux/.config'
-    # Ready to build kernel deb packages: cd linux; make menuconfig; make -j$(nproc) bindep-pkg
+    echo "Kernel ready for patching and configuring."
+    echo "build:   cd linux && make bindeb-pkg"
+    echo "install: dpkg -i linux-*.deb"
 }
 
 debian-10-install-containerd-pre() {
@@ -445,6 +447,26 @@ fedora-install-pkg-local() {
     fi
     vm-command "rpm -Uvh $force $*" ||
         command-error "failed to install local package(s)"
+}
+
+fedora-install-kernel-dev() {
+    fedora-install-pkg fedpkg fedora-packager rpmdevtools ncurses-devel pesign grubby git-core
+    vm-command "(set -x -e
+      echo root >> /etc/pesign/users
+      echo $(vm-ssh-user) >> /etc/pesign/users
+      /usr/libexec/pesign/pesign-authorize
+      fedpkg clone -a kernel
+      cd kernel
+      git fetch
+      git switch ${VM_DISTRO/edora-/} # example: git switch f35 in fedora-35
+      sed -i 's/# define buildid .local/%define buildid .e2e/g' kernel.spec
+    )" || {
+        echo "installing kernel development environment failed"
+        return 1
+    }
+    echo "Kernel ready for patching and configuring."
+    echo "build:   cd kernel && dnf builddep -y kernel.spec && fedpkg local"
+    echo "install: cd kernel/x86_64 && dnf install -y --nogpgcheck kernel-{core-,modules-,}[5-9]*.e2e.fc*.x86_64.rpm"
 }
 
 fedora-install-golang() {
