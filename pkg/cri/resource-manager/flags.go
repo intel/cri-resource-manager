@@ -74,7 +74,7 @@ func init() {
 	flag.StringVar(&opt.FallbackConfig, "fallback-config", "",
 		"Fallback configuration to use unless/until one is available from the cache or agent.")
 	flag.StringVar(&opt.ForceConfig, "force-config", "",
-		"Configuration used to override the one stored in the cache. Does not override the agent.")
+		"Configuration used to override the one stored in the cache. Disables the agent.")
 	flag.StringVar(&opt.ForceConfigSignal, "force-config-signal", "SIGHUP",
 		"Signal used to reload forced configuration.")
 	flag.BoolVar(&opt.ResetConfig, "reset-config", false,
