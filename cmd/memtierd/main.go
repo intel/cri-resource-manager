@@ -28,7 +28,8 @@ import (
 )
 
 type Config struct {
-	Policy memtier.PolicyConfig
+	Policy   memtier.PolicyConfig
+	Routines []memtier.RoutineConfig
 }
 
 func exit(format string, a ...interface{}) {
@@ -36,7 +37,7 @@ func exit(format string, a ...interface{}) {
 	os.Exit(1)
 }
 
-func policyFromConfigFile(filename string) memtier.Policy {
+func loadConfigFile(filename string) (memtier.Policy, []memtier.Routine) {
 	configBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		exit("%s", err)
@@ -57,7 +58,19 @@ func policyFromConfigFile(filename string) memtier.Policy {
 		exit("%s", err)
 	}
 
-	return policy
+	routines := []memtier.Routine{}
+	for _, routineCfg := range config.Routines {
+		routine, err := memtier.NewRoutine(routineCfg.Name)
+		if err != nil {
+			exit("%s", err)
+		}
+		err = routine.SetConfigJson(routineCfg.Config)
+		if err != nil {
+			exit("routine %s: %s", routineCfg.Name, err)
+		}
+		routines = append(routines, routine)
+	}
+	return policy, routines
 }
 
 func main() {
@@ -77,8 +90,9 @@ func main() {
 	}
 
 	var policy memtier.Policy
+	var routines []memtier.Routine
 	if *optConfig != "" {
-		policy = policyFromConfigFile(*optConfig)
+		policy, routines = loadConfigFile(*optConfig)
 	} else {
 		exit("missing -prompt or -config")
 	}
@@ -94,6 +108,12 @@ func main() {
 		}
 	}
 
+	for r, routine := range routines {
+		if err := routine.Start(); err != nil {
+			exit("error in starting routine %d: %s", r+1, err)
+		}
+	}
+
 	prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
 	if stdinFileInfo, _ := os.Stdin.Stat(); (stdinFileInfo.Mode() & os.ModeCharDevice) == 0 {
 		// Input comes from a pipe.
@@ -101,5 +121,8 @@ func main() {
 		prompt.SetEcho(true)
 	}
 	prompt.SetPolicy(policy)
+	if len(routines) > 0 {
+		prompt.SetRoutines(routines)
+	}
 	prompt.Interact()
 }

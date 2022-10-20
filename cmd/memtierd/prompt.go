@@ -38,18 +38,20 @@ type Cmd struct {
 }
 
 type Prompt struct {
-	r       *bufio.Reader
-	w       *bufio.Writer
-	f       *flag.FlagSet
-	mover   *memtier.Mover
-	pages   *memtier.Pages
-	aranges *memtier.AddrRanges
-	tracker memtier.Tracker
-	policy  memtier.Policy
-	cmds    map[string]Cmd
-	ps1     string
-	echo    bool
-	quit    bool
+	r            *bufio.Reader
+	w            *bufio.Writer
+	f            *flag.FlagSet
+	mover        *memtier.Mover
+	pages        *memtier.Pages
+	aranges      *memtier.AddrRanges
+	tracker      memtier.Tracker
+	policy       memtier.Policy
+	routines     []memtier.Routine
+	routineInUse int
+	cmds         map[string]Cmd
+	ps1          string
+	echo         bool
+	quit         bool
 }
 
 type commandStatus int
@@ -72,16 +74,17 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		mover: memtier.NewMover(),
 	}
 	p.cmds = map[string]Cmd{
-		"q":       Cmd{"quit interactive prompt.", p.cmdQuit},
-		"tracker": Cmd{"manage tracker, track memory accesses.", p.cmdTracker},
-		"stats":   Cmd{"print statistics.", p.cmdStats},
-		"swap":    Cmd{"print swapped pages.", p.cmdSwap},
-		"pages":   Cmd{"select pages, print selected page nodes and flags.", p.cmdPages},
-		"arange":  Cmd{"select/split/filter address ranges.", p.cmdArange},
-		"mover":   Cmd{"manage mover, move selected pages.", p.cmdMover},
-		"policy":  Cmd{"manage policy, start/stop memory tiering.", p.cmdPolicy},
-		"help":    Cmd{"print help.", p.cmdHelp},
-		"nop":     Cmd{"no operation.", p.cmdNop},
+		"q":        Cmd{"quit interactive prompt.", p.cmdQuit},
+		"tracker":  Cmd{"manage tracker, track memory accesses.", p.cmdTracker},
+		"stats":    Cmd{"print statistics.", p.cmdStats},
+		"swap":     Cmd{"print swapped pages.", p.cmdSwap},
+		"pages":    Cmd{"select pages, print selected page nodes and flags.", p.cmdPages},
+		"arange":   Cmd{"select/split/filter address ranges.", p.cmdArange},
+		"mover":    Cmd{"manage mover, move selected pages.", p.cmdMover},
+		"policy":   Cmd{"manage policy, start/stop memory tiering.", p.cmdPolicy},
+		"routines": Cmd{"manage routines.", p.cmdRoutines},
+		"help":     Cmd{"print help.", p.cmdHelp},
+		"nop":      Cmd{"no operation.", p.cmdNop},
 	}
 	return &p
 }
@@ -175,6 +178,10 @@ func (p *Prompt) SetPolicy(policy memtier.Policy) {
 	p.policy = policy
 	p.mover = p.policy.Mover()
 	p.tracker = p.policy.Tracker()
+}
+
+func (p *Prompt) SetRoutines(routines []memtier.Routine) {
+	p.routines = routines
 }
 
 func sortedStringKeys(m map[string]Cmd) []string {
@@ -800,6 +807,85 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	}
 	if *dump {
 		p.output("%s\n", p.policy.Dump(remainder))
+		p.output("\n")
+	}
+	return csOk
+}
+
+func (p *Prompt) cmdRoutines(args []string) commandStatus {
+	ls := p.f.Bool("ls", false, "list available routine types")
+	create := p.f.String("create", "", "create new routine from type NAME")
+	config := p.f.String("config", "", "reconfigure the routine with JSON string")
+	configDump := p.f.Bool("config-dump", false, "dump current config")
+	configFile := p.f.String("config-file", "", "reconfigure the routine with JSON FILE")
+	dump := p.f.Bool("dump", false, "dump routine state")
+	start := p.f.Bool("start", false, "start routine")
+	stop := p.f.Bool("stop", false, "stop routine")
+	use := p.f.Int("use", -1, "pass commands to routine at given index (0, 1, ...)")
+	if err := p.f.Parse(args); err != nil {
+		return csOk
+	}
+	remainder := p.f.Args()
+	if *ls {
+		p.output(strings.Join(memtier.RoutineList(), "\n") + "\n")
+		return csOk
+	}
+	if *create != "" {
+		routine, err := memtier.NewRoutine(*create)
+		if err != nil {
+			p.output("%s\n", err)
+			return csOk
+		}
+		p.routines = append(p.routines, routine)
+		p.routineInUse = len(p.routines) - 1
+		p.output("routine %d created, started using it\n", p.routineInUse)
+	}
+	if len(p.routines) == 0 {
+		p.output("no routines, create one with -create NAME\n")
+		return csOk
+	}
+	if *use > -1 {
+		if *use >= len(p.routines) {
+			p.output("invalid routine %d, the last one is %d\n", *use, len(p.routines)-1)
+			return csOk
+		}
+		p.routineInUse = *use
+	}
+	if *configFile != "" {
+		configJson, err := ioutil.ReadFile(*configFile)
+		if err != nil {
+			p.output("reading file %q failed: %s\n", *configFile, err)
+			return csOk
+		}
+		err = p.routines[p.routineInUse].SetConfigJson(string(configJson))
+		if err != nil {
+			p.output("config failed: %s\n", err)
+			return csOk
+		}
+	}
+	if *config != "" {
+		err := p.routines[p.routineInUse].SetConfigJson(*config)
+		if err != nil {
+			p.output("config failed: %s\n", err)
+			return csOk
+		}
+	}
+	if *start {
+		err := p.routines[p.routineInUse].Start()
+		if err != nil {
+			p.output("start failed: %s\n", err)
+			return csOk
+		}
+	}
+	if *configDump {
+		p.output("%s\n", p.routines[p.routineInUse].GetConfigJson())
+	}
+	if *stop {
+		p.routines[p.routineInUse].Stop()
+		p.output("routine %d stopped\n", p.routineInUse)
+	}
+	if *dump {
+		p.output("%s\n", p.routines[p.routineInUse].Dump(remainder))
 		p.output("\n")
 	}
 	return csOk

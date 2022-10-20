@@ -126,6 +126,25 @@ func GetStats() *Stats {
 	return stats
 }
 
+// MadvicedPageCount returns the number of pages on which
+// process_madvice(pid, advice) has been called. If pid==-1 or
+// advice==-1, then return the sum of pages of all pids and advices.
+func (s *Stats) MadvicedPageCount(pid int, advice int) uint64 {
+	totalPages := uint64(0)
+	for spid, spm := range s.pidMadvices {
+		if pid != -1 && pid != spid {
+			continue
+		}
+		for adv, pageCount := range spm.advicePageCount {
+			if advice != -1 && adv != advice {
+				continue
+			}
+			totalPages += pageCount
+		}
+	}
+	return totalPages
+}
+
 func (s *Stats) Store(entry interface{}) {
 	s.Lock()
 	defer s.Unlock()

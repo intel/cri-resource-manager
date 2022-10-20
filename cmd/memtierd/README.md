@@ -367,3 +367,38 @@ trackers, what they detect and their dependencies.
     - `/proc/PID/pagemap`
 - multi:
   - Combination of trackers.
+
+## Routines
+
+Routines are configured and executed independently of policies and
+trackers.
+
+### StatActions routine
+
+The `statactions` routine executes commands based on configured
+criteria. Each of these routines run periodically with the interval of
+`intervalms` milliseconds, checking which criteria are fulfilled, and
+then executing corresponding commands.
+
+Following is an example of an memtierd configuration that configures
+only a policy stub but has two routines. The first routine prints time
+to `statactions-1s-period.txt` every second. The second routine checks
+every 5 seconds whether or not more than 3000 MB of memory has been
+paged out. If this is the case, the routine executes a command that
+frees the page cache. Then the routine resets its internal counter to
+start waiting for the next 3000 MB to be paged out.
+
+```
+policy:
+  name: stub
+routines:
+- name: statactions
+  config: |
+    intervalms: 1000
+    intervalcommand: ["sh", "-c", "date +%s.%N >> /tmp/statactions-1s-period.txt"]
+- name: statactions
+  config: |
+    intervalms: 5000
+    pageoutmb: 3000
+    pageoutcommand: ["sh", "-c", "echo 1 > /proc/sys/vm/drop_caches"]
+```
