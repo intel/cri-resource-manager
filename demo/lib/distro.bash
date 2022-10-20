@@ -1,7 +1,9 @@
 # shellcheck disable=SC2120
 GO_URLDIR=https://golang.org/dl
-GO_VERSION=1.16.8
+GO_VERSION=1.19.1
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
+CRICTL_VERSION=${CRICTL_VERSION:-"v1.25.0"}
+MINIKUBE_VERSION=${MINIKUBE_VERSION:-v1.27.0}
 
 ###########################################################################
 
@@ -35,6 +37,9 @@ distro-restart-containerd() { distro-resolve "$@"; }
 distro-install-crio()       { distro-resolve "$@"; }
 distro-config-crio()        { distro-resolve "$@"; }
 distro-restart-crio()       { distro-resolve "$@"; }
+distro-install-crictl()     { distro-resolve "$@"; }
+distro-install-cri-dockerd(){ distro-resolve "$@"; }
+distro-install-minikube()   { distro-resolve "$@"; }
 distro-install-k8s()        { distro-resolve "$@"; }
 distro-install-kernel-dev() { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
@@ -234,6 +239,7 @@ debian-install-pkg-local() {
 }
 
 debian-install-golang() {
+    debian-refresh-pkg-db
     debian-install-pkg golang git-core
 }
 
@@ -255,6 +261,13 @@ debian-10-install-containerd-pre() {
 
 debian-sid-install-containerd-post() {
     vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
+}
+
+debian-install-cri-dockerd-pre() {
+    debian-refresh-pkg-db
+    debian-install-pkg docker.io conntrack
+    vm-command "addgroup $(vm-ssh-user) docker"
+    distro-install-golang
 }
 
 debian-install-crio-pre() {
@@ -487,6 +500,12 @@ fedora-install-containernetworking-plugins() {
     distro-install-pkg containernetworking-plugins
     vm-command "[ -x /opt/cni/bin/loopback ] || { mkdir -p /opt/cni/bin; mount --bind /usr/libexec/cni /opt/cni/bin; }"
     vm-command "grep /usr/libexec/cni /etc/fstab || echo /usr/libexec/cni /opt/cni/bin none defaults,bind,nofail 0 0 >> /etc/fstab"
+}
+
+fedora-install-cri-dockerd-pre() {
+    distro-install-pkg docker git-core conntrack
+    vm-command "systemctl enable docker --now; usermod --append --groups docker $(vm-ssh-user)"
+    distro-install-golang
 }
 
 fedora-install-crio-pre() {
@@ -1099,6 +1118,35 @@ EOF
 default-restart-crio() {
     vm-command "systemctl daemon-reload && systemctl restart crio" ||
         command-error "failed to restart crio systemd service"
+}
+
+default-install-minikube() {
+    vm-command "curl -Lo /usr/local/bin/minikube https://storage.googleapis.com/minikube/releases/${MINIKUBE_VERSION}/minikube-linux-amd64 && chmod +x /usr/local/bin/minikube"
+    distro-install-crictl
+}
+
+default-install-crictl() {
+    vm-command "set -e -x
+    wget https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz
+    sudo tar zxvf crictl-${CRICTL_VERSION}-linux-amd64.tar.gz -C /usr/local/bin
+    rm -f crictl-${CRICTL_VERSION}-linux-amd64.tar.gz
+    "
+}
+
+default-install-cri-dockerd() {
+    vm-command "set -e -x
+    git clone --depth=1 https://github.com/Mirantis/cri-dockerd.git
+    cd cri-dockerd
+    mkdir bin
+    go build -o bin/cri-dockerd
+    mkdir -p /usr/local/bin
+    install -o root -g root -m 0755 bin/cri-dockerd /usr/local/bin/cri-dockerd
+    cp -a packaging/systemd/* /etc/systemd/system
+    sed -i -e 's,/usr/bin/cri-dockerd,/usr/local/bin/cri-dockerd,' /etc/systemd/system/cri-docker.service
+    systemctl daemon-reload
+    systemctl enable cri-docker.service
+    systemctl enable --now cri-docker.socket
+    "
 }
 
 default-env-file-dir() {

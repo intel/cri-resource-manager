@@ -1001,6 +1001,16 @@ vm-install-k8s() {
     distro-restart-$VM_CRI
 }
 
+vm-install-minikube() {
+    vm-install-containernetworking
+    distro-install-cri-dockerd
+    distro-install-minikube
+}
+
+vm-create-minikube-cluster() {
+    vm-command "sysctl fs.protected_regular=0; minikube start --driver=none --alsologtostderr=true"
+}
+
 vm-create-singlenode-cluster() {
     if ! [ "$(type -t vm-install-cni-$(distro-k8s-cni))" == "function" ]; then
         error "invalid CNI: $(distro-k8s-cni)"
