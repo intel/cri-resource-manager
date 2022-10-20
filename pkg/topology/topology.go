@@ -28,7 +28,7 @@ import (
 
 // to mock in tests
 var (
-	mockRoot = ""
+	sysRoot = ""
 )
 
 const (
@@ -48,6 +48,11 @@ type Hint struct {
 // Hints represents set of hints collected from multiple providers
 type Hints map[string]Hint
 
+// SetSysRoot sets the sysfs root directory to use.
+func SetSysRoot(root string) {
+	sysRoot = root
+}
+
 func getDevicesFromVirtual(realDevPath string) (devs []string, err error) {
 	if !filepath.HasPrefix(realDevPath, "/sys/devices/virtual") {
 		return nil, fmt.Errorf("%s is not a virtual device", realDevPath)
@@ -58,7 +63,7 @@ func getDevicesFromVirtual(realDevPath string) (devs []string, err error) {
 	dir, file := filepath.Split(relPath)
 	switch dir {
 	case "vfio/":
-		iommuGroup := filepath.Join(mockRoot, "/sys/kernel/iommu_groups", file, "devices")
+		iommuGroup := filepath.Join(sysRoot, "/sys/kernel/iommu_groups", file, "devices")
 		files, err := ioutil.ReadDir(iommuGroup)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read IOMMU group %s", iommuGroup)
@@ -128,7 +133,7 @@ func NewTopologyHints(devPath string) (hints Hints, err error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed get realpath for %s", devPath)
 	}
-	for p := realDevPath; strings.HasPrefix(p, mockRoot+"/sys/devices/"); p = filepath.Dir(p) {
+	for p := realDevPath; strings.HasPrefix(p, sysRoot+"/sys/devices/"); p = filepath.Dir(p) {
 		hint, err := getTopologyHint(p)
 		if err != nil {
 			return nil, err

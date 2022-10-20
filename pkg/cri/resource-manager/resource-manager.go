@@ -38,6 +38,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/instrumentation"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/pidfile"
+	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/topology"
 
 	policyCollector "github.com/intel/cri-resource-manager/pkg/policycollector"
 	"github.com/intel/cri-resource-manager/pkg/utils"
@@ -85,6 +87,9 @@ func NewResourceManager() (ResourceManager, error) {
 	if err := m.setupCache(); err != nil {
 		return nil, err
 	}
+
+	sysfs.SetSysRoot(opt.HostRoot)
+	topology.SetSysRoot(opt.HostRoot)
 
 	switch {
 	case opt.ResetPolicy && opt.ResetConfig:

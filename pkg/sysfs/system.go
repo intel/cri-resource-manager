@@ -30,9 +30,12 @@ import (
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
+var (
+	// Parent directory under which host sysfs, etc. is mounted (if non-standard location).
+	sysRoot = ""
+)
+
 const (
-	// SysfsRootPath is the mount path of sysfs.
-	SysfsRootPath = "/sys"
 	// sysfs devices/cpu subdirectory path
 	sysfsCPUPath = "devices/system/cpu"
 	// sysfs device/node subdirectory path
@@ -236,9 +239,14 @@ type Cache struct {
 	cpus  idset.IDSet // CPUs sharing this cache
 }
 
+// SetSysRoot sets the sys root directory.
+func SetSysRoot(path string) {
+	sysRoot = path
+}
+
 // DiscoverSystem performs discovery of the running systems details.
 func DiscoverSystem(args ...DiscoveryFlag) (System, error) {
-	return DiscoverSystemAt(SysfsRootPath, args...)
+	return DiscoverSystemAt(filepath.Join("/", sysRoot, "sys"))
 }
 
 // DiscoverSystemAt performs discovery of the running systems details from sysfs mounted at path.
@@ -1051,9 +1059,12 @@ func (p *cpuPackage) SstInfo() *sst.SstPackageInfo {
 }
 
 // Discover cache associated with the given CPU.
+//
 // Notes:
-//     I'm not sure how to interpret the cache information under sysfs. This code is now effectively
-//     disabled by forcing the associated discovery bit off in the discovery flags.
+//
+//	I'm not sure how to interpret the cache information under sysfs.
+//	This code is now effectively disabled by forcing the associated
+//	discovery bit off in the discovery flags.
 func (sys *system) discoverCache(path string) error {
 	var id idset.ID
 
