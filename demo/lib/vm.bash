@@ -1054,6 +1054,14 @@ vm-install-cni-flannel() {
     fi
 }
 
+vm-install-kernel-dev() { # script API
+    # Usage: vm-install-kernel-dev
+    #
+    # Install dependencies and kernel sources ready for patching,
+    # configuring and building packages.
+    distro-install-kernel-dev
+}
+
 vm-print-usage() {
     echo "- Login VM:     ssh $VM_SSH_USER@$VM_IP"
     echo "- Stop VM:      govm stop $VM_NAME"
