@@ -101,13 +101,9 @@ func (t *TrackerMulti) ResetCounters() {
 }
 
 func (t *TrackerMulti) GetCounters() *TrackerCounters {
-	var tcs *TrackerCounters
+	var tcs *TrackerCounters = &TrackerCounters{}
 	for _, tracker := range t.trackers {
-		if tcs == nil {
-			tcs = tracker.GetCounters()
-		} else {
-			*tcs = append(*tcs, *tracker.GetCounters()...)
-		}
+		*tcs = append(*tcs, *tracker.GetCounters()...)
 	}
 	return tcs.Flattened(nil, nil)
 }
