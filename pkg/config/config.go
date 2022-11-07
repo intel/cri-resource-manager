@@ -137,9 +137,20 @@ func Print() {
 }
 
 // Describe the configuration fragment for the given path.
-func Describe(names ...string) {
+func Describe(paths ...string) {
 	fmt.Printf("XXX TODO: config.Describe()\n")
-	Print()
+
+	if len(paths) == 0 {
+		paths = []string{""}
+	}
+
+	for _, path := range paths {
+		if n := root.get(path); n != nil {
+			fmt.Printf("- %s:\n", n.path.Canonical())
+			fmt.Printf("%s\n", n.describe())
+		}
+	}
+
 	return
 }
 

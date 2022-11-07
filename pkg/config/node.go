@@ -115,21 +115,35 @@ func newNode(path Path, ptr interface{}) *node {
 	}
 }
 
-func (n *node) depthFirst(fn func(*node) error) error {
+func (n *node) depthFirst(fn func(*node, int) error) error {
+	if n == nil {
+		return nil
+	}
+	return n.dfWalk(fn, 0)
+}
+
+func (n *node) dfWalk(fn func(*node, int) error, level int) error {
 	for _, c := range n.children {
-		if err := fn(c); err != nil {
+		if err := c.dfWalk(fn, level+1); err != nil {
 			return err
 		}
 	}
-	return fn(n)
+	return fn(n, level)
 }
 
-func (n *node) breadthFirst(fn func(*node) error) error {
-	if err := fn(n); err != nil {
+func (n *node) breadthFirst(fn func(*node, int) error) error {
+	if n == nil {
+		return nil
+	}
+	return n.bfWalk(fn, 0)
+}
+
+func (n *node) bfWalk(fn func(*node, int) error, level int) error {
+	if err := fn(n, level); err != nil {
 		return err
 	}
 	for _, c := range n.children {
-		if err := fn(c); err != nil {
+		if err := c.bfWalk(fn, level+1); err != nil {
 			return err
 		}
 	}
@@ -163,6 +177,18 @@ func (n *node) add(path Path, ptr interface{}) error {
 	p.ptr = ptr
 
 	return nil
+}
+
+func (n *node) get(path string) *node {
+	p := n
+	for _, name := range makePath(path).Canonical() {
+		c, ok := p.children[name]
+		if !ok {
+			return nil
+		}
+		p = c
+	}
+	return p
 }
 
 func (n *node) compile() error {
@@ -300,6 +326,17 @@ func (n *node) dump(level int, dumpData bool) string {
 	return str
 }
 
+func (n *node) describe() string {
+	str := ""
+	n.breadthFirst(func(p *node, level int) error {
+		if p.ptr != nil {
+			str += indent(level) + p.ptr.(Fragment).Describe()
+		}
+		return nil
+	})
+	return str
+}
+
 func indent(level int) string {
 	return fmt.Sprintf("%*s", level, "")
 }
@@ -312,6 +349,9 @@ const (
 type Path []string
 
 func makePath(s string) Path {
+	if s == "" {
+		return []string{}
+	}
 	return strings.Split(s, pathSep)
 }
 
