@@ -107,9 +107,9 @@ func (m *resmgr) updateConfig(v interface{}) error {
 
 	err = m.activateConfig("updated", v)
 	if err != nil {
-		err = m.activateConfig("reverted", old)
-		if err != nil {
-			m.Error("failed to revert to existing configuration: %v", err)
+		revErr := m.activateConfig("reverted", old)
+		if revErr != nil {
+			m.Error("failed to revert to existing configuration: %v", revErr)
 		}
 
 		return err

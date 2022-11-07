@@ -221,7 +221,23 @@ func (m *resmgr) Stop() {
 // SetConfig pushes new configuration to the resource manager.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
 	m.Info("applying new configuration from agent...")
-	return m.updateConfig(conf)
+	if err := m.updateConfig(conf); err != nil {
+		m.Error("failed to apply configuration: %v", err)
+		return err
+	}
+	m.Info("configuration applied")
+	return nil
+}
+
+// reloadConfig reloads forced configuration from a file.
+func (m *resmgr) reloadConfig() error {
+	m.Info("reloading forced configuration from %s...", opt.ForceConfig)
+	if err := m.updateConfig(opt.ForceConfig); err != nil {
+		m.Error("failed to reload configuration: %v", err)
+		return err
+	}
+	m.Info("configuration reloaded")
+	return nil
 }
 
 // SetAdjustment pushes new external adjustments to the resource manager.
@@ -351,12 +367,15 @@ func (m *resmgr) setupConfigSignal(signame string) error {
 				}
 			}
 
-			m.Info("reloading forced configuration %s...", opt.ForceConfig)
+			m.reloadConfig()
+			/*
+				m.Info("reloading forced configuration %s...", opt.ForceConfig)
 
-			if err := m.updateConfig(opt.ForceConfig); err != nil {
-				m.Error("failed to reload forced configuration %s: %v",
-					opt.ForceConfig, err)
-			}
+				if err := m.updateConfig(opt.ForceConfig); err != nil {
+					m.Error("failed to reload forced configuration %s: %v",
+						opt.ForceConfig, err)
+				}
+			*/
 		}
 	}(m.signals)
 
