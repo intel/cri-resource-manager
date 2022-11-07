@@ -319,6 +319,9 @@ func (n *node) dump(level int, dumpData bool) string {
 	}
 
 	for name, c := range n.children {
+		if str != "" && str[len(str)-1] != '\n' {
+			str += "\n"
+		}
 		str += fmt.Sprintf("%s%s:\n", indent(level), name)
 		str += fmt.Sprintf("%s\n", c.dump(level+2, dumpData))
 	}
