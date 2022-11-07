@@ -281,6 +281,8 @@ func Register(name, description string, c Controller) error {
 		c:           c,
 	}
 
+	opt.Controllers[name] = Default
+
 	return nil
 }
 
