@@ -21,6 +21,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/agent"
 	"github.com/intel/cri-resource-manager/pkg/log"
+	"github.com/intel/cri-resource-manager/pkg/version"
 )
 
 func main() {
@@ -35,6 +36,8 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to create resource manager agent instance: %v", err)
 	}
+
+	log.Info("cri-resmgr agent (version %s, build %s) starting...", version.Version, version.Build)
 
 	if err := a.Run(); err != nil {
 		log.Fatal("%v", err)
