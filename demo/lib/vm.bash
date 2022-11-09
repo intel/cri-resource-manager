@@ -17,6 +17,7 @@ vms:
       - KVM_CPU_OPTS=${VM_QEMU_CPUMEM:=-machine pc -smp cpus=4 -m 8G}
       - EXTRA_QEMU_OPTS=-monitor unix:/data/monitor,server,nowait ${VM_QEMU_EXTRA}
       - USE_NET_BRIDGES=${USE_NET_BRIDGES:-0}
+      - DISABLE_VGA=1
     user-data: |
       #!/bin/bash
       set -e
