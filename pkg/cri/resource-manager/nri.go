@@ -376,10 +376,32 @@ func (p *nriPlugin) adjustResources(a *api.ContainerAdjustment, c *api.Container
 		a.AddLinuxHugepageLimit(l.PageSize, l.Limit)
 	}
 	if bioc := cc.GetBlockIOClass(); bioc != "" {
-		a.SetLinuxBlockIOClass(bioc)
+		// XXX TODO skip setting blockio class for now
+		//
+		// We need to do class to CLOS resolution here using goresctrl.
+		// For that we need to figure out how to properly initialize
+		// goresctrl if we are running as a DaemonSet with host sysfs
+		// mounted under a non-standard location.
+
+		p.resmgr.Info("*** TODO: should set Block I/O class to %s...", bioc)
+
+		//a.SetLinuxBlockIOClass(bioc)
 	}
+	// XXX TODO skip setting RDT class for now...
+	//
+	// We need to do class to CLOS resolution here using goresctrl.
+	// For that we need to figure out how to properly initialize
+	// goresctrl if we are running as a DaemonSet with host sysfs
+	// mounted under a non-standard location.
 	if rdtc := cc.GetRDTClass(); rdtc != "" {
-		a.SetLinuxRDTClass(rdtc)
+		if rdtc == cache.RDTClassPodQoS {
+			rdtc = string(cc.GetQOSClass())
+		}
+		if rdtc != "" {
+			p.resmgr.Info("*** TODO: should set RDT class to %s...", rdtc)
+		}
+
+		//a.SetLinuxRDTClass(rdtc)
 	}
 }
 
