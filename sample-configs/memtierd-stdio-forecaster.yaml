@@ -1,0 +1,35 @@
+# This memtierd configuration file demonstrates external
+# forecaster written in Python
+#
+# Heat forecaster is a component that
+# 1. receives all heatmaps from the heat policy in policy interval
+# 2. communicates a forecast of expected heats in order to trigger
+#    predictivie memory moves.
+
+policy:
+  name: heat
+  config: |
+    intervalms: 10000
+
+    pids:
+      - $(pidof meme)
+
+    heatmap:
+      heatmax: 0.01
+      heatretention: 0.8
+      heatclasses: 4
+
+    forecaster:
+      name: stdio
+      config: |
+        command: ['python3', 'memtierd-stdio-forecaster.py']
+
+    tracker:
+      name: softdirty
+      config: |
+        pagesinregion: 512
+        scanintervalms: 5000
+
+    mover:
+      intervalms: 20
+      bandwidth: 200

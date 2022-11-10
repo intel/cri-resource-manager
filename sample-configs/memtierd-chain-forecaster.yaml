@@ -1,0 +1,39 @@
+# This memtierd configuration file demonstrates chaining
+# forecasters
+
+policy:
+  name: heat
+  config: |
+    intervalms: 10000
+
+    pids:
+      - $(pidof meme)
+
+    heatmap:
+      heatmax: 0.01
+      heatretention: 0.8
+      heatclasses: 4
+
+    forecaster:
+      name: chain
+      config: |
+        forecasters:
+        - name: trace
+          config: |
+            file: /tmp/forecaster-chain-in.txt
+        - name: stdio
+          config: |
+            command: ['python3', 'memtierd-stdio-forecaster.py']
+        - name: trace
+          config: |
+            file: /tmp/forecaster-chain-out.txt
+
+    tracker:
+      name: softdirty
+      config: |
+        pagesinregion: 512
+        scanintervalms: 5000
+
+    mover:
+      intervalms: 20
+      bandwidth: 200
