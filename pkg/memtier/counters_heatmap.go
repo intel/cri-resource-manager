@@ -67,6 +67,29 @@ type HeatRange struct {
 	updated int64
 }
 
+func (hr *HeatRange) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("{\"addr\":%d,\"length\":%d,\"heat\":%f,\"created\":%d,\"updated\":%d}", hr.addr, hr.length, hr.heat, hr.created, hr.updated)), nil
+}
+
+func (hr *HeatRange) UnmarshalJSON(raw []byte) error {
+	hrJson := struct {
+		Addr    uint64
+		Length  uint64
+		Heat    float64
+		Created int64
+		Updated int64
+	}{}
+	if err := json.Unmarshal(raw, &hrJson); err != nil {
+		return fmt.Errorf("failed to unmarshal heats from %v: %w", raw, err)
+	}
+	hr.addr = hrJson.Addr
+	hr.length = hrJson.Length
+	hr.heat = hrJson.Heat
+	hr.created = hrJson.Created
+	hr.updated = hrJson.Updated
+	return nil
+}
+
 func NewCounterHeatmap() *Heatmap {
 	heatmap := &Heatmap{
 		pidHrs: make(map[int]*HeatRanges),
