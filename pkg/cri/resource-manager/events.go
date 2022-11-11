@@ -43,13 +43,25 @@ func (m *resmgr) setupEventProcessing() error {
 	return nil
 }
 
+func (m *resmgr) startMetricsProcessing() error {
+	if m.policy.Bypassed() {
+		return nil
+	}
+
+	if err := m.metrics.Start(); err != nil {
+		return resmgrError("failed to start metrics (pre)processor: %v", err)
+	}
+
+	return nil
+}
+
 // startEventProcessing starts event and metrics processing.
 func (m *resmgr) startEventProcessing() error {
 	if m.policy.Bypassed() {
 		return nil
 	}
 
-	if err := m.metrics.Start(); err != nil {
+	if err := m.startMetricsProcessing(); err != nil {
 		return resmgrError("failed to start metrics (pre)processor: %v", err)
 	}
 

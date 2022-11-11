@@ -199,6 +199,12 @@ func (m *resmgr) Start() error {
 		}
 	} else {
 		m.nri.start()
+
+		if err := m.startEventProcessing(); err != nil {
+			return err
+		}
+
+		m.startIntrospection()
 	}
 
 	if err := pidfile.Remove(); err != nil {
