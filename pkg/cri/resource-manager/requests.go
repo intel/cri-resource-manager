@@ -779,9 +779,11 @@ func (m *resmgr) setConfig(v interface{}) error {
 
 	if !(m.policy == nil || m.policy.Bypassed()) {
 		// synchronize state of controllers with new configuration
-		if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
-			m.Error("failed to synchronize controllers with new configuration: %v", err)
-			return resmgrError("failed to synchronize controllers with new configuration: %v", err)
+		if m.nri == nil {
+			if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
+				m.Error("failed to synchronize controllers with new configuration: %v", err)
+				return resmgrError("failed to synchronize controllers with new configuration: %v", err)
+			}
 		}
 
 		if err = m.runPostUpdateHooks(context.Background(), "setConfig"); err != nil {
@@ -792,7 +794,10 @@ func (m *resmgr) setConfig(v interface{}) error {
 
 	// if we managed to activate a configuration from the agent, store it in the cache
 	if cfg, ok := v.(*config.RawConfig); ok {
+		m.Info("setting configuration from agent")
 		m.cache.SetConfig(cfg)
+	} else {
+		m.Info("RawConfig failed")
 	}
 
 	m.Info("successfully switched to new configuration")
@@ -805,9 +810,11 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 	for _, c := range m.cache.GetPendingContainers() {
 		switch c.GetState() {
 		case cache.ContainerStateRunning, cache.ContainerStateCreated:
-			if err := m.control.RunPostUpdateHooks(c); err != nil {
-				m.Warn("%s post-update hook failed for %s: %v",
-					method, c.PrettyName(), err)
+			if m.nri == nil {
+				if err := m.control.RunPostUpdateHooks(c); err != nil {
+					m.Warn("%s post-update hook failed for %s: %v",
+						method, c.PrettyName(), err)
+				}
 			}
 			if req, ok := c.ClearCRIRequest(); ok {
 				if _, err := m.sendCRIRequest(ctx, req); err != nil {
@@ -817,9 +824,11 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 			}
 			m.policy.ExportResourceData(c)
 		case cache.ContainerStateCreating:
-			if err := m.control.RunPreCreateHooks(c); err != nil {
-				m.Warn("%s pre-create hook failed for %s: %v",
-					method, c.PrettyName(), err)
+			if m.nri == nil {
+				if err := m.control.RunPreCreateHooks(c); err != nil {
+					m.Warn("%s pre-create hook failed for %s: %v",
+						method, c.PrettyName(), err)
+				}
 			}
 			m.policy.ExportResourceData(c)
 		default:
@@ -832,8 +841,10 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 
 // runPostStartHooks runs the necessary hooks after having started a container.
 func (m *resmgr) runPostStartHooks(ctx context.Context, method string, c cache.Container) error {
-	if err := m.control.RunPostStartHooks(c); err != nil {
-		m.Error("%s: post-start hook failed for %s: %v", method, c.PrettyName(), err)
+	if m.nri == nil {
+		if err := m.control.RunPostStartHooks(c); err != nil {
+			m.Error("%s: post-start hook failed for %s: %v", method, c.PrettyName(), err)
+		}
 	}
 	return nil
 }
@@ -841,8 +852,10 @@ func (m *resmgr) runPostStartHooks(ctx context.Context, method string, c cache.C
 // runPostReleaseHooks runs the necessary hooks after releaseing resources of some containers
 func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string, released ...cache.Container) error {
 	for _, c := range released {
-		if err := m.control.RunPostStopHooks(c); err != nil {
-			m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
+		if m.nri == nil {
+			if err := m.control.RunPostStopHooks(c); err != nil {
+				m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
+			}
 		}
 		if c.GetState() == cache.ContainerStateStale {
 			m.cache.DeleteContainer(c.GetCacheID())
@@ -851,15 +864,19 @@ func (m *resmgr) runPostReleaseHooks(ctx context.Context, method string, release
 	for _, c := range m.cache.GetPendingContainers() {
 		switch state := c.GetState(); state {
 		case cache.ContainerStateStale, cache.ContainerStateExited:
-			if err := m.control.RunPostStopHooks(c); err != nil {
-				m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
+			if m.nri == nil {
+				if err := m.control.RunPostStopHooks(c); err != nil {
+					m.Warn("post-stop hook failed for %s: %v", c.PrettyName(), err)
+				}
 			}
 			if state == cache.ContainerStateStale {
 				m.cache.DeleteContainer(c.GetCacheID())
 			}
 		case cache.ContainerStateRunning, cache.ContainerStateCreated:
-			if err := m.control.RunPostUpdateHooks(c); err != nil {
-				m.Warn("post-update hook failed for %s: %v", c.PrettyName(), err)
+			if m.nri == nil {
+				if err := m.control.RunPostUpdateHooks(c); err != nil {
+					m.Warn("post-update hook failed for %s: %v", c.PrettyName(), err)
+				}
 			}
 			if req, ok := c.ClearCRIRequest(); ok {
 				if _, err := m.sendCRIRequest(ctx, req); err != nil {
@@ -880,8 +897,10 @@ func (m *resmgr) runPostUpdateHooks(ctx context.Context, method string) error {
 	for _, c := range m.cache.GetPendingContainers() {
 		switch c.GetState() {
 		case cache.ContainerStateRunning, cache.ContainerStateCreated:
-			if err := m.control.RunPostUpdateHooks(c); err != nil {
-				return err
+			if m.nri == nil {
+				if err := m.control.RunPostUpdateHooks(c); err != nil {
+					return err
+				}
 			}
 			if req, ok := c.GetCRIRequest(); ok {
 				if _, err := m.sendCRIRequest(ctx, req); err != nil {
