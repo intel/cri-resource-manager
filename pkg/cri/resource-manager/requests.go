@@ -671,20 +671,44 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 	m.Lock()
 	defer m.Unlock()
 
-	containerID := request.(*criv1.UpdateContainerResourcesRequest).ContainerId
-	container, ok := m.cache.LookupContainer(containerID)
+	//
+	// Notes:
+	//   Once VPA is fully implemented, we need to start passing these
+	//   requests on to the active policy.
+	//
+	// containerID := request.(*criv1.UpdateContainerResourcesRequest).ContainerId
+	// container, ok := m.cache.LookupContainer(containerID)
+	// if !ok {
+	//     m.Warn("%s: failed to look up container %s, just passing request through",
+	//         method, containerID)
+	//     return handler(ctx, request)
+	// }
+	//
+	// err := m.policy.UpdateResources(container)
+	// if err != nil {
+	//     m.Error("%s: failed to update resources of container %s: %v", method, containerID, err)
+	//     return nil, err
+	// }
+	//
+	// err := m.runPostUpdateHooks(ctx, method)
+	// if err != nil {
+	//     m.Warn("%s: failed to run post-update hooks for update of container %s: %v",
+	//         method, containerID, err)
+	// }
+	//
+	// return &criv1.UpdateContainerResourcesResponse{}, nil
+	//
 
-	if !ok {
-		m.Warn("%s: silently dropping container update request for %s...",
-			method, containerID)
-	} else {
-		m.Warn("%s: silently dropping container update request for %s...",
-			method, container.PrettyName())
-		m.Warn("%s: XXX TODO: we probably should reallocate the container instead...",
-			method)
+	if !m.warnedCRIUpdate {
+		m.Warn("CRI UpdateContainerResources request received. Unless Vertical")
+		m.Warn("Pod Autoscaling is fully implemented, this usually indicates that")
+		m.Warn("kubelet is running with CPU Manager enabled and 'static' or some")
+		m.Warn("other than 'none' policy active. This does not make much sense when")
+		m.Warn("CRI Resource Manager is also active and on the kubelet-runtime")
+		m.Warn("signalling path. Please consider disabling CPU Manager or setting")
+		m.Warn("its active policy to 'none'.")
+		m.warnedCRIUpdate = true
 	}
-
-	m.updateIntrospection()
 
 	return &criv1.UpdateContainerResourcesResponse{}, nil
 }
