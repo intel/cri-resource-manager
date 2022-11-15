@@ -572,19 +572,22 @@ func (p *balloons) chooseBalloonInstance(blnDef *BalloonDef, fm FillMethod, c ca
 		return p.balloons[0], nil
 	case FillDefaultBalloon:
 		return p.balloons[1], nil
-	case FillNewBalloon:
-		if newBln, err := p.newBalloon(blnDef, true); err == nil {
-			p.balloons = append(p.balloons, newBln)
-			return newBln, nil
-		} else {
-			return nil, nil
+	case FillNewBalloon, FillNewBalloonMust:
+		// Choosing an existing balloon without containers is
+		// preferred over instantiating a new balloon.
+		for _, bln := range p.balloonsByDef(blnDef) {
+			if len(bln.PodIDs) == 0 {
+				return bln, nil
+			}
 		}
-	case FillNewBalloonMust:
 		if newBln, err := p.newBalloon(blnDef, true); err == nil {
 			p.balloons = append(p.balloons, newBln)
 			return newBln, nil
 		} else {
-			return nil, err
+			if fm == FillNewBalloonMust {
+				return nil, err
+			}
+			return nil, nil
 		}
 	case FillSameNamespace:
 		for _, bln := range p.balloonsByNamespace(c.GetNamespace()) {
