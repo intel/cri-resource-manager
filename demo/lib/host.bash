@@ -180,7 +180,7 @@ host-create-vm() {
     echo "# VM Docker image: $VM_CONTAINER_IMAGE"
     echo "# VM Docker cntnr: $VM_CONTAINER_ID"
     if [ -n "$VM_CONTAINER_IMAGE" ]; then
-        VM_CONTAINER_QEMU_VERSION=$(docker run --entrypoint=/usr/bin/qemu-system-x86_64 $VM_CONTAINER_IMAGE -version | awk '/QEMU emulator version/{print $4}')
+        VM_CONTAINER_QEMU_VERSION=$(docker run --rm --entrypoint=/usr/bin/qemu-system-x86_64 $VM_CONTAINER_IMAGE -version | awk '/QEMU emulator version/{print $4}')
     fi
     if [ -n "$VM_CONTAINER_QEMU_VERSION" ]; then
         if [[ "$VM_CONTAINER_QEMU_VERSION" > "5" ]]; then
