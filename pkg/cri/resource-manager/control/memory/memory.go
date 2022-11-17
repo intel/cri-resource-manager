@@ -59,9 +59,9 @@ func getMemoryController() *memctl {
 // Start initializes the controller for enforcing decisions.
 func (ctl *memctl) Start(cache cache.Cache, client client.Client) error {
 	// Let's keep this off for now so we can exercise this without a patched kernel...
-	/*if !ctl.checkToptierLimitSupport() {
+	if !ctl.checkToptierLimitSupport() {
 		return memctlError("cgroup top tier memory limit control not available")
-	}*/
+	}
 	ctl.cache = cache
 	return nil
 }
