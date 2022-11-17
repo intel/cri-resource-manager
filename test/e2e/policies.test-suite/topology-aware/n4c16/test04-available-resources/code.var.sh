@@ -39,6 +39,13 @@ test-and-verify-allowed() {
     reset counters
 }
 
+if [ "$VM_CRI_DS" == "1" ]; then
+    # When cri-rm is run in a pod
+    CRIRM_SYS_PATH="/host"
+else
+    CRIRM_SYS_PATH=""
+fi
+
 if vm-command "[ -d /sys/fs/cgroup/cpuset ]"; then
     # cgroup v1
     CGROUP_CPUSET=/sys/fs/cgroup/cpuset
@@ -50,7 +57,7 @@ CRIRM_CGROUP=$CGROUP_CPUSET/cri-resmgr-test-05-1
 vm-command "rmdir $CRIRM_CGROUP; mkdir $CRIRM_CGROUP; echo 1-4,11 > $CRIRM_CGROUP/cpuset.cpus"
 
 terminate cri-resmgr
-AVAILABLE_CPU="\"$CRIRM_CGROUP\""
+AVAILABLE_CPU="\"${CRIRM_SYS_PATH}$CRIRM_CGROUP\""
 cri_resmgr_cfg=$(instantiate cri-resmgr-available-resources.cfg)
 launch cri-resmgr
 test-and-verify-allowed 1 2 3 4
@@ -60,7 +67,7 @@ CRIRM_CGROUP=$CGROUP_CPUSET/cri-resmgr-test-05-2
 vm-command "rmdir $CRIRM_CGROUP; mkdir $CRIRM_CGROUP; echo 5-8,11 > $CRIRM_CGROUP/cpuset.cpus"
 
 terminate cri-resmgr
-AVAILABLE_CPU="\"${CRIRM_CGROUP#/sys/fs/cgroup/cpuset}\""
+AVAILABLE_CPU="\"${CRIRM_SYS_PATH}${CRIRM_CGROUP}\""
 cri_resmgr_cfg=$(instantiate cri-resmgr-available-resources.cfg)
 launch cri-resmgr
 test-and-verify-allowed 5 6 7 8

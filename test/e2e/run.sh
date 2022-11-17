@@ -131,6 +131,9 @@ usage() {
     echo "                   This is only needed if you have set VM_IP and want"
     echo "                   the proxy information set in the target host. By default"
     echo "                   the proxies are not set if VM_IP is set."
+    echo "    cri_resmgr_no_ds: If NRI is enabled, then this option will set cri-resmgr"
+    echo "                      to be run as a normal system process instead of being a DaemonSet and"
+    echo "                      managed by Kubernetes. Has no effect if NRI is not enabled."
     echo ""
     echo "  Test input VARs:"
     echo "    cri_resmgr_cfg: configuration file forced to cri-resmgr."
@@ -192,15 +195,35 @@ screen-create-vm() {
 
 screen-install-cri-resmgr() {
     speed=60 out "### Installing CRI Resource Manager to VM."
-    vm-install-cri-resmgr
+    vm-install-cri-resmgr "$1"
 }
 
 screen-launch-cri-resmgr() {
     speed=60 out "### Launching cri-resmgr with config $cri_resmgr_cfg."
-    if [ "${binsrc#packages}" != "$binsrc" ]; then
-        launch cri-resmgr-systemd
+
+    if [ "$VM_CRI_DS" == "0" ]; then
+	if [ "${binsrc#packages}" != "$binsrc" ]; then
+            launch cri-resmgr-systemd
+	else
+            launch cri-resmgr
+	fi
     else
-        launch cri-resmgr
+        launch cri-resmgr-daemonset
+    fi
+}
+
+launch-cri-resmgr() {
+
+    if [ "$VM_CRI_DS" == "1" ]; then
+            screen-launch-cri-resmgr $1
+    else
+	if ! vm-command-q "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1; then
+            screen-launch-cri-resmgr $1
+	fi
+	if [ -n "$crirm_src" ]; then
+            vm-check-source-files-changed "$crirm_src" "$crirm_src/bin/cri-resmgr"
+            vm-check-running-binary "$crirm_src/bin/cri-resmgr"
+	fi
     fi
 }
 
@@ -445,7 +468,7 @@ install() { # script API
     local target="$1"
     case "$target" in
         "cri-resmgr")
-            vm-install-cri-resmgr
+            vm-install-cri-resmgr "$reinstall_cri_resmgr"
             ;;
         "cri-resmgr-agent")
             vm-install-cri-resmgr-agent
@@ -499,6 +522,9 @@ launch() { # script API
     #                        this launches cri-resmgr as a proxy,
     #                        otherwise as a dynamic NRI plugin.
     #
+    #   cri-resmgr-daemonset:
+    #                launch cri-resmgr on VM using Kubernetes DaemonSet
+    #
     #   cri-resmgr-systemd:
     #                launch cri-resmgr on VM using "systemctl start".
     #                Works when installed with binsrc=packages/<distro>.
@@ -521,33 +547,43 @@ launch() { # script API
     local cri_resmgr_mode=""
     case $target in
         "cri-resmgr")
-            host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
+	    # Some e2e tests want to restart cri-rm, so check if we are using daemonset
+	    if [ "$VM_CRI_DS" == "1" ]; then
+		launch cri-resmgr-daemonset
+		return $?
+	    fi
+
+	    host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" || {
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
-            }
-            vm-command "cat $(basename "$cri_resmgr_cfg")"
-            if [[ "$k8scri" == cri-resmgr* ]]; then
+	    }
+	    vm-command "cat $(basename "$cri_resmgr_cfg")"
+	    if [[ "$k8scri" == cri-resmgr* ]]; then
                 # launch cri-resmgr as the top element in the k8s container runtime stack
                 cri_resmgr_mode="-relay-socket ${cri_resmgr_sock} -runtime-socket $cri_sock -image-socket $cri_sock"
-            else
+	    else
                 # launch cri-resmgr as an NRI plugin to running container runtime
                 cri_resmgr_mode="-use-nri-plugin"
-            fi
-            launch_cmd="cri-resmgr $cri_resmgr_mode $cri_resmgr_config_option $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
-            vm-command-q "rm -f $cri_resmgr_pidfile"
-            vm-command-q "echo '$launch_cmd' > cri-resmgr.launch.sh ; rm -f cri-resmgr.output.txt"
-            vm-command "$launch_cmd  >cri-resmgr.output.txt 2>&1 &"
-            vm-wait-process --timeout 30 --pidfile "$cri_resmgr_pidfile" cri-resmgr
-            vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
+	    fi
+	    launch_cmd="cri-resmgr $cri_resmgr_mode $cri_resmgr_config_option $(basename "$cri_resmgr_cfg") $cri_resmgr_extra_args"
+	    vm-command-q "rm -f $cri_resmgr_pidfile"
+	    vm-command-q "echo '$launch_cmd' > cri-resmgr.launch.sh ; rm -f cri-resmgr.output.txt"
+	    vm-command "$launch_cmd  >cri-resmgr.output.txt 2>&1 &"
+	    vm-wait-process --timeout 30 --pidfile "$cri_resmgr_pidfile" cri-resmgr
+	    vm-command "grep 'FATAL ERROR' cri-resmgr.output.txt" >/dev/null 2>&1 && {
                 command-error "launching cri-resmgr failed with FATAL ERROR"
-            }
-            vm-command "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1 || {
+	    }
+	    vm-command "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1 || {
                 echo "cri-resmgr last output line:"
                 vm-command-q "tail -n 1 cri-resmgr.output.txt"
                 command-error "launching cri-resmgr failed, cannot find cri-resmgr PID"
-            }
+	    }
             ;;
 
         "cri-resmgr-agent")
+	    # If running as DaemonSet, then the agent is part of cri-resmgr pod
+	    if [ "$VM_CRI_DS" == "1" ]; then
+		return 0
+	    fi
             host-command "$SCP \"$adjustment_schema\" $VM_SSH_USER@$VM_IP:" ||
                 command-error "copying \"$adjustment_schema\" to VM failed"
             vm-command "kubectl delete -f $(basename "$adjustment_schema"); kubectl create -f $(basename "$adjustment_schema")"
@@ -574,6 +610,54 @@ launch() { # script API
             }
             ;;
 
+        "cri-resmgr-daemonset")
+	    if [ "$cri_resmgr_config" == "fallback" ]; then
+		cri_resmgr_deployment_file="/etc/cri-resmgr/cri-resmgr-deployment-fallback.yaml"
+	    else
+		cri_resmgr_deployment_file="/etc/cri-resmgr/cri-resmgr-deployment.yaml"
+	    fi
+	    vm-command "chown $VM_SSH_USER:$VM_SSH_USER /etc/cri-resmgr/"
+	    host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:/etc/cri-resmgr/cri-resmgr.cfg" || {
+                command-error "copying \"$cri_resmgr_cfg\" to VM failed"
+	    }
+            host-command "$SCP \"$adjustment_schema\" $VM_SSH_USER@$VM_IP:" ||
+                command-error "copying \"$adjustment_schema\" to VM failed"
+            vm-command "kubectl delete -f $(basename "$adjustment_schema"); kubectl create -f $(basename "$adjustment_schema")"
+	    vm-command "kubectl apply -f $cri_resmgr_deployment_file" ||
+		error "Cannot apply deployment"
+	    #vm-command "kubectl wait --for=condition=Available -n kube-system daemonset/cri-resmgr" ||
+            #    error "cri-resmgr deployment did not become Available"
+
+	    # Direct logs to output file
+	    POD="$(namespace=kube-system wait_t=5 vm-wait-pod-regexp cri-resmgr-)"
+	    if [ ! -z "$POD" ]; then
+		# If the POD contains \n, then the old pod is still there. Wait a sec in this
+		# case and retry.
+		POD_CHECK=$(echo "$POD" | awk 'BEGIN { RS=""; FS="\n"} { print $2 }')
+		if [ ! -z "$POD_CHECK" ]; then
+		    sleep 1
+		    POD="$(namespace=kube-system wait_t=5 vm-wait-pod-regexp cri-resmgr-)"
+		    if [ -z "$POD" ]; then
+			error "Cannot figure out pod name"
+		    fi
+		fi
+
+		# Check if we have CrashLoopBackOff or Error for the pod
+		status="$(vm-command-q "kubectl get pod "$POD" -n kube-system | tail -1 | awk '{ print \$3 }'")"
+		if [ "$status" == "CrashLoopBackOff" ] || [ "$status" == "Error" ]; then
+		    # Check if cri-resmgr failed, ignore the agent errors for now
+		    if vm-command "kubectl logs $POD -n kube-system -c cri-resmgr | tail -1 | grep -q ^F" 2>&1; then
+			error "Cannot start cri-resmgr"
+		    fi
+		fi
+
+		vm-command "fuser --kill cri-resmgr.output.txt 2>/dev/null"
+		vm-command "kubectl -n kube-system logs "$POD" -f -c cri-resmgr  >cri-resmgr.output.txt 2>&1 &"
+	    else
+		error "cri-resmgr pod not found"
+	    fi
+	    ;;
+
         "cri-resmgr-webhook")
             kubectl apply -f webhook/webhook-deployment.yaml
             kubectl wait --for=condition=Available -n cri-resmgr deployments/cri-resmgr-webhook ||
@@ -599,10 +683,18 @@ terminate() { # script API
     local target="$1"
     case $target in
         "cri-resmgr")
-            vm-command "fuser --kill ${cri_resmgr_pidfile} 2>/dev/null"
+	    if [ "$VM_CRI_DS" == "1" ]; then
+		vm-command "kubectl delete -f /etc/cri-resmgr/cri-resmgr-deployment.yaml"
+	    else
+		vm-command "fuser --kill ${cri_resmgr_pidfile} 2>/dev/null"
+	    fi
             ;;
         "cri-resmgr-agent")
-            vm-command "fuser --kill ${cri_resmgr_agent_sock} 2>/dev/null"
+	    if [ "$VM_CRI_DS" == "1" ]; then
+		vm-command "kubectl delete -f /etc/cri-resmgr/cri-resmgr-deployment.yaml"
+	    else
+		vm-command "fuser --kill ${cri_resmgr_agent_sock} 2>/dev/null"
+	    fi
             ;;
         "cri-resmgr-webhook")
             vm-command "kubectl delete -f webhook/mutating-webhook-config.yaml; kubectl delete -f webhook/webhook-deployment.yaml"
@@ -1054,7 +1146,7 @@ test-user-code() {
 }
 
 # Validate parameters
-input_var_names="mode user_script_file distro k8scri k8smaster vm cgroups speed binsrc reinstall_all reinstall_containerd reinstall_crio reinstall_cri_resmgr reinstall_k8s reinstall_oneshot outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts"
+input_var_names="mode user_script_file distro k8scri k8smaster vm cgroups speed binsrc reinstall_all reinstall_containerd reinstall_crio reinstall_cri_resmgr reinstall_k8s reinstall_oneshot outdir cleanup on_verify_fail on_create_fail on_verify on_create on_launch topology cri_resmgr_cfg cri_resmgr_extra_args cri_resmgr_agent_extra_args code py_consts use_nri_plugin"
 
 INTERACTIVE_MODE=0
 mode=$1
@@ -1288,7 +1380,21 @@ else
     use_nri_plugin="0"
 fi
 
-host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri" "$use_nri_plugin"
+if [ "$use_nri_plugin" == "0" ]; then
+    cri_resmgr_ds=0
+else
+    if [ -z "${cri_resmgr_no_ds}" ]; then
+	cri_resmgr_ds=1
+    else
+	if [ "${cri_resmgr_no_ds}" == "0" ]; then
+	    cri_resmgr_ds=1
+	else
+	    cri_resmgr_ds=0
+	fi
+    fi
+fi
+
+host-get-vm-config "$vm" || host-set-vm-config "$vm" "$distro" "$cri" "$use_nri_plugin" "$cri_resmgr_ds"
 
 if [ -z "$VM_IP" ] || [ -z "$VM_SSH_USER" ]; then
     screen-create-vm
@@ -1390,15 +1496,11 @@ if [ -n "$crio_src" ] && [[ "$k8scri" == *crio* ]]; then
     vm-check-running-binary "$crio_src/bin/crio"
 fi
 
-# Start cri-resmgr if not already running
-if [ "$omit_cri_resmgr" != "1" ]; then
-    if ! vm-command-q "fuser ${cri_resmgr_pidfile}" >/dev/null 2>&1; then
-        screen-launch-cri-resmgr
-    fi
-    if [ -n "$crirm_src" ]; then
-        vm-check-source-files-changed "$crirm_src" "$crirm_src/bin/cri-resmgr"
-        vm-check-running-binary "$crirm_src/bin/cri-resmgr"
-    fi
+# Start cri-resmgr if not already running. Note that for NRI with cri-rm run
+# as a DaemonSet, this must be done after we have setup the cluster so that
+# Kubernetes is already running.
+if [ "$omit_cri_resmgr" != "1" ] && [ "$VM_CRI_DS" == "0" ]; then
+    launch-cri-resmgr
 fi
 
 # Create kubernetes cluster or wait that it is online
@@ -1417,10 +1519,18 @@ else
     vm-wait-process --timeout 180 kube-apiserver
 fi
 
+if [ "$omit_cri_resmgr" != "1" ] && [ "$VM_CRI_DS" == "1" ]; then
+    launch-cri-resmgr
+fi
+
 # Start cri-resmgr-agent if not already running
 if [ "$omit_agent" != "1" ]; then
-    if ! vm-command-q "fuser ${cri_resmgr_agent_sock}" >/dev/null; then
-        screen-launch-cri-resmgr-agent
+    # The agent is started as part of cri-rm if running as a DaemonSet so
+    # no need to start it here.
+    if [ "$VM_CRI_DS" == "0" ]; then
+	if ! vm-command-q "fuser ${cri_resmgr_agent_sock}" >/dev/null; then
+            screen-launch-cri-resmgr-agent
+	fi
     fi
 fi
 

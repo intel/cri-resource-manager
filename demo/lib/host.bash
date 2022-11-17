@@ -36,7 +36,7 @@ host-get-vm-config() {
         return 1
     fi
     source "$VM_DATA_CONFIG"
-    if [ -z "$VM_NAME" ] || [ -z "$VM_DISTRO" ] || [ -z "$VM_CRI" ] || [ -z "$VM_SSH_USER" ] || [ -z "$VM_NRI" ]; then
+    if [ -z "$VM_NAME" ] || [ -z "$VM_DISTRO" ] || [ -z "$VM_CRI" ] || [ -z "$VM_SSH_USER" ] || [ -z "$VM_NRI" ] || [ -z "$VM_CRI_DS" ]; then
         return 1
     fi
     VM_COMPOSE_YAML="$HOST_VM_DATA_DIR/govm-compose.yaml"
@@ -56,6 +56,7 @@ host-set-vm-config() {
     VM_DISTRO="$2"
     VM_CRI="$3"
     VM_NRI="$4"
+    VM_CRI_DS="$5"
     VM_SSH_USER="$(vm-ssh-user)"
     HOST_VM_DATA_DIR="$(eval "echo $HOST_VM_DATA_DIR_TEMPLATE")"
     mkdir -p "$HOST_VM_DATA_DIR"
@@ -67,6 +68,7 @@ VM_DISTRO="$VM_DISTRO"
 VM_CRI="$VM_CRI"
 VM_SSH_USER="$VM_SSH_USER"
 VM_NRI="$VM_NRI"
+VM_CRI_DS="$VM_CRI_DS"
 EOF
 }
 
@@ -180,6 +182,9 @@ host-create-vm() {
     echo "# VM Linux distro: $VM_DISTRO"
     echo "# VM CRI         : $VM_CRI"
     echo "# VM NRI         : $VM_NRI"
+    if [ "$VM_NRI" != "0" ]; then
+	echo "# VM CRI DS      : $VM_CRI_DS"
+    fi
     echo "# VM Docker image: $VM_CONTAINER_IMAGE"
     echo "# VM Docker cntnr: $VM_CONTAINER_ID"
     if [ -n "$VM_CONTAINER_IMAGE" ]; then

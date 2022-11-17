@@ -16,10 +16,10 @@ spec:
       command: ['sh', '-c', 'echo ${NAME}c${CONT} \$(sleep inf)']
       resources:
         requests:
-          cpu: 500m
+          cpu: 250m
           memory: ${MEM}
         limits:
-          cpu: 500m
+          cpu: 250m
           memory: ${MEM}
     "; done)
     - name: ${NAME}c9
@@ -28,8 +28,8 @@ spec:
       command: ['sh', '-c', 'echo ${NAME}c9 \$(sleep inf)']
       resources:
         requests:
-          cpu: 500m
+          cpu: 250m
           memory: ${MEM}
         limits:
-          cpu: 500m
+          cpu: 250m
           memory: ${MEM}

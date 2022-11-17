@@ -1,6 +1,29 @@
 # Test resource allocation / free on different container exit and
 # restart scenarios.
 
+# Make sure all the pods in default namespace are cleared so we get a fresh start
+#kubectl delete pods --all --now
+
+# Cleanup kernel commandline, otherwise isolcpus will affect CPU
+# pinning and cause false negatives from other tests on this VM.
+# This can happen if test08-isolcpus failed and we are re-running
+# the tests from the start.
+vm-command "grep isolcpus /proc/cmdline" && {
+    vm-del-kernel-cmdline-arg "isolcpus=8,9"
+    vm-force-restart
+    vm-command "grep isolcpus /proc/cmdline" && {
+	error "failed to clean up isolcpus kernel commandline parameter"
+    }
+    echo "isolcpus removed from kernel commandline"
+    vm-command "systemctl restart kubelet"
+    vm-wait-process --timeout 120 kube-apiserver
+
+    # Do a fresh start
+    terminate cri-resmgr
+    launch cri-resmgr
+    sleep 2
+}
+
 CONTCOUNT=1 CPU=1000m MEM=64M create guaranteed
 report allowed
 verify 'len(cpus["pod0c0"]) == 1'

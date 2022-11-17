@@ -39,3 +39,8 @@ fi
 
 echo "waiting for $genscriptcount generated tests to finish..."
 wait
+
+# Restore default test configuration, restart cri-resmgr.
+terminate cri-resmgr
+cri_resmgr_cfg=$(instantiate cri-resmgr.cfg)
+launch cri-resmgr

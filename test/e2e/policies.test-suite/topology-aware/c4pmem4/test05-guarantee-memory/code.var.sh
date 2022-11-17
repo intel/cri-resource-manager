@@ -53,7 +53,7 @@ rotate_log
 
 # use conservative estimate for available memory per node
 PER_NODE_MEM=$((1500+4000))
-PER_NODE_CPU=1000
+PER_NODE_CPU=750m
 PER_NODE_PMEM=1
 NODE_COUNT_TOTAL=4
 # All nodes have only a single CPU. Thus, with any (< 1000m) CPU reservation

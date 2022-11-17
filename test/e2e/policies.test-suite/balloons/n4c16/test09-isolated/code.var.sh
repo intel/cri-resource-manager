@@ -1,6 +1,12 @@
 terminate cri-resmgr
 cri_resmgr_cfg=${TEST_DIR}/balloons-isolated.cfg cri_resmgr_extra_args="-metrics-interval 4s" launch cri-resmgr
 
+if [ "$VM_CRI_DS" == "1" ]; then
+    pod_name=$(vm-cri-resmgr-pod-name)
+    vm-command "fuser --kill /tmp/cri-resmgr-port-forward 2>/dev/null"
+    vm-command "kubectl port-forward $pod_name 8891:8891 -n kube-system > /tmp/cri-resmgr-port-forward 2>&1 &"
+fi
+
 verify-metrics-has-line 'balloon="isolated-pods\[0\]"'
 verify-metrics-has-line 'balloon="isolated-pods\[1\]"'
 verify-metrics-has-no-line 'balloon="isolated-pods\[2\]"'

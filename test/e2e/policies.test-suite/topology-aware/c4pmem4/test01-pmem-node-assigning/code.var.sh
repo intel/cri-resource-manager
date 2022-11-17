@@ -5,6 +5,9 @@
 terminate cri-resmgr
 launch cri-resmgr
 
+# Let cri-rm to fully start
+sleep 2
+
 CRI_RESMGR_OUTPUT_COMMAND="cat cri-resmgr.output.txt"
 
 echo "Verify PMEM node assignment to CPU-ful nodes"

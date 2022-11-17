@@ -9,9 +9,16 @@ cleanup() {
         kubectl delete pods -n btype1ns0 --all --now; \
         kubectl delete namespace $testns || :; \
         kubectl delete namespace btype1ns0 || :"
-    terminate cri-resmgr
-    terminate cri-resmgr-agent
-    vm-command "cri-resmgr -reset-policy; cri-resmgr -reset-config"
+
+    if [ "$VM_CRI_DS" == "1" ]; then
+	terminate cri-resmgr
+	vm-remove-cache
+	vm-command "fuser --kill /tmp/cri-resmgr-port-forward 2>/dev/null"
+    else
+	terminate cri-resmgr
+	terminate cri-resmgr-agent
+	vm-command "cri-resmgr -reset-policy; cri-resmgr -reset-config"
+    fi
 }
 
 apply-configmap() {
@@ -21,8 +28,18 @@ apply-configmap() {
 }
 
 cleanup
-cri_resmgr_extra_args="-metrics-interval 1s" cri_resmgr_config=fallback launch cri-resmgr
-launch cri-resmgr-agent
+
+if [ "$VM_CRI_DS" == "1" ]; then
+    # The agent is started by cri-resmgr daemonset so no need for a separate startup.
+    cri_resmgr_extra_args="-metrics-interval 1s" cri_resmgr_config=fallback launch cri-resmgr
+
+    pod_name=$(vm-cri-resmgr-pod-name)
+    vm-command "fuser --kill /tmp/cri-resmgr-port-forward 2>/dev/null"
+    vm-command "kubectl port-forward $pod_name 8891:8891 -n kube-system > /tmp/cri-resmgr-port-forward 2>&1 &"
+else
+    cri_resmgr_extra_args="-metrics-interval 1s" cri_resmgr_config=fallback launch cri-resmgr
+    launch cri-resmgr-agent
+fi
 
 kubectl create namespace $testns
 kubectl create namespace btype1ns0

@@ -678,7 +678,71 @@ vm-networking() {
 vm-install-cri-resmgr() {
     prefix=/usr/local
     # shellcheck disable=SC2154
-    if [ "$binsrc" == "github" ]; then
+
+    reinstall_cri_resmgr="$1"
+
+    # Deploy cri-resmgr as a DaemonSet if needed
+    if [ "$VM_CRI_DS" == "1" ]; then
+	# If NRI is in use, then we can support running CRI-RM as a DaemonSet.
+	# To do so we create cri-resmgr container image and deploy it in VM.
+	crirm_image_info="$(docker images --filter=reference=cri-resmgr --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+	if [ -z "$crirm_image_info" ] || [ "$reinstall_cri_resmgr" == "1" ]; then
+	    (cd $HOST_PROJECT_DIR; make image-cri-resmgr)
+
+	    crirm_image_info="$(docker images --filter=reference=cri-resmgr --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+	    if [ -z "$crirm_image_info" ]; then
+		error "cannot find cri-resmgr image on host, run \"make images\" and check \"docker images --filter=reference=cri-resmgr\""
+	    fi
+	fi
+
+	# Do the agent too so that they can be placed in the same pod
+	crirm_agent_image_info="$(docker images --filter=reference=cri-resmgr-agent --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+	if [ -z "$crirm_agent_image_info" ] || [ "$reinstall_cri_resmgr_agent" == "1" ]; then
+	    (cd $HOST_PROJECT_DIR; make image-cri-resmgr-agent)
+
+	    crirm_agent_image_info="$(docker images --filter=reference=cri-resmgr-agent --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+	    if [ -z "$crirm_agent_image_info" ]; then
+		error "cannot find cri-resmgr-agent image on host, run \"make images\" and check \"docker images --filter=reference=cri-resmgr-agent\""
+	    fi
+	fi
+
+	echo "installing cri-resmgr to VM from image: $crirm_image_info"
+	sleep 1
+	crirm_image_id="$(awk '{print $1}' <<< "$crirm_image_info")"
+	crirm_image_repotag="$(awk '{print $2}' <<< "$crirm_image_info")"
+	crirm_image_tar="$(realpath "$OUTPUT_DIR/cri-resmgr-image-$crirm_image_id.tar")"
+	docker image save "$crirm_image_repotag" > "$crirm_image_tar"
+	vm-put-file "$crirm_image_tar" "cri-resmgr/$(basename "$crirm_image_tar")" || {
+            command-error "copying cri-resmgr image to VM failed"
+	}
+	vm-cri-import-image cri-resmgr "cri-resmgr/$(basename "$crirm_image_tar")"
+
+	echo "installing cri-resmgr-agent to VM from image: $crirm_agent_image_info"
+	crirm_agent_image_id="$(awk '{print $1}' <<< "$crirm_agent_image_info")"
+	crirm_agent_image_repotag="$(awk '{print $2}' <<< "$crirm_agent_image_info")"
+	crirm_agent_image_tar="$(realpath "$OUTPUT_DIR/cri-resmgr-agent-image-$crirm_agent_image_id.tar")"
+	docker image save "$crirm_agent_image_repotag" > "$crirm_agent_image_tar"
+	vm-put-file "$crirm_agent_image_tar" "cri-resmgr/$(basename "$crirm_agent_image_tar")" || {
+            command-error "copying cri-resmgr-agent image to VM failed"
+	}
+	vm-cri-import-image cri-resmgr-agent "cri-resmgr/$(basename "$crirm_agent_image_tar")"
+
+	vm-command "mkdir -p /etc/cri-resmgr"
+	sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
+            -e 's|^\(\s*\)tolerations:$|\1tolerations:\n\1  - {"key": "cmk", "operator": "Equal", "value": "true", "effect": "NoSchedule"}|g' \
+            -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
+	    -e "s|AGENT_IMAGE_PLACEHOLDER|$crirm_agent_image_repotag|" \
+	    -e "s|CRI_RM_CONFIG_OPTION|force|" \
+            < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e.yaml" \
+            | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment.yaml
+	sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
+            -e 's|^\(\s*\)tolerations:$|\1tolerations:\n\1  - {"key": "cmk", "operator": "Equal", "value": "true", "effect": "NoSchedule"}|g' \
+            -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
+	    -e "s|AGENT_IMAGE_PLACEHOLDER|$crirm_agent_image_repotag|" \
+	    -e "s|CRI_RM_CONFIG_OPTION|fallback|" \
+            < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e.yaml" \
+            | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment-fallback.yaml
+    elif [ "$binsrc" == "github" ]; then
         vm-install-golang
         vm-install-pkg make
         vm-command "go get -d -v github.com/intel/cri-resource-manager"
@@ -1104,6 +1168,49 @@ vm-install-kernel-dev() { # script API
     distro-install-kernel-dev
 }
 
+vm-wait-pod-regexp() {
+    # Usage: [VAR=VALUE] vm-wait-pod-regexp <pod-name-with-regexp>
+    #
+    # Wait until pod (found using regexp) is created and ready.
+    #
+    # Parameters:
+    #   pod-name-with-regexp: pod name, for example "cri-resmgr-"
+    #   would find the first pod that contains "cri-resmgr-" string.
+    #
+    # Optional parameters (VAR=VALUE):
+    #   namespace: namespace to which instances are checked
+    #   wait: condition to be waited for (see kubectl wait --for=condition=).
+    #         If empty (""), skip waiting. The default is wait="Ready".
+    #   wait_t: wait timeout in seconds. The default is wait_t=240.
+    local namespace_args
+    local wait=${wait-Ready}
+    local wait_t=${wait_t-240}
+
+    if [ -n "${namespace:-}" ]; then
+        namespace_args="-n $namespace"
+    else
+        namespace_args=""
+    fi
+
+    pod_regexp="$1"
+
+    # Rudimentary wait as "kubectl wait" will timeout immediately if pod is not yet there.
+    vm-run-until --timeout "$wait_t" "kubectl get pods $namespace_args | grep -q $pod_regexp" || error "timeout while waiting $pod_regexp"
+
+    POD="$(vm-command-q "kubectl get pods $namespace_args | awk '/${pod_regexp}/ { print \$1 }'")"
+    if [ -z "$POD" ]; then
+        command-error "Pod $pod_regexp not found"
+    fi
+
+    #vm-command "kubectl wait --timeout=${wait_t}s --for=condition=${wait} $namespace_args pod/$POD" >/dev/null 2>&1 ||
+    #    command-error "waiting for ${POD} to become ready timed out"
+    vm-command "kubectl wait --timeout=${wait_t}s --for=condition=${wait} $namespace_args pod/$POD" >/dev/null 2>&1
+
+    echo "$POD"
+
+    return 0
+}
+
 vm-print-usage() {
     echo "- Login VM:     ssh $VM_SSH_USER@$VM_IP"
     echo "- Stop VM:      govm stop $VM_NAME"
@@ -1118,6 +1225,20 @@ vm-cgroup-version() {
     fi
 
     echo "1"
+}
+
+vm-remove-cache() { # remove cri-rm cache file
+    rm -f /var/lib/cri-resmgr/cache
+}
+
+vm-pod-ip() {
+    local pod="$(vm-cri-resmgr-pod-name)"
+
+    echo $(vm-command-q "kubectl get pod --no-headers=true -o custom-columns=NODE:status.podIP -n kube-system $pod")
+}
+
+vm-cri-resmgr-pod-name() {
+    echo "$(namespace=kube-system wait_t=5 vm-wait-pod-regexp cri-resmgr-)"
 }
 
 vm-check-env || exit 1

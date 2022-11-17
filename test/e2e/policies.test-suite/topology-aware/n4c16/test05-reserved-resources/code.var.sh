@@ -13,7 +13,7 @@ cri_resmgr_cfg_orig=$cri_resmgr_cfg
 # if exiting with success. Otherwise leave the pod running for
 # debugging in case of a failure.
 cleanup-kube-system() {
-    ( kubectl delete pods pod0 pod1 pod2 pod3 pod4 pod5 -n kube-system --now ) || true
+    ( kubectl delete pods pod0 pod1 pod2 pod3 pod4 pod5 -n kube-system --now --ignore-not-found=true) || true
 }
 cleanup-kube-system
 
@@ -72,7 +72,8 @@ verify "cpus['pod2c0'] == cpus['pod2c1'] == cpus['pod2c2'] == cpus['pod2c3']" \
 #
 # Run this twice to make sure allocated reserved CPUs are released correctly.
 for pod in pod3 pod4; do
-    namespace=kube-system CPU=1 CONTCOUNT=1 create guaranteed
+    namespace=kube-system CPU=100m CONTCOUNT=1 create guaranteed
+    report allowed
     verify "cpus['${pod}c0'] == {'cpu07', 'cpu11'}"
     kubectl delete -n kube-system pods/$pod --now
 done

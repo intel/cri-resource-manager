@@ -4,11 +4,22 @@ vm-command "grep isolcpus=8,9 /proc/cmdline" || {
     vm-command "grep isolcpus=8,9 /proc/cmdline" || {
         error "failed to set isolcpus kernel commandline parameter"
     }
-    launch cri-resmgr
+
+    if [ "$VM_CRI_DS" == "0" ]; then
+	# systemd or manually started cri-resmgr
+	launch cri-resmgr
+    fi
     vm-command "systemctl restart kubelet"
     sleep 1
     vm-wait-process --timeout 120 kube-apiserver
     vm-run-until --timeout 120 "kubectl get node"
+
+    if [ "$VM_CRI_DS" == "1" ]; then
+	# daemonset started cri-resmgr
+	launch cri-resmgr
+	# Let the system stabilize a bit
+	sleep 2
+    fi
 }
 
 CONTCOUNT=1
@@ -102,6 +113,16 @@ vm-command "grep isolcpus /proc/cmdline" && {
     error "failed to clean up isolcpus kernel commandline parameter"
 }
 echo "isolcpus removed from kernel commandline"
-launch cri-resmgr
+
+if [ "$VM_CRI_DS" == "0" ]; then
+    # systemd or manually started cri-resmgr
+    launch cri-resmgr
+fi
+
 vm-command "systemctl restart kubelet"
 vm-wait-process --timeout 120 kube-apiserver
+
+if [ "$VM_CRI_DS" == "1" ]; then
+    # daemonset started cri-resmgr
+    launch cri-resmgr
+fi

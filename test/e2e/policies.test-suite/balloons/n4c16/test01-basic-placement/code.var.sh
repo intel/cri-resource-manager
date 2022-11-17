@@ -8,6 +8,11 @@ cleanup() {
 
 cleanup
 
+# Do a fresh start
+terminate cri-resmgr
+vm-remove-cache
+launch cri-resmgr
+
 # pod0: run on reserved CPUs
 namespace=kube-system CONTCOUNT=2 create balloons-busybox
 report allowed

@@ -1,3 +1,29 @@
+# Make sure all the pods in default namespace are cleared so we get a fresh start
+kubectl delete pods --all --now
+
+# Remove also any leftover test pods from kube-system
+kubectl delete pods pod0 pod1 pod2 pod3 pod4 pod5 --ignore-not-found=true --now -n kube-system
+
+# Cleanup kernel commandline, otherwise isolcpus will affect CPU
+# pinning and cause false negatives from other tests on this VM.
+# This can happen if test08-isolcpus failed and we are re-running
+# the tests from the start.
+vm-command "grep isolcpus /proc/cmdline" && {
+    vm-del-kernel-cmdline-arg "isolcpus=8,9"
+    vm-force-restart
+    vm-command "grep isolcpus /proc/cmdline" && {
+	error "failed to clean up isolcpus kernel commandline parameter"
+    }
+    echo "isolcpus removed from kernel commandline"
+    vm-command "systemctl restart kubelet"
+    vm-wait-process --timeout 120 kube-apiserver
+}
+
+# Do a fresh start
+terminate cri-resmgr
+vm-remove-cache
+cri_resmgr_cfg=$(instantiate cri-resmgr.cfg)
+launch cri-resmgr
 
 # pod0: Test that 4 guaranteed containers eligible for isolated CPU allocation
 # gets evenly spread over NUMA nodes.

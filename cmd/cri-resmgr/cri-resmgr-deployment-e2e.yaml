@@ -1,0 +1,188 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cri-resmgr
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cri-resmgr
+rules:
+- apiGroups:
+  - ""
+  - criresmgr.intel.com
+  resources:
+  - nodes
+  - configmaps
+  - adjustments
+  - labels
+  - annotations
+  verbs:
+  - get
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cri-resmgr
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cri-resmgr
+subjects:
+- kind: ServiceAccount
+  name: cri-resmgr
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cri-resmgr-agent
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cri-resmgr-agent
+rules:
+- apiGroups:
+  - ""
+  - criresmgr.intel.com
+  resources:
+  - nodes
+  - configmaps
+  - adjustments
+  - labels
+  - annotations
+  verbs:
+  - get
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cri-resmgr-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cri-resmgr-agent
+subjects:
+- kind: ServiceAccount
+  name: cri-resmgr-agent
+  namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: cri-resmgr
+  name: cri-resmgr
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: cri-resmgr
+  template:
+    metadata:
+      labels:
+        app: cri-resmgr
+    spec:
+      serviceAccount: cri-resmgr
+      nodeSelector:
+        kubernetes.io/os: "linux"
+      containers:
+        - name: cri-resmgr
+          args:
+            - --use-nri-plugin
+            - --host-root
+            - /host
+            - --CRI_RM_CONFIG_OPTION-config
+            - /etc/cri-resmgr/cri-resmgr.cfg
+            - --pid-file
+            - /tmp/cri-resmgr.pid
+            - -metrics-interval
+            - 1s
+          ports:
+            - containerPort: 8891
+              name: metrics
+              protocol: TCP
+              hostPort: 8891
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          image: CRIRM_IMAGE_PLACEHOLDER
+          imagePullPolicy: Always # for testing
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+          - name: resmgrnrisock
+            mountPath: /var/run/nri.sock
+          - name: resmgrdata
+            mountPath: /var/lib/cri-resmgr
+          - name: hostsysfs
+            mountPath: /host/sys
+          - name: resmgrsockets
+            mountPath: /var/run/cri-resmgr
+          - name: resmgrconfig
+            mountPath: /etc/cri-resmgr
+        - name: cri-resmgr-agent
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          image: AGENT_IMAGE_PLACEHOLDER
+          imagePullPolicy: Always # for testing
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+          - name: resmgrsockets
+            mountPath: /var/run/cri-resmgr
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            exec:
+              command: ["/bin/cri-resmgr-agent-probe"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
+      volumes:
+      - name: resmgrnrisock
+        hostPath:
+          path: /var/run/nri.sock
+      - name: resmgrdata
+        hostPath:
+          path: /var/lib/cri-resmgr
+          type: DirectoryOrCreate
+        hostPath:
+          path: /var/lib/cri-resmgr
+      - name: hostsysfs
+        hostPath:
+          path: /host
+          type: DirectoryOrCreate
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: resmgrsockets
+        hostPath:
+          path: /var/run/cri-resmgr
+      - name: resmgrconfig
+        hostPath:
+          path: /etc/cri-resmgr

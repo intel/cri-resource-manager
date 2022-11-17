@@ -2,6 +2,9 @@
 
 cleanup() {
     vm-command "kubectl delete pods --all --now"
+    if [ "$VM_CRI_DS" == "1" ]; then
+	vm-command "fuser --kill /tmp/cri-resmgr-port-forward 2>/dev/null"
+    fi
     return 0
 }
 
@@ -10,7 +13,16 @@ cleanup
 # Launch cri-resmgr with wanted metrics update interval and a
 # configuration that opens the instrumentation http server.
 terminate cri-resmgr
+vm-remove-cache
+
 cri_resmgr_cfg=${TEST_DIR}/balloons-metrics.cfg  cri_resmgr_extra_args="-metrics-interval 4s" launch cri-resmgr
+
+if [ "$VM_CRI_DS" == "1" ]; then
+    pod_name=$(vm-cri-resmgr-pod-name)
+    vm-command "fuser --kill /tmp/cri-resmgr-port-forward 2>/dev/null"
+    vm-command "kubectl port-forward $pod_name 8891:8891 -n kube-system > /tmp/cri-resmgr-port-forward 2>&1 &"
+fi
+
 verify-metrics-has-line 'balloon="default\[0\]"'
 verify-metrics-has-line 'balloon="reserved\[0\]"'
 verify-metrics-has-no-line 'balloon="full-core\[0\]"'
