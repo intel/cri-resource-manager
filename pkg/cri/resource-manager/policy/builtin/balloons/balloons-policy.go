@@ -214,8 +214,14 @@ func (p *balloons) AllocateResources(c cache.Container) error {
 	// Resize selected balloon to fit the new container, unless it
 	// uses the ReservedResources CPUs, which is a fixed set.
 	reqMilliCpus := p.containerRequestedMilliCpus(c.GetCacheID()) + p.requestedMilliCpus(bln)
-	if bln.AvailMilliCpus() < reqMilliCpus {
-		p.resizeBalloon(bln, reqMilliCpus)
+	// Even if all containers in a balloon request is 0 mCPU in
+	// total (all are BestEffort, for example), force the size of
+	// the balloon to be enough for at least 1 mCPU
+	// request. Otherwise balloon's cpuset becomes empty, which in
+	// would mean no CPU pinning and balloon's containers would
+	// run on any CPUs.
+	if bln.AvailMilliCpus() < max(1, reqMilliCpus) {
+		p.resizeBalloon(bln, max(1, reqMilliCpus))
 	}
 	p.assignContainer(c, bln)
 	if log.DebugEnabled() {
@@ -232,12 +238,16 @@ func (p *balloons) ReleaseResources(c cache.Container) error {
 		if log.DebugEnabled() {
 			log.Debug(p.dumpBalloon(bln))
 		}
-		// Deflate the balloon, even down to 0 mCPUs before
-		// possibly freeing it.
-		p.resizeBalloon(bln, p.requestedMilliCpus(bln))
 		if bln.ContainerCount() == 0 {
+			// Deflate the balloon completely before
+			// freeing it.
+			p.resizeBalloon(bln, 0)
 			log.Debug("all containers removed, free balloon allocation %s", bln.PrettyName())
 			p.freeBalloon(bln)
+		} else {
+			// Make sure that the balloon will have at
+			// least 1 CPU to run remaining containers.
+			p.resizeBalloon(bln, max(1, p.requestedMilliCpus(bln)))
 		}
 	} else {
 		log.Debug("ReleaseResources: balloon-less container %s, nothing to release", c.PrettyName())
@@ -1114,6 +1124,13 @@ func removeString(strings []string, element string) []string {
 		}
 	}
 	return strings
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // Register us as a policy implementation.
