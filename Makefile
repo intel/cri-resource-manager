@@ -230,8 +230,10 @@ DISTRO_VERSION := $(shell . /etc/os-release; echo "$${VERSION_ID:-unknown}")
 DISTRO_PACKAGE := $(shell echo $(DISTRO_ID) | tr -d ' \t' | \
     sed -E 's/.*((centos)|(fedora)|(suse)).*/rpm/;s/.*((ubuntu)|(debian)).*/deb/')
 
-# Be quiet by default but let folks override it with Q= on the command line.
-Q := @
+# Be quiet by default but let folks override it with Q= or V=1 on the command line.
+ifneq ($(V),1)
+  Q := @
+endif
 
 # Default target: just build everything.
 all: build update-workflows
