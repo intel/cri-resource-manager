@@ -52,6 +52,7 @@ type Server interface {
 
 // server implements Server.
 type server struct {
+	v1.UnimplementedConfigServer
 	log.Logger
 	socket          string          // configured socket
 	sync.Mutex                      // lock for concurrent per-request goroutines.
