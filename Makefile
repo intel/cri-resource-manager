@@ -6,6 +6,7 @@ GO_PARALLEL :=
 GO_CMD      := go
 GO_BUILD    := $(GO_CMD) build $(GO_PARALLEL)
 GO_GEN      := $(GO_CMD) generate -x
+GO_INSTALL  := $(GO_CMD) install
 GO_FMT      := gofmt
 GO_CYCLO    := gocyclo
 GO_LINT     := golint
@@ -691,6 +692,18 @@ install-git-hooks:
 	    touch .git-hooks.redirected && \
 	    echo "done."; \
 	fi
+
+# Rules for installing protoc and related utilities.
+install-protoc:
+	$(Q)./scripts/hack/install-protobuf
+
+install-protoc-gen-go:
+	$(Q)$(GO_INSTALL) google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+
+install-protoc-gen-go-grpc:
+	$(Q)$(GO_INSTALL) google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
+
+install-protoc-tools: install-protoc install-protoc-gen-go install-protoc-gen-go-grpc
 
 # Rules for updating github workflows.
 update-workflows: .github/workflows/verify.yml
