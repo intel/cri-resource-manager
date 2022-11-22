@@ -424,7 +424,7 @@ vm-wait-process() { # script API
         return 1
     fi
     process="$1"
-    vm-run-until --timeout "$timeout" "pidof -q \"$process\"" || error "timeout while waiting $process"
+    vm-run-until --timeout "$timeout" "pidof \"$process\" > /dev/null" || error "timeout while waiting $process"
 
     # As we first wait for the process, and then wait for the pidfile (if enabled)
     # we might wait longer than expected. Accept that anomaly atm.
