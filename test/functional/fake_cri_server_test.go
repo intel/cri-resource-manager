@@ -205,7 +205,11 @@ func (s *fakeCriServer) ContainerStatus(ctx context.Context, req *api.ContainerS
 }
 
 func (s *fakeCriServer) UpdateContainerResources(ctx context.Context, req *api.UpdateContainerResourcesRequest) (*api.UpdateContainerResourcesResponse, error) {
-	response, err := s.callHandler(ctx, req, nil)
+	response, err := s.callHandler(ctx, req,
+		func(*fakeCriServer, context.Context, *api.UpdateContainerResourcesRequest) (*api.UpdateContainerResourcesResponse, error) {
+			return &api.UpdateContainerResourcesResponse{}, nil
+		},
+	)
 	return response.(*api.UpdateContainerResourcesResponse), err
 }
 
@@ -267,7 +271,11 @@ func (s *fakeCriServer) Status(ctx context.Context, req *api.StatusRequest) (*ap
 // Implementation of api.ImageServiceServer
 
 func (s *fakeCriServer) ListImages(ctx context.Context, req *api.ListImagesRequest) (*api.ListImagesResponse, error) {
-	response, err := s.callHandler(ctx, req, nil)
+	response, err := s.callHandler(ctx, req,
+		func(*fakeCriServer, context.Context, *api.ListImagesRequest) (*api.ListImagesResponse, error) {
+			return &api.ListImagesResponse{}, nil
+		},
+	)
 	return response.(*api.ListImagesResponse), err
 }
 
