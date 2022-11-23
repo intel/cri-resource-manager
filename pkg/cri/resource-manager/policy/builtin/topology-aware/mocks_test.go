@@ -26,7 +26,7 @@ import (
 	"github.com/intel/goresctrl/pkg/sst"
 	idset "github.com/intel/goresctrl/pkg/utils"
 	v1 "k8s.io/api/core/v1"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -376,7 +376,7 @@ func (m *mockContainer) GetDeviceByContainer(string) *cache.Device {
 func (m *mockContainer) GetResourceRequirements() v1.ResourceRequirements {
 	return m.returnValueForGetResourceRequirements
 }
-func (m *mockContainer) GetLinuxResources() *cri.LinuxContainerResources {
+func (m *mockContainer) GetLinuxResources() *criv1.LinuxContainerResources {
 	panic("unimplemented")
 }
 func (m *mockContainer) SetCommand([]string) {
@@ -439,7 +439,7 @@ func (m *mockContainer) GetCpusetCpus() string {
 func (m *mockContainer) GetCpusetMems() string {
 	panic("unimplemented")
 }
-func (m *mockContainer) SetLinuxResources(*cri.LinuxContainerResources) {
+func (m *mockContainer) SetLinuxResources(*criv1.LinuxContainerResources) {
 	panic("unimplemented")
 }
 func (m *mockContainer) SetCPUPeriod(int64) {
@@ -460,10 +460,10 @@ func (m *mockContainer) SetCpusetCpus(string) {
 }
 func (m *mockContainer) SetCpusetMems(string) {
 }
-func (m *mockContainer) UpdateCriCreateRequest(*cri.CreateContainerRequest) error {
+func (m *mockContainer) UpdateCriCreateRequest(*criv1.CreateContainerRequest) error {
 	panic("unimplemented")
 }
-func (m *mockContainer) CriUpdateRequest() (*cri.UpdateContainerResourcesRequest, error) {
+func (m *mockContainer) CriUpdateRequest() (*criv1.UpdateContainerResourcesRequest, error) {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetAffinity() ([]*cache.Affinity, error) {
@@ -502,13 +502,13 @@ func (m *mockContainer) GetCRIRequest() (interface{}, bool) {
 func (m *mockContainer) ClearCRIRequest() (interface{}, bool) {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetCRIEnvs() []*cri.KeyValue {
+func (m *mockContainer) GetCRIEnvs() []*criv1.KeyValue {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetCRIMounts() []*cri.Mount {
+func (m *mockContainer) GetCRIMounts() []*criv1.Mount {
 	panic("unimplemented")
 }
-func (m *mockContainer) GetCRIDevices() []*cri.Device {
+func (m *mockContainer) GetCRIDevices() []*criv1.Device {
 	panic("unimplemented")
 }
 func (m *mockContainer) GetPending() []string {
@@ -735,10 +735,10 @@ func (m *mockCache) SetAdjustment(*config.Adjustment) (bool, map[string]error) {
 func (m *mockCache) Save() error {
 	return nil
 }
-func (m *mockCache) RefreshPods(*cri.ListPodSandboxResponse, map[string]*cache.PodStatus) ([]cache.Pod, []cache.Pod, []cache.Container) {
+func (m *mockCache) RefreshPods(*criv1.ListPodSandboxResponse, map[string]*cache.PodStatus) ([]cache.Pod, []cache.Pod, []cache.Container) {
 	panic("unimplemented")
 }
-func (m *mockCache) RefreshContainers(*cri.ListContainersResponse) ([]cache.Container, []cache.Container) {
+func (m *mockCache) RefreshContainers(*criv1.ListContainersResponse) ([]cache.Container, []cache.Container) {
 	panic("unimplemented")
 }
 func (m *mockCache) ContainerDirectory(string) string {
