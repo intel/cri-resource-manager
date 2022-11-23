@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
@@ -42,7 +42,7 @@ func IsPodQOSClassName(class string) bool {
 }
 
 // estimateComputeResources calculates resource requests/limits from a CRI request.
-func estimateComputeResources(lnx *cri.LinuxContainerResources, cgroupParent string) corev1.ResourceRequirements {
+func estimateComputeResources(lnx *criv1.LinuxContainerResources, cgroupParent string) corev1.ResourceRequirements {
 	var qos corev1.PodQOSClass
 
 	resources := corev1.ResourceRequirements{

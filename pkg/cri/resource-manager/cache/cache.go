@@ -26,7 +26,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
@@ -79,9 +79,9 @@ type PodState int32
 
 const (
 	// PodStateReady marks a pod ready.
-	PodStateReady = PodState(int32(cri.PodSandboxState_SANDBOX_READY))
+	PodStateReady = PodState(int32(criv1.PodSandboxState_SANDBOX_READY))
 	// PodStateNotReady marks a pod as not ready.
-	PodStateNotReady = PodState(int32(cri.PodSandboxState_SANDBOX_NOTREADY))
+	PodStateNotReady = PodState(int32(criv1.PodSandboxState_SANDBOX_NOTREADY))
 	// PodStateStale marks a pod as removed.
 	PodStateStale = PodState(int32(PodStateNotReady) + 1)
 )
@@ -198,13 +198,13 @@ type ContainerState int32
 
 const (
 	// ContainerStateCreated marks a container created, not running.
-	ContainerStateCreated = ContainerState(int32(cri.ContainerState_CONTAINER_CREATED))
+	ContainerStateCreated = ContainerState(int32(criv1.ContainerState_CONTAINER_CREATED))
 	// ContainerStateRunning marks a container created, running.
-	ContainerStateRunning = ContainerState(int32(cri.ContainerState_CONTAINER_RUNNING))
+	ContainerStateRunning = ContainerState(int32(criv1.ContainerState_CONTAINER_RUNNING))
 	// ContainerStateExited marks a container exited.
-	ContainerStateExited = ContainerState(int32(cri.ContainerState_CONTAINER_EXITED))
+	ContainerStateExited = ContainerState(int32(criv1.ContainerState_CONTAINER_EXITED))
 	// ContainerStateUnknown marks a container to be in an unknown state.
-	ContainerStateUnknown = ContainerState(int32(cri.ContainerState_CONTAINER_UNKNOWN))
+	ContainerStateUnknown = ContainerState(int32(criv1.ContainerState_CONTAINER_UNKNOWN))
 	// ContainerStateCreating marks a container as being created.
 	ContainerStateCreating = ContainerState(int32(ContainerStateUnknown) + 1)
 	// ContainerStateStale marks a container removed.
@@ -287,7 +287,7 @@ type Container interface {
 	// GetResourceRequirements returns the webhook-annotated requirements for ths container.
 	GetResourceRequirements() v1.ResourceRequirements
 	// GetLinuxResources returns the CRI linux resource request of the container.
-	GetLinuxResources() *cri.LinuxContainerResources
+	GetLinuxResources() *criv1.LinuxContainerResources
 
 	// SetCommand sets the container command.
 	SetCommand([]string)
@@ -333,7 +333,7 @@ type Container interface {
 	GetCpusetMems() string
 
 	// SetLinuxResources sets the Linux-specific resource request of the container.
-	SetLinuxResources(*cri.LinuxContainerResources)
+	SetLinuxResources(*criv1.LinuxContainerResources)
 	// SetCPUPeriod sets the CFS CPU period of the container.
 	SetCPUPeriod(int64)
 	// SetCPUQuota sets the CFS CPU quota of the container.
@@ -388,11 +388,11 @@ type Container interface {
 	ClearCRIRequest() (interface{}, bool)
 
 	// GetCRIEnvs returns container environment variables.
-	GetCRIEnvs() []*cri.KeyValue
+	GetCRIEnvs() []*criv1.KeyValue
 	// GetCRIMounts returns container mounts.
-	GetCRIMounts() []*cri.Mount
+	GetCRIMounts() []*criv1.Mount
 	// GetCRIDevices returns container devices.
-	GetCRIDevices() []*cri.Device
+	GetCRIDevices() []*criv1.Device
 
 	// GetPending gets the names of the controllers with pending changes.
 	GetPending() []string
@@ -430,9 +430,9 @@ type container struct {
 	Tags          map[string]string  // container tags (local dynamic labels)
 	Adjustment    string             // name of applicable external adjustment, if any
 
-	Resources v1.ResourceRequirements      // container resources (from webhook annotation)
-	LinuxReq  *cri.LinuxContainerResources // used to estimate Resources if we lack annotations
-	req       *interface{}                 // pending CRI request
+	Resources v1.ResourceRequirements        // container resources (from webhook annotation)
+	LinuxReq  *criv1.LinuxContainerResources // used to estimate Resources if we lack annotations
+	req       *interface{}                   // pending CRI request
 
 	CgroupDir    string       // cgroup directory relative to a(ny) controller.
 	RDTClass     string       // RDT class this container is assigned to.
@@ -450,11 +450,11 @@ type MountType int32
 
 const (
 	// MountPrivate is a private container mount.
-	MountPrivate MountType = MountType(cri.MountPropagation_PROPAGATION_PRIVATE)
+	MountPrivate MountType = MountType(criv1.MountPropagation_PROPAGATION_PRIVATE)
 	// MountHostToContainer is a host-to-container mount.
-	MountHostToContainer MountType = MountType(cri.MountPropagation_PROPAGATION_HOST_TO_CONTAINER)
+	MountHostToContainer MountType = MountType(criv1.MountPropagation_PROPAGATION_HOST_TO_CONTAINER)
 	// MountBidirectional is a bidirectional mount.
-	MountBidirectional MountType = MountType(cri.MountPropagation_PROPAGATION_BIDIRECTIONAL)
+	MountBidirectional MountType = MountType(criv1.MountPropagation_PROPAGATION_BIDIRECTIONAL)
 )
 
 // Mount is a filesystem entry mounted inside a container.
@@ -502,7 +502,6 @@ func (pm *PageMigrate) Clone() *PageMigrate {
 	return c
 }
 
-//
 // Cachable is an interface opaque cachable data must implement.
 type Cachable interface {
 	// Set value (via a pointer receiver) to the object.
@@ -511,7 +510,6 @@ type Cachable interface {
 	Get() interface{}
 }
 
-//
 // Cache is the primary interface exposed for tracking pods and containers.
 //
 // Cache tracks pods and containers in the runtime, mostly by processing CRI
@@ -583,9 +581,9 @@ type Cache interface {
 	Save() error
 
 	// RefreshPods purges/inserts stale/new pods/containers using a pod sandbox list response.
-	RefreshPods(*cri.ListPodSandboxResponse, map[string]*PodStatus) ([]Pod, []Pod, []Container)
+	RefreshPods(*criv1.ListPodSandboxResponse, map[string]*PodStatus) ([]Pod, []Pod, []Container)
 	// RefreshContainers purges/inserts stale/new containers using a container list response.
-	RefreshContainers(*cri.ListContainersResponse) ([]Container, []Container)
+	RefreshContainers(*criv1.ListContainersResponse) ([]Container, []Container)
 
 	// Get the container (data) directory for a container.
 	ContainerDirectory(string) string
@@ -861,10 +859,10 @@ func (cch *cache) InsertPod(id string, msg interface{}, status *PodStatus) (Pod,
 	p := &pod{cache: cch, ID: id}
 
 	switch msg.(type) {
-	case *cri.RunPodSandboxRequest:
-		err = p.fromRunRequest(msg.(*cri.RunPodSandboxRequest))
-	case *cri.PodSandbox:
-		err = p.fromListResponse(msg.(*cri.PodSandbox), status)
+	case *criv1.RunPodSandboxRequest:
+		err = p.fromRunRequest(msg.(*criv1.RunPodSandboxRequest))
+	case *criv1.PodSandbox:
+		err = p.fromListResponse(msg.(*criv1.PodSandbox), status)
 	default:
 		err = fmt.Errorf("cannot create pod from message %T", msg)
 	}
@@ -911,10 +909,10 @@ func (cch *cache) InsertContainer(msg interface{}) (Container, error) {
 	}
 
 	switch msg.(type) {
-	case *cri.CreateContainerRequest:
-		err = c.fromCreateRequest(msg.(*cri.CreateContainerRequest))
-	case *cri.Container:
-		err = c.fromListResponse(msg.(*cri.Container))
+	case *criv1.CreateContainerRequest:
+		err = c.fromCreateRequest(msg.(*criv1.CreateContainerRequest))
+	case *criv1.Container:
+		err = c.fromListResponse(msg.(*criv1.Container))
 	default:
 		err = fmt.Errorf("cannot create container from message %T", msg)
 	}
@@ -954,7 +952,7 @@ func (cch *cache) UpdateContainerID(cacheID string, msg interface{}) (Container,
 			cacheID)
 	}
 
-	reply, ok := msg.(*cri.CreateContainerResponse)
+	reply, ok := msg.(*criv1.CreateContainerResponse)
 	if !ok {
 		return nil, cacheError("%s: failed to update ID from message %T",
 			c.PrettyName(), msg)
@@ -1021,7 +1019,7 @@ func (cch *cache) LookupContainerByCgroup(path string) (Container, bool) {
 }
 
 // RefreshPods purges/inserts stale/new pods/containers using a pod sandbox list response.
-func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string]*PodStatus) ([]Pod, []Pod, []Container) {
+func (cch *cache) RefreshPods(msg *criv1.ListPodSandboxResponse, status map[string]*PodStatus) ([]Pod, []Pod, []Container) {
 	valid := make(map[string]struct{})
 
 	add := []Pod{}
@@ -1065,7 +1063,7 @@ func (cch *cache) RefreshPods(msg *cri.ListPodSandboxResponse, status map[string
 }
 
 // RefreshContainers purges/inserts stale/new containers using a container list response.
-func (cch *cache) RefreshContainers(msg *cri.ListContainersResponse) ([]Container, []Container) {
+func (cch *cache) RefreshContainers(msg *criv1.ListContainersResponse) ([]Container, []Container) {
 	valid := make(map[string]struct{})
 
 	add := []Container{}

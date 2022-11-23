@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
@@ -39,7 +39,7 @@ type fakePod struct {
 	qos         v1.PodQOSClass
 	labels      map[string]string
 	annotations map[string]string
-	podCfg      *cri.PodSandboxConfig
+	podCfg      *criv1.PodSandboxConfig
 }
 
 type fakeContainer struct {
@@ -48,7 +48,7 @@ type fakeContainer struct {
 	id          string
 	labels      map[string]string
 	annotations map[string]string
-	resources   cri.LinuxContainerResources
+	resources   criv1.LinuxContainerResources
 }
 
 func createTmpCache() (Cache, string, error) {
@@ -90,16 +90,16 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 		cgroupPath = "/kubepods.slice/kubepods-pod" + strings.ReplaceAll(fp.uid, "-", "_")
 	}
 
-	req := &cri.RunPodSandboxRequest{
-		Config: &cri.PodSandboxConfig{
-			Metadata: &cri.PodSandboxMetadata{
+	req := &criv1.RunPodSandboxRequest{
+		Config: &criv1.PodSandboxConfig{
+			Metadata: &criv1.PodSandboxMetadata{
 				Name:      fp.name,
 				Uid:       fp.uid,
 				Namespace: "default",
 			},
 			Labels:      fp.labels,
 			Annotations: fp.annotations,
-			Linux: &cri.LinuxPodSandboxConfig{
+			Linux: &criv1.LinuxPodSandboxConfig{
 				CgroupParent: cgroupPath,
 			},
 		},
@@ -123,15 +123,15 @@ func createFakeContainer(cch Cache, fc *fakeContainer) (Container, error) {
 	fc.id = fmt.Sprintf("container-id-%4.4d", nextFakeContainerID)
 	nextFakeContainerID++
 
-	req := &cri.CreateContainerRequest{
+	req := &criv1.CreateContainerRequest{
 		PodSandboxId: fc.fakePod.id,
-		Config: &cri.ContainerConfig{
-			Metadata: &cri.ContainerMetadata{
+		Config: &criv1.ContainerConfig{
+			Metadata: &criv1.ContainerMetadata{
 				Name: fc.name,
 			},
 			Labels:      fc.labels,
 			Annotations: fc.annotations,
-			Linux: &cri.LinuxContainerConfig{
+			Linux: &criv1.LinuxContainerConfig{
 				Resources: &fc.resources,
 			},
 		},
@@ -144,7 +144,7 @@ func createFakeContainer(cch Cache, fc *fakeContainer) (Container, error) {
 		return nil, err
 	}
 	cch.(*cache).Debug("*** <= created Container: %+v\n", *c.(*container))
-	update := &cri.CreateContainerResponse{ContainerId: fc.id}
+	update := &criv1.CreateContainerResponse{ContainerId: fc.id}
 	if _, err := cch.UpdateContainerID(c.GetCacheID(), update); err != nil {
 		return nil, err
 	}

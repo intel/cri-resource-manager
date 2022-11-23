@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
@@ -33,7 +33,7 @@ const (
 )
 
 // Create a pod from a run request.
-func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
+func (p *pod) fromRunRequest(req *criv1.RunPodSandboxRequest) error {
 	cfg := req.Config
 	if cfg == nil {
 		return cacheError("pod %s has no config", p.ID)
@@ -62,7 +62,7 @@ func (p *pod) fromRunRequest(req *cri.RunPodSandboxRequest) error {
 }
 
 // Create a pod from a list response.
-func (p *pod) fromListResponse(pod *cri.PodSandbox, status *PodStatus) error {
+func (p *pod) fromListResponse(pod *criv1.PodSandbox, status *PodStatus) error {
 	meta := pod.Metadata
 	if meta == nil {
 		return cacheError("pod %s has no reply metadata", p.ID)
@@ -510,7 +510,7 @@ func (p *pod) getTasks(recursive, processes bool) ([]string, error) {
 }
 
 // ParsePodStatus parses a PodSandboxStatusResponse into a PodStatus.
-func ParsePodStatus(response *cri.PodSandboxStatusResponse) (*PodStatus, error) {
+func ParsePodStatus(response *criv1.PodSandboxStatusResponse) (*PodStatus, error) {
 	var name string
 
 	type infoRuntimeSpec struct {
