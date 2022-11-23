@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Block I/O Demo &mdash; CRI Resource Manager 0.7.0-87-g6b458ca7 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <title>Block I/O Demo &mdash; CRI Resource Manager 0.7.0-91-g45a4b99e documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
-  <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -37,7 +42,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -87,23 +92,23 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="tex2jax_ignore mathjax_ignore section" id="block-i-o-demo">
-<h1>Block I/O Demo<a class="headerlink" href="#block-i-o-demo" title="Permalink to this headline">¶</a></h1>
+  <section id="block-i-o-demo">
+<h1>Block I/O Demo<a class="headerlink" href="#block-i-o-demo" title="Permalink to this heading"></a></h1>
 <p>This demo creates a virtual machine for a single-node Kubernetes*
 cluster where container runtime features are extended by <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code>.</p>
 <p>In this setup, <code class="docutils literal notranslate"><span class="pre">cri-resmgr</span></code> is configured with block I/O parameters
 that throttle I/O bandwith of a container that constantly scans
 system file checksums.</p>
-<div class="section" id="prerequisites">
-<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this heading"></a></h2>
 <p>Install:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">docker</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">govm</span></code></p></li>
 </ul>
-</div>
-<div class="section" id="run-the-demo">
-<h2>Run the demo<a class="headerlink" href="#run-the-demo" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="run-the-demo">
+<h2>Run the demo<a class="headerlink" href="#run-the-demo" title="Permalink to this heading"></a></h2>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">./</span><span class="n">run</span><span class="o">.</span><span class="n">sh</span> <span class="n">play</span>
 </pre></div>
 </div>
@@ -112,16 +117,16 @@ experiment with it. You can login to the virtual machine:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ govm ssh crirm-demo-blockio
 </pre></div>
 </div>
-</div>
-<div class="section" id="clean-up-and-run-the-demo-from-scratch">
-<h2>Clean up - and run the demo from scratch<a class="headerlink" href="#clean-up-and-run-the-demo-from-scratch" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="clean-up-and-run-the-demo-from-scratch">
+<h2>Clean up - and run the demo from scratch<a class="headerlink" href="#clean-up-and-run-the-demo-from-scratch" title="Permalink to this heading"></a></h2>
 <p>In order to run the demo from scratch again, delete the virtual
 machine:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ govm delete crirm-demo-blockio
 </pre></div>
 </div>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>

@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.7.0-87-g6b458ca7 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.7.0-91-g45a4b99e documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
-  <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -37,7 +42,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -101,10 +106,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="tex2jax_ignore mathjax_ignore section" id="rdt-intel-resource-director-technology">
-<h1>RDT (Intel® Resource Director Technology)<a class="headerlink" href="#rdt-intel-resource-director-technology" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="background">
-<h2>Background<a class="headerlink" href="#background" title="Permalink to this headline">¶</a></h2>
+  <section id="rdt-intel-resource-director-technology">
+<h1>RDT (Intel® Resource Director Technology)<a class="headerlink" href="#rdt-intel-resource-director-technology" title="Permalink to this heading"></a></h1>
+<section id="background">
+<h2>Background<a class="headerlink" href="#background" title="Permalink to this heading"></a></h2>
 <p>Intel® RDT provides capabilities for cache and memory allocation and
 monitoring. In Linux system the functionality is exposed to the user space via
 the <a class="reference external" href="https://docs.kernel.org/x86/resctrl.html">resctrl</a>
@@ -116,9 +121,9 @@ we use the term ‘RDT class’ instead of ‘resource control group’.</p>
 Cache Allocation (CAT) with Code and Data Prioritization (CDP) and Memory
 Bandwidth Allocation (MBA) plus Cache Monitoring (CMT) and Memory Bandwidth
 Monitoring (MBM).</p>
-</div>
-<div class="section" id="overview">
-<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h2>
 <p>RDT configuration in CRI-RM is class-based. Each container gets assigned to an
 RDT class. In turn, all processes of the container will be assigned to the RDT
 Classes of Service (CLOS) (under <code class="docutils literal notranslate"><span class="pre">/sys/fs/resctrl</span></code>) corresponding the RDT class. CRI-RM will configure
@@ -128,9 +133,9 @@ configuration changes.</p>
 RDT is enabled CRI-RM tries to assign containers into an RDT class with a name
 matching their Pod QoS class. This default behavior can be overridden with
 pod annotations.</p>
-</div>
-<div class="section" id="class-assignment">
-<h2>Class Assignment<a class="headerlink" href="#class-assignment" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="class-assignment">
+<h2>Class Assignment<a class="headerlink" href="#class-assignment" title="Permalink to this heading"></a></h2>
 <p>By default, containers get an RDT class with the same name as its Pod QoS class
 (Guaranteed, Burstable or Besteffort). If the RDT class is missing the
 container will be assigned to the system root class.</p>
@@ -146,11 +151,11 @@ pod-level annotation (above)</p></li>
 Guaranteed, Burstable or Besteffort.</p>
 <p>The default assignment could also be overridden by a policy but currently none
 of the builtin policies do that.</p>
-</div>
-<div class="section" id="configuration">
-<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="operating-modes">
-<h3>Operating Modes<a class="headerlink" href="#operating-modes" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this heading"></a></h2>
+<section id="operating-modes">
+<h3>Operating Modes<a class="headerlink" href="#operating-modes" title="Permalink to this heading"></a></h3>
 <p>The RDT controller supports three operating modes, controlled by
 <code class="docutils literal notranslate"><span class="pre">rdt.options.mode</span></code> configuration option.</p>
 <ul class="simple">
@@ -167,14 +172,14 @@ are removed.</p></li>
 resctrl filesystem according to the rdt class definitions in the CRI-RM
 configuration. This is the default operating mode.</p></li>
 </ul>
-</div>
-<div class="section" id="rdt-classes">
-<h3>RDT Classes<a class="headerlink" href="#rdt-classes" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="rdt-classes">
+<h3>RDT Classes<a class="headerlink" href="#rdt-classes" title="Permalink to this heading"></a></h3>
 <p>The RDT class configuration in CRI-RM is a two-level hierarchy consisting of
 partitions and classes. It specifies a set of partitions each having a set of
 classes.</p>
-<div class="section" id="partitions">
-<h4>Partitions<a class="headerlink" href="#partitions" title="Permalink to this headline">¶</a></h4>
+<section id="partitions">
+<h4>Partitions<a class="headerlink" href="#partitions" title="Permalink to this heading"></a></h4>
 <p>Partitions represent a logical grouping of the underlying classes, each
 partition specifying a portion of the available resources (L2/L3/MB) which will
 be shared by the classes under it. Partitions guarantee non-overlapping
@@ -182,9 +187,9 @@ exclusive cache allocation - i.e. no overlap on the cache ways between
 partitions is allowed. However, by technology, MB allocations are not
 exclusive. Thus, it is possible to assign all partitions 100% of memory
 bandwidth, for example.</p>
-</div>
-<div class="section" id="classes">
-<h4>Classes<a class="headerlink" href="#classes" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="classes">
+<h4>Classes<a class="headerlink" href="#classes" title="Permalink to this heading"></a></h4>
 <p>Classes represent the actual RDT classes containers are assigned to. In
 contrast to partitions, cache allocation between classes under a specific
 partition may overlap (and they usually do).</p>
@@ -192,51 +197,51 @@ partition may overlap (and they usually do).</p>
 classes corresponding to the Pod QoS classes are specified. Also, the maximum
 number of classes (CLOSes) supported by the underlying hardware must not be
 exceeded.</p>
-</div>
-</div>
-<div class="section" id="example">
-<h3>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="example">
+<h3>Example<a class="headerlink" href="#example" title="Permalink to this heading"></a></h3>
 <p>Below is a config snippet that would allocate 60% of the L3 cache lines
 exclusively to the Guarenteed class. The remaining 40% L3 is for Burstable and
 Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
 memory bandwidth whereas the other classes are throttled to 50%.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">rdt</span><span class="p">:</span>
-  <span class="c1"># Common options</span>
-  <span class="nt">options</span><span class="p">:</span>
-    <span class="c1"># One of Full, Discovery or Disabled</span>
-    <span class="nt">mode</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Full</span>
-    <span class="c1"># Set to true to disable creation of monitoring groups</span>
-    <span class="nt">monitoringDisabled</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>
-    <span class="nt">l3</span><span class="p">:</span>
-      <span class="c1"># Make this false if L3 CAT must be available</span>
-      <span class="nt">optional</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
-    <span class="nt">mb</span><span class="p">:</span>
-      <span class="c1"># Make this false if MBA must be available</span>
-      <span class="nt">optional</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">rdt</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Common options</span><span class="w"></span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># One of Full, Discovery or Disabled</span><span class="w"></span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Full</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Set to true to disable creation of monitoring groups</span><span class="w"></span>
+<span class="w">    </span><span class="nt">monitoringDisabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w"></span>
+<span class="w">    </span><span class="nt">l3</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Make this false if L3 CAT must be available</span><span class="w"></span>
+<span class="w">      </span><span class="nt">optional</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
+<span class="w">    </span><span class="nt">mb</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Make this false if MBA must be available</span><span class="w"></span>
+<span class="w">      </span><span class="nt">optional</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
 
-  <span class="c1"># Configuration of classes</span>
-  <span class="nt">partitions</span><span class="p">:</span>
-    <span class="nt">exclusive</span><span class="p">:</span>
-      <span class="c1"># Allocate 60% of all L3 cache to the &quot;exclusive&quot; partition</span>
-      <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;60%&quot;</span>
-      <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span>
-      <span class="nt">classes</span><span class="p">:</span>
-        <span class="nt">Guaranteed</span><span class="p">:</span>
-          <span class="c1"># Allocate all of the partitions cache lines to &quot;Guaranteed&quot;</span>
-          <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
-    <span class="nt">shared</span><span class="p">:</span>
-      <span class="c1"># Allocate 40% L3 cache IDs to the &quot;shared&quot; partition</span>
-      <span class="c1"># These will NOT overlap with the cache lines allocated for &quot;exclusive&quot; partition</span>
-      <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;40%&quot;</span>
-      <span class="nt">mbAllocation</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span>
-      <span class="nt">classes</span><span class="p">:</span>
-        <span class="nt">Burstable</span><span class="p">:</span>
-          <span class="c1"># Allow &quot;Burstable&quot; to use all cache lines of the &quot;shared&quot; partition</span>
-          <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;100%&quot;</span>
-        <span class="nt">BestEffort</span><span class="p">:</span>
-          <span class="c1"># Allow &quot;Besteffort&quot; to use only half of the L3 cache # lines of the &quot;shared&quot; partition.</span>
-          <span class="c1"># These will overlap with those used by &quot;Burstable&quot;</span>
-          <span class="nt">l3Allocation</span><span class="p">:</span> <span class="s">&quot;50%&quot;</span>
+<span class="w">  </span><span class="c1"># Configuration of classes</span><span class="w"></span>
+<span class="w">  </span><span class="nt">partitions</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Allocate 60% of all L3 cache to the &quot;exclusive&quot; partition</span><span class="w"></span>
+<span class="w">      </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;60%&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="nt">mbAllocation</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span><span class="w"></span>
+<span class="w">      </span><span class="nt">classes</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">Guaranteed</span><span class="p">:</span><span class="w"></span>
+<span class="w">          </span><span class="c1"># Allocate all of the partitions cache lines to &quot;Guaranteed&quot;</span><span class="w"></span>
+<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100%&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nt">shared</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Allocate 40% L3 cache IDs to the &quot;shared&quot; partition</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># These will NOT overlap with the cache lines allocated for &quot;exclusive&quot; partition</span><span class="w"></span>
+<span class="w">      </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;40%&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="nt">mbAllocation</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span><span class="w"></span>
+<span class="w">      </span><span class="nt">classes</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">Burstable</span><span class="p">:</span><span class="w"></span>
+<span class="w">          </span><span class="c1"># Allow &quot;Burstable&quot; to use all cache lines of the &quot;shared&quot; partition</span><span class="w"></span>
+<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100%&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nt">BestEffort</span><span class="p">:</span><span class="w"></span>
+<span class="w">          </span><span class="c1"># Allow &quot;Besteffort&quot; to use only half of the L3 cache # lines of the &quot;shared&quot; partition.</span><span class="w"></span>
+<span class="w">          </span><span class="c1"># These will overlap with those used by &quot;Burstable&quot;</span><span class="w"></span>
+<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;50%&quot;</span><span class="w"></span>
 </pre></div>
 </div>
 <p>The configuration also supports far more fine-grained control, e.g. per
@@ -248,17 +253,17 @@ configure cache allocations exactly as required. For detailed description of the
 <a class="reference external" href="https://github.com/intel/goresctrl/blob/v0.2.0/doc/rdt.md">goresctrl library documentation</a></p>
 <p>See <code class="docutils literal notranslate"><span class="pre">rdt</span></code> in the <span class="xref myst">example ConfigMap spec</span>
 for another example configuration.</p>
-</div>
-<div class="section" id="dynamic-configuration">
-<h3>Dynamic Configuration<a class="headerlink" href="#dynamic-configuration" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="dynamic-configuration">
+<h3>Dynamic Configuration<a class="headerlink" href="#dynamic-configuration" title="Permalink to this heading"></a></h3>
 <p>RDT supports dynamic configuration i.e. the resctrl filesystem is reconfigured
 whenever a configuration update e.g. via the <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">Node Agent</span></a> is
 received. However, the configuration update is rejected if it is incompatible
 with the set of currently running containers - e.g. the new config is missing a
 class that a running container has been assigned to.</p>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>

@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CPU Allocator &mdash; CRI Resource Manager 0.7.0-87-g6b458ca7 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <title>CPU Allocator &mdash; CRI Resource Manager 0.7.0-91-g45a4b99e documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
-  <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -37,7 +42,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -97,20 +102,20 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="tex2jax_ignore mathjax_ignore section" id="cpu-allocator">
-<h1>CPU Allocator<a class="headerlink" href="#cpu-allocator" title="Permalink to this headline">¶</a></h1>
+  <section id="cpu-allocator">
+<h1>CPU Allocator<a class="headerlink" href="#cpu-allocator" title="Permalink to this heading"></a></h1>
 <p>CRI Resource Manager has a separate CPU allocator component that helps policies
 make educated allocation of CPU cores for workloads.  Currently all policies
 except for <a class="reference internal" href="static-pools.html"><span class="doc std std-doc">static-pools</span></a> utilize the built-in CPU allocator.
 See policy specific documentation for more details.</p>
-<div class="section" id="topology-based-allocation">
-<h2>Topology Based Allocation<a class="headerlink" href="#topology-based-allocation" title="Permalink to this headline">¶</a></h2>
+<section id="topology-based-allocation">
+<h2>Topology Based Allocation<a class="headerlink" href="#topology-based-allocation" title="Permalink to this heading"></a></h2>
 <p>The CPU allocator tries to optimize the allocation of CPUs in terms of the
 hardware topology. More specifically, it aims at packing all CPUs of one
 request “near” each other in order to minimize memory latencies between CPUs.</p>
-</div>
-<div class="section" id="cpu-prioritization">
-<h2>CPU Prioritization<a class="headerlink" href="#cpu-prioritization" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="cpu-prioritization">
+<h2>CPU Prioritization<a class="headerlink" href="#cpu-prioritization" title="Permalink to this heading"></a></h2>
 <p>The CPU allocator also does automatic CPU prioritization by detecting CPU
 features and their configuration parameters. Currently, CRI Resource Manager
 supports CPU priority detection based on the <code class="docutils literal notranslate"><span class="pre">intel_pstate</span></code> scaling
@@ -120,14 +125,14 @@ driver in the Linux CPUFreq subsystem, and, Intel Speed Select Technology
 Policies utilizing the CPU allocator may choose to prefer certain priority
 class for certain types of workloads. For example, prefer (and preserve) high
 priority CPUs for high priority workloads.</p>
-<div class="section" id="intel-speed-select-technology-sst">
-<h3>Intel Speed Select Technology (SST)<a class="headerlink" href="#intel-speed-select-technology-sst" title="Permalink to this headline">¶</a></h3>
+<section id="intel-speed-select-technology-sst">
+<h3>Intel Speed Select Technology (SST)<a class="headerlink" href="#intel-speed-select-technology-sst" title="Permalink to this heading"></a></h3>
 <p>CRI Resource Manager supports detection of all Intel Speed Select Technology
 (SST) features, i.e. Speed Select Technology Performance Profile (SST-PP), Base
 Frequency (SST-BF), Turbo Frequency (SST-TF) and Core Power (SST-CP).</p>
 <p>CPU prioritization is based on detection of the currently active SST features
 and their parameterization:</p>
-<ol class="simple">
+<ol class="arabic simple">
 <li><p>If SST-TF has been enabled, all CPUs prioritized by SST-TF are flagged as
 high priority.</p></li>
 <li><p>If SST-CP is enabled but SST-TF disabled, the CPU allocator examines the
@@ -139,9 +144,9 @@ CLOS as normal priority.</p></li>
 priority cores (having higher guaranteed base frequency) will be flagged
 as high priority.</p></li>
 </ol>
-</div>
-<div class="section" id="linux-cpufreq">
-<h3>Linux CPUFreq<a class="headerlink" href="#linux-cpufreq" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="linux-cpufreq">
+<h3>Linux CPUFreq<a class="headerlink" href="#linux-cpufreq" title="Permalink to this heading"></a></h3>
 <p>CPUFreq based prioritization only takes effect if Intel Speed Select Technology
 (SST) is disabled (or not supported). CRI-RM divides CPU cores into priority
 classes based on two parameters:</p>
@@ -154,9 +159,9 @@ will be flagged as high priority.  Low base frequency will map to low priority,
 correspondingly.</p>
 <p>CPU cores with high EPP priority (relative to the other cores in the system)
 will be marked as high priority cores.</p>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>

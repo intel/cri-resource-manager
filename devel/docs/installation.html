@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Installation &mdash; CRI Resource Manager 0.7.0-87-g6b458ca7 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <title>Installation &mdash; CRI Resource Manager 0.7.0-91-g45a4b99e documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
-  <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -37,7 +42,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
@@ -85,10 +90,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="tex2jax_ignore mathjax_ignore section" id="installation">
-<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="installing-from-packages">
-<h2>Installing from packages<a class="headerlink" href="#installing-from-packages" title="Permalink to this headline">¶</a></h2>
+  <section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h1>
+<section id="installing-from-packages">
+<h2>Installing from packages<a class="headerlink" href="#installing-from-packages" title="Permalink to this heading"></a></h2>
 <p>You can install CRI Resource Manager from <code class="docutils literal notranslate"><span class="pre">deb</span></code> or <code class="docutils literal notranslate"><span class="pre">rpm</span></code> packages
 for supported distros.</p>
 <ul class="simple">
@@ -101,9 +106,9 @@ packages</p></li>
 </ul>
 </li>
 </ul>
-</div>
-<div class="section" id="installing-from-sources">
-<h2>Installing from sources<a class="headerlink" href="#installing-from-sources" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="installing-from-sources">
+<h2>Installing from sources<a class="headerlink" href="#installing-from-sources" title="Permalink to this heading"></a></h2>
 <p>Although not recommended, you can install CRI Resource Manager from sources:</p>
 <ul class="simple">
 <li><p>get the sources: <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">clone</span> <span class="pre">https://github.com/intel/cri-resource-manager</span></code></p></li>
@@ -112,9 +117,9 @@ packages</p></li>
 <p>You will need at least <code class="docutils literal notranslate"><span class="pre">git</span></code>, <code class="docutils literal notranslate"><span class="pre">golang</span> <span class="pre">1.18</span></code> or newer,
 <code class="docutils literal notranslate"><span class="pre">GNU</span> <span class="pre">make</span></code>, <code class="docutils literal notranslate"><span class="pre">bash</span></code>, <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">sed</span></code>, <code class="docutils literal notranslate"><span class="pre">head</span></code>, <code class="docutils literal notranslate"><span class="pre">date</span></code>, and <code class="docutils literal notranslate"><span class="pre">install</span></code> to be able to build and install
 from sources.</p>
-</div>
-<div class="section" id="building-packages-for-the-distro-of-your-host">
-<h2>Building packages for the distro of your host<a class="headerlink" href="#building-packages-for-the-distro-of-your-host" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="building-packages-for-the-distro-of-your-host">
+<h2>Building packages for the distro of your host<a class="headerlink" href="#building-packages-for-the-distro-of-your-host" title="Permalink to this heading"></a></h2>
 <p>You can build packages for the <code class="docutils literal notranslate"><span class="pre">$distro</span></code> of your host by executing the
 following command:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">make</span> <span class="n">packages</span>
@@ -134,9 +139,9 @@ installed on your host.</p>
 </div>
 <p>If you see a <code class="docutils literal notranslate"><span class="pre">Dockerfile.$distro-$version</span></code> matching your host then your
 distro is supported.</p>
-</div>
-<div class="section" id="building-packages-for-another-distro">
-<h2>Building packages for another distro<a class="headerlink" href="#building-packages-for-another-distro" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="building-packages-for-another-distro">
+<h2>Building packages for another distro<a class="headerlink" href="#building-packages-for-another-distro" title="Permalink to this heading"></a></h2>
 <p>You can cross-build packages of the native <code class="docutils literal notranslate"><span class="pre">$type</span></code> for a particular
 <code class="docutils literal notranslate"><span class="pre">$version</span></code> of a <code class="docutils literal notranslate"><span class="pre">$distro</span></code> by running the following command:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>make cross-$type.$distro-$version
@@ -147,9 +152,9 @@ container. However, instead of building for your host, it will build them
 for the specified distro. For instance <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">cross-deb.ubuntu-18.04</span></code> will
 build <code class="docutils literal notranslate"><span class="pre">deb</span></code> packages for <code class="docutils literal notranslate"><span class="pre">Ubuntu\*</span> <span class="pre">18.04</span></code> and <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">cross-rpm.centos-8</span></code> will
 build <code class="docutils literal notranslate"><span class="pre">rpm</span></code> packages for <code class="docutils literal notranslate"><span class="pre">CentOS\*</span> <span class="pre">8</span></code></p>
-</div>
-<div class="section" id="post-install-configuration">
-<h2>Post-install configuration<a class="headerlink" href="#post-install-configuration" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="post-install-configuration">
+<h2>Post-install configuration<a class="headerlink" href="#post-install-configuration" title="Permalink to this heading"></a></h2>
 <p>The provided packages install <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service files and a sample
 configuration. The easiest way to get up and running is to rename the sample
 configuration and start CRI Resource Manager using systemd. You can do this
@@ -174,8 +179,8 @@ ${EDITOR:-vi} /etc/sysconfig/cri-resource-manager
 systemctl restart cri-resource-manager
 </pre></div>
 </div>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>

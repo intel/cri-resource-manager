@@ -1,17 +1,22 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Container Affinity and Anti-Affinity &mdash; CRI Resource Manager 0.7.0-87-g6b458ca7 documentation</title><link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <title>Container Affinity and Anti-Affinity &mdash; CRI Resource Manager 0.7.0-91-g45a4b99e documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
-  <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -37,7 +42,7 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
@@ -96,10 +101,10 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="tex2jax_ignore mathjax_ignore section" id="container-affinity-and-anti-affinity">
-<h1>Container Affinity and Anti-Affinity<a class="headerlink" href="#container-affinity-and-anti-affinity" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="introduction">
-<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+  <section id="container-affinity-and-anti-affinity">
+<h1>Container Affinity and Anti-Affinity<a class="headerlink" href="#container-affinity-and-anti-affinity" title="Permalink to this heading"></a></h1>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h2>
 <p>Some policies allow the user to give hints about how particular containers
 should be <em>co-located</em> within a node. In particular these hints express whether
 containers should be located <em>‘close’</em> to each other or <em>‘far away’</em> from each
@@ -123,61 +128,61 @@ There are two types of affinities:</p>
 <li><p>close to those the container has affinity towards</p></li>
 <li><p>far from those the container has anti-affinity towards.</p></li>
 </ul>
-</div>
-<div class="section" id="affinity-annotation-syntax">
-<h2>Affinity Annotation Syntax<a class="headerlink" href="#affinity-annotation-syntax" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="affinity-annotation-syntax">
+<h2>Affinity Annotation Syntax<a class="headerlink" href="#affinity-annotation-syntax" title="Permalink to this heading"></a></h2>
 <p><em>Affinities</em> are defined as the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/affinity</span></code> annotation.
 <em>Anti-affinities</em> are defined as the <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/anti-affinity</span></code>
 annotation. They are specified in the <code class="docutils literal notranslate"><span class="pre">metadata</span></code> section of the <code class="docutils literal notranslate"><span class="pre">Pod</span> <span class="pre">YAML</span></code>, under
 <code class="docutils literal notranslate"><span class="pre">annotations</span></code> as a dictionary, with each dictionary key being the name of the
 <em>container</em> within the Pod to which the annotation belongs to.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
-  <span class="nt">anotations</span><span class="p">:</span>
-    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
-      <span class="no">container1:</span>
-        <span class="no">- scope:</span>
-            <span class="no">key: key-ref</span>
-            <span class="no">operator: op</span>
-            <span class="no">values:</span>
-            <span class="no">- value1</span>
-            <span class="no">...</span>
-            <span class="no">- valueN</span>
-          <span class="no">match:</span>
-            <span class="no">key: key-ref</span>
-            <span class="no">operator: op</span>
-            <span class="no">values:</span>
-            <span class="no">- value1</span>
-            <span class="no">...</span>
-            <span class="no">- valueN</span>
-          <span class="no">weight: w</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">anotations</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span><span class="w"></span>
+<span class="w">      </span><span class="no">container1:</span><span class="w"></span>
+<span class="w">        </span><span class="no">- scope:</span><span class="w"></span>
+<span class="w">            </span><span class="no">key: key-ref</span><span class="w"></span>
+<span class="w">            </span><span class="no">operator: op</span><span class="w"></span>
+<span class="w">            </span><span class="no">values:</span><span class="w"></span>
+<span class="w">            </span><span class="no">- value1</span><span class="w"></span>
+<span class="w">            </span><span class="no">...</span><span class="w"></span>
+<span class="w">            </span><span class="no">- valueN</span><span class="w"></span>
+<span class="w">          </span><span class="no">match:</span><span class="w"></span>
+<span class="w">            </span><span class="no">key: key-ref</span><span class="w"></span>
+<span class="w">            </span><span class="no">operator: op</span><span class="w"></span>
+<span class="w">            </span><span class="no">values:</span><span class="w"></span>
+<span class="w">            </span><span class="no">- value1</span><span class="w"></span>
+<span class="w">            </span><span class="no">...</span><span class="w"></span>
+<span class="w">            </span><span class="no">- valueN</span><span class="w"></span>
+<span class="w">          </span><span class="no">weight: w</span><span class="w"></span>
 </pre></div>
 </div>
 <p>An anti-affinity is defined similarly but using <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/anti-affinity</span></code>
 as the annotation key.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
-  <span class="nt">anotations</span><span class="p">:</span>
-    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
-      <span class="no">container1:</span>
-        <span class="no">- scope:</span>
-            <span class="no">key: key-ref</span>
-            <span class="no">operator: op</span>
-            <span class="no">values:</span>
-            <span class="no">- value1</span>
-            <span class="no">...</span>
-            <span class="no">- valueN</span>
-          <span class="no">match:</span>
-            <span class="no">key: key-ref</span>
-            <span class="no">operator: op</span>
-            <span class="no">values:</span>
-            <span class="no">- value1</span>
-            <span class="no">...</span>
-            <span class="no">- valueN</span>
-          <span class="no">weight: w</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">anotations</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span><span class="w"></span>
+<span class="w">      </span><span class="no">container1:</span><span class="w"></span>
+<span class="w">        </span><span class="no">- scope:</span><span class="w"></span>
+<span class="w">            </span><span class="no">key: key-ref</span><span class="w"></span>
+<span class="w">            </span><span class="no">operator: op</span><span class="w"></span>
+<span class="w">            </span><span class="no">values:</span><span class="w"></span>
+<span class="w">            </span><span class="no">- value1</span><span class="w"></span>
+<span class="w">            </span><span class="no">...</span><span class="w"></span>
+<span class="w">            </span><span class="no">- valueN</span><span class="w"></span>
+<span class="w">          </span><span class="no">match:</span><span class="w"></span>
+<span class="w">            </span><span class="no">key: key-ref</span><span class="w"></span>
+<span class="w">            </span><span class="no">operator: op</span><span class="w"></span>
+<span class="w">            </span><span class="no">values:</span><span class="w"></span>
+<span class="w">            </span><span class="no">- value1</span><span class="w"></span>
+<span class="w">            </span><span class="no">...</span><span class="w"></span>
+<span class="w">            </span><span class="no">- valueN</span><span class="w"></span>
+<span class="w">          </span><span class="no">weight: w</span><span class="w"></span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="affinity-semantics">
-<h2>Affinity Semantics<a class="headerlink" href="#affinity-semantics" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="affinity-semantics">
+<h2>Affinity Semantics<a class="headerlink" href="#affinity-semantics" title="Permalink to this heading"></a></h2>
 <p>An affinity consists of three parts:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">scope</span> <span class="pre">expression</span></code>: defines which containers this affinity is evaluated against</p></li>
@@ -278,43 +283,43 @@ A non-existent subkey evaluates to the empty string. For instance the joint key<
 <p>evaluates to</p>
 <p><code class="docutils literal notranslate"><span class="pre">&lt;qosclass&gt;:&lt;pod</span> <span class="pre">name&gt;:&lt;container</span> <span class="pre">name&gt;</span></code></p>
 <p>For existence operators, a joint key is considered to exist if any of its subkeys exists.</p>
-</div>
-<div class="section" id="examples">
-<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Permalink to this heading"></a></h2>
 <p>Put the container <code class="docutils literal notranslate"><span class="pre">peter</span></code> close to the container <code class="docutils literal notranslate"><span class="pre">sheep</span></code> but far away from the
 container <code class="docutils literal notranslate"><span class="pre">wolf</span></code>.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
-  <span class="nt">annotations</span><span class="p">:</span>
-    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
-      <span class="no">peter:</span>
-      <span class="no">- match:</span>
-          <span class="no">key: name</span>
-          <span class="no">operator: Equals</span>
-          <span class="no">values:</span>
-          <span class="no">- sheep</span>
-        <span class="no">weight: 5</span>
-    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
-      <span class="no">peter:</span>
-      <span class="no">- match:</span>
-          <span class="no">key: name</span>
-          <span class="no">operator: Equals</span>
-          <span class="no">values:</span>
-          <span class="no">- wolf</span>
-        <span class="no">weight: 5</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span><span class="w"></span>
+<span class="w">      </span><span class="no">peter:</span><span class="w"></span>
+<span class="w">      </span><span class="no">- match:</span><span class="w"></span>
+<span class="w">          </span><span class="no">key: name</span><span class="w"></span>
+<span class="w">          </span><span class="no">operator: Equals</span><span class="w"></span>
+<span class="w">          </span><span class="no">values:</span><span class="w"></span>
+<span class="w">          </span><span class="no">- sheep</span><span class="w"></span>
+<span class="w">        </span><span class="no">weight: 5</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span><span class="w"></span>
+<span class="w">      </span><span class="no">peter:</span><span class="w"></span>
+<span class="w">      </span><span class="no">- match:</span><span class="w"></span>
+<span class="w">          </span><span class="no">key: name</span><span class="w"></span>
+<span class="w">          </span><span class="no">operator: Equals</span><span class="w"></span>
+<span class="w">          </span><span class="no">values:</span><span class="w"></span>
+<span class="w">          </span><span class="no">- wolf</span><span class="w"></span>
+<span class="w">        </span><span class="no">weight: 5</span><span class="w"></span>
 </pre></div>
 </div>
-</div>
-<div class="section" id="shorthand-notation">
-<h2>Shorthand Notation<a class="headerlink" href="#shorthand-notation" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="shorthand-notation">
+<h2>Shorthand Notation<a class="headerlink" href="#shorthand-notation" title="Permalink to this heading"></a></h2>
 <p>There is an alternative shorthand syntax for what is considered to be the most common
 case: defining affinities between containers within the same pod. With this notation
 one needs to give just the names of the containers, like in the example below.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span>  <span class="nt">annotations</span><span class="p">:</span>
-    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
-      <span class="no">container3: [ container1 ]</span>
-    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|</span>
-      <span class="no">container3: [ container2 ]</span>
-      <span class="no">container4: [ container2, container3 ]</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">annotations</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span><span class="w"></span>
+<span class="w">      </span><span class="no">container3: [ container1 ]</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span><span class="w"></span>
+<span class="w">      </span><span class="no">container3: [ container2 ]</span><span class="w"></span>
+<span class="w">      </span><span class="no">container4: [ container2, container3 ]</span><span class="w"></span>
 </pre></div>
 </div>
 <p>This shorthand notation defines:</p>
@@ -332,33 +337,33 @@ one needs to give just the names of the containers, like in the example below.</
 </li>
 </ul>
 <p>The equivalent annotation in full syntax would be</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span>
-  <span class="nt">annotations</span><span class="p">:</span>
-    <span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span> <span class="p p-Indicator">|+</span>
-      <span class="no">container3:</span>
-      <span class="no">- match:</span>
-          <span class="no">key: labels/io.kubernetes.container.name</span>
-          <span class="no">operator: In</span>
-          <span class="no">values:</span>
-          <span class="no">- container1</span>
-    <span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span> <span class="p p-Indicator">|+</span>
-      <span class="no">container3:</span>
-      <span class="no">- match:</span>
-          <span class="no">key: labels/io.kubernetes.container.name</span>
-          <span class="no">operator: In</span>
-          <span class="no">values:</span>
-          <span class="no">- container2</span>
-      <span class="no">container4:</span>
-      <span class="no">- match:</span>
-          <span class="no">key: labels/io.kubernetes.container.name</span>
-          <span class="no">operator: In</span>
-          <span class="no">values:</span>
-          <span class="no">- container2</span>
-          <span class="no">- container3</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|+</span><span class="w"></span>
+<span class="w">      </span><span class="no">container3:</span><span class="w"></span>
+<span class="w">      </span><span class="no">- match:</span><span class="w"></span>
+<span class="w">          </span><span class="no">key: labels/io.kubernetes.container.name</span><span class="w"></span>
+<span class="w">          </span><span class="no">operator: In</span><span class="w"></span>
+<span class="w">          </span><span class="no">values:</span><span class="w"></span>
+<span class="w">          </span><span class="no">- container1</span><span class="w"></span>
+<span class="w">    </span><span class="nt">cri-resource-manager.intel.com/anti-affinity</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|+</span><span class="w"></span>
+<span class="w">      </span><span class="no">container3:</span><span class="w"></span>
+<span class="w">      </span><span class="no">- match:</span><span class="w"></span>
+<span class="w">          </span><span class="no">key: labels/io.kubernetes.container.name</span><span class="w"></span>
+<span class="w">          </span><span class="no">operator: In</span><span class="w"></span>
+<span class="w">          </span><span class="no">values:</span><span class="w"></span>
+<span class="w">          </span><span class="no">- container2</span><span class="w"></span>
+<span class="w">      </span><span class="no">container4:</span><span class="w"></span>
+<span class="w">      </span><span class="no">- match:</span><span class="w"></span>
+<span class="w">          </span><span class="no">key: labels/io.kubernetes.container.name</span><span class="w"></span>
+<span class="w">          </span><span class="no">operator: In</span><span class="w"></span>
+<span class="w">          </span><span class="no">values:</span><span class="w"></span>
+<span class="w">          </span><span class="no">- container2</span><span class="w"></span>
+<span class="w">          </span><span class="no">- container3</span><span class="w"></span>
 </pre></div>
 </div>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
