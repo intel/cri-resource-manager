@@ -1,4 +1,4 @@
-FROM sphinxdoc/sphinx:3.2.1
+FROM sphinxdoc/sphinx:5.3.0
 
 RUN apt-get update && apt-get install -y wget git
 
