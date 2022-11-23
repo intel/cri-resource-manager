@@ -17,7 +17,7 @@ package relay
 import (
 	"context"
 
-	api "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/dump"
 )
@@ -38,145 +38,145 @@ func (r *relay) qualifier(msg interface{}) string {
 }
 
 func (r *relay) Version(ctx context.Context,
-	req *api.VersionRequest) (*api.VersionResponse, error) {
+	req *criv1.VersionRequest) (*criv1.VersionResponse, error) {
 	r.dump("Version", req)
 	return r.client.Version(ctx, req)
 }
 
 func (r *relay) RunPodSandbox(ctx context.Context,
-	req *api.RunPodSandboxRequest) (*api.RunPodSandboxResponse, error) {
+	req *criv1.RunPodSandboxRequest) (*criv1.RunPodSandboxResponse, error) {
 	r.dump("RunPodSandbox", req)
 	return r.client.RunPodSandbox(ctx, req)
 }
 
 func (r *relay) StopPodSandbox(ctx context.Context,
-	req *api.StopPodSandboxRequest) (*api.StopPodSandboxResponse, error) {
+	req *criv1.StopPodSandboxRequest) (*criv1.StopPodSandboxResponse, error) {
 	r.dump("StopPodSandbox", req)
 	return r.client.StopPodSandbox(ctx, req)
 }
 
 func (r *relay) RemovePodSandbox(ctx context.Context,
-	req *api.RemovePodSandboxRequest) (*api.RemovePodSandboxResponse, error) {
+	req *criv1.RemovePodSandboxRequest) (*criv1.RemovePodSandboxResponse, error) {
 	r.dump("RemovePodSandbox", req)
 	return r.client.RemovePodSandbox(ctx, req)
 }
 
 func (r *relay) PodSandboxStatus(ctx context.Context,
-	req *api.PodSandboxStatusRequest) (*api.PodSandboxStatusResponse, error) {
+	req *criv1.PodSandboxStatusRequest) (*criv1.PodSandboxStatusResponse, error) {
 	r.dump("PodSandboxStatus", req)
 	return r.client.PodSandboxStatus(ctx, req)
 }
 
 func (r *relay) ListPodSandbox(ctx context.Context,
-	req *api.ListPodSandboxRequest) (*api.ListPodSandboxResponse, error) {
+	req *criv1.ListPodSandboxRequest) (*criv1.ListPodSandboxResponse, error) {
 	r.dump("ListPodSandbox", req)
 	return r.client.ListPodSandbox(ctx, req)
 }
 
 func (r *relay) CreateContainer(ctx context.Context,
-	req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
+	req *criv1.CreateContainerRequest) (*criv1.CreateContainerResponse, error) {
 	r.dump("CreateContainer", req)
 	return r.client.CreateContainer(ctx, req)
 }
 
 func (r *relay) StartContainer(ctx context.Context,
-	req *api.StartContainerRequest) (*api.StartContainerResponse, error) {
+	req *criv1.StartContainerRequest) (*criv1.StartContainerResponse, error) {
 	r.dump("StartContainer", req)
 	return r.client.StartContainer(ctx, req)
 }
 
 func (r *relay) StopContainer(ctx context.Context,
-	req *api.StopContainerRequest) (*api.StopContainerResponse, error) {
+	req *criv1.StopContainerRequest) (*criv1.StopContainerResponse, error) {
 	r.dump("StopContainer", req)
 	return r.client.StopContainer(ctx, req)
 }
 
 func (r *relay) RemoveContainer(ctx context.Context,
-	req *api.RemoveContainerRequest) (*api.RemoveContainerResponse, error) {
+	req *criv1.RemoveContainerRequest) (*criv1.RemoveContainerResponse, error) {
 	r.dump("RemoveContainer", req)
 	return r.client.RemoveContainer(ctx, req)
 }
 
 func (r *relay) ListContainers(ctx context.Context,
-	req *api.ListContainersRequest) (*api.ListContainersResponse, error) {
+	req *criv1.ListContainersRequest) (*criv1.ListContainersResponse, error) {
 	r.dump("ListContainers", req)
 	return r.client.ListContainers(ctx, req)
 }
 
 func (r *relay) ContainerStatus(ctx context.Context,
-	req *api.ContainerStatusRequest) (*api.ContainerStatusResponse, error) {
+	req *criv1.ContainerStatusRequest) (*criv1.ContainerStatusResponse, error) {
 	r.dump("ContainerStatus", req)
 	return r.client.ContainerStatus(ctx, req)
 }
 
 func (r *relay) UpdateContainerResources(ctx context.Context,
-	req *api.UpdateContainerResourcesRequest) (*api.UpdateContainerResourcesResponse, error) {
+	req *criv1.UpdateContainerResourcesRequest) (*criv1.UpdateContainerResourcesResponse, error) {
 	r.dump("UpdateContainerResources", req)
 	return r.client.UpdateContainerResources(ctx, req)
 }
 
 func (r *relay) ReopenContainerLog(ctx context.Context,
-	req *api.ReopenContainerLogRequest) (*api.ReopenContainerLogResponse, error) {
+	req *criv1.ReopenContainerLogRequest) (*criv1.ReopenContainerLogResponse, error) {
 	r.dump("ReopenContainerLog", req)
 	return r.client.ReopenContainerLog(ctx, req)
 }
 
 func (r *relay) ExecSync(ctx context.Context,
-	req *api.ExecSyncRequest) (*api.ExecSyncResponse, error) {
+	req *criv1.ExecSyncRequest) (*criv1.ExecSyncResponse, error) {
 	r.dump("ExecSync", req)
 	return r.client.ExecSync(ctx, req)
 }
 
 func (r *relay) Exec(ctx context.Context,
-	req *api.ExecRequest) (*api.ExecResponse, error) {
+	req *criv1.ExecRequest) (*criv1.ExecResponse, error) {
 	r.dump("Exec", req)
 	return r.client.Exec(ctx, req)
 }
 
 func (r *relay) Attach(ctx context.Context,
-	req *api.AttachRequest) (*api.AttachResponse, error) {
+	req *criv1.AttachRequest) (*criv1.AttachResponse, error) {
 	r.dump("Attach", req)
 	return r.client.Attach(ctx, req)
 }
 
 func (r *relay) PortForward(ctx context.Context,
-	req *api.PortForwardRequest) (*api.PortForwardResponse, error) {
+	req *criv1.PortForwardRequest) (*criv1.PortForwardResponse, error) {
 	r.dump("PortForward", req)
 	return r.client.PortForward(ctx, req)
 }
 
 func (r *relay) ContainerStats(ctx context.Context,
-	req *api.ContainerStatsRequest) (*api.ContainerStatsResponse, error) {
+	req *criv1.ContainerStatsRequest) (*criv1.ContainerStatsResponse, error) {
 	r.dump("ContainerStats", req)
 	return r.client.ContainerStats(ctx, req)
 }
 
 func (r *relay) ListContainerStats(ctx context.Context,
-	req *api.ListContainerStatsRequest) (*api.ListContainerStatsResponse, error) {
+	req *criv1.ListContainerStatsRequest) (*criv1.ListContainerStatsResponse, error) {
 	r.dump("ListContainerStats", req)
 	return r.client.ListContainerStats(ctx, req)
 }
 
 func (r *relay) PodSandboxStats(ctx context.Context,
-	req *api.PodSandboxStatsRequest) (*api.PodSandboxStatsResponse, error) {
+	req *criv1.PodSandboxStatsRequest) (*criv1.PodSandboxStatsResponse, error) {
 	r.dump("PodSandboxStats", req)
 	return r.client.PodSandboxStats(ctx, req)
 }
 
 func (r *relay) ListPodSandboxStats(ctx context.Context,
-	req *api.ListPodSandboxStatsRequest) (*api.ListPodSandboxStatsResponse, error) {
+	req *criv1.ListPodSandboxStatsRequest) (*criv1.ListPodSandboxStatsResponse, error) {
 	r.dump("ListPodSandboxStats", req)
 	return r.client.ListPodSandboxStats(ctx, req)
 }
 
 func (r *relay) UpdateRuntimeConfig(ctx context.Context,
-	req *api.UpdateRuntimeConfigRequest) (*api.UpdateRuntimeConfigResponse, error) {
+	req *criv1.UpdateRuntimeConfigRequest) (*criv1.UpdateRuntimeConfigResponse, error) {
 	r.dump("UpdateRuntimeConfig", req)
 	return r.client.UpdateRuntimeConfig(ctx, req)
 }
 
 func (r *relay) Status(ctx context.Context,
-	req *api.StatusRequest) (*api.StatusResponse, error) {
+	req *criv1.StatusRequest) (*criv1.StatusResponse, error) {
 	r.dump("Status", req)
 	return r.client.Status(ctx, req)
 }
