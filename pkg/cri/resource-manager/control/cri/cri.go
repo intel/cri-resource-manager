@@ -20,7 +20,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
-	criapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -75,7 +75,7 @@ func (ctl *crictl) PreCreateHook(c cache.Container) error {
 	if !ok {
 		return criError("pre-create hook: no pending CRI request")
 	}
-	create, ok := request.(*criapi.CreateContainerRequest)
+	create, ok := request.(*criv1.CreateContainerRequest)
 	if !ok {
 		return criError("pre-create hook: pending CRI request of wrong type (%T)", request)
 	}
@@ -88,7 +88,7 @@ func (ctl *crictl) PreCreateHook(c cache.Container) error {
 	create.Config.Mounts = c.GetCRIMounts()
 	create.Config.Devices = c.GetCRIDevices()
 	if create.Config.Linux == nil {
-		create.Config.Linux = &criapi.LinuxContainerConfig{}
+		create.Config.Linux = &criv1.LinuxContainerConfig{}
 	}
 	create.Config.Linux.Resources = c.GetLinuxResources()
 
@@ -109,7 +109,7 @@ func (ctl *crictl) PostStartHook(c cache.Container) error {
 
 // PostUpdateHook is the CRI controller post-update hook.
 func (ctl *crictl) PostUpdateHook(c cache.Container) error {
-	var update *criapi.UpdateContainerResourcesRequest
+	var update *criv1.UpdateContainerResourcesRequest
 
 	if !c.HasPending(CRIController) {
 		log.Debug("post-update hook: no changes for %s", c.PrettyName())
@@ -124,12 +124,12 @@ func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 	}
 	request, ok := c.GetCRIRequest()
 	if !ok {
-		update = &criapi.UpdateContainerResourcesRequest{
+		update = &criv1.UpdateContainerResourcesRequest{
 			ContainerId: c.GetID(),
 		}
 		c.SetCRIRequest(update)
 	} else {
-		if update, ok = request.(*criapi.UpdateContainerResourcesRequest); !ok {
+		if update, ok = request.(*criv1.UpdateContainerResourcesRequest); !ok {
 			return criError("post-update hook: CRI request of wrong type (%T)", request)
 		}
 	}
