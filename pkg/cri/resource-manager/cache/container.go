@@ -28,13 +28,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	extapi "github.com/intel/cri-resource-manager/pkg/apis/resmgr/v1alpha1"
 )
 
 // Create a container for a create request.
-func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
+func (c *container) fromCreateRequest(req *criv1.CreateContainerRequest) error {
 	c.PodID = req.PodSandboxId
 
 	pod, ok := c.cache.Pods[c.PodID]
@@ -142,7 +142,7 @@ func (c *container) fromCreateRequest(req *cri.CreateContainerRequest) error {
 }
 
 // Create container from a container list response.
-func (c *container) fromListResponse(lrc *cri.Container) error {
+func (c *container) fromListResponse(lrc *criv1.Container) error {
 	c.PodID = lrc.PodSandboxId
 
 	pod, ok := c.cache.Pods[c.PodID]
@@ -478,7 +478,7 @@ func (c *container) GetResourceRequirements() v1.ResourceRequirements {
 	return c.Resources
 }
 
-func (c *container) GetLinuxResources() *cri.LinuxContainerResources {
+func (c *container) GetLinuxResources() *criv1.LinuxContainerResources {
 	if c.LinuxReq == nil {
 		return nil
 	}
@@ -640,14 +640,14 @@ func (c *container) GetCpusetMems() string {
 	return c.LinuxReq.CpusetMems
 }
 
-func (c *container) SetLinuxResources(req *cri.LinuxContainerResources) {
+func (c *container) SetLinuxResources(req *criv1.LinuxContainerResources) {
 	c.LinuxReq = req
 	c.markPending(CRI)
 }
 
 func (c *container) SetCPUPeriod(value int64) {
 	if c.LinuxReq == nil {
-		c.LinuxReq = &cri.LinuxContainerResources{}
+		c.LinuxReq = &criv1.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuPeriod = value
 	c.markPending(CRI)
@@ -655,7 +655,7 @@ func (c *container) SetCPUPeriod(value int64) {
 
 func (c *container) SetCPUQuota(value int64) {
 	if c.LinuxReq == nil {
-		c.LinuxReq = &cri.LinuxContainerResources{}
+		c.LinuxReq = &criv1.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuQuota = value
 	c.markPending(CRI)
@@ -663,7 +663,7 @@ func (c *container) SetCPUQuota(value int64) {
 
 func (c *container) SetCPUShares(value int64) {
 	if c.LinuxReq == nil {
-		c.LinuxReq = &cri.LinuxContainerResources{}
+		c.LinuxReq = &criv1.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpuShares = value
 	c.markPending(CRI)
@@ -671,7 +671,7 @@ func (c *container) SetCPUShares(value int64) {
 
 func (c *container) SetMemoryLimit(value int64) {
 	if c.LinuxReq == nil {
-		c.LinuxReq = &cri.LinuxContainerResources{}
+		c.LinuxReq = &criv1.LinuxContainerResources{}
 	}
 	c.LinuxReq.MemoryLimitInBytes = value
 	c.markPending(CRI)
@@ -679,7 +679,7 @@ func (c *container) SetMemoryLimit(value int64) {
 
 func (c *container) SetOomScoreAdj(value int64) {
 	if c.LinuxReq == nil {
-		c.LinuxReq = &cri.LinuxContainerResources{}
+		c.LinuxReq = &criv1.LinuxContainerResources{}
 	}
 	c.LinuxReq.OomScoreAdj = value
 	c.markPending(CRI)
@@ -687,7 +687,7 @@ func (c *container) SetOomScoreAdj(value int64) {
 
 func (c *container) SetCpusetCpus(value string) {
 	if c.LinuxReq == nil {
-		c.LinuxReq = &cri.LinuxContainerResources{}
+		c.LinuxReq = &criv1.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetCpus = value
 	c.markPending(CRI)
@@ -695,7 +695,7 @@ func (c *container) SetCpusetCpus(value string) {
 
 func (c *container) SetCpusetMems(value string) {
 	if c.LinuxReq == nil {
-		c.LinuxReq = &cri.LinuxContainerResources{}
+		c.LinuxReq = &criv1.LinuxContainerResources{}
 	}
 	c.LinuxReq.CpusetMems = value
 	c.markPending(CRI)
@@ -870,11 +870,11 @@ func (c *container) ClearCRIRequest() (interface{}, bool) {
 	return req, ok
 }
 
-func (c *container) GetCRIEnvs() []*cri.KeyValue {
-	envs := make([]*cri.KeyValue, len(c.Env), len(c.Env))
+func (c *container) GetCRIEnvs() []*criv1.KeyValue {
+	envs := make([]*criv1.KeyValue, len(c.Env), len(c.Env))
 	idx := 0
 	for k, v := range c.Env {
-		envs[idx] = &cri.KeyValue{
+		envs[idx] = &criv1.KeyValue{
 			Key:   k,
 			Value: v,
 		}
@@ -883,33 +883,33 @@ func (c *container) GetCRIEnvs() []*cri.KeyValue {
 	return envs
 }
 
-func (c *container) GetCRIMounts() []*cri.Mount {
+func (c *container) GetCRIMounts() []*criv1.Mount {
 	if c.Mounts == nil {
 		return nil
 	}
-	mounts := make([]*cri.Mount, len(c.Mounts), len(c.Mounts))
+	mounts := make([]*criv1.Mount, len(c.Mounts), len(c.Mounts))
 	idx := 0
 	for _, m := range c.Mounts {
-		mounts[idx] = &cri.Mount{
+		mounts[idx] = &criv1.Mount{
 			ContainerPath:  m.Container,
 			HostPath:       m.Host,
 			Readonly:       m.Readonly,
 			SelinuxRelabel: m.Relabel,
-			Propagation:    cri.MountPropagation(m.Propagation),
+			Propagation:    criv1.MountPropagation(m.Propagation),
 		}
 		idx++
 	}
 	return mounts
 }
 
-func (c *container) GetCRIDevices() []*cri.Device {
+func (c *container) GetCRIDevices() []*criv1.Device {
 	if c.Devices == nil {
 		return nil
 	}
-	devices := make([]*cri.Device, len(c.Devices), len(c.Devices))
+	devices := make([]*criv1.Device, len(c.Devices), len(c.Devices))
 	idx := 0
 	for _, d := range c.Devices {
-		devices[idx] = &cri.Device{
+		devices[idx] = &criv1.Device{
 			ContainerPath: d.Container,
 			HostPath:      d.Host,
 			Permissions:   d.Permissions,

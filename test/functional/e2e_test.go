@@ -31,7 +31,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/dump"
 	"google.golang.org/grpc"
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 )
@@ -52,7 +52,7 @@ func init() {
 type testEnv struct {
 	t           *testing.T
 	handlers    map[string]interface{}
-	client      api.RuntimeServiceClient
+	client      criv1.RuntimeServiceClient
 	forceConfig string
 	mgr         resmgr.ResourceManager
 	cache       cache.Cache
@@ -132,7 +132,7 @@ func (env *testEnv) Run(name string, testFunction func(context.Context, *testEnv
 		}
 		defer conn.Close()
 
-		client := api.NewRuntimeServiceClient(conn)
+		client := criv1.NewRuntimeServiceClient(conn)
 
 		env.client = client
 		env.mgr = resMgr
@@ -149,7 +149,7 @@ func (env *testEnv) Run(name string, testFunction func(context.Context, *testEnv
 func TestListPodSandbox(t *testing.T) {
 	tcases := []struct {
 		name         string
-		pods         []*api.PodSandbox
+		pods         []*criv1.PodSandbox
 		expectedPods int
 	}{
 		{
@@ -157,14 +157,14 @@ func TestListPodSandbox(t *testing.T) {
 		},
 		{
 			name:         "list one pod",
-			pods:         []*api.PodSandbox{{}},
+			pods:         []*criv1.PodSandbox{{}},
 			expectedPods: 1,
 		},
 	}
 	for _, tc := range tcases {
 		criHandlers := map[string]interface{}{
-			"ListPodSandbox": func(*fakeCriServer, context.Context, *api.ListPodSandboxRequest) (*api.ListPodSandboxResponse, error) {
-				return &api.ListPodSandboxResponse{
+			"ListPodSandbox": func(*fakeCriServer, context.Context, *criv1.ListPodSandboxRequest) (*criv1.ListPodSandboxResponse, error) {
+				return &criv1.ListPodSandboxResponse{
 					Items: tc.pods,
 				}, nil
 			},
@@ -176,7 +176,7 @@ func TestListPodSandbox(t *testing.T) {
 		env.Run(tc.name, func(ctx context.Context, env *testEnv) {
 			t := env.t
 			client := env.client
-			resp, err := client.ListPodSandbox(ctx, &api.ListPodSandboxRequest{})
+			resp, err := client.ListPodSandbox(ctx, &criv1.ListPodSandboxRequest{})
 			if err != nil {
 				t.Errorf("Unexpected error: %+v", err)
 				return
@@ -191,7 +191,7 @@ func TestListPodSandbox(t *testing.T) {
 func TestListContainers(t *testing.T) {
 	tcases := []struct {
 		name               string
-		containers         []*api.Container
+		containers         []*criv1.Container
 		expectedContainers int
 	}{
 		{
@@ -199,14 +199,14 @@ func TestListContainers(t *testing.T) {
 		},
 		{
 			name:               "list one container",
-			containers:         []*api.Container{{}},
+			containers:         []*criv1.Container{{}},
 			expectedContainers: 1,
 		},
 	}
 	for _, tc := range tcases {
 		criHandlers := map[string]interface{}{
-			"ListContainers": func(*fakeCriServer, context.Context, *api.ListContainersRequest) (*api.ListContainersResponse, error) {
-				return &api.ListContainersResponse{
+			"ListContainers": func(*fakeCriServer, context.Context, *criv1.ListContainersRequest) (*criv1.ListContainersResponse, error) {
+				return &criv1.ListContainersResponse{
 					Containers: tc.containers,
 				}, nil
 			},
@@ -218,7 +218,7 @@ func TestListContainers(t *testing.T) {
 		env.Run(tc.name, func(ctx context.Context, env *testEnv) {
 			t := env.t
 			client := env.client
-			resp, err := client.ListContainers(ctx, &api.ListContainersRequest{})
+			resp, err := client.ListContainers(ctx, &criv1.ListContainersRequest{})
 			if err != nil {
 				t.Errorf("Unexpected error: %+v", err)
 				return
@@ -239,19 +239,19 @@ policy:
 `
 	tcases := []struct {
 		name         string
-		reqs         []*api.RunPodSandboxRequest
+		reqs         []*criv1.RunPodSandboxRequest
 		expectedPods int
 	}{
 		{
 			name: "create Pod #1",
-			reqs: []*api.RunPodSandboxRequest{
+			reqs: []*criv1.RunPodSandboxRequest{
 				createPodRequest("Pod#1", "UID#1", "", nil, nil, ""),
 			},
 			expectedPods: 1,
 		},
 		{
 			name: "create Pods #1 and #2",
-			reqs: []*api.RunPodSandboxRequest{
+			reqs: []*criv1.RunPodSandboxRequest{
 				createPodRequest("Pod#1", "UID#1", "", nil, nil, ""),
 				createPodRequest("Pod#2", "UID#2", "", nil, nil, ""),
 			},
@@ -259,7 +259,7 @@ policy:
 		},
 		{
 			name: "create Pods #1, #2, and #3",
-			reqs: []*api.RunPodSandboxRequest{
+			reqs: []*criv1.RunPodSandboxRequest{
 				createPodRequest("Pod#1", "UID#1", "", nil, nil, ""),
 				createPodRequest("Pod#2", "UID#2", "", nil, nil, ""),
 				createPodRequest("Pod#3", "UID#3", "", nil, nil, ""),
@@ -268,7 +268,7 @@ policy:
 		},
 		{
 			name: "create Pods #1, #2, #3, #4, '1, '2, '3",
-			reqs: []*api.RunPodSandboxRequest{
+			reqs: []*criv1.RunPodSandboxRequest{
 				createPodRequest("Pod#1", "UID#1", "", nil, nil, ""),
 				createPodRequest("Pod#2", "UID#2", "", nil, nil, ""),
 				createPodRequest("Pod#3", "UID#3", "", nil, nil, ""),
@@ -291,9 +291,9 @@ policy:
 	numPods := 0
 	for _, tc := range tcases {
 		criHandlers := map[string]interface{}{
-			"RunPodSandbox": func(*fakeCriServer, context.Context, *api.RunPodSandboxRequest) (*api.RunPodSandboxResponse, error) {
+			"RunPodSandbox": func(*fakeCriServer, context.Context, *criv1.RunPodSandboxRequest) (*criv1.RunPodSandboxResponse, error) {
 				numPods++
-				return &api.RunPodSandboxResponse{
+				return &criv1.RunPodSandboxResponse{
 					PodSandboxId: fmt.Sprintf("Pod#%d", numPods),
 				}, nil
 			},
@@ -331,25 +331,25 @@ policy:
 	type pod struct {
 		UID string
 		ID  string
-		req *api.RunPodSandboxRequest
+		req *criv1.RunPodSandboxRequest
 	}
 
 	type container struct {
 		pod    string
 		name   string
 		expect int
-		req    *api.CreateContainerRequest
+		req    *criv1.CreateContainerRequest
 		ID     string
 	}
 
 	tcases := []struct {
 		name       string
-		pods       []*api.RunPodSandboxRequest
+		pods       []*criv1.RunPodSandboxRequest
 		containers []*container
 	}{
 		{
 			name: "create containers per one pod",
-			pods: []*api.RunPodSandboxRequest{
+			pods: []*criv1.RunPodSandboxRequest{
 				createPodRequest("Pod#1", "UID#1", "", nil, nil, ""),
 			},
 			containers: []*container{
@@ -359,7 +359,7 @@ policy:
 		},
 		{
 			name: "create lingering containers per one pod",
-			pods: []*api.RunPodSandboxRequest{
+			pods: []*criv1.RunPodSandboxRequest{
 				createPodRequest("Pod#1", "UID#1", "", nil, nil, ""),
 			},
 			containers: []*container{
@@ -377,15 +377,15 @@ policy:
 	numContainers := 0
 	for _, tc := range tcases {
 		criHandlers := map[string]interface{}{
-			"RunPodSandbox": func(*fakeCriServer, context.Context, *api.RunPodSandboxRequest) (*api.RunPodSandboxResponse, error) {
+			"RunPodSandbox": func(*fakeCriServer, context.Context, *criv1.RunPodSandboxRequest) (*criv1.RunPodSandboxResponse, error) {
 				numPods++
-				return &api.RunPodSandboxResponse{
+				return &criv1.RunPodSandboxResponse{
 					PodSandboxId: fmt.Sprintf("Pod#%d", numPods),
 				}, nil
 			},
-			"CreateContainer": func(*fakeCriServer, context.Context, *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
+			"CreateContainer": func(*fakeCriServer, context.Context, *criv1.CreateContainerRequest) (*criv1.CreateContainerResponse, error) {
 				numContainers++
-				return &api.CreateContainerResponse{
+				return &criv1.CreateContainerResponse{
 					ContainerId: fmt.Sprintf("Container#%d", numContainers),
 				}, nil
 			},
@@ -442,7 +442,7 @@ policy:
 
 func createPodRequest(name, uid, namespace string,
 	labels, annotations map[string]string,
-	cgroupParent string) *api.RunPodSandboxRequest {
+	cgroupParent string) *criv1.RunPodSandboxRequest {
 	if namespace == "" {
 		namespace = "default"
 	}
@@ -450,16 +450,16 @@ func createPodRequest(name, uid, namespace string,
 		labels = map[string]string{}
 	}
 	labels[kubetypes.KubernetesPodUIDLabel] = uid
-	return &api.RunPodSandboxRequest{
-		Config: &api.PodSandboxConfig{
-			Metadata: &api.PodSandboxMetadata{
+	return &criv1.RunPodSandboxRequest{
+		Config: &criv1.PodSandboxConfig{
+			Metadata: &criv1.PodSandboxMetadata{
 				Name:      name,
 				Uid:       uid,
 				Namespace: namespace,
 			},
 			Labels:      labels,
 			Annotations: annotations,
-			Linux: &api.LinuxPodSandboxConfig{
+			Linux: &criv1.LinuxPodSandboxConfig{
 				CgroupParent: cgroupParent,
 			},
 		},
@@ -467,14 +467,14 @@ func createPodRequest(name, uid, namespace string,
 }
 
 func createContainerRequest(podID, name string,
-	podReq *api.RunPodSandboxRequest) *api.CreateContainerRequest {
-	return &api.CreateContainerRequest{
+	podReq *criv1.RunPodSandboxRequest) *criv1.CreateContainerRequest {
+	return &criv1.CreateContainerRequest{
 		PodSandboxId: podID,
-		Config: &api.ContainerConfig{
-			Metadata: &api.ContainerMetadata{
+		Config: &criv1.ContainerConfig{
+			Metadata: &criv1.ContainerMetadata{
 				Name: name,
 			},
-			Linux: &api.LinuxContainerConfig{},
+			Linux: &criv1.LinuxContainerConfig{},
 		},
 		SandboxConfig: podReq.Config,
 	}

@@ -28,7 +28,7 @@ import (
 
 	"github.com/intel/cri-resource-manager/pkg/utils"
 	"google.golang.org/grpc"
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
@@ -63,8 +63,8 @@ func newFakeCriServer(t *testing.T, socket string, fakeHandlers map[string]inter
 		fakeHandlers: fakeHandlers,
 	}
 
-	api.RegisterRuntimeServiceServer(srv.grpcServer, srv)
-	api.RegisterImageServiceServer(srv.grpcServer, srv)
+	criv1.RegisterRuntimeServiceServer(srv.grpcServer, srv)
+	criv1.RegisterImageServiceServer(srv.grpcServer, srv)
 
 	lis, err := net.Listen("unix", socket)
 	if err != nil {
@@ -129,12 +129,12 @@ func (s *fakeCriServer) callHandler(ctx context.Context, request interface{}, de
 	return out[0].Interface(), err
 }
 
-// Implementation of api.RuntimeServiceServer
+// Implementation of criv1.RuntimeServiceServer
 
-func (s *fakeCriServer) Version(ctx context.Context, req *api.VersionRequest) (*api.VersionResponse, error) {
+func (s *fakeCriServer) Version(ctx context.Context, req *criv1.VersionRequest) (*criv1.VersionResponse, error) {
 	response, err := s.callHandler(ctx, req,
-		func(*fakeCriServer, context.Context, *api.VersionRequest) (*api.VersionResponse, error) {
-			return &api.VersionResponse{
+		func(*fakeCriServer, context.Context, *criv1.VersionRequest) (*criv1.VersionResponse, error) {
+			return &criv1.VersionResponse{
 				Version:           fakeKubeAPIVersion,
 				RuntimeName:       fakeRuntimeName,
 				RuntimeVersion:    fakeRuntimeVersion,
@@ -142,151 +142,159 @@ func (s *fakeCriServer) Version(ctx context.Context, req *api.VersionRequest) (*
 			}, nil
 		},
 	)
-	return response.(*api.VersionResponse), err
+	return response.(*criv1.VersionResponse), err
 }
 
-func (s *fakeCriServer) RunPodSandbox(ctx context.Context, req *api.RunPodSandboxRequest) (*api.RunPodSandboxResponse, error) {
+func (s *fakeCriServer) RunPodSandbox(ctx context.Context, req *criv1.RunPodSandboxRequest) (*criv1.RunPodSandboxResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.RunPodSandboxResponse), err
+	return response.(*criv1.RunPodSandboxResponse), err
 }
 
-func (s *fakeCriServer) StopPodSandbox(ctx context.Context, req *api.StopPodSandboxRequest) (*api.StopPodSandboxResponse, error) {
+func (s *fakeCriServer) StopPodSandbox(ctx context.Context, req *criv1.StopPodSandboxRequest) (*criv1.StopPodSandboxResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.StopPodSandboxResponse), err
+	return response.(*criv1.StopPodSandboxResponse), err
 }
 
-func (s *fakeCriServer) RemovePodSandbox(ctx context.Context, req *api.RemovePodSandboxRequest) (*api.RemovePodSandboxResponse, error) {
+func (s *fakeCriServer) RemovePodSandbox(ctx context.Context, req *criv1.RemovePodSandboxRequest) (*criv1.RemovePodSandboxResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.RemovePodSandboxResponse), err
+	return response.(*criv1.RemovePodSandboxResponse), err
 }
 
-func (s *fakeCriServer) PodSandboxStatus(ctx context.Context, req *api.PodSandboxStatusRequest) (*api.PodSandboxStatusResponse, error) {
+func (s *fakeCriServer) PodSandboxStatus(ctx context.Context, req *criv1.PodSandboxStatusRequest) (*criv1.PodSandboxStatusResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.PodSandboxStatusResponse), err
+	return response.(*criv1.PodSandboxStatusResponse), err
 }
 
-func (s *fakeCriServer) ListPodSandbox(ctx context.Context, req *api.ListPodSandboxRequest) (*api.ListPodSandboxResponse, error) {
-	response, err := s.callHandler(ctx, req, func(*fakeCriServer, context.Context, *api.ListPodSandboxRequest) (*api.ListPodSandboxResponse, error) {
-		return &api.ListPodSandboxResponse{}, nil
+func (s *fakeCriServer) ListPodSandbox(ctx context.Context, req *criv1.ListPodSandboxRequest) (*criv1.ListPodSandboxResponse, error) {
+	response, err := s.callHandler(ctx, req, func(*fakeCriServer, context.Context, *criv1.ListPodSandboxRequest) (*criv1.ListPodSandboxResponse, error) {
+		return &criv1.ListPodSandboxResponse{}, nil
 	})
-	return response.(*api.ListPodSandboxResponse), err
+	return response.(*criv1.ListPodSandboxResponse), err
 }
 
-func (s *fakeCriServer) CreateContainer(ctx context.Context, req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
+func (s *fakeCriServer) CreateContainer(ctx context.Context, req *criv1.CreateContainerRequest) (*criv1.CreateContainerResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.CreateContainerResponse), err
+	return response.(*criv1.CreateContainerResponse), err
 }
 
-func (s *fakeCriServer) StartContainer(ctx context.Context, req *api.StartContainerRequest) (*api.StartContainerResponse, error) {
+func (s *fakeCriServer) StartContainer(ctx context.Context, req *criv1.StartContainerRequest) (*criv1.StartContainerResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.StartContainerResponse), err
+	return response.(*criv1.StartContainerResponse), err
 }
 
-func (s *fakeCriServer) StopContainer(ctx context.Context, req *api.StopContainerRequest) (*api.StopContainerResponse, error) {
+func (s *fakeCriServer) StopContainer(ctx context.Context, req *criv1.StopContainerRequest) (*criv1.StopContainerResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.StopContainerResponse), err
+	return response.(*criv1.StopContainerResponse), err
 }
 
-func (s *fakeCriServer) RemoveContainer(ctx context.Context, req *api.RemoveContainerRequest) (*api.RemoveContainerResponse, error) {
+func (s *fakeCriServer) RemoveContainer(ctx context.Context, req *criv1.RemoveContainerRequest) (*criv1.RemoveContainerResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.RemoveContainerResponse), err
+	return response.(*criv1.RemoveContainerResponse), err
 }
 
-func (s *fakeCriServer) ListContainers(ctx context.Context, req *api.ListContainersRequest) (*api.ListContainersResponse, error) {
-	response, err := s.callHandler(ctx, req, func(*fakeCriServer, context.Context, *api.ListContainersRequest) (*api.ListContainersResponse, error) {
-		return &api.ListContainersResponse{}, nil
+func (s *fakeCriServer) ListContainers(ctx context.Context, req *criv1.ListContainersRequest) (*criv1.ListContainersResponse, error) {
+	response, err := s.callHandler(ctx, req, func(*fakeCriServer, context.Context, *criv1.ListContainersRequest) (*criv1.ListContainersResponse, error) {
+		return &criv1.ListContainersResponse{}, nil
 	})
-	return response.(*api.ListContainersResponse), err
+	return response.(*criv1.ListContainersResponse), err
 }
 
-func (s *fakeCriServer) ContainerStatus(ctx context.Context, req *api.ContainerStatusRequest) (*api.ContainerStatusResponse, error) {
+func (s *fakeCriServer) ContainerStatus(ctx context.Context, req *criv1.ContainerStatusRequest) (*criv1.ContainerStatusResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ContainerStatusResponse), err
+	return response.(*criv1.ContainerStatusResponse), err
 }
 
-func (s *fakeCriServer) UpdateContainerResources(ctx context.Context, req *api.UpdateContainerResourcesRequest) (*api.UpdateContainerResourcesResponse, error) {
-	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.UpdateContainerResourcesResponse), err
+func (s *fakeCriServer) UpdateContainerResources(ctx context.Context, req *criv1.UpdateContainerResourcesRequest) (*criv1.UpdateContainerResourcesResponse, error) {
+	response, err := s.callHandler(ctx, req,
+		func(*fakeCriServer, context.Context, *criv1.UpdateContainerResourcesRequest) (*criv1.UpdateContainerResourcesResponse, error) {
+			return &criv1.UpdateContainerResourcesResponse{}, nil
+		},
+	)
+	return response.(*criv1.UpdateContainerResourcesResponse), err
 }
 
-func (s *fakeCriServer) ReopenContainerLog(ctx context.Context, req *api.ReopenContainerLogRequest) (*api.ReopenContainerLogResponse, error) {
+func (s *fakeCriServer) ReopenContainerLog(ctx context.Context, req *criv1.ReopenContainerLogRequest) (*criv1.ReopenContainerLogResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ReopenContainerLogResponse), err
+	return response.(*criv1.ReopenContainerLogResponse), err
 }
 
-func (s *fakeCriServer) ExecSync(ctx context.Context, req *api.ExecSyncRequest) (*api.ExecSyncResponse, error) {
+func (s *fakeCriServer) ExecSync(ctx context.Context, req *criv1.ExecSyncRequest) (*criv1.ExecSyncResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ExecSyncResponse), err
+	return response.(*criv1.ExecSyncResponse), err
 }
 
-func (s *fakeCriServer) Exec(ctx context.Context, req *api.ExecRequest) (*api.ExecResponse, error) {
+func (s *fakeCriServer) Exec(ctx context.Context, req *criv1.ExecRequest) (*criv1.ExecResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ExecResponse), err
+	return response.(*criv1.ExecResponse), err
 }
 
-func (s *fakeCriServer) Attach(ctx context.Context, req *api.AttachRequest) (*api.AttachResponse, error) {
+func (s *fakeCriServer) Attach(ctx context.Context, req *criv1.AttachRequest) (*criv1.AttachResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.AttachResponse), err
+	return response.(*criv1.AttachResponse), err
 }
 
-func (s *fakeCriServer) PortForward(ctx context.Context, req *api.PortForwardRequest) (*api.PortForwardResponse, error) {
+func (s *fakeCriServer) PortForward(ctx context.Context, req *criv1.PortForwardRequest) (*criv1.PortForwardResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.PortForwardResponse), err
+	return response.(*criv1.PortForwardResponse), err
 }
 
-func (s *fakeCriServer) ContainerStats(ctx context.Context, req *api.ContainerStatsRequest) (*api.ContainerStatsResponse, error) {
+func (s *fakeCriServer) ContainerStats(ctx context.Context, req *criv1.ContainerStatsRequest) (*criv1.ContainerStatsResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ContainerStatsResponse), err
+	return response.(*criv1.ContainerStatsResponse), err
 }
 
-func (s *fakeCriServer) ListContainerStats(ctx context.Context, req *api.ListContainerStatsRequest) (*api.ListContainerStatsResponse, error) {
+func (s *fakeCriServer) ListContainerStats(ctx context.Context, req *criv1.ListContainerStatsRequest) (*criv1.ListContainerStatsResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ListContainerStatsResponse), err
+	return response.(*criv1.ListContainerStatsResponse), err
 }
 
-func (s *fakeCriServer) PodSandboxStats(ctx context.Context, req *api.PodSandboxStatsRequest) (*api.PodSandboxStatsResponse, error) {
+func (s *fakeCriServer) PodSandboxStats(ctx context.Context, req *criv1.PodSandboxStatsRequest) (*criv1.PodSandboxStatsResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.PodSandboxStatsResponse), err
+	return response.(*criv1.PodSandboxStatsResponse), err
 }
 
-func (s *fakeCriServer) ListPodSandboxStats(ctx context.Context, req *api.ListPodSandboxStatsRequest) (*api.ListPodSandboxStatsResponse, error) {
+func (s *fakeCriServer) ListPodSandboxStats(ctx context.Context, req *criv1.ListPodSandboxStatsRequest) (*criv1.ListPodSandboxStatsResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ListPodSandboxStatsResponse), err
+	return response.(*criv1.ListPodSandboxStatsResponse), err
 }
 
-func (s *fakeCriServer) UpdateRuntimeConfig(ctx context.Context, req *api.UpdateRuntimeConfigRequest) (*api.UpdateRuntimeConfigResponse, error) {
+func (s *fakeCriServer) UpdateRuntimeConfig(ctx context.Context, req *criv1.UpdateRuntimeConfigRequest) (*criv1.UpdateRuntimeConfigResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.UpdateRuntimeConfigResponse), err
+	return response.(*criv1.UpdateRuntimeConfigResponse), err
 }
 
-func (s *fakeCriServer) Status(ctx context.Context, req *api.StatusRequest) (*api.StatusResponse, error) {
+func (s *fakeCriServer) Status(ctx context.Context, req *criv1.StatusRequest) (*criv1.StatusResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.StatusResponse), err
+	return response.(*criv1.StatusResponse), err
 }
 
-// Implementation of api.ImageServiceServer
+// Implementation of criv1.ImageServiceServer
 
-func (s *fakeCriServer) ListImages(ctx context.Context, req *api.ListImagesRequest) (*api.ListImagesResponse, error) {
-	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ListImagesResponse), err
+func (s *fakeCriServer) ListImages(ctx context.Context, req *criv1.ListImagesRequest) (*criv1.ListImagesResponse, error) {
+	response, err := s.callHandler(ctx, req,
+		func(*fakeCriServer, context.Context, *criv1.ListImagesRequest) (*criv1.ListImagesResponse, error) {
+			return &criv1.ListImagesResponse{}, nil
+		},
+	)
+	return response.(*criv1.ListImagesResponse), err
 }
 
-func (s *fakeCriServer) ImageStatus(ctx context.Context, req *api.ImageStatusRequest) (*api.ImageStatusResponse, error) {
+func (s *fakeCriServer) ImageStatus(ctx context.Context, req *criv1.ImageStatusRequest) (*criv1.ImageStatusResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ImageStatusResponse), err
+	return response.(*criv1.ImageStatusResponse), err
 }
 
-func (s *fakeCriServer) PullImage(ctx context.Context, req *api.PullImageRequest) (*api.PullImageResponse, error) {
+func (s *fakeCriServer) PullImage(ctx context.Context, req *criv1.PullImageRequest) (*criv1.PullImageResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.PullImageResponse), err
+	return response.(*criv1.PullImageResponse), err
 }
 
-func (s *fakeCriServer) RemoveImage(ctx context.Context, req *api.RemoveImageRequest) (*api.RemoveImageResponse, error) {
+func (s *fakeCriServer) RemoveImage(ctx context.Context, req *criv1.RemoveImageRequest) (*criv1.RemoveImageResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.RemoveImageResponse), err
+	return response.(*criv1.RemoveImageResponse), err
 }
 
-func (s *fakeCriServer) ImageFsInfo(ctx context.Context, req *api.ImageFsInfoRequest) (*api.ImageFsInfoResponse, error) {
+func (s *fakeCriServer) ImageFsInfo(ctx context.Context, req *criv1.ImageFsInfoRequest) (*criv1.ImageFsInfoResponse, error) {
 	response, err := s.callHandler(ctx, req, nil)
-	return response.(*api.ImageFsInfoResponse), err
+	return response.(*criv1.ImageFsInfoResponse), err
 }

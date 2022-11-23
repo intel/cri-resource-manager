@@ -20,11 +20,11 @@ import (
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
 
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
-	apiVersion = "v1alpha2"
+	apiVersion = "v1"
 
 	imageService = "ImageService"
 	listImages   = "ListImages"
@@ -78,406 +78,406 @@ func (s *server) interceptRequest(ctx context.Context, service, method string,
 }
 
 func (s *server) ListImages(ctx context.Context,
-	req *api.ListImagesRequest) (*api.ListImagesResponse, error) {
+	req *criv1.ListImagesRequest) (*criv1.ListImagesResponse, error) {
 	rsp, err := s.interceptRequest(ctx, imageService, listImages, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.image).ListImages(ctx, req.(*api.ListImagesRequest))
+			return (*s.image).ListImages(ctx, req.(*criv1.ListImagesRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ListImagesResponse), err
+	return rsp.(*criv1.ListImagesResponse), err
 }
 
 func (s *server) ImageStatus(ctx context.Context,
-	req *api.ImageStatusRequest) (*api.ImageStatusResponse, error) {
+	req *criv1.ImageStatusRequest) (*criv1.ImageStatusResponse, error) {
 	rsp, err := s.interceptRequest(ctx, imageService, imageStatus, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.image).ImageStatus(ctx, req.(*api.ImageStatusRequest))
+			return (*s.image).ImageStatus(ctx, req.(*criv1.ImageStatusRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ImageStatusResponse), err
+	return rsp.(*criv1.ImageStatusResponse), err
 }
 
 func (s *server) PullImage(ctx context.Context,
-	req *api.PullImageRequest) (*api.PullImageResponse, error) {
+	req *criv1.PullImageRequest) (*criv1.PullImageResponse, error) {
 	rsp, err := s.interceptRequest(ctx, imageService, pullImage, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.image).PullImage(ctx, req.(*api.PullImageRequest))
+			return (*s.image).PullImage(ctx, req.(*criv1.PullImageRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.PullImageResponse), err
+	return rsp.(*criv1.PullImageResponse), err
 }
 
 func (s *server) RemoveImage(ctx context.Context,
-	req *api.RemoveImageRequest) (*api.RemoveImageResponse, error) {
+	req *criv1.RemoveImageRequest) (*criv1.RemoveImageResponse, error) {
 	rsp, err := s.interceptRequest(ctx, imageService, removeImage, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.image).RemoveImage(ctx, req.(*api.RemoveImageRequest))
+			return (*s.image).RemoveImage(ctx, req.(*criv1.RemoveImageRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.RemoveImageResponse), err
+	return rsp.(*criv1.RemoveImageResponse), err
 }
 
 func (s *server) ImageFsInfo(ctx context.Context,
-	req *api.ImageFsInfoRequest) (*api.ImageFsInfoResponse, error) {
+	req *criv1.ImageFsInfoRequest) (*criv1.ImageFsInfoResponse, error) {
 	rsp, err := s.interceptRequest(ctx, imageService, imageFsInfo, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.image).ImageFsInfo(ctx, req.(*api.ImageFsInfoRequest))
+			return (*s.image).ImageFsInfo(ctx, req.(*criv1.ImageFsInfoRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ImageFsInfoResponse), err
+	return rsp.(*criv1.ImageFsInfoResponse), err
 }
 
 func (s *server) Version(ctx context.Context,
-	req *api.VersionRequest) (*api.VersionResponse, error) {
+	req *criv1.VersionRequest) (*criv1.VersionResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, version, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).Version(ctx, req.(*api.VersionRequest))
+			return (*s.runtime).Version(ctx, req.(*criv1.VersionRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.VersionResponse), err
+	return rsp.(*criv1.VersionResponse), err
 }
 
 func (s *server) RunPodSandbox(ctx context.Context,
-	req *api.RunPodSandboxRequest) (*api.RunPodSandboxResponse, error) {
+	req *criv1.RunPodSandboxRequest) (*criv1.RunPodSandboxResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, runPodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).RunPodSandbox(ctx, req.(*api.RunPodSandboxRequest))
+			return (*s.runtime).RunPodSandbox(ctx, req.(*criv1.RunPodSandboxRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.RunPodSandboxResponse), err
+	return rsp.(*criv1.RunPodSandboxResponse), err
 }
 
 func (s *server) StopPodSandbox(ctx context.Context,
-	req *api.StopPodSandboxRequest) (*api.StopPodSandboxResponse, error) {
+	req *criv1.StopPodSandboxRequest) (*criv1.StopPodSandboxResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, stopPodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).StopPodSandbox(ctx, req.(*api.StopPodSandboxRequest))
+			return (*s.runtime).StopPodSandbox(ctx, req.(*criv1.StopPodSandboxRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.StopPodSandboxResponse), err
+	return rsp.(*criv1.StopPodSandboxResponse), err
 }
 
 func (s *server) RemovePodSandbox(ctx context.Context,
-	req *api.RemovePodSandboxRequest) (*api.RemovePodSandboxResponse, error) {
+	req *criv1.RemovePodSandboxRequest) (*criv1.RemovePodSandboxResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, removePodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).RemovePodSandbox(ctx, req.(*api.RemovePodSandboxRequest))
+			return (*s.runtime).RemovePodSandbox(ctx, req.(*criv1.RemovePodSandboxRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.RemovePodSandboxResponse), err
+	return rsp.(*criv1.RemovePodSandboxResponse), err
 }
 
 func (s *server) PodSandboxStatus(ctx context.Context,
-	req *api.PodSandboxStatusRequest) (*api.PodSandboxStatusResponse, error) {
+	req *criv1.PodSandboxStatusRequest) (*criv1.PodSandboxStatusResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, podSandboxStatus, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).PodSandboxStatus(ctx, req.(*api.PodSandboxStatusRequest))
+			return (*s.runtime).PodSandboxStatus(ctx, req.(*criv1.PodSandboxStatusRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.PodSandboxStatusResponse), err
+	return rsp.(*criv1.PodSandboxStatusResponse), err
 }
 
 func (s *server) ListPodSandbox(ctx context.Context,
-	req *api.ListPodSandboxRequest) (*api.ListPodSandboxResponse, error) {
+	req *criv1.ListPodSandboxRequest) (*criv1.ListPodSandboxResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, listPodSandbox, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ListPodSandbox(ctx, req.(*api.ListPodSandboxRequest))
+			return (*s.runtime).ListPodSandbox(ctx, req.(*criv1.ListPodSandboxRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ListPodSandboxResponse), err
+	return rsp.(*criv1.ListPodSandboxResponse), err
 }
 
 func (s *server) CreateContainer(ctx context.Context,
-	req *api.CreateContainerRequest) (*api.CreateContainerResponse, error) {
+	req *criv1.CreateContainerRequest) (*criv1.CreateContainerResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, createContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).CreateContainer(ctx, req.(*api.CreateContainerRequest))
+			return (*s.runtime).CreateContainer(ctx, req.(*criv1.CreateContainerRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.CreateContainerResponse), err
+	return rsp.(*criv1.CreateContainerResponse), err
 }
 
 func (s *server) StartContainer(ctx context.Context,
-	req *api.StartContainerRequest) (*api.StartContainerResponse, error) {
+	req *criv1.StartContainerRequest) (*criv1.StartContainerResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, startContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).StartContainer(ctx, req.(*api.StartContainerRequest))
+			return (*s.runtime).StartContainer(ctx, req.(*criv1.StartContainerRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.StartContainerResponse), err
+	return rsp.(*criv1.StartContainerResponse), err
 }
 
 func (s *server) StopContainer(ctx context.Context,
-	req *api.StopContainerRequest) (*api.StopContainerResponse, error) {
+	req *criv1.StopContainerRequest) (*criv1.StopContainerResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, stopContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).StopContainer(ctx, req.(*api.StopContainerRequest))
+			return (*s.runtime).StopContainer(ctx, req.(*criv1.StopContainerRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.StopContainerResponse), err
+	return rsp.(*criv1.StopContainerResponse), err
 }
 
 func (s *server) RemoveContainer(ctx context.Context,
-	req *api.RemoveContainerRequest) (*api.RemoveContainerResponse, error) {
+	req *criv1.RemoveContainerRequest) (*criv1.RemoveContainerResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, removeContainer, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).RemoveContainer(ctx, req.(*api.RemoveContainerRequest))
+			return (*s.runtime).RemoveContainer(ctx, req.(*criv1.RemoveContainerRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.RemoveContainerResponse), err
+	return rsp.(*criv1.RemoveContainerResponse), err
 }
 
 func (s *server) ListContainers(ctx context.Context,
-	req *api.ListContainersRequest) (*api.ListContainersResponse, error) {
+	req *criv1.ListContainersRequest) (*criv1.ListContainersResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, listContainers, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ListContainers(ctx, req.(*api.ListContainersRequest))
+			return (*s.runtime).ListContainers(ctx, req.(*criv1.ListContainersRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ListContainersResponse), err
+	return rsp.(*criv1.ListContainersResponse), err
 }
 
 func (s *server) ContainerStatus(ctx context.Context,
-	req *api.ContainerStatusRequest) (*api.ContainerStatusResponse, error) {
+	req *criv1.ContainerStatusRequest) (*criv1.ContainerStatusResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, containerStatus, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ContainerStatus(ctx, req.(*api.ContainerStatusRequest))
+			return (*s.runtime).ContainerStatus(ctx, req.(*criv1.ContainerStatusRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ContainerStatusResponse), err
+	return rsp.(*criv1.ContainerStatusResponse), err
 }
 
 func (s *server) UpdateContainerResources(ctx context.Context,
-	req *api.UpdateContainerResourcesRequest) (*api.UpdateContainerResourcesResponse, error) {
+	req *criv1.UpdateContainerResourcesRequest) (*criv1.UpdateContainerResourcesResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, updateContainerResources, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
 			return (*s.runtime).UpdateContainerResources(ctx,
-				req.(*api.UpdateContainerResourcesRequest))
+				req.(*criv1.UpdateContainerResourcesRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.UpdateContainerResourcesResponse), err
+	return rsp.(*criv1.UpdateContainerResourcesResponse), err
 }
 
 func (s *server) ReopenContainerLog(ctx context.Context,
-	req *api.ReopenContainerLogRequest) (*api.ReopenContainerLogResponse, error) {
+	req *criv1.ReopenContainerLogRequest) (*criv1.ReopenContainerLogResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, reopenContainerLog, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ReopenContainerLog(ctx, req.(*api.ReopenContainerLogRequest))
+			return (*s.runtime).ReopenContainerLog(ctx, req.(*criv1.ReopenContainerLogRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ReopenContainerLogResponse), err
+	return rsp.(*criv1.ReopenContainerLogResponse), err
 }
 
 func (s *server) ExecSync(ctx context.Context,
-	req *api.ExecSyncRequest) (*api.ExecSyncResponse, error) {
+	req *criv1.ExecSyncRequest) (*criv1.ExecSyncResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, execSync, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ExecSync(ctx, req.(*api.ExecSyncRequest))
+			return (*s.runtime).ExecSync(ctx, req.(*criv1.ExecSyncRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ExecSyncResponse), err
+	return rsp.(*criv1.ExecSyncResponse), err
 }
 
 func (s *server) Exec(ctx context.Context,
-	req *api.ExecRequest) (*api.ExecResponse, error) {
+	req *criv1.ExecRequest) (*criv1.ExecResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, exec, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).Exec(ctx, req.(*api.ExecRequest))
+			return (*s.runtime).Exec(ctx, req.(*criv1.ExecRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ExecResponse), err
+	return rsp.(*criv1.ExecResponse), err
 }
 
 func (s *server) Attach(ctx context.Context,
-	req *api.AttachRequest) (*api.AttachResponse, error) {
+	req *criv1.AttachRequest) (*criv1.AttachResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, attach, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).Attach(ctx, req.(*api.AttachRequest))
+			return (*s.runtime).Attach(ctx, req.(*criv1.AttachRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.AttachResponse), err
+	return rsp.(*criv1.AttachResponse), err
 }
 
 func (s *server) PortForward(ctx context.Context,
-	req *api.PortForwardRequest) (*api.PortForwardResponse, error) {
+	req *criv1.PortForwardRequest) (*criv1.PortForwardResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, portForward, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).PortForward(ctx, req.(*api.PortForwardRequest))
+			return (*s.runtime).PortForward(ctx, req.(*criv1.PortForwardRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.PortForwardResponse), err
+	return rsp.(*criv1.PortForwardResponse), err
 }
 
 func (s *server) ContainerStats(ctx context.Context,
-	req *api.ContainerStatsRequest) (*api.ContainerStatsResponse, error) {
+	req *criv1.ContainerStatsRequest) (*criv1.ContainerStatsResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, containerStats, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ContainerStats(ctx, req.(*api.ContainerStatsRequest))
+			return (*s.runtime).ContainerStats(ctx, req.(*criv1.ContainerStatsRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ContainerStatsResponse), err
+	return rsp.(*criv1.ContainerStatsResponse), err
 }
 
 func (s *server) ListContainerStats(ctx context.Context,
-	req *api.ListContainerStatsRequest) (*api.ListContainerStatsResponse, error) {
+	req *criv1.ListContainerStatsRequest) (*criv1.ListContainerStatsResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, listContainerStats, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ListContainerStats(ctx, req.(*api.ListContainerStatsRequest))
+			return (*s.runtime).ListContainerStats(ctx, req.(*criv1.ListContainerStatsRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ListContainerStatsResponse), err
+	return rsp.(*criv1.ListContainerStatsResponse), err
 }
 
-func (s *server) PodSandboxStats(ctx context.Context, req *api.PodSandboxStatsRequest) (*api.PodSandboxStatsResponse, error) {
+func (s *server) PodSandboxStats(ctx context.Context, req *criv1.PodSandboxStatsRequest) (*criv1.PodSandboxStatsResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, podSandboxStats, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).PodSandboxStats(ctx, req.(*api.PodSandboxStatsRequest))
+			return (*s.runtime).PodSandboxStats(ctx, req.(*criv1.PodSandboxStatsRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.PodSandboxStatsResponse), err
+	return rsp.(*criv1.PodSandboxStatsResponse), err
 }
 
-func (s *server) ListPodSandboxStats(ctx context.Context, req *api.ListPodSandboxStatsRequest) (*api.ListPodSandboxStatsResponse, error) {
+func (s *server) ListPodSandboxStats(ctx context.Context, req *criv1.ListPodSandboxStatsRequest) (*criv1.ListPodSandboxStatsResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, listPodSandboxStats, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).ListPodSandboxStats(ctx, req.(*api.ListPodSandboxStatsRequest))
+			return (*s.runtime).ListPodSandboxStats(ctx, req.(*criv1.ListPodSandboxStatsRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.ListPodSandboxStatsResponse), err
+	return rsp.(*criv1.ListPodSandboxStatsResponse), err
 }
 
 func (s *server) UpdateRuntimeConfig(ctx context.Context,
-	req *api.UpdateRuntimeConfigRequest) (*api.UpdateRuntimeConfigResponse, error) {
+	req *criv1.UpdateRuntimeConfigRequest) (*criv1.UpdateRuntimeConfigResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, updateRuntimeConfig, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).UpdateRuntimeConfig(ctx, req.(*api.UpdateRuntimeConfigRequest))
+			return (*s.runtime).UpdateRuntimeConfig(ctx, req.(*criv1.UpdateRuntimeConfigRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.UpdateRuntimeConfigResponse), err
+	return rsp.(*criv1.UpdateRuntimeConfigResponse), err
 }
 
 func (s *server) Status(ctx context.Context,
-	req *api.StatusRequest) (*api.StatusResponse, error) {
+	req *criv1.StatusRequest) (*criv1.StatusResponse, error) {
 	rsp, err := s.interceptRequest(ctx, runtimeService, status, req,
 		func(ctx context.Context, req interface{}) (interface{}, error) {
-			return (*s.runtime).Status(ctx, req.(*api.StatusRequest))
+			return (*s.runtime).Status(ctx, req.(*criv1.StatusRequest))
 		})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return rsp.(*api.StatusResponse), err
+	return rsp.(*criv1.StatusResponse), err
 }

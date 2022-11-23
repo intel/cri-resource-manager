@@ -16,30 +16,31 @@ package relay
 
 import (
 	"context"
-	api "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (r *relay) ListImages(ctx context.Context,
-	req *api.ListImagesRequest) (*api.ListImagesResponse, error) {
+	req *criv1.ListImagesRequest) (*criv1.ListImagesResponse, error) {
 	return r.client.ListImages(ctx, req)
 }
 
 func (r *relay) ImageStatus(ctx context.Context,
-	req *api.ImageStatusRequest) (*api.ImageStatusResponse, error) {
+	req *criv1.ImageStatusRequest) (*criv1.ImageStatusResponse, error) {
 	return r.client.ImageStatus(ctx, req)
 }
 
 func (r *relay) PullImage(ctx context.Context,
-	req *api.PullImageRequest) (*api.PullImageResponse, error) {
+	req *criv1.PullImageRequest) (*criv1.PullImageResponse, error) {
 	return r.client.PullImage(ctx, req)
 }
 
 func (r *relay) RemoveImage(ctx context.Context,
-	req *api.RemoveImageRequest) (*api.RemoveImageResponse, error) {
+	req *criv1.RemoveImageRequest) (*criv1.RemoveImageResponse, error) {
 	return r.client.RemoveImage(ctx, req)
 }
 
 func (r *relay) ImageFsInfo(ctx context.Context,
-	req *api.ImageFsInfoRequest) (*api.ImageFsInfoResponse, error) {
+	req *criv1.ImageFsInfoRequest) (*criv1.ImageFsInfoResponse, error) {
 	return r.client.ImageFsInfo(ctx, req)
 }

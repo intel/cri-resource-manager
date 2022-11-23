@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	criapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
@@ -71,24 +71,24 @@ func (m *resmgr) disambiguate(msg interface{}) string {
 	defer m.RUnlock()
 
 	switch req := msg.(type) {
-	case *criapi.RunPodSandboxRequest:
+	case *criv1.RunPodSandboxRequest:
 		if req.Config != nil && req.Config.Metadata != nil {
 			qualifier = req.Config.Metadata.Name
 		}
-	case *criapi.StopPodSandboxRequest:
+	case *criv1.StopPodSandboxRequest:
 		if pod, ok := m.cache.LookupPod(req.PodSandboxId); ok {
 			qualifier = pod.GetName()
 		} else {
 			qualifier = "unknown pod " + req.PodSandboxId
 		}
-	case *criapi.RemovePodSandboxRequest:
+	case *criv1.RemovePodSandboxRequest:
 		if pod, ok := m.cache.LookupPod(req.PodSandboxId); ok {
 			qualifier = pod.GetName()
 		} else {
 			qualifier = "unknown pod " + req.PodSandboxId
 		}
 
-	case *criapi.CreateContainerRequest:
+	case *criv1.CreateContainerRequest:
 		switch {
 		case req.SandboxConfig == nil || req.SandboxConfig.Metadata == nil:
 			qualifier = "missing pod metadata in request"
@@ -98,26 +98,26 @@ func (m *resmgr) disambiguate(msg interface{}) string {
 			qualifier = req.SandboxConfig.Metadata.Name + ":" + req.Config.Metadata.Name
 		}
 
-	case *criapi.StartContainerRequest:
+	case *criv1.StartContainerRequest:
 		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
 			qualifier = container.PrettyName()
 		} else {
 			qualifier = "unknown container " + req.ContainerId
 		}
-	case *criapi.StopContainerRequest:
+	case *criv1.StopContainerRequest:
 		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
 			qualifier = container.PrettyName()
 		} else {
 			qualifier = "unknown container " + req.ContainerId
 		}
-	case *criapi.RemoveContainerRequest:
+	case *criv1.RemoveContainerRequest:
 		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
 			qualifier = container.PrettyName()
 		} else {
 			qualifier = "unknown container " + req.ContainerId
 		}
 
-	case *criapi.UpdateContainerResourcesRequest:
+	case *criv1.UpdateContainerResourcesRequest:
 		if container, ok := m.cache.LookupContainer(req.ContainerId); ok {
 			qualifier = container.PrettyName()
 		} else {
@@ -175,7 +175,7 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 	m.Info("synchronizing cache state with CRI runtime...")
 
 	add, del := []cache.Container{}, []cache.Container{}
-	pods, err := m.relay.Client().ListPodSandbox(ctx, &criapi.ListPodSandboxRequest{})
+	pods, err := m.relay.Client().ListPodSandbox(ctx, &criv1.ListPodSandboxRequest{})
 	if err != nil {
 		return nil, nil, resmgrError("cache synchronization pod query failed: %v", err)
 	}
@@ -194,7 +194,7 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 		del = append(del, c)
 	}
 
-	containers, err := m.relay.Client().ListContainers(ctx, &criapi.ListContainersRequest{})
+	containers, err := m.relay.Client().ListContainers(ctx, &criv1.ListContainersRequest{})
 	if err != nil {
 		return nil, nil, resmgrError("cache synchronization container query failed: %v", err)
 	}
@@ -218,7 +218,7 @@ func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Co
 
 func (m *resmgr) queryPodStatus(ctx context.Context, podID string) (*cache.PodStatus, error) {
 	response, err := m.relay.Client().PodSandboxStatus(ctx,
-		&criapi.PodSandboxStatusRequest{
+		&criv1.PodSandboxStatusRequest{
 			PodSandboxId: podID,
 			Verbose:      true,
 		})
@@ -239,7 +239,7 @@ func (m *resmgr) RunPod(ctx context.Context, method string, request interface{},
 		return reply, rqerr
 	}
 
-	podID := reply.(*criapi.RunPodSandboxResponse).PodSandboxId
+	podID := reply.(*criv1.RunPodSandboxResponse).PodSandboxId
 
 	m.Lock()
 	defer m.Unlock()
@@ -296,7 +296,7 @@ func (m *resmgr) StopPod(ctx context.Context, method string, request interface{}
 	m.Lock()
 	defer m.Unlock()
 
-	podID := request.(*criapi.StopPodSandboxRequest).PodSandboxId
+	podID := request.(*criv1.StopPodSandboxRequest).PodSandboxId
 	pod, ok := m.cache.LookupPod(podID)
 
 	if !ok {
@@ -348,7 +348,7 @@ func (m *resmgr) RemovePod(ctx context.Context, method string, request interface
 	m.Lock()
 	defer m.Unlock()
 
-	podID := request.(*criapi.RemovePodSandboxRequest).PodSandboxId
+	podID := request.(*criv1.RemovePodSandboxRequest).PodSandboxId
 	pod, ok := m.cache.LookupPod(podID)
 
 	if !ok {
@@ -399,7 +399,7 @@ func (m *resmgr) CreateContainer(ctx context.Context, method string, request int
 	defer m.Unlock()
 
 	// kubelet doesn't always clean up crashed containers so we try doing it here
-	if msg, ok := request.(*criapi.CreateContainerRequest); ok {
+	if msg, ok := request.(*criv1.CreateContainerRequest); ok {
 		if pod, ok := m.cache.LookupPod(msg.PodSandboxId); ok {
 			if msg.Config != nil && msg.Config.Metadata != nil {
 				if c, ok := pod.GetContainer(msg.Config.Metadata.Name); ok {
@@ -468,7 +468,7 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 	m.Lock()
 	defer m.Unlock()
 
-	containerID := request.(*criapi.StartContainerRequest).ContainerId
+	containerID := request.(*criv1.StartContainerRequest).ContainerId
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
@@ -523,7 +523,7 @@ func (m *resmgr) StopContainer(ctx context.Context, method string, request inter
 	m.Lock()
 	defer m.Unlock()
 
-	containerID := request.(*criapi.StopContainerRequest).ContainerId
+	containerID := request.(*criv1.StopContainerRequest).ContainerId
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
@@ -569,7 +569,7 @@ func (m *resmgr) RemoveContainer(ctx context.Context, method string, request int
 	m.Lock()
 	defer m.Unlock()
 
-	containerID := request.(*criapi.RemoveContainerRequest).ContainerId
+	containerID := request.(*criv1.RemoveContainerRequest).ContainerId
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
@@ -611,7 +611,7 @@ func (m *resmgr) ListContainers(ctx context.Context, method string, request inte
 		return reply, rqerr
 	}
 
-	if f := request.(*criapi.ListContainersRequest).Filter; f != nil {
+	if f := request.(*criv1.ListContainersRequest).Filter; f != nil {
 		if f.Id != "" || f.State != nil || f.PodSandboxId != "" || len(f.LabelSelector) > 0 {
 			return reply, nil
 		}
@@ -620,11 +620,11 @@ func (m *resmgr) ListContainers(ctx context.Context, method string, request inte
 	m.Lock()
 	defer m.Unlock()
 
-	clistmap := map[string]*criapi.Container{}
+	clistmap := map[string]*criv1.Container{}
 	released := []cache.Container{}
-	for _, listed := range reply.(*criapi.ListContainersResponse).Containers {
+	for _, listed := range reply.(*criv1.ListContainersResponse).Containers {
 		clistmap[listed.Id] = listed
-		if listed.State != criapi.ContainerState_CONTAINER_EXITED {
+		if listed.State != criv1.ContainerState_CONTAINER_EXITED {
 			continue
 		}
 		if c, ok := m.cache.LookupContainer(listed.Id); ok {
@@ -673,7 +673,7 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 	m.Lock()
 	defer m.Unlock()
 
-	containerID := request.(*criapi.UpdateContainerResourcesRequest).ContainerId
+	containerID := request.(*criv1.UpdateContainerResourcesRequest).ContainerId
 	container, ok := m.cache.LookupContainer(containerID)
 
 	if !ok {
@@ -688,7 +688,7 @@ func (m *resmgr) UpdateContainer(ctx context.Context, method string, request int
 
 	m.updateIntrospection()
 
-	return &criapi.UpdateContainerResourcesResponse{}, nil
+	return &criv1.UpdateContainerResourcesResponse{}, nil
 }
 
 // RebalanceContainers tries to find a more optimal container resource allocation if necessary.
@@ -904,8 +904,8 @@ func (m *resmgr) runPostUpdateHooks(ctx context.Context, method string) error {
 func (m *resmgr) sendCRIRequest(ctx context.Context, request interface{}) (interface{}, error) {
 	client := m.relay.Client()
 	switch request.(type) {
-	case *criapi.UpdateContainerResourcesRequest:
-		req := request.(*criapi.UpdateContainerResourcesRequest)
+	case *criv1.UpdateContainerResourcesRequest:
+		req := request.(*criv1.UpdateContainerResourcesRequest)
 		m.Debug("sending update request for container %s...", req.ContainerId)
 		return client.UpdateContainerResources(ctx, req)
 	default:
@@ -914,7 +914,7 @@ func (m *resmgr) sendCRIRequest(ctx context.Context, request interface{}) (inter
 }
 
 func (m *resmgr) checkRuntime(ctx context.Context) error {
-	version, err := m.relay.Client().Version(ctx, &criapi.VersionRequest{
+	version, err := m.relay.Client().Version(ctx, &criv1.VersionRequest{
 		Version: kubeAPIVersion,
 	})
 	if err != nil {
