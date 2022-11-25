@@ -273,24 +273,45 @@ func (c *client) Status(ctx context.Context, in *criv1.StatusRequest, opts ...gr
 	return c.rsc.Status(ctx, in)
 }
 
+func (c *client) CheckpointContainer(ctx context.Context, in *criv1.CheckpointContainerRequest, opts ...grpc.CallOption) (*criv1.CheckpointContainerResponse, error) {
+	if err := c.checkRuntimeService(); err != nil {
+		return nil, err
+	}
+
+	return c.rsc.CheckpointContainer(ctx, in)
+}
+
+func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetEventsRequest, opts ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
+	if err := c.checkRuntimeService(); err != nil {
+		return nil, err
+	}
+
+	eventsClient, err := c.rsc.GetContainerEvents(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+
+	return eventsClient, err
+}
+
 //
 // These are being introduced but they are not defined yet for the
 // CRI API version we are compiling against.
 /*
-func (c *client) CheckpointContainer(ctx context.Context, in *criv1.CheckpointContainerRequest, opts ...grpc.CallOption) (*criv1.CheckpointContainerResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1 RuntimeService")
-}
-
-func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetContainerEventsRequest, opts ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1 RuntimeService")
-}
-
 func (c *client) ListMetricDescriptors(ctx context.Context, in *criv1.ListMetricDescriptorsRequest, opts ...grpc.CallOption) (*criv1.ListMetricDescriptorsResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1 RuntimeService")
+	if err := c.checkRuntimeService(); err != nil {
+		return nil, err
+	}
+
+	return c.rsc.ListMetricDescriptors(ctx, in)
 }
 
 func (c *client) ListPodSandboxMetrics(ctx context.Context, in *criv1.ListPodSandboxMetricsRequest, opts ...grpc.CallOption) (*criv1.ListPodSandboxMetricsResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1 RuntimeService")
+	if err := c.checkRuntimeService(); err != nil {
+		return nil, err
+	}
+
+	return c.rsc.ListPodSandboxMetrics(ctx, in)
 }
 */
 

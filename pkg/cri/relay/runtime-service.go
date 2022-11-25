@@ -17,6 +17,8 @@ package relay
 import (
 	"context"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/dump"
@@ -179,4 +181,13 @@ func (r *relay) Status(ctx context.Context,
 	req *criv1.StatusRequest) (*criv1.StatusResponse, error) {
 	r.dump("Status", req)
 	return r.client.Status(ctx, req)
+}
+
+func (r *relay) CheckpointContainer(ctx context.Context, req *criv1.CheckpointContainerRequest) (*criv1.CheckpointContainerResponse, error) {
+	r.dump("CheckpointContainer", req)
+	return r.client.CheckpointContainer(ctx, req)
+}
+
+func (r *relay) GetContainerEvents(req *criv1.GetEventsRequest, src criv1.RuntimeService_GetContainerEventsServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
 }

@@ -268,6 +268,15 @@ func (s *fakeCriServer) Status(ctx context.Context, req *criv1.StatusRequest) (*
 	return response.(*criv1.StatusResponse), err
 }
 
+func (s *fakeCriServer) CheckpointContainer(ctx context.Context, req *criv1.CheckpointContainerRequest) (*criv1.CheckpointContainerResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*criv1.CheckpointContainerResponse), err
+}
+
+func (s *fakeCriServer) GetContainerEvents(req *criv1.GetEventsRequest, srv criv1.RuntimeService_GetContainerEventsServer) error {
+	return nil
+}
+
 // Implementation of criv1.ImageServiceServer
 
 func (s *fakeCriServer) ListImages(ctx context.Context, req *criv1.ListImagesRequest) (*criv1.ListImagesResponse, error) {
