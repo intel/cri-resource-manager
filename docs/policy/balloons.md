@@ -76,6 +76,13 @@ Balloons policy parameters:
 - `ReservedPoolNamespaces` is a list of namespaces (wildcards allowed)
   that are assigned to the special reserved balloon, that is, will run
   on reserved CPUs. This always includes the `kube-system` namespace.
+- `AllocatorTopologyBalancing` affects selecting CPUs for new
+  balloons. If `true`, new balloons are created using CPUs on
+  package/die/NUMA with most free CPUs. This optimizes for performance
+  and inflating balloons within the same package/die/NUMA. The default
+  is `false`: pack new balloons tightly on the same
+  packages/dies/NUMAs. This optimizes for powersaving by enabing deep
+  sleep states on large parts of the hardware.
 - `BalloonTypes` is a list of balloon type definitions. Each type can
   be configured with the following parameters:
   - `Name` of the balloon type. This is used in pod annotations to
@@ -113,6 +120,19 @@ Balloons policy parameters:
     preferring exclusive CPUs, as long as there are enough free
     CPUs. The default is `false`: prefer filling and inflating
     existing balloons over creating new ones.
+  - `ShareIdleCPUsInSame`: Whenever the number of or sizes of balloons
+    change, idle CPUs (that do not belong to any balloon) are reshared
+    as extra CPUs to workloads in balloons with this option. The value
+    sets locality of allowed extra CPUs that will be common to these
+    workloads.
+    - `system`: workloads are allowed to use idle CPUs available
+      anywhere in the system.
+    - `package`: ...allowed to use idle CPUs in the same package(s)
+    (sockets) as the balloon.
+    - `die`: ...in the same die(s) as the balloon.
+    - `numa`: ...in the same numa node(s) as the balloon.
+    - `core`: ...allowed to use idle CPU threads in the same cores with
+      the balloon.
   - `AllocatorPriority` (0: High, 1: Normal, 2: Low, 3: None). CPU
     allocator parameter, used when creating new or resizing existing
     balloons. If there are balloon types with pre-created balloons
