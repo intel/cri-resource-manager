@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${NAME}
+  $(if [ -n "$POD_ANNOTATION" ]; then echo "
+  annotations:
+    $POD_ANNOTATION
+  "; fi)
+  labels:
+    app: ${NAME}
+spec:
+  containers:
+  $(contnum=0; for reqlim in ${CPUREQLIM}; do echo "
+  - name: ${NAME}c${contnum}
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+      - -c
+      - ${WORK}echo ${NAME}c${contnum} \$(sleep inf)
+    $(if [ -n "${reqlim}" ]; then echo "
+    resources:
+      $(if [ -n "${reqlim/-*}" ]; then echo "
+      requests:
+        cpu: ${reqlim/-*/}
+      "; fi)
+      $(if [ -n "${reqlim/*-/}" ]; then echo "
+      limits:
+        cpu: ${reqlim/*-}
+      "; fi)
+    "; fi)
+  "; contnum=$((contnum + 1)); done )
+  $(if [ -n "$INITCPUREQLIM" ]; then echo "
+  initContainers:
+  $(contnum=0; for initreqlim in ${INITCPUREQLIM}; do echo "
+  - name: ${NAME}c${contnum}-init
+    image: busybox
+    imagePullPolicy: IfNotPresent
+    command:
+      - sh
+      - -c
+      - ${WORK}echo ${NAME}c${contnum}-init \$(sleep 1)
+    $(if [ -n "${initreqlim}" ]; then echo "
+    resources:
+      $(if [ -n "${initreqlim/-*}" ]; then echo "
+      requests:
+        cpu: ${initreqlim/-*/}
+      "; fi)
+      $(if [ -n "${initreqlim/*-/}" ]; then echo "
+      limits:
+        cpu: ${initreqlim/*-}
+      "; fi)
+    "; fi)
+  "; contnum=$((contnum + 1)); done )
+  "; fi)
+  terminationGracePeriodSeconds: 1
