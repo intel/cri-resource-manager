@@ -94,23 +94,6 @@ func (p *policy) reinstateGrants(grants map[string]Grant) error {
 	return nil
 }
 
-func (p *policy) saveConfig() error {
-	cached := cachedOptions{Options: *opt}
-	p.cache.SetPolicyEntry(keyConfig, cache.Cachable(&cached))
-	p.cache.Save()
-	return nil
-}
-
-func (p *policy) restoreConfig() bool {
-	cached := cachedOptions{}
-	if !p.cache.GetPolicyEntry(keyConfig, &cached) {
-		return false
-	}
-
-	*opt = cached.Options
-	return true
-}
-
 type cachedGrant struct {
 	Exclusive   string
 	Part        int
@@ -245,22 +228,5 @@ func (a *allocations) Set(value interface{}) {
 func (a *allocations) Dump(logfn func(format string, args ...interface{}), prefix string) {
 	for _, cg := range a.grants {
 		logfn(prefix+"%s", cg)
-	}
-}
-
-type cachedOptions struct {
-	Options options
-}
-
-func (o *cachedOptions) Get() interface{} {
-	return o
-}
-
-func (o *cachedOptions) Set(value interface{}) {
-	switch value.(type) {
-	case options:
-		o.Options = value.(cachedOptions).Options
-	case *options:
-		o.Options = value.(*cachedOptions).Options
 	}
 }

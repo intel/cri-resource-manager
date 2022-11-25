@@ -476,8 +476,6 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 		p.root.Dump("<post-config>")
 	}
 
-	p.saveConfig()
-
 	return nil
 }
 
@@ -554,11 +552,6 @@ func (p *policy) checkConstraints() error {
 }
 
 func (p *policy) restoreCache() error {
-	if !p.restoreConfig() {
-		log.Warn("no saved configuration found in cache...")
-		p.saveConfig()
-	}
-
 	allocations := p.newAllocations()
 	if p.cache.GetPolicyEntry(keyAllocations, &allocations) {
 		if err := p.restoreAllocations(&allocations); err != nil {
