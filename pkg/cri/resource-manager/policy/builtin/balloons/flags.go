@@ -37,6 +37,12 @@ type balloonsOptionsWrapped struct {
 	// ReservedPoolNamespaces is a list of namespace globs that
 	// will be allocated to reserved CPUs.
 	ReservedPoolNamespaces []string `json:"ReservedPoolNamespaces,omitempty"`
+	// If AllocatorTopologyBalancing is true, balloons are
+	// allocated and resized so that all topology elements
+	// (packages, dies, numa nodes, cores) have roughly same
+	// amount of allocations. The default is false: balloons are
+	// packed tightly to optimize power efficiency.
+	AllocatorTopologyBalancing bool
 	// BallonDefs contains balloon type definitions.
 	BalloonDefs []*BalloonDef `json:"BalloonTypes,omitempty"`
 }
@@ -91,6 +97,12 @@ type BalloonDef struct {
 	// prefer using filling free capacity and possibly inflating
 	// existing balloons before creating new ones.
 	PreferNewBalloons bool
+	// ShareIdleCpusInSame <topology-level>: if there are idle
+	// CPUs, that is CPUs not in any balloon, in the same
+	// <topology-level> as any CPU in the balloon, then allow
+	// workloads to run on those (shared) CPUs in addition to the
+	// (dedicated) CPUs of the balloon.
+	ShareIdleCpusInSame CPUTopologyLevel `json:"ShareIdleCPUsInSame,omitempty"`
 }
 
 var defaultPinCPU bool = true
