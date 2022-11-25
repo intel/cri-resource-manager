@@ -40,9 +40,9 @@ namespace="btype1ns0" create balloons-busybox
 CPUREQ=1 MEMREQ="100M" CPULIM=1 MEMLIM="100M"
 namespace="e2e-balloons-test06" create balloons-busybox
 vm-command "curl -s $verify_metrics_url"
-verify-metrics-has-line 'btype0\[0\].*containers="pod0:pod0c0"'
-verify-metrics-has-line 'btype1\[0\].*containers="pod1:pod1c0"'
-verify-metrics-has-line 'btype2\[0\].*containers="pod2:pod2c0"'
+verify-metrics-has-line 'btype0\[0\].*containers=".*pod0:pod0c0'
+verify-metrics-has-line 'btype1\[0\].*containers=".*pod1:pod1c0'
+verify-metrics-has-line 'btype2\[0\].*containers=".*pod2:pod2c0'
 
 # Remove first two balloon types, change btype2 to match all
 # namespaces.
