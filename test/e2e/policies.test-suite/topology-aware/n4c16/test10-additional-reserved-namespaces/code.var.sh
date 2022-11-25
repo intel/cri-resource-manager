@@ -28,3 +28,28 @@ verify 'cpus["pod0c0"] == {"cpu10", "cpu11"}'
 verify 'cpus["pod1c0"] == {"cpu08", "cpu09"}'
 
 cleanup-test-pods
+
+# Test that
+# - containers that are namespace-assigned to reserved pools are pinned there
+# - containers that are annotated to opt-put that are pinned elsewhere, and
+# - containers that are namespace-assigned and annotated to reserved pools are pinned there
+
+(kubectl create namespace foobar) || true
+
+cleanup-foobar-namespace() {
+    (kubectl delete pods -n foobar --all) || true
+}
+cleanup-foobar-namespace
+
+CONTCOUNT=1 namespace=foobar create besteffort
+ANN0='prefer-reserved-cpus.cri-resource-manager.intel.com/pod: "false"'
+CONTCOUNT=1 namespace=foobar create besteffort
+ANN0='prefer-reserved-cpus.cri-resource-manager.intel.com/pod: "true"'
+CONTCOUNT=1 namespace=foobar create besteffort
+
+report allowed
+verify 'cpus["pod2c0"] == {"cpu10", "cpu11"}'
+verify 'cpus["pod3c0"] == {"cpu08", "cpu09"}'
+verify 'cpus["pod4c0"] == {"cpu10", "cpu11"}'
+
+cleanup-foobar-namespace
