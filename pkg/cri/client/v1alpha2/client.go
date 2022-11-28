@@ -706,24 +706,35 @@ func (c *client) Status(ctx context.Context, in *criv1.StatusRequest, opts ...gr
 	return v1resp, nil
 }
 
+func (c *client) CheckpointContainer(ctx context.Context, in *criv1.CheckpointContainerRequest, opts ...grpc.CallOption) (*criv1.CheckpointContainerResponse, error) {
+	c.Errorf("internal error: GetContainerEvents() called for v1alpha2 client")
+	return &criv1.CheckpointContainerResponse{},
+		fmt.Errorf("internal error: CheckpointContainer() called for v1alpha2 client")
+}
+
+func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetEventsRequest, opts ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
+	c.Errorf("internal error: GetContainerEvents() called for v1alpha2 client")
+	return nil, fmt.Errorf("internal error: GetContainerEvents() called for v1alpha2 client")
+}
+
 //
 // These are being introduced but they are not defined yet for the
 // CRI API version we are compiling against.
 /*
-func (c *client) CheckpointContainer(ctx context.Context, in *criv1.CheckpointContainerRequest, opts ...grpc.CallOption) (*criv1.CheckpointContainerResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1alpha2 RuntimeService")
-}
-
-func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetContainerEventsRequest, opts ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1alpha2 RuntimeService")
-}
-
 func (c *client) ListMetricDescriptors(ctx context.Context, in *criv1.ListMetricDescriptorsRequest, opts ...grpc.CallOption) (*criv1.ListMetricDescriptorsResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1alpha2 RuntimeService")
+	if err := c.checkRuntimeService(); err != nil {
+		return nil, err
+	}
+
+	return c.rsc.ListMetricDescriptors(ctx, in)
 }
 
 func (c *client) ListPodSandboxMetrics(ctx context.Context, in *criv1.ListPodSandboxMetricsRequest, opts ...grpc.CallOption) (*criv1.ListPodSandboxMetricsResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI v1alpha2 RuntimeService")
+	if err := c.checkRuntimeService(); err != nil {
+		return nil, err
+	}
+
+	return c.rsc.ListPodSandboxMetrics(ctx, in)
 }
 */
 

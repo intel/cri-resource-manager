@@ -19,6 +19,8 @@ import (
 
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
+	grpccodes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -58,6 +60,7 @@ const (
 	listPodSandboxStats      = "ListPodSandboxStats"
 	updateRuntimeConfig      = "UpdateRuntimeConfig"
 	status                   = "Status"
+	checkpointContainer      = "CheckpointContainer"
 )
 
 func fqmn(service, method string) string {
@@ -480,4 +483,21 @@ func (s *server) Status(ctx context.Context,
 	}
 
 	return rsp.(*criv1.StatusResponse), err
+}
+
+func (s *server) CheckpointContainer(ctx context.Context, req *criv1.CheckpointContainerRequest) (*criv1.CheckpointContainerResponse, error) {
+	rsp, err := s.interceptRequest(ctx, runtimeService, checkpointContainer, req,
+		func(ctx context.Context, req interface{}) (interface{}, error) {
+			return (*s.runtime).CheckpointContainer(ctx, req.(*criv1.CheckpointContainerRequest))
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.(*criv1.CheckpointContainerResponse), err
+}
+
+func (s *server) GetContainerEvents(req *criv1.GetEventsRequest, src criv1.RuntimeService_GetContainerEventsServer) error {
+	return grpcstatus.Errorf(grpccodes.Unimplemented, "GetContainerEvents not implemented")
 }
