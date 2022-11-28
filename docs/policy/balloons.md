@@ -66,8 +66,11 @@ Balloons policy parameters:
 - `PinCPU` controls pinning a container to CPUs of its balloon. The
   default is `true`: the container cannot use other CPUs.
 - `PinMemory` controls pinning a container to the memories that are
-  closest to the CPUs of its balloon. Pinning memory disallows using
-  memory from other NUMA nodes.
+  closest to the CPUs of its balloon. The default is `true`: allow
+  using memory only from the closest NUMA nodes. Warning: this may
+  cause kernel to kill workloads due to out-of-memory error when
+  closest NUMA nodes do not have enough memory. In this situation
+  consider switching this option `false`.
 - `IdleCPUClass` specifies the CPU class of those CPUs that do not
   belong to any balloon.
 - `ReservedPoolNamespaces` is a list of namespaces (wildcards allowed)
