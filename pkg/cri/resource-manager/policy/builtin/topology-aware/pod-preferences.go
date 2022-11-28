@@ -343,20 +343,20 @@ func checkReservedPoolNamespaces(namespace string) bool {
 	return false
 }
 
-func checkReservedCPUsAnnotations(c cache.Container) bool {
+func checkReservedCPUsAnnotations(c cache.Container) (bool, bool) {
 	hintSetting, ok := c.GetEffectiveAnnotation(preferReservedCPUsKey)
 	if !ok {
-		return false
+		return false, false
 	}
 
 	preference, err := strconv.ParseBool(hintSetting)
 	if err != nil {
 		log.Error("failed to parse reserved CPU preference %s = '%s': %v",
 			keyReservedCPUsPreference, hintSetting, err)
-		return false
+		return false, false
 	}
 
-	return preference
+	return preference, true
 }
 
 // cpuAllocationPreferences figures out the amount and kind of CPU to allocate.
@@ -431,10 +431,11 @@ func cpuAllocationPreferences(pod cache.Pod, container cache.Container) (int, in
 	fraction := int(request.MilliValue())
 
 	// easy cases: kube-system namespace, Burstable or BestEffort QoS class containers
+	preferReserved, explicitReservation := checkReservedCPUsAnnotations(container)
 	switch {
-	case checkReservedPoolNamespaces(namespace):
+	case preferReserved == true:
 		return 0, fraction, false, cpuReserved
-	case checkReservedCPUsAnnotations(container):
+	case checkReservedPoolNamespaces(namespace) && !explicitReservation:
 		return 0, fraction, false, cpuReserved
 	case qosClass == corev1.PodQOSBurstable:
 		return 0, fraction, false, cpuNormal
