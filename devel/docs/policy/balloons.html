@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-111-g1fe7ae0a documentation</title>
+  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-113-g609e575e documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -175,8 +175,11 @@ on managing the configuration.</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">PinCPU</span></code> controls pinning a container to CPUs of its balloon. The
 default is <code class="docutils literal notranslate"><span class="pre">true</span></code>: the container cannot use other CPUs.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">PinMemory</span></code> controls pinning a container to the memories that are
-closest to the CPUs of its balloon. Pinning memory disallows using
-memory from other NUMA nodes.</p></li>
+closest to the CPUs of its balloon. The default is <code class="docutils literal notranslate"><span class="pre">true</span></code>: allow
+using memory only from the closest NUMA nodes. Warning: this may
+cause kernel to kill workloads due to out-of-memory error when
+closest NUMA nodes do not have enough memory. In this situation
+consider switching this option <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">IdleCPUClass</span></code> specifies the CPU class of those CPUs that do not
 belong to any balloon.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">ReservedPoolNamespaces</span></code> is a list of namespaces (wildcards allowed)
