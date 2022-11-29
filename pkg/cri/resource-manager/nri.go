@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/yaml"
@@ -223,7 +224,9 @@ func (p *nriPlugin) CreateContainer(pod *api.PodSandbox, container *api.Containe
 }
 
 func (p *nriPlugin) StartContainer(pod *api.PodSandbox, container *api.Container) error {
-	p.dump("NRI-StartContainer", "pod", pod, "container", container)
+	method := "NRI-StartContainer"
+
+	p.dump(method, "pod", pod, "container", container)
 
 	m := p.resmgr
 
@@ -233,6 +236,16 @@ func (p *nriPlugin) StartContainer(pod *api.PodSandbox, container *api.Container
 	c, ok := m.cache.LookupContainer(container.Id)
 	if ok {
 		c.UpdateState(cache.ContainerStateRunning)
+
+		e := &events.Policy{
+			Type:   events.ContainerStarted,
+			Source: "resource-manager",
+			Data:   c,
+		}
+
+		if _, err := m.policy.HandleEvent(e); err != nil {
+			m.Error("%s: policy failed to handle event %s: %v", method, e.Type, err)
+		}
 	}
 
 	// test timeouts
