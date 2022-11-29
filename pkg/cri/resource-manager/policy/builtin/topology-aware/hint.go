@@ -15,12 +15,13 @@
 package topologyaware
 
 import (
+	"strconv"
+	"strings"
+
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
 	idset "github.com/intel/goresctrl/pkg/utils"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-	"strconv"
-	"strings"
 )
 
 // Calculate the hint score of the given hint and CPUSet.
@@ -116,32 +117,4 @@ func (cs *supply) hintCpus(h topology.Hint) cpuset.CPUSet {
 	}
 
 	return cpus
-}
-
-// a fake hint is of the format: target=[cpus:cpus[/nodes:nodes[/sockets:sockets]]];...
-func (fh fakehints) String() string {
-	str := ""
-	sep := ""
-
-	for target, hints := range fh {
-		hstr := ""
-		hsep := ""
-		for _, h := range hints {
-			if h.CPUs != "" {
-				hstr = "cpus:" + h.CPUs
-				hsep = "/"
-			}
-			if h.NUMAs != "" {
-				hstr += hsep + "nodes:" + h.NUMAs
-				hsep = "/"
-			}
-			if h.Sockets != "" {
-				hstr += hsep + "sockets:" + h.Sockets
-			}
-		}
-		str += sep + target + "=" + hstr
-		sep = ";"
-	}
-
-	return str
 }

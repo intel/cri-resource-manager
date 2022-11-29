@@ -25,6 +25,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
+	"github.com/intel/cri-resource-manager/pkg/topology"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
@@ -1119,24 +1120,12 @@ func (cs *supply) GetScore(req Request) Score {
 	score.hints = make(map[string]float64, len(hints))
 
 	for provider, hint := range cr.container.GetTopologyHints() {
+		if provider == topology.ProviderKubelet {
+			log.Warn(" - ignoring topology pseudo-hint from kubelet allocation %s", hint)
+			continue
+		}
 		log.Debug(" - evaluating topology hint %s", hint)
 		score.hints[provider] = cs.node.HintScore(hint)
-	}
-
-	// calculate any fake hint scores
-	pod, _ := cr.container.GetPod()
-	key := pod.GetName() + ":" + cr.container.GetName()
-	if fakeHints, ok := opt.FakeHints[key]; ok {
-		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint)
-			score.hints[provider] = cs.node.HintScore(hint)
-		}
-	}
-	if fakeHints, ok := opt.FakeHints[cr.container.GetName()]; ok {
-		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint)
-			score.hints[provider] = cs.node.HintScore(hint)
-		}
 	}
 
 	return score
