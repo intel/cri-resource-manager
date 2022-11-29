@@ -16,7 +16,6 @@ package topologyaware
 
 import (
 	config "github.com/intel/cri-resource-manager/pkg/config"
-	"github.com/intel/cri-resource-manager/pkg/topology"
 )
 
 // Options captures our configurable policy parameters.
@@ -29,8 +28,6 @@ type options struct {
 	PreferIsolated bool `json:"PreferIsolatedCPUs"`
 	// PreferShared controls whether shared CPU allocation is always preferred by default.
 	PreferShared bool `json:"PreferSharedCPUs"`
-	// FakeHints are the set of fake TopologyHints to use for testing purposes.
-	FakeHints fakehints `json:",omitempty"`
 	// ReservedPoolNamespaces is a list of namespace globs that will be allocated to reserved CPUs
 	ReservedPoolNamespaces []string `json:"ReservedPoolNamespaces,omitempty"`
 	// ColocatePods causes all containers in a pod to have affinity for each other.
@@ -43,21 +40,6 @@ type options struct {
 var opt = defaultOptions().(*options)
 var aliasOpt = defaultOptions().(*options)
 
-// fakeHints is our flag.Value for per-pod or per-container faked topology.Hints.
-type fakehints map[string]topology.Hints
-
-// newFakeHints creates a new set of fake hints.
-func newFakeHints() fakehints {
-	return make(fakehints)
-}
-
-// merge merges the given hints to the existing set.
-func (fh *fakehints) merge(hints fakehints) {
-	if fh == nil {
-		*fh = newFakeHints()
-	}
-}
-
 // defaultOptions returns a new options instance, all initialized to defaults.
 func defaultOptions() interface{} {
 	return &options{
@@ -65,7 +47,6 @@ func defaultOptions() interface{} {
 		PinMemory:              true,
 		PreferIsolated:         true,
 		PreferShared:           false,
-		FakeHints:              make(fakehints),
 		ReservedPoolNamespaces: []string{"kube-system"},
 	}
 }

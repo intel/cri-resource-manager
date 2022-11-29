@@ -1123,22 +1123,6 @@ func (cs *supply) GetScore(req Request) Score {
 		score.hints[provider] = cs.node.HintScore(hint)
 	}
 
-	// calculate any fake hint scores
-	pod, _ := cr.container.GetPod()
-	key := pod.GetName() + ":" + cr.container.GetName()
-	if fakeHints, ok := opt.FakeHints[key]; ok {
-		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint)
-			score.hints[provider] = cs.node.HintScore(hint)
-		}
-	}
-	if fakeHints, ok := opt.FakeHints[cr.container.GetName()]; ok {
-		for provider, hint := range fakeHints {
-			log.Debug(" - evaluating fake hint %s", hint)
-			score.hints[provider] = cs.node.HintScore(hint)
-		}
-	}
-
 	return score
 }
 
