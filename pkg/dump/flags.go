@@ -38,7 +38,7 @@ import (
 
 const (
 	// DefaultConfig is the default dump configuration.
-	DefaultConfig = "off:.*,full:((Create)|(Start)|(Run)|(Update)|(Stop)|(Remove)).*,off:.*Image.*"
+	DefaultConfig = "off:.*,short:((Create)|(Start)|(Run)|(Update)|(Stop)|(Remove)).*,off:.*Image.*"
 )
 
 // Dumping options configurable via the command line or pkg/config.
