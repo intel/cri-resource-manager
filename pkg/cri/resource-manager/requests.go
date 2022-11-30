@@ -58,8 +58,6 @@ func (m *resmgr) setupRequestProcessing() error {
 		return resmgrError("failed to register resource-manager CRI interceptors: %v", err)
 	}
 
-	m.relay.Server().SetBypassCheckFn(m.policy.Bypassed)
-
 	return nil
 }
 
@@ -168,7 +166,7 @@ func (m *resmgr) startRequestProcessing() error {
 
 // syncWithCRI synchronizes cache pods and containers with the CRI runtime.
 func (m *resmgr) syncWithCRI(ctx context.Context) ([]cache.Container, []cache.Container, error) {
-	if m.policy.Bypassed() || !m.relay.Client().HasRuntimeService() {
+	if !m.relay.Client().HasRuntimeService() {
 		return nil, nil, nil
 	}
 
@@ -703,7 +701,7 @@ func (m *resmgr) RebalanceContainers() error {
 
 // rebalance triggers a policy-specific rebalancing cycle of containers.
 func (m *resmgr) rebalance(method string) error {
-	if m.policy == nil || m.policy.Bypassed() {
+	if m.policy == nil {
 		return nil
 	}
 
@@ -728,7 +726,7 @@ func (m *resmgr) DeliverPolicyEvent(e *events.Policy) error {
 	m.Lock()
 	defer m.Unlock()
 
-	if m.policy == nil || m.policy.Bypassed() {
+	if m.policy == nil {
 		return nil
 	}
 
@@ -777,7 +775,7 @@ func (m *resmgr) setConfig(v interface{}) error {
 		return resmgrError("configuration rejected: %v", err)
 	}
 
-	if !(m.policy == nil || m.policy.Bypassed()) {
+	if m.policy != nil {
 		// synchronize state of controllers with new configuration
 		if err = m.control.StartStopControllers(m.cache, m.relay.Client()); err != nil {
 			m.Error("failed to synchronize controllers with new configuration: %v", err)
