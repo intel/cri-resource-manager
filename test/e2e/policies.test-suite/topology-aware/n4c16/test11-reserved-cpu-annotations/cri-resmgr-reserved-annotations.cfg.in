@@ -6,3 +6,7 @@ policy:
     cpu: ${AVAILABLE_CPU}
 logger:
   Debug: cri-resmgr,resource-manager,cache,policy
+  Klog:
+    skip_headers: true
+dump:
+  Config: off:.*,full:((Create)|(Start)|(Run)|(Update)|(Stop)|(Remove)).*,off:.*Image.*

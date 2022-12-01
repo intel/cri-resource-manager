@@ -302,4 +302,4 @@ data:
     Config: full:.*,short:.*Stop.*,off:.*List.*
     File: /tmp/cri-selective-debug.dump
   logger: |+
-    Debug: resource-manager,cache,policy,message
+    Debug: resource-manager,cache
