@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cri-rm-reset-config-policy
+  labels:
+    app: cri-rm-reset-config-policy
+  namespace: kube-system
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: cri-rm-reset-config
+          image: CRIRM_IMAGE_PLACEHOLDER
+          imagePullPolicy: Never
+          command:
+            - cri-resmgr
+            - --reset-config
+          volumeMounts:
+            - name: resmgrnrisock
+              mountPath: /var/run/nri.sock
+            - name: resmgrdata
+              mountPath: /var/lib/cri-resmgr
+            - name: resmgrsockets
+              mountPath: /var/run/cri-resmgr
+            - name: resmgrconfig
+              mountPath: /etc/cri-resmgr
+      containers:
+        - name: cri-rm-reset-policy
+          image: CRIRM_IMAGE_PLACEHOLDER
+          imagePullPolicy: Never
+          command:
+            - cri-resmgr
+            - --reset-policy
+          volumeMounts:
+            - name: resmgrnrisock
+              mountPath: /var/run/nri.sock
+            - name: resmgrdata
+              mountPath: /var/lib/cri-resmgr
+            - name: resmgrsockets
+              mountPath: /var/run/cri-resmgr
+            - name: resmgrconfig
+              mountPath: /etc/cri-resmgr
+      volumes:
+        - name: resmgrnrisock
+          hostPath:
+            path: /var/run/nri.sock
+        - name: resmgrdata
+          hostPath:
+            path: /var/lib/cri-resmgr
+            type: DirectoryOrCreate
+          hostPath:
+            path: /var/lib/cri-resmgr
+        - name: resmgrsockets
+          hostPath:
+            path: /var/run/cri-resmgr
+        - name: resmgrconfig
+          hostPath:
+            path: /etc/cri-resmgr

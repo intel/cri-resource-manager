@@ -742,6 +742,10 @@ vm-install-cri-resmgr() {
 	    -e "s|CRI_RM_CONFIG_OPTION|fallback|" \
             < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e.yaml" \
             | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment-fallback.yaml
+	sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
+            -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
+            < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e-reset-config-policy.yaml" \
+            | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment-e2e-reset-config-policy.yaml
     elif [ "$binsrc" == "github" ]; then
         vm-install-golang
         vm-install-pkg make
@@ -1239,6 +1243,31 @@ vm-pod-ip() {
 
 vm-cri-resmgr-pod-name() {
     echo "$(namespace=kube-system wait_t=5 vm-wait-pod-regexp cri-resmgr-)"
+}
+
+# This should only be run if cri-rm is not running
+vm-cri-resmgr-reset-config-policy() {
+    if [ "$VM_CRI_DS" == "1" ]; then
+	local POD=$(vm-cri-resmgr-pod-name)
+	if [ ! -z "$POD" ]; then
+	    POD=$(vm-cri-resmgr-pod-name)
+	    if [ ! -z "$POD" ]; then
+		echo "cri-rm ($POD) already running, cannot reset policy"
+		return 1
+	    fi
+	fi
+
+	local reset_config_policy_yaml="/etc/cri-resmgr/cri-resmgr-deployment-e2e-reset-config-policy.yaml"
+
+	# We can immediately remove the pod as it is only run once and can be discarded after that
+	vm-command "kubectl delete --ignore-not-found=true -f $reset_config_policy_yaml"
+	vm-command "kubectl apply -f $reset_config_policy_yaml"
+#	vm-command "kubectl delete -f $reset_config_policy_yaml"
+    else
+	vm-command "cri-resmgr -reset-policy; cri-resmgr -reset-config"
+    fi
+
+    return 0
 }
 
 vm-check-env || exit 1
