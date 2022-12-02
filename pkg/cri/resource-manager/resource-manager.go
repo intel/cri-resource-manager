@@ -259,6 +259,11 @@ func (m *resmgr) Stop() {
 
 // SetConfig pushes new configuration to the resource manager.
 func (m *resmgr) SetConfig(conf *config.RawConfig) error {
+	if conf.Data == nil {
+		m.Info("config from agent is empty, ignoring...")
+		return resmgrError("config from agent is empty, ignoring...")
+	}
+
 	m.Info("applying new configuration from agent...")
 	return m.setConfig(conf)
 }
@@ -402,7 +407,7 @@ func (m *resmgr) loadConfig() error {
 
 	m.Info("trying configuration from agent...")
 	if conf, err := m.agent.GetConfig(1 * time.Second); err == nil {
-		if err = pkgcfg.SetConfig(conf.Data); err == nil {
+		if err = pkgcfg.SetConfig(conf.Data); err == nil && conf.Data != nil {
 			m.conf = conf // schedule storing in cache if we ever manage to start up
 			return nil
 		}
@@ -410,7 +415,7 @@ func (m *resmgr) loadConfig() error {
 	}
 
 	m.Info("trying last cached configuration...")
-	if conf := m.cache.GetConfig(); conf != nil {
+	if conf := m.cache.GetConfig(); conf != nil && conf.Data != nil {
 		err := pkgcfg.SetConfig(conf.Data)
 		if err == nil {
 			return nil
