@@ -1,14 +1,24 @@
 # Relaunch cri-resmgr so that it will listen to cri-resmgr-agent
 cleanup() {
     vm-command "kubectl delete pod -n kube-system pod0 --now; kubectl delete pods --all --now; kubectl delete cm -n kube-system cri-resmgr-config.default"
+
     terminate cri-resmgr
-    terminate cri-resmgr-agent
-    vm-command "cri-resmgr -reset-policy; cri-resmgr -reset-config"
+
+    if [ "$VM_CRI_DS" == "0" ]; then
+	terminate cri-resmgr-agent
+    fi
+
+    vm-cri-resmgr-reset-config-policy
 }
 
 cleanup
+
 cri_resmgr_config=fallback launch cri-resmgr
-launch cri-resmgr-agent
+
+# The agent is started by cri-resmgr daemonset so no need for a separate startup.
+if [ "$VM_CRI_DS" == "0" ]; then
+    launch cri-resmgr-agent
+fi
 
 # Create a pod to every pod pool in the default config:
 # reserved, shared, singlecpu, dualcpu
@@ -17,9 +27,9 @@ CPUREQ="" namespace=kube-system create podpools-busybox
 # pod1: default
 CPUREQ="" create podpools-busybox
 # pod2: singlecpu
-CPUREQ="1" POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: singlecpu" create podpools-busybox
+CPUREQ="250m" POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: singlecpu" create podpools-busybox
 # pod3, pod4, pod5, pod6: dualcpu (dualcpu 3 pods/pool, packed)
-n=4 CPUREQ="1" POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" create podpools-busybox
+n=4 CPUREQ="250m" POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" create podpools-busybox
 report allowed
 verify "cpus['pod0c0'] == expected.cpus.reserved[0]" \
        "cpus['pod1c0'] == expected.cpus.default[0]" \
@@ -30,7 +40,7 @@ verify "cpus['pod0c0'] == expected.cpus.reserved[0]" \
        "cpus['pod6c0'] == expected.cpus.dualcpu[1]"
 
 echo "Switch to new configuration without singlecpu pools"
-vm-put-file $(NAME=dualcpu CPU=2 MAXPODS=2 INSTANCES="100 %" instantiate podpools-configmap.yaml) podpools-dualcpu-configmap.yaml
+vm-put-file $(NAME=dualcpu CPU=1 MAXPODS=2 INSTANCES="100 %" instantiate podpools-configmap.yaml) podpools-dualcpu-configmap.yaml
 kubectl apply -f podpools-dualcpu-configmap.yaml
 sleep 5
 report allowed
@@ -86,4 +96,7 @@ verify "cpus['pod0c0'] == expected.cpus.reserved[0]" `# reserved remains the sam
 # that by default rely on forced configurations.
 cleanup
 launch cri-resmgr
-launch cri-resmgr-agent
+
+if [ "$VM_CRI_DS" == "0" ]; then
+    launch cri-resmgr-agent
+fi

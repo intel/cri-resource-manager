@@ -7,7 +7,7 @@ data:
   policy: |+
     Active: podpools
     ReservedResources:
-      CPU: 1
+      CPU: 250m
     podpools:
       Pools:
         - Name: $NAME

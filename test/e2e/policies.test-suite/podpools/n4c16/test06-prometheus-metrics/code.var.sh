@@ -51,6 +51,12 @@ metrics_url="http://localhost:8891/metrics"
 terminate cri-resmgr
 cri_resmgr_cfg=${TEST_DIR}/podpools-metrics.cfg  cri_resmgr_extra_args="-metrics-interval 4s" launch cri-resmgr
 
+if [ "$VM_CRI_DS" == "1" ]; then
+    pod_name=$(vm-cri-resmgr-pod-name)
+    vm-command "fuser --kill /tmp/cri-resmgr-port-forward 2>/dev/null"
+    vm-command "kubectl port-forward $pod_name 8891:8891 -n kube-system > /tmp/cri-resmgr-port-forward 2>&1 &"
+fi
+
 # pod0: single container, reserve 400m CPU, but do not use it.
 out ""
 out "### Idle single-container pod"
