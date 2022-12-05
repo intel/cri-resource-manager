@@ -77,7 +77,7 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		"q":        Cmd{"quit interactive prompt.", p.cmdQuit},
 		"tracker":  Cmd{"manage tracker, track memory accesses.", p.cmdTracker},
 		"stats":    Cmd{"print statistics.", p.cmdStats},
-		"swap":     Cmd{"print swapped pages.", p.cmdSwap},
+		"swap":     Cmd{"swap in/out, print swapped pages.", p.cmdSwap},
 		"pages":    Cmd{"select pages, print selected page nodes and flags.", p.cmdPages},
 		"arange":   Cmd{"select/split/filter address ranges.", p.cmdArange},
 		"mover":    Cmd{"manage mover, move selected pages.", p.cmdMover},
@@ -265,7 +265,7 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	swapIn := p.f.Bool("in", false, "swap in selected ranges")
 	swapOut := p.f.Bool("out", false, "swap out selected ranges")
-	ranges := p.f.String("ranges", "", "-ranges=START[-STOP][,START[-STOP]...] include only given virtual address ranges")
+	ranges := p.f.String("ranges", "", "-ranges=RANGE[,RANGE...] select ranges. RANGE syntax: STARTADDR (single page at STARTADDR), STARTADDR-ENDADDR, STARTADDR+SIZE[kMG].")
 	status := p.f.Bool("status", false, "print number of swapped out pages")
 	vaddrs := p.f.Bool("vaddrs", false, "print vaddrs of swapped out pages")
 
@@ -359,7 +359,7 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 func (p *Prompt) cmdPages(args []string) commandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	attrs := p.f.String("attrs", "", "include only <Exclusive,Dirty,NotDirty,InHeap,InAnonymous> pages")
-	ranges := p.f.String("ranges", "", "-ranges=START[-STOP][,START[-STOP]...] include only given ranges")
+	ranges := p.f.String("ranges", "", "-ranges=RANGE[,RANGE...]. RANGE syntax: STARTADDR (single page at STARTADDR), STARTADDR-ENDADDR, STARTADDR+SIZE[kMG].")
 	fromNode := p.f.Int("node", -1, "include only pages currently on NODE")
 	pr := p.f.Int("pr", -1, "-pr=NUM: print first NUM address ranges")
 	pm := p.f.Int("pm", -1, "-pm=NUM: print pagemap bits and PFNs of first NUM pages in selected ranges")
@@ -928,25 +928,12 @@ func parseOptPages(pagesStr string) (uint64, error) {
 
 func parseOptRanges(rangeStr string) []memtier.AddrRange {
 	addrRanges := []memtier.AddrRange{}
-	for _, startStopStr := range strings.Split(rangeStr, ",") {
-		startStopSlice := strings.Split(startStopStr, "-")
-		if len(startStopSlice) != 1 && len(startStopSlice) != 2 {
-			exit("invalid addresss range %q, expected STARTADDR-STOPADDR", startStopStr)
-		}
-		startAddr, err := strconv.ParseUint(startStopSlice[0], 16, 64)
+	for _, addrRangeStr := range strings.Split(rangeStr, ",") {
+		ar, err := memtier.NewAddrRangeFromString(addrRangeStr)
 		if err != nil {
-			exit("invalid start address %q", startStopSlice[0])
+			exit("invalid addresss range %q, expected STARTADDR, STARTADDR-STOPADDR or STARTADDR+SIZE[UNIT]", addrRangeStr)
 		}
-		if len(startStopSlice) == 1 {
-			addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, startAddr+constUPagesize))
-			continue
-		}
-
-		stopAddr, err := strconv.ParseUint(startStopSlice[1], 16, 64)
-		if err != nil {
-			exit("invalid stop address %q", startStopSlice[1])
-		}
-		addrRanges = append(addrRanges, *memtier.NewAddrRange(startAddr, stopAddr))
+		addrRanges = append(addrRanges, *ar)
 	}
 	return addrRanges
 }

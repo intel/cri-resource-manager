@@ -16,6 +16,7 @@ package memtier
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -29,6 +30,50 @@ type AddrRanges struct {
 type AddrRange struct {
 	addr   uint64
 	length uint64
+}
+
+func NewAddrRangeFromString(s string) (*AddrRange, error) {
+	// Syntax:
+	// STARTADDR[-ENDADDR]
+	// STARTADDR[+SIZE[FACTOR]]
+	var startAddr, endAddr uint64
+	var err error
+	switch {
+	case strings.Contains(s, "-"):
+		startEndSlice := strings.Split(s, "-")
+		if len(startEndSlice) != 2 {
+			return nil, fmt.Errorf("invalid START-END address range %q", s)
+		}
+		startAddr, err = strconv.ParseUint(startEndSlice[0], 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid start address %q", startEndSlice[0])
+		}
+		endAddr, err = strconv.ParseUint(startEndSlice[1], 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid end address %q", startEndSlice[1])
+		}
+	case strings.Contains(s, "+"):
+		startSizeSlice := strings.Split(s, "+")
+		if len(startSizeSlice) != 2 {
+			return nil, fmt.Errorf("invalid START+SIZE address range %q", s)
+		}
+		startAddr, err = strconv.ParseUint(startSizeSlice[0], 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid start address %q", startSizeSlice[0])
+		}
+		size, err := parseMemBytes(startSizeSlice[1])
+		if err != nil || size < 0 {
+			return nil, fmt.Errorf("invalid size %q after address %q", startSizeSlice[1], startSizeSlice[0])
+		}
+		endAddr = startAddr + uint64(size)
+	default:
+		startAddr, err = strconv.ParseUint(s, 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid address %q", s)
+		}
+		endAddr = startAddr + constUPagesize
+	}
+	return NewAddrRange(startAddr, endAddr), nil
 }
 
 func NewAddrRange(startAddr, stopAddr uint64) *AddrRange {
@@ -52,6 +97,10 @@ func (r *AddrRange) EndAddr() uint64 {
 
 func (r *AddrRange) Length() uint64 {
 	return r.length
+}
+
+func (r *AddrRange) Equals(other *AddrRange) bool {
+	return r.addr == other.addr && r.length == other.length
 }
 
 func NewAddrRanges(pid int, arParams ...AddrRange) *AddrRanges {
@@ -209,4 +258,36 @@ func (ar *AddrRanges) Intersection(intRanges []AddrRange) {
 		}
 	}
 	ar.addrs = newAddrs
+}
+
+func parseMemBytes(s string) (int64, error) {
+	factor := int64(1)
+	// Syntax: INT[PREFIX[i][B]]
+	if len(s) > 0 && s[len(s)-1] == 'B' {
+		s = s[:len(s)-1]
+	}
+	if len(s) > 0 && s[len(s)-1] == 'i' {
+		s = s[:len(s)-1]
+	}
+	if len(s) == 0 {
+		return 0, fmt.Errorf("syntax error parsing bytes")
+	}
+	numpart := s[:len(s)-1]
+	switch s[len(s)-1] {
+	case 'k':
+		factor = 1 << 10
+	case 'M':
+		factor = 1 << 20
+	case 'G':
+		factor = 1 << 30
+	case 'T':
+		factor = 1 << 40
+	default:
+		numpart = s
+	}
+	n, err := strconv.ParseInt(numpart, 10, 0)
+	if err != nil {
+		return n, err
+	}
+	return n * factor, nil
 }
