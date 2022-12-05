@@ -107,7 +107,7 @@ func (hf *HeatForecasterStdio) startProcess(config *HeatForecasterStdioConfig) e
 			return fmt.Errorf("forecaster stdio: cannot open config.stderr file %q for writing: %w", config.Stderr[5:], err)
 		}
 	} else if config.Stderr != "" {
-		return fmt.Errorf("forecaster stdio: unknown config.stderr directive %w, expecting empty or \"file:/path/to/stderr.log\"")
+		return fmt.Errorf("forecaster stdio: unknown config.stderr directive %s, expecting empty or \"file:/path/to/stderr.log\"", config.Stderr)
 	} else {
 		// config.Stderr is undefined, copy it to stderr of memtierd.
 		hf.process.Stderr = os.Stderr
