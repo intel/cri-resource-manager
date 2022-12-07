@@ -1193,6 +1193,26 @@ EOF
     vm-pipe-to-file /etc/containers/registries.conf
 }
 
+default-reconfig-crio() {
+    if [ "$VM_NRI" == "1" ]; then
+	vm-command "[ -f /etc/crio/crio.conf ] || { mkdir -p /etc/crio > /dev/null 2>&1 ; cat > /etc/crio/crio.conf <<EOF
+# CRI-O NRI configuration.
+[crio.nri]
+# Globally enable or disable NRI.
+enable_nri = true
+# NRI configuration file to use.
+# nri_config_file = "/etc/nri/nri.conf"
+# NRI socket path to create.
+# nri_socket_path = "/var/run/nri.sock"
+# NRI plugin directory to use.
+# nri_plugin_dir = "/opt/nri/plugins"
+EOF
+}"
+	vm-command "[ -f /etc/nri/nri.conf ] || { mkdir -p /etc/nri > /dev/null 2>&1 ; touch /etc/nri/nri.conf
+}"
+    fi
+}
+
 default-restart-crio() {
     vm-command "systemctl daemon-reload && systemctl restart crio" ||
         command-error "failed to restart crio systemd service"
