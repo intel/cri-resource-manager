@@ -78,6 +78,8 @@ type resmgr struct {
 	stop         chan interface{}   // channel for signalling shutdown to goroutines
 	signals      chan os.Signal     // signal channel
 	introspect   *introspect.Server // server for external introspection
+
+	warnedCRIUpdate bool // warned about CRI UpdateContainer calls
 }
 
 // NewResourceManager creates a new ResourceManager instance.
