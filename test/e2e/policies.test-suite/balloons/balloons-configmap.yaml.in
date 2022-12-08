@@ -35,6 +35,7 @@ data:
           Namespaces:
             - ${BTYPE1_NAMESPACE0:-btype1ns0}
           MinCPUs: ${BTYPE1_MINCPUS:-1}
+          MaxCPUs: ${BTYPE1_MAXCPUS:-1}
           AllocatorPriority: ${BTYPE1_ALLOCATIONPRIORITY:-1}
           CPUClass: ${BTYPE1_CPUCLASS:-classB}
           PreferNewBalloons: ${BTYPE1_PREFERNEWBALLOONS:-false}

@@ -50,6 +50,8 @@ const (
 	reservedBalloonDefName = "reserved"
 	// defaultBalloonDefName is the name in the default balloon definition.
 	defaultBalloonDefName = "default"
+	// NoLimit value denotes no limit being set.
+	NoLimit = 0
 )
 
 // balloons contains configuration and runtime attributes of the balloons policy
@@ -122,7 +124,10 @@ func (bln Balloon) AvailMilliCpus() int {
 	return bln.Cpus.Size() * 1000
 }
 
-func (bln Balloon) MaxAvailMilliCpus() int {
+func (bln Balloon) MaxAvailMilliCpus(freeCpus cpuset.CPUSet) int {
+	if bln.Def.MaxCpus == NoLimit {
+		return (bln.Cpus.Size() + freeCpus.Size()) * 1000
+	}
 	return bln.Def.MaxCpus * 1000
 }
 
@@ -433,7 +438,7 @@ func (p *balloons) freeMilliCpus(bln *Balloon) int {
 // maxFreeMilliCpus returns free CPU resources in a balloon when it is
 // inflated as large as possible.
 func (p *balloons) maxFreeMilliCpus(bln *Balloon) int {
-	return bln.MaxAvailMilliCpus() - p.requestedMilliCpus(bln)
+	return bln.MaxAvailMilliCpus(p.freeCpus) - p.requestedMilliCpus(bln)
 }
 
 // largest helps finding the largest element and value in a slice.
@@ -511,7 +516,7 @@ func (p *balloons) newBalloon(blnDef *BalloonDef, confCpus bool) (*Balloon, erro
 	var err error
 	blnsOfDef := p.balloonsByDef(blnDef)
 	// Allowed to create new balloon instance from blnDef?
-	if blnDef.MaxBalloons > 0 && blnDef.MaxBalloons <= len(blnsOfDef) {
+	if blnDef.MaxBalloons > NoLimit && blnDef.MaxBalloons <= len(blnsOfDef) {
 		return nil, balloonsError("cannot create new %q balloon, MaxBalloons limit (%d) reached", blnDef.Name, blnDef.MaxBalloons)
 	}
 	// Find the first unused balloon instance index.
@@ -757,7 +762,7 @@ func (p *balloons) dumpBalloon(bln *Balloon) string {
 		bln.Mems,
 		p.requestedMilliCpus(bln),
 		bln.AvailMilliCpus(),
-		bln.MaxAvailMilliCpus(),
+		bln.MaxAvailMilliCpus(p.freeCpus),
 		pods,
 		conts)
 	return s
@@ -937,11 +942,28 @@ func (p *balloons) applyBalloonDef(balloons *[]*Balloon, blnDef *BalloonDef, fre
 	return nil
 }
 
+func (p *balloons) validateConfig(bpoptions *BalloonsOptions) error {
+	for _, blnDef := range bpoptions.BalloonDefs {
+		if blnDef.MaxCpus != NoLimit && blnDef.MinCpus > blnDef.MaxCpus {
+			return balloonsError("MinCpus (%d) > MaxCpus (%d) in balloon type %q",
+				blnDef.MinCpus, blnDef.MaxCpus, blnDef.Name)
+		}
+		if blnDef.MaxBalloons != NoLimit && blnDef.MinBalloons > blnDef.MaxBalloons {
+			return balloonsError("MinBalloons (%d) > MaxBalloons (%d) in balloon type %q",
+				blnDef.MinCpus, blnDef.MaxCpus, blnDef.Name)
+		}
+	}
+	return nil
+}
+
 // setConfig takes new balloon configuration into use.
 func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
 	// TODO: revert allocations (p.freeCpus) to old ones if the
 	// configuration is invalid. Currently bad configuration
 	// leaves a mess in bookkeeping.
+	if err := p.validateConfig(bpoptions); err != nil {
+		return balloonsError("invalid configuration: %w", err)
+	}
 
 	// Create the default reserved and default balloon
 	// definitions. Some properties of these definitions may be
@@ -1046,7 +1068,7 @@ func (p *balloons) resizeBalloon(bln *Balloon, newMilliCpus int) error {
 	}
 	oldCpuCount := bln.Cpus.Size()
 	newCpuCount := (newMilliCpus + 999) / 1000
-	if bln.Def.MaxCpus > 0 && newCpuCount > bln.Def.MaxCpus {
+	if bln.Def.MaxCpus > NoLimit && newCpuCount > bln.Def.MaxCpus {
 		newCpuCount = bln.Def.MaxCpus
 	}
 	if bln.Def.MinCpus > 0 && newCpuCount < bln.Def.MinCpus {
