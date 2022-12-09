@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-141-gb8ae38be documentation</title>
+  <title>Balloons Policy &mdash; CRI Resource Manager 0.7.0-143-g6af78db2 documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -185,6 +185,15 @@ belong to any balloon.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">ReservedPoolNamespaces</span></code> is a list of namespaces (wildcards allowed)
 that are assigned to the special reserved balloon, that is, will run
 on reserved CPUs. This always includes the <code class="docutils literal notranslate"><span class="pre">kube-system</span></code> namespace.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">AllocatorTopologyBalancing</span></code> affects selecting CPUs for new
+balloons. If <code class="docutils literal notranslate"><span class="pre">true</span></code>, new balloons are created using CPUs on
+NUMA/die/package with most free CPUs, that is, balloons are spread
+across the hardware topology. This helps inflating balloons within
+the same NUMA/die/package and reduces interference between workloads
+in balloons when system is not fully loaded. The default is <code class="docutils literal notranslate"><span class="pre">false</span></code>:
+pack new balloons tightly into the same NUMAs/dies/packages. This
+helps keeping large portions of hardware idle and entering into deep
+power saving states.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">BalloonTypes</span></code> is a list of balloon type definitions. Each type can
 be configured with the following parameters:</p>
 <ul>
@@ -223,6 +232,22 @@ placing containers to existing balloons. This results in
 preferring exclusive CPUs, as long as there are enough free
 CPUs. The default is <code class="docutils literal notranslate"><span class="pre">false</span></code>: prefer filling and inflating
 existing balloons over creating new ones.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ShareIdleCPUsInSame</span></code>: Whenever the number of or sizes of balloons
+change, idle CPUs (that do not belong to any balloon) are reshared
+as extra CPUs to workloads in balloons with this option. The value
+sets locality of allowed extra CPUs that will be common to these
+workloads.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">system</span></code>: workloads are allowed to use idle CPUs available
+anywhere in the system.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">package</span></code>: …allowed to use idle CPUs in the same package(s)
+(sockets) as the balloon.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">die</span></code>: …in the same die(s) as the balloon.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">numa</span></code>: …in the same numa node(s) as the balloon.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">core</span></code>: …allowed to use idle CPU threads in the same cores with
+the balloon.</p></li>
+</ul>
+</li>
 <li><p><code class="docutils literal notranslate"><span class="pre">AllocatorPriority</span></code> (0: High, 1: Normal, 2: Low, 3: None). CPU
 allocator parameter, used when creating new or resizing existing
 balloons. If there are balloon types with pre-created balloons
