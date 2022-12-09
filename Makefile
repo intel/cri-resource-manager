@@ -638,7 +638,7 @@ cross-bin.%: docker/cross-build/% dist
 	    $$distro-build /bin/bash -c '$(DOCKER_BIN_BUILD)' && \
 	rm -fr $$builddir
 
-cross-tar cross-tarball: dist docker/cross-build/centos-7
+cross-tar cross-tarball: dist docker/cross-build/fedora
 	$(Q)distro=tarball; \
 	builddir=$(BUILD_DIR)/docker/$$distro; \
 	outdir=$(PACKAGES_DIR)/$$distro; \
@@ -650,7 +650,7 @@ cross-tar cross-tarball: dist docker/cross-build/centos-7
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
-	    centos-7-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
+	    fedora-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
 	rm -fr $$builddir
 
 # Build a docker image (for distro cross-building).
