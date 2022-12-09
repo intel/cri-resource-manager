@@ -10,6 +10,7 @@ GO_FMT      := gofmt
 GO_CYCLO    := gocyclo
 GO_LINT     := golint
 GO_CILINT   := golangci-lint
+GO_VERSION  ?= 1.18.9
 
 # TEST_TAGS is the set of extra build tags passed for tests.
 # We disable AVX collector for tests by default.
@@ -186,15 +187,15 @@ DOCKER_SITE_CMD := $(DOCKER) run --rm -v "`pwd`:/docs" --user=`id -u`:`id -g` \
 
 # Supported distros with debian native packaging format.
 SUPPORTED_DEB_DISTROS := $(shell \
-    grep -l 'apt-get ' dockerfiles/cross-build/Dockerfile.*.in | \
+    grep -l 'apt-get ' dockerfiles/cross-build/Dockerfile.* | \
     egrep -v '((~)|(swp))$$' | \
-    sed 's:^.*Dockerfile.::g;s:.in$$::g')
+    sed 's:^.*Dockerfile.::g')
 
 # Supported distros with rpm native packaging format.
 SUPPORTED_RPM_DISTROS := $(shell \
-    egrep -l '(dnf )|(yum )|(zypper )' dockerfiles/cross-build/Dockerfile.*.in | \
+    egrep -l '(dnf )|(yum )|(zypper )' dockerfiles/cross-build/Dockerfile.* | \
     egrep -v '((~)|(swp))$$' | \
-    sed 's:^.*Dockerfile.::g;s:.in$$::g')
+    sed 's:^.*Dockerfile.::g')
 
 # Directory to leave built distro packages and collateral in.
 PACKAGES_DIR := packages
@@ -358,9 +359,8 @@ clean-gen:
 
 image-%:
 	$(Q)bin=$(patsubst image-%,%,$@); \
-	    go_version=`$(GO_CMD) list -m -f '{{.GoVersion}}'`; \
 	    $(DOCKER) build . -f "cmd/$$bin/Dockerfile" \
-	    --build-arg GO_VERSION=$${go_version} \
+	    --build-arg GO_VERSION=$(GO_VERSION) \
 	    -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
 image-push-%: image-%
@@ -658,11 +658,7 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	$(Q)distro=$(patsubst docker/cross-build/%,%,$@) && \
 	echo "Building cross-build docker image for $$distro..." && \
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
-	scripts/build/docker-build-image $$distro-build --container $(DOCKER_PULL) $(DOCKER_OPTIONS)
-
-dockerfiles/cross-build/Dockerfile.%: dockerfiles/cross-build/Dockerfile.%.in go.mod
-	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
-        sed -E "s/^ARG GOLANG_VERSION=.*$$/ARG GOLANG_VERSION=$${golang}/g" $< > $@
+	scripts/build/docker-build-image $$distro-build $(GO_VERSION) --container $(DOCKER_PULL) $(DOCKER_OPTIONS)
 
 # Rule for recompiling a changed protobuf.
 %.pb.go: %.proto
@@ -687,8 +683,7 @@ install-git-hooks:
 update-workflows: .github/workflows/verify.yml
 
 .github/workflows/verify.yml: go.mod
-	$(Q)golang=$$(go list -m -f '{{.GoVersion}}'); \
-        sed -E -i "s/go-version:.*$$/go-version: $${golang}/g" $@
+	$(Q)sed -E -i "s/go-version:.*$$/go-version: $(GO_VERSION)/g" $@
 
 #
 # go dependencies for our binaries (careful with that axe, Eugene...)

@@ -2,8 +2,9 @@
 
 VOLUMES=(-v /sys:/sys -v /home:/mnt/host/home)
 IMAGE=$1
+GO_VERSION=$2
 DOCKERFILE=dockerfiles/cross-build/Dockerfile.${IMAGE%-build}
-shift
+shift 2
 
 while [ -n "$1" ]; do
     case $1 in
@@ -36,6 +37,7 @@ echo "  - options   : " "${PASSTHROUGH[@]}"
 
 docker build . \
        -f "$DOCKERFILE" -t "$IMAGE" \
+       --build-arg GO_VERSION=$GO_VERSION \
        --build-arg "CREATE_USER=$USER" \
        --build-arg USER_OPTIONS="-u $(id -u)" \
        "${PASSTHROUGH[@]}" || exit 1
