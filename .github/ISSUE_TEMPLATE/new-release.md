@@ -22,7 +22,7 @@ future releases.
     - [ ] Run `git commit -m 'go.mod,go.sum: update dependencies.' go.{mod,sum}`, if necessary.
   - [ ] Run `git tag -a -m "CRI Resource Manager release $VERSION" $VERSION`.
   - [ ] Create source+dependencies tarball with `make vendored-dist`.
-  - [ ] Create binary tarball with `make binary-dist`.
+  - [ ] Create binary tarball with `make cross-tar`.
   - [ ] Build RPM packages with `make cross-rpm`.
   - [ ] Build DEB packages with `make cross-deb`.
   - [ ] Build container images with `make images`.
