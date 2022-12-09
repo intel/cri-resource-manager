@@ -1,29 +1,27 @@
 # pull in base + a minimal set of useful packages
-FROM debian:buster as debian-10-build
+FROM opensuse/leap:15.4 as suse-15.4-build
 
-ARG GOLANG_VERSION=x.yz
+ARG GO_VERSION=x.yz
 ARG GOLANG_URLDIR=https://dl.google.com/go
-ARG CREATE_USER="test"
+ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-# pull in stuff for cgo
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        build-essential fakeroot devscripts \
-        bash git make sed debhelper wget ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+RUN zypper install -y rpm-build \
+    kernel-devel clang gcc \
+    git make \
+    wget
 
-RUN arch="$(dpkg --print-architecture)"; \
-    case "${arch##*-}" in \
-        amd64) goarch=linux-amd64;; \
+RUN arch="$(rpm --eval %{_arch})"; \
+    case "${arch}" in \
+        x86_64) goarch=linux-amd64;; \
         i386) goarch=linux-386;; \
         armhf) goarch=linux-armv6l;; \
         ppc64el) goarch=linux-ppc64le;; \
         s390x) goarch=linux-s390x;; \
     esac; \
     \
-    wget $GOLANG_URLDIR/go$GOLANG_VERSION.$goarch.tar.gz -O go.tgz && \
+    wget $GOLANG_URLDIR/go$GO_VERSION.$goarch.tar.gz -O go.tgz && \
     tar -C /usr/local -xvzf go.tgz && rm go.tgz && \
     \
     export PATH="/usr/local/go/bin:$PATH" && \

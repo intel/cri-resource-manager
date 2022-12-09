@@ -1,7 +1,7 @@
 # pull in base + a minimal set of useful packages
-FROM ubuntu:18.04 as ubuntu-18.04-build
+FROM debian:sid as debian-sid-build
 
-ARG GOLANG_VERSION=x.yz
+ARG GO_VERSION=x.yz
 ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG CREATE_USER="test"
 ARG USER_OPTIONS=""
@@ -23,7 +23,7 @@ RUN arch="$(dpkg --print-architecture)"; \
         s390x) goarch=linux-s390x;; \
     esac; \
     \
-    wget $GOLANG_URLDIR/go$GOLANG_VERSION.$goarch.tar.gz -O go.tgz && \
+    wget $GOLANG_URLDIR/go$GO_VERSION.$goarch.tar.gz -O go.tgz && \
     tar -C /usr/local -xvzf go.tgz && rm go.tgz && \
     \
     export PATH="/usr/local/go/bin:$PATH" && \
