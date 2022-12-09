@@ -8,7 +8,7 @@ ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
 RUN dnf install -y rpm-build systemd-rpm-macros \
-    kernel-devel gcc clang \
+    kernel-devel gcc clang glibc-static \
     git-core make wget
 
 RUN arch="$(rpm --eval %{_arch})"; \
