@@ -547,6 +547,10 @@ launch() { # script API
     local cri_resmgr_mode=""
     case $target in
         "cri-resmgr")
+	    if [ "$omit_cri_resmgr" == "1" ]; then
+		return 0
+	    fi
+
 	    # Some e2e tests want to restart cri-rm, so check if we are using daemonset
 	    if [ "$VM_CRI_DS" == "1" ]; then
 		launch cri-resmgr-daemonset
@@ -580,6 +584,10 @@ launch() { # script API
             ;;
 
         "cri-resmgr-agent")
+	    if [ "$omit_agent" == "1" ]; then
+		return 0
+	    fi
+
 	    # If running as DaemonSet, then the agent is part of cri-resmgr pod
 	    if [ "$VM_CRI_DS" == "1" ]; then
 		return 0
@@ -598,6 +606,10 @@ launch() { # script API
             ;;
 
         "cri-resmgr-systemd")
+	    if [ "$omit_cri_resmgr" == "1" ]; then
+		return 0
+	    fi
+
             host-command "$SCP \"$cri_resmgr_cfg\" $VM_SSH_USER@$VM_IP:" ||
                 command-error "copying \"$cri_resmgr_cfg\" to VM failed"
             vm-command "cp \"$(basename "$cri_resmgr_cfg")\" /etc/cri-resmgr/fallback.cfg"
@@ -611,6 +623,10 @@ launch() { # script API
             ;;
 
         "cri-resmgr-daemonset")
+	    if [ "$omit_cri_resmgr" == "1" ]; then
+		return 0
+	    fi
+
 	    if [ "$cri_resmgr_config" == "fallback" ]; then
 		cri_resmgr_deployment_file="/etc/cri-resmgr/cri-resmgr-deployment-fallback.yaml"
 	    else
@@ -683,6 +699,10 @@ terminate() { # script API
     local target="$1"
     case $target in
         "cri-resmgr")
+	    if [ "$omit_cri_resmgr" == "1" ]; then
+		return 0
+	    fi
+
 	    if [ "$VM_CRI_DS" == "1" ]; then
 		vm-command "kubectl delete -f /etc/cri-resmgr/cri-resmgr-deployment.yaml"
 	    else
@@ -690,6 +710,10 @@ terminate() { # script API
 	    fi
             ;;
         "cri-resmgr-agent")
+	    if [ "$omit_agent" == "1" ]; then
+		return 0
+	    fi
+
 	    if [ "$VM_CRI_DS" == "1" ]; then
 		vm-command "kubectl delete -f /etc/cri-resmgr/cri-resmgr-deployment.yaml"
 	    else
