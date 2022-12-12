@@ -37,6 +37,12 @@ type balloonsOptionsWrapped struct {
 	// ReservedPoolNamespaces is a list of namespace globs that
 	// will be allocated to reserved CPUs.
 	ReservedPoolNamespaces []string `json:"ReservedPoolNamespaces,omitempty"`
+	// If AllocatorTopologyBalancing is true, balloons are
+	// allocated and resized so that all topology elements
+	// (packages, dies, numa nodes, cores) have roughly same
+	// amount of allocations. The default is false: balloons are
+	// packed tightly to optimize power efficiency.
+	AllocatorTopologyBalancing bool
 	// BallonDefs contains balloon type definitions.
 	BalloonDefs []*BalloonDef `json:"BalloonTypes,omitempty"`
 }
