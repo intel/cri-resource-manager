@@ -451,7 +451,7 @@ e2e-tests: build-static
 	    exit 1; \
 	fi
 
-packaging-tests: cross-deb cross-rpm
+packaging-tests: cross-packages
 	$(Q)for dir in test/e2e/packages.test-suite/*; do \
 	    cleanup=1 omit_agent=1 $(E2E_RUN) $$dir; \
 	    echo "--------------------------------------"; \
@@ -480,7 +480,7 @@ else
     packages: cross-$(DISTRO_PACKAGE).$(DISTRO_ID)
 endif
 
-cross-packages: cross-rpm cross-deb
+cross-packages: cross-rpm cross-deb cross-tar
 
 cross-rpm: $(foreach d,$(SUPPORTED_RPM_DISTROS),cross-rpm.$(d))
 
