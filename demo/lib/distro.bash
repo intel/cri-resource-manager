@@ -675,7 +675,7 @@ opensuse-15_4-image-url() {
 }
 
 opensuse-tumbleweed-image-url() {
-    echo "https://ftp.uni-erlangen.de/opensuse/tumbleweed/appliances/openSUSE-Tumbleweed-JeOS.x86_64-OpenStack-Cloud.qcow2"
+    echo "https://ftp.uni-erlangen.de/opensuse/tumbleweed/appliances/openSUSE-MicroOS.x86_64-ContainerHost-OpenStack-Cloud.qcow2"
 }
 
 opensuse-install-utils() {
