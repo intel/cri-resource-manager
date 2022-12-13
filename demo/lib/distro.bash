@@ -45,6 +45,7 @@ distro-install-kernel-dev() { distro-resolve "$@"; }
 distro-k8s-cni()            { distro-resolve "$@"; }
 distro-k8s-cni-subnet()     { distro-resolve "$@"; }
 distro-set-kernel-cmdline() { distro-resolve "$@"; }
+distro-govm-env()           { distro-resolve "$@"; }
 distro-bootstrap-commands() { distro-resolve "$@"; }
 distro-env-file-dir()       { distro-resolve "$@"; }
 
@@ -607,7 +608,7 @@ fedora-33-install-crio-pre() {
 ###########################################################################
 
 #
-# OpenSUSE 15.2 and SLES
+# OpenSUSE and SLES
 #
 
 ZYPPER="zypper --non-interactive --no-gpg-checks"
@@ -666,11 +667,11 @@ sles-install-utils() {
 }
 
 opensuse-image-url() {
-    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.3/appliances/openSUSE-Leap-15.3-JeOS.x86_64-15.3-OpenStack-Cloud-Current.qcow2"
+    opensuse-15_4-image-url
 }
 
-opensuse-15_2-image-url() {
-    echo "https://download.opensuse.org/repositories/Cloud:/Images:/Leap_15.2/images/openSUSE-Leap-15.2-OpenStack.x86_64-0.0.4-Build8.25.qcow2"
+opensuse-15_4-image-url() {
+    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.4/appliances/openSUSE-Leap-15.4-JeOS.x86_64-15.4-OpenStack-Cloud-Current.qcow2"
 }
 
 opensuse-tumbleweed-image-url() {
@@ -765,7 +766,7 @@ opensuse-wait-for-zypper() {
 opensuse-require-repo-virtualization-containers() {
     vm-command "zypper ls"
     if ! grep -q Virtualization_containers <<< "$COMMAND_OUTPUT"; then
-        opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/openSUSE_Leap_15.2/Virtualization:containers.repo
+        opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/15.4/Virtualization:containers.repo
         opensuse-refresh-pkg-db
     fi
 }
@@ -822,7 +823,7 @@ opensuse-install-k8s() {
     vm-command "echo 1 > /proc/sys/net/ipv4/ip_forward"
     vm-command "zypper ls"
     if ! grep -q snappy <<< "$COMMAND_OUTPUT"; then
-        distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.2 snappy"
+        distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.4 snappy"
         distro-refresh-pkg-db
     fi
     distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
@@ -903,6 +904,9 @@ sed -e '/Signature checking/a gpgcheck = off' -i /etc/zypp/zypp.conf
 EOF
 }
 
+opensuse-govm-env() {
+    echo "DISABLE_VGA=N"
+}
 
 ###########################################################################
 
@@ -1147,6 +1151,10 @@ default-install-cri-dockerd() {
     systemctl enable cri-docker.service
     systemctl enable --now cri-docker.socket
     "
+}
+
+default-govm-env() {
+    echo "DISABLE_VGA=Y"
 }
 
 default-env-file-dir() {
