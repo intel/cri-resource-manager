@@ -6,6 +6,7 @@ GO_PARALLEL :=
 GO_CMD      := go
 GO_BUILD    := $(GO_CMD) build $(GO_PARALLEL)
 GO_GEN      := $(GO_CMD) generate -x
+GO_INSTALL  := $(GO_CMD) install
 GO_FMT      := gofmt
 GO_CYCLO    := gocyclo
 GO_LINT     := golint
@@ -26,6 +27,13 @@ GO_CILINT_RUNFLAGS := --build-tags $(TEST_TAGS)
 PROTOC    := $(shell command -v protoc;)
 PROTOBUFS  = $(shell find cmd pkg -name \*.proto)
 PROTOCODE := $(patsubst %.proto,%.pb.go,$(PROTOBUFS))
+
+PROTO_INCLUDE = -I$(PWD):/usr/local/include:/usr/include
+PROTO_OPTIONS = --proto_path=. $(PROTO_INCLUDE) \
+    --go_opt=paths=source_relative --go_out=. \
+    --go-grpc_opt=paths=source_relative --go-grpc_out=.
+PROTO_COMPILE = $(PROTOC) $(PROTO_OPTIONS)
+
 
 # ShellCheck for checking shell scripts.
 SHELLCHECK := shellcheck
@@ -74,7 +82,7 @@ UI_ASSETS := $(shell for i in pkg/cri/resource-manager/visualizer/*; do \
 
 # Right now we don't depend on libexec/%.o on purpose so make sure the file
 # is always up-to-date when elf/avx512.c is changed.
-GEN_TARGETS := pkg/avx/programbytes_gendata.go
+GEN_TARGETS := pkg/avx/programbytes_gendata.go $(PROTOCODE)
 
 # Determine binary version and buildid, and versions for rpm, deb, and tar packages.
 BUILD_VERSION := $(shell scripts/build/get-buildid --version --shell=no)
@@ -230,8 +238,10 @@ DISTRO_VERSION := $(shell . /etc/os-release; echo "$${VERSION_ID:-unknown}")
 DISTRO_PACKAGE := $(shell echo $(DISTRO_ID) | tr -d ' \t' | \
     sed -E 's/.*((centos)|(fedora)|(suse)).*/rpm/;s/.*((ubuntu)|(debian)).*/deb/')
 
-# Be quiet by default but let folks override it with Q= on the command line.
-Q := @
+# Be quiet by default but let folks override it with Q= or V=1 on the command line.
+ifneq ($(V),1)
+  Q := @
+endif
 
 # Default target: just build everything.
 all: build update-workflows
@@ -668,7 +678,7 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 %.pb.go: %.proto
 	$(Q)if [ -n "$(PROTOC)" -o ! -e "$@" ]; then \
 	        echo "Generating go code ($@) for updated protobuf $<..."; \
-	        $(PROTOC) -I . $< --go_out=plugins=grpc:.; \
+		$(PROTO_COMPILE) $<; \
 	else \
 	        echo "WARNING: no protoc found, compiling with OUTDATED $@..."; \
 	fi
@@ -682,6 +692,18 @@ install-git-hooks:
 	    touch .git-hooks.redirected && \
 	    echo "done."; \
 	fi
+
+# Rules for installing protoc and related utilities.
+install-protoc:
+	$(Q)./scripts/hack/install-protobuf
+
+install-protoc-gen-go:
+	$(Q)$(GO_INSTALL) google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+
+install-protoc-gen-go-grpc:
+	$(Q)$(GO_INSTALL) google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
+
+install-protoc-tools: install-protoc install-protoc-gen-go install-protoc-gen-go-grpc
 
 # Rules for updating github workflows.
 update-workflows: .github/workflows/verify.yml

@@ -17,7 +17,7 @@ limitations under the License.
 syntax = "proto3";
 
 package v1;
-option go_package = "v1";
+option go_package = "../v1";
 
 service Agent{
     rpc GetNode(GetNodeRequest) returns (GetNodeReply) {}

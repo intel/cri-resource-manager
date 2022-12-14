@@ -104,6 +104,7 @@ func (s *server) Stop() {
 
 // grpcServer implements v1.AgentServer
 type grpcServer struct {
+	v1.UnimplementedAgentServer
 	log.Logger
 	cli       *k8sclient.Clientset
 	getConfig getConfigFn
