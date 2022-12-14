@@ -570,10 +570,11 @@ cross-rpm.%: docker/cross-build/% clean-spec spec dist
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp packaging/rpm/cri-resource-manager.spec $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
+	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_RPM_BUILD)' && \
 	rm -fr $$builddir
 
@@ -613,10 +614,11 @@ cross-deb.%: docker/cross-build/% \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp -r debian $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
+	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_DEB_BUILD)' && \
 	rm -fr $$builddir
 
@@ -631,10 +633,11 @@ cross-bin.%: docker/cross-build/% dist
 	mkdir -p $(BINARIES_DIR)/$$distro && \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
+	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_BIN_BUILD)' && \
 	rm -fr $$builddir
 
@@ -646,10 +649,11 @@ cross-tar cross-tarball: dist docker/cross-build/fedora
 	mkdir -p $$outdir && \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $(shell echo $$USER) \
+	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
+	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    fedora-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
 	rm -fr $$builddir
 
