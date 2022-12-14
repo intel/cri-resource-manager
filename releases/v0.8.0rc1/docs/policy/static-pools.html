@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.8.0rc1 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Balloons Policy" href="balloons.html" />
+    <link rel="prev" title="Topology-Aware Policy" href="topology-aware.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> CRI Resource Manager
+          </a>
+              <div class="version">
+                v0.8.0rc1
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Policies</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="topology-aware.html">Topology-Aware Policy</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Static-Pools (STP) Policy</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#deployment">Deployment</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#install-cri-resmgr">Install cri-resmgr</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#deploy-node-agent">Deploy Node Agent</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#deploy-admission-webhook">Deploy Admission Webhook</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#configuration">Configuration</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#pools-configuration">Pools Configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#debugging">Debugging</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#running-workloads">Running Workloads</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#pod-configuration-using-env-variables">Pod Configuration Using Env Variables</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#backwards-compatibility-for-cmk-isolate">Backwards Compatibility for <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="balloons.html">Balloons Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="podpools.html">Podpools Policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="container-affinity.html">Container Affinity and Anti-Affinity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="blockio.html">Block IO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="rdt.html">RDT (Intel® Resource Director Technology)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cpu-allocator.html">CPU Allocator</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Policies</a></li>
+      <li class="breadcrumb-item active">Static-Pools (STP) Policy</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/docs/policy/static-pools.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="static-pools-stp-policy">
+<h1>Static-Pools (STP) Policy<a class="headerlink" href="#static-pools-stp-policy" title="Permalink to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">static-pools</span></code> (STP) builtin policy was inspired by <a class="reference external" href="https://github.com/intel/CPU-Manager-for-Kubernetes">CMK (CPU Manager for
+Kubernetes)</a>. It is an example policy demonstrating capabilities of
+<code class="docutils literal notranslate"><span class="pre">cri-resource-manager</span></code> and not considered as production ready.</p>
+<p>Basically, the STP policy aims to replicate the functionality of the <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code> command of CMK. It also has compatibility features to function as
+a drop-in replacement in order to allow easier testing and prototyping.</p>
+<p>Features:</p>
+<ul class="simple">
+<li><p>arbitrary number of configurable CPU list pools</p></li>
+<li><p>dynamic configuration updates via the <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">node agent</span></a></p></li>
+</ul>
+<p>Please see the documentation of
+<a class="reference external" href="https://github.com/intel/CPU-Manager-for-Kubernetes">CMK</a> for a more detailed
+description of the terminology and functionality.</p>
+<p>CMK compatibility features:</p>
+<ul class="simple">
+<li><p>supports the same environment variables as the original CMK, except for:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMK_LOCK_TIMEOUT</span></code> and <code class="docutils literal notranslate"><span class="pre">CMK_PROC_FS</span></code>: configuration variables that are not
+applicable in cri-resmgr context</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMK_LOG_LEVEL</span></code>: not implemented, yet</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CMK_NUM_CORES</span></code>: not needed in cri-resmgr as we take this value directly
+from the container resource request</p></li>
+</ul>
+</li>
+<li><p>supports the existing configuration directory format of CMK for retrieving
+the pool configuration</p></li>
+<li><p>parses the container command/args in an attempt to retrieve command line
+options of <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code></p></li>
+<li><p>supports generating CMK-specific node label and taint (off by default)</p></li>
+</ul>
+</section>
+<section id="deployment">
+<h2>Deployment<a class="headerlink" href="#deployment" title="Permalink to this heading"></a></h2>
+<section id="install-cri-resmgr">
+<h3>Install cri-resmgr<a class="headerlink" href="#install-cri-resmgr" title="Permalink to this heading"></a></h3>
+<p>Deploy cri-resmgr on each node as you would for any other policy. See
+<a class="reference internal" href="../installation.html"><span class="doc std std-doc">installation</span></a> for more details.</p>
+</section>
+<section id="deploy-node-agent">
+<h3>Deploy Node Agent<a class="headerlink" href="#deploy-node-agent" title="Permalink to this heading"></a></h3>
+<p>The CRI-RM node agent is required in order to communicate with the Kubernetes
+control plane. In particular, the STP policy needs this capability for
+updating the extended resource (that represents exclusive cores) as well as
+managing legacy CMK node annotation and taint. In addition, the node agent
+enables dynamic configuration updates.</p>
+<p>See <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">node agent</span></a> for detailed instructions for set-up and
+usage.</p>
+</section>
+<section id="deploy-admission-webhook">
+<h3>Deploy Admission Webhook<a class="headerlink" href="#deploy-admission-webhook" title="Permalink to this heading"></a></h3>
+<p>You need to run and enable the cri-resmgr mutating admission webhook which
+creates pod annotations consumed by CRI-RM. This is required so that the STP
+policy is able to inspect the extended resources (in this case, exclusive CPU
+cores) requested by containers.</p>
+<p>See the <a class="reference internal" href="../webhook.html"><span class="doc std std-doc">webhook</span></a> for instructions how to set it up.</p>
+</section>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Permalink to this heading"></a></h2>
+<p>The policy is configured using the yaml-based configuration system of CRI-RM.
+See <a class="reference internal" href="../setup.html#setting-up-cri-resource-manager"><span class="std std-doc">setup and usage</span></a> for more
+details on managing the configuration.</p>
+<p>At minimum, you need to specify the active policy in the configuration.
+Policy-specific options control the pool configuration and legacy node label
+and taint.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">Active</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static-pools</span><span class="w"></span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Set to true to create CMK node label</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#LabelNode: false</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Set to true to create CMK node taint</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#TaintNode: false</span><span class="w"></span>
+<span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
+</pre></div>
+</div>
+<p>See the <span class="xref myst">sample configmap</span>
+for a complete example containing all available configuration options.</p>
+<p>If dynamic configuration via the <a class="reference internal" href="../node-agent.html"><span class="doc std std-doc">node agent</span></a> is in use the
+policy options, including pools configuration, may be altered at runtime.</p>
+<p><strong>NOTE</strong>: the active policy (<code class="docutils literal notranslate"><span class="pre">policy.Active</span></code>) cannot be changed at runtime. In
+order to change the active policy cri-resmgr needs to be restarted.</p>
+<section id="pools-configuration">
+<h3>Pools Configuration<a class="headerlink" href="#pools-configuration" title="Permalink to this heading"></a></h3>
+<p>There are three possible sources of the pools configuration, in decreasing
+priority order:</p>
+<ol class="arabic simple">
+<li><p>CRI-RM global config</p></li>
+<li><p>stand-alone static-pools config file</p></li>
+<li><p>CMK directory tree</p></li>
+</ol>
+<p>The configuration is fully evaluated whenever a re-configuration event is
+received (e.g. from the node agent). Thus, a valid pools config appearing in
+the CRI-RM global config will take precedence over a directory tree based
+config that was previously active. Similarly, removing pools config from the
+CRI-RM global config will make a local config (file or directory tree)
+effective.</p>
+<p><strong>NOTE:</strong> cri-resmgr does not have any utility for generating a pool
+configuration. Thus, you need to either manually write one by yourself, or, run
+the <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">init</span></code> command (of the original CMK) in order to create a legacy
+configuration directory structure.</p>
+<section id="global-config">
+<h4>Global Config<a class="headerlink" href="#global-config" title="Permalink to this heading"></a></h4>
+<p>Configuration from the global CRI-RM config takes the highest preference, if
+specified (under <code class="docutils literal notranslate"><span class="pre">policy.static-pools.pools</span></code>). A referential example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">pools</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
+<span class="w">      </span><span class="nt">shared</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
+<span class="w">      </span><span class="nt">infra</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="stand-alone-yaml-file">
+<h4>Stand-alone YAML File<a class="headerlink" href="#stand-alone-yaml-file" title="Permalink to this heading"></a></h4>
+<p>Path to a stand-alone configuration file can be specified by the
+<code class="docutils literal notranslate"><span class="pre">policy.static-pools.ConfFilePath</span></code> option (empty by default) in the CRI-RM
+global config:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">ConfFilePath</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/conf.yaml&quot;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Format of the configuration file is similar to the pools config used in the
+global CRI-RM config. You can also see the
+<span class="xref myst">example config file</span>
+for a starting point.</p>
+</section>
+<section id="cmk-directory-tree">
+<h4>CMK Directory Tree<a class="headerlink" href="#cmk-directory-tree" title="Permalink to this heading"></a></h4>
+<p>The STP policy also supports configuration directory format of the original
+CMK. It reads the configuration from a location specified by the
+<code class="docutils literal notranslate"><span class="pre">policy.static-pools.ConfFileDir</span></code> field (<code class="docutils literal notranslate"><span class="pre">/etc/cmk</span></code> by default) in the CRI-RM
+global config:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">ConfFileDir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/cmk&quot;</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="debugging">
+<h3>Debugging<a class="headerlink" href="#debugging" title="Permalink to this heading"></a></h3>
+<p>In order to enable more verbose logging for the STP policy set the
+<code class="docutils literal notranslate"><span class="pre">LOGGER_DEBUG=static-pools</span></code> environment variable or enable debug from the CRI-RM
+global config:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">logger</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">Debug</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static-pools</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="running-workloads">
+<h2>Running Workloads<a class="headerlink" href="#running-workloads" title="Permalink to this heading"></a></h2>
+<p>The preferred way to specify the pod configuration is through environment
+variables. However, exclusive cores must be reserved by making a request of the
+<code class="docutils literal notranslate"><span class="pre">cmk.intel.com/exclusive-cores</span></code> extended resource. Naming of the extended
+resource has <code class="docutils literal notranslate"><span class="pre">cmk</span></code> prefix in order to provide backwards compatibility with the
+original CMK.</p>
+<section id="pod-configuration-using-env-variables">
+<h3>Pod Configuration Using Env Variables<a class="headerlink" href="#pod-configuration-using-env-variables" title="Permalink to this heading"></a></h3>
+<p>The following environment variables are recognized:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Name</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>STP_NO_AFFINITY</td>
+<td>Do not set cpu affinity. The workload is responsible for reading the <code>CMK_CPUS_ASSIGNED</code> environment variable and setting the affinity itself.</td>
+</tr>
+<tr>
+<td>STP_POOL</td>
+<td>Name of the pool to run in</td>
+</tr>
+<tr>
+<td>STP_SOCKET_ID</td>
+<td>Socket where cores should be allocated. Set to -1 to accept any socket.</td>
+</tr>
+</tbody>
+</table>
+<p>An example Pod spec for running a workload in the <code class="docutils literal notranslate"><span class="pre">exclusive</span></code> pool with one
+core reserved from socket id 0:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span><span class="w"></span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span><span class="w"></span>
+<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-test</span><span class="w"></span>
+<span class="nt">spec</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">containers</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-test</span><span class="w"></span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">busybox</span><span class="w"></span>
+<span class="w">    </span><span class="nt">env</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STP_POOL</span><span class="w"></span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;exclusive&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STP_SOCKET_ID</span><span class="w"></span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;sh&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;-c&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;while</span><span class="nv"> </span><span class="s">:;</span><span class="nv"> </span><span class="s">do</span><span class="nv"> </span><span class="s">echo</span><span class="nv"> </span><span class="s">ASSIGNED:</span><span class="nv"> </span><span class="s">$CMK_CPUS_ASSIGNED;</span><span class="nv"> </span><span class="s">sleep</span><span class="nv"> </span><span class="s">1;</span><span class="nv"> </span><span class="s">done&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nt">resources</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="nt">requests</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cmk.intel.com/exclusive-cores</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="nt">limits</span><span class="p">:</span><span class="w"></span>
+<span class="w">        </span><span class="nt">cmk.intel.com/exclusive-cores</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="backwards-compatibility-for-cmk-isolate">
+<h3>Backwards Compatibility for <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code><a class="headerlink" href="#backwards-compatibility-for-cmk-isolate" title="Permalink to this heading"></a></h3>
+<p>The STP policy parses the container command/args in an attempt to
+retrieve the Pod configuration (from <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code> options). This is to provide
+backwards compatibility with existing CMK workload specs. It manipulates the
+container command and args so that <code class="docutils literal notranslate"><span class="pre">cmk</span> <span class="pre">isolate</span></code> and all it’s arguments are
+removed.</p>
+<p>In the example below STP policy will run <code class="docutils literal notranslate"><span class="pre">sh</span> <span class="pre">-c</span> <span class="pre">&quot;sleep</span> <span class="pre">10000&quot;</span></code> in the <code class="docutils literal notranslate"><span class="pre">infra</span></code>
+pool.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span><span class="w"></span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span><span class="w"></span>
+<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmk-test</span><span class="w"></span>
+<span class="nt">spec</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">containers</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmk-test</span><span class="w"></span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">busybox</span><span class="w"></span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;sh&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;-c&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nt">args</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;/opt/bin/cmk</span><span class="nv"> </span><span class="s">isolate</span><span class="nv"> </span><span class="s">--conf-dir=/etc/cmk</span><span class="nv"> </span><span class="s">--pool=infra</span><span class="nv"> </span><span class="s">sleep</span><span class="nv"> </span><span class="s">10000&quot;</span><span class="w"></span>
+</pre></div>
+</div>
+<!-- Links -->
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="topology-aware.html" class="btn btn-neutral float-left" title="Topology-Aware Policy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="balloons.html" class="btn btn-neutral float-right" title="Balloons Policy" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, various.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.8
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>

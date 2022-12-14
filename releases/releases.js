@@ -7,5 +7,6 @@ function getReleaseListItems() {
     { name: 'v0.7.0', url: 'v0.7.0' },
     { name: 'v0.7.1', url: 'v0.7.1' },
     { name: 'v0.7.2', url: 'v0.7.2' },
+    { name: 'v0.8.0rc1', url: 'v0.8.0rc1' },
   ];
 }
