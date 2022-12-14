@@ -97,6 +97,12 @@ type BalloonDef struct {
 	// prefer using filling free capacity and possibly inflating
 	// existing balloons before creating new ones.
 	PreferNewBalloons bool
+	// ShareIdleCpusInSame <topology-level>: if there are idle
+	// CPUs, that is CPUs not in any balloon, in the same
+	// <topology-level> as any CPU in the balloon, then allow
+	// workloads to run on those (shared) CPUs in addition to the
+	// (dedicated) CPUs of the balloon.
+	ShareIdleCpusInSame CPUTopologyLevel `json:"ShareIdleCPUsInSame,omitempty"`
 }
 
 var defaultPinCPU bool = true
