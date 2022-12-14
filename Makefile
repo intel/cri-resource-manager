@@ -550,7 +550,7 @@ binary-dist:
 	echo "Creating binary dist tarball $$tarball..."; \
 	tardir=binary-dist; \
 	rm -fr $$tarball* $$tardir && \
-	$(MAKE) STATIC=1 DESTDIR=$$tardir \
+	$(MAKE) DESTDIR=$$tardir \
 	        BUILD_DIRS=cri-resmgr \
 	        PREFIX=/opt/intel \
 	        DEFAULTDIR=/etc/default \
@@ -664,7 +664,7 @@ cross-tar cross-tarball: dist docker/cross-build/fedora
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
-	    fedora-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
+	    centos-7-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
 	rm -fr $$builddir
 
 # Build a docker image (for distro cross-building).
