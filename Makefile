@@ -12,6 +12,7 @@ GO_CYCLO    := gocyclo
 GO_LINT     := golint
 GO_CILINT   := golangci-lint
 GO_VERSION  ?= 1.18.9
+GOLICENSES_VERSION  ?= v1.5.0
 
 # TEST_TAGS is the set of extra build tags passed for tests.
 # We disable AVX collector for tests by default.
@@ -356,6 +357,14 @@ install-minimal-docs:
 	    $(INSTALL) -m 0644 -T $$f $(DESTDIR)$(DOCDIR)/$${df}; \
 	done
 
+install-licenses:
+	$(Q)for cmd in $(BUILD_DIRS); do \
+	    install -D LICENSE $(DESTDIR)/licenses/$$cmd/LICENSE && \
+	    go-licenses save ./cmd/$$cmd \
+	        --ignore github.com/intel/cri-resource-manager \
+	        --save_path $(DESTDIR)/licenses/$$cmd/go-licenses; \
+	done
+
 clean-bin: $(foreach dir,$(BUILD_DIRS),clean-$(dir))
 	$(Q)rm -f .static.*
 
@@ -371,6 +380,7 @@ image-%:
 	$(Q)bin=$(patsubst image-%,%,$@); \
 	    $(DOCKER) build . -f "cmd/$$bin/Dockerfile" \
 	    --build-arg GO_VERSION=$(GO_VERSION) \
+	    --build-arg GOLICENSES_VERSION=$(GOLICENSES_VERSION) \
 	    -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
 image-push-%: image-%
@@ -555,6 +565,7 @@ binary-dist:
 	        PREFIX=/opt/intel \
 	        DEFAULTDIR=/etc/default \
 	        UNITDIR=$(SYSCONFDIR)/systemd/system install install-minimal-docs && \
+	$(MAKE) DESTDIR=$$tardir/opt/intel/ install-licenses && \
 	$(TAR) -C $$tardir -cf $$tarball . && \
 	$(GZIP) $$tarball && \
 	rm -fr $$tardir
@@ -672,7 +683,11 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	$(Q)distro=$(patsubst docker/cross-build/%,%,$@) && \
 	echo "Building cross-build docker image for $$distro..." && \
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
-	scripts/build/docker-build-image $$distro-build $(GO_VERSION) --container $(DOCKER_PULL) $(DOCKER_OPTIONS)
+	scripts/build/docker-build-image $$distro-build \
+	    --container $(DOCKER_PULL) \
+	    --build-arg GO_VERSION=$(GO_VERSION) \
+	    --build-arg GOLICENSES_VERSION=$(GOLICENSES_VERSION) \
+	    $(DOCKER_OPTIONS)
 
 # Rule for recompiling a changed protobuf.
 %.pb.go: %.proto

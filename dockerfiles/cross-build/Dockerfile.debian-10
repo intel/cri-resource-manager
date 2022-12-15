@@ -2,6 +2,7 @@
 FROM debian:buster as debian-10-build
 
 ARG GO_VERSION=x.yz
+ARG GOLICENSES_VERSION
 ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG CREATE_USER="test"
 ARG USER_OPTIONS=""
@@ -29,6 +30,8 @@ RUN arch="$(dpkg --print-architecture)"; \
     export PATH="/usr/local/go/bin:$PATH" && \
     echo "PATH=/usr/local/go/bin:$PATH" > /etc/profile.d/go.sh && \
     go version
+
+RUN GOBIN=/go/bin go install github.com/google/go-licenses@${GOLICENSES_VERSION}
 
 RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
     useradd -m -s /bin/bash $CREATE_USER $USER_OPTIONS
