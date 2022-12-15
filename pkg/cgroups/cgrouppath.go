@@ -16,11 +16,12 @@ package cgroups
 
 import (
 	"flag"
+	"os"
 	"path"
 	"path/filepath"
 )
 
-//nolint
+// nolint
 const (
 	// Tasks is a cgroup's "tasks" entry.
 	Tasks = "tasks"
@@ -36,6 +37,8 @@ const (
 	CpusetCpus = "cpuset.cpus"
 	// CpusetMems is the cpuset controller's cpuset.mems entry.
 	CpusetMems = "cpuset.mems"
+	// Controllers is the cgroup v2 controllers file
+	Controllers = "cgroup.controllers"
 )
 
 var (
@@ -45,6 +48,8 @@ var (
 	v2Dir = path.Join(mountDir, "unified")
 	// KubeletRoot is the --cgroup-root option the kubelet is running with.
 	KubeletRoot = ""
+	// detected system cgroup version, 0 is undetected
+	systemCgroupVersion = 0
 )
 
 // GetMountDir returns the common mount point for cgroup v1 controllers.
@@ -82,4 +87,15 @@ func init() {
 		v2Dir, "cgroup v2 unified mount directory")
 	flag.StringVar(&KubeletRoot, "kubelet-cgroup-root", KubeletRoot,
 		"--cgroup-root options the kubelet is running with")
+}
+
+func DetectSystemCgroupVersion() int {
+	if systemCgroupVersion == 0 {
+		if _, err := os.Stat(path.Join(GetMountDir(), Controllers)); err == nil {
+			systemCgroupVersion = 2
+		} else {
+			systemCgroupVersion = 1
+		}
+	}
+	return systemCgroupVersion
 }
