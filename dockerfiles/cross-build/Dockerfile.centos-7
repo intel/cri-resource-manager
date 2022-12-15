@@ -2,6 +2,7 @@
 FROM centos:7 as centos-7-build
 
 ARG GO_VERSION=x.yz
+ARG GOLICENSES_VERSION
 ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG GIT_VERSION=2.27.0
 ARG GIT_URLDIR=https://github.com/git/git/archive
@@ -37,6 +38,8 @@ RUN mkdir /git && cd /git && wget $GIT_URLDIR/v$GIT_VERSION.tar.gz && \
     make -j8 NO_TCLTK=1 NO_GETTEXT=1 prefix=/usr all && \
     yum remove -y git && \
     make -j8 NO_TCLTK=1 NO_GETTEXT=1 prefix=/usr install
+
+RUN GOBIN=/go/bin go install github.com/google/go-licenses@${GOLICENSES_VERSION}
 
 RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
     useradd -m -s /bin/bash $CREATE_USER $USER_OPTIONS

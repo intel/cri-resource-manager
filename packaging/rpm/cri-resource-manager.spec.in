@@ -19,6 +19,7 @@ placement policies.
 
 %build
 make build BUILD_DIRS=cri-resmgr
+make install-licenses BUILD_DIRS=cri-resmgr DESTDIR=.
 
 %install
 %make_install UNITDIR=%{_unitdir} SYSCONFDIR=%{_sysconfdir} BUILD_DIRS=cri-resmgr
@@ -32,6 +33,6 @@ install -m 0700 -d %{?buildroot}%{_sharedstatedir}/cri-resmgr
 %dir %attr(0700,root,root) %{_sharedstatedir}/cri-resmgr
 %dir %attr(0700,root,root) %{_sysconfdir}/cri-resmgr
 %config(noreplace) %{_sysconfdir}/cri-resmgr/*
-%doc LICENSE
+%license licenses/cri-resmgr/*
 %doc README.md docs/*.md
 %doc cmd/*/*.sample
