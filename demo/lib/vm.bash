@@ -675,6 +675,72 @@ vm-networking() {
     vm-setup-proxies
 }
 
+vm-create-deployment() {
+    reinstall_cri_resmgr="$1"
+
+    crirm_image_info="$(docker images --filter=reference=$DOCKER_REF_NAME --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+    if [ -z "$crirm_image_info" ] || [ "$reinstall_cri_resmgr" == "1" ]; then
+	(cd $HOST_PROJECT_DIR; make image-cri-resmgr)
+
+	crirm_image_info="$(docker images --filter=reference=$DOCKER_REF_NAME --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+	if [ -z "$crirm_image_info" ]; then
+	    error "cannot find $DOCKER_REF_NAME image on host, run \"make images\" and check \"docker images --filter=reference=$DOCKER_REF_NAME\""
+	fi
+    fi
+
+    # Do the agent too so that they can be placed in the same pod
+    crirm_agent_image_info="$(docker images --filter=reference=cri-resmgr-agent --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+    if [ -z "$crirm_agent_image_info" ] || [ "$reinstall_cri_resmgr_agent" == "1" ]; then
+	(cd $HOST_PROJECT_DIR; make image-cri-resmgr-agent)
+
+	crirm_agent_image_info="$(docker images --filter=reference=cri-resmgr-agent --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
+	if [ -z "$crirm_agent_image_info" ]; then
+	    error "cannot find cri-resmgr-agent image on host, run \"make images\" and check \"docker images --filter=reference=cri-resmgr-agent\""
+	fi
+    fi
+
+    echo "installing $DOCKER_REF_NAME to VM from image: $crirm_image_info"
+    sleep 1
+    crirm_image_id="$(awk '{print $1}' <<< "$crirm_image_info")"
+    crirm_image_repotag="$(awk '{print $2}' <<< "$crirm_image_info")"
+    crirm_image_tar="$(realpath "$OUTPUT_DIR/cri-resmgr-image-$crirm_image_id.tar")"
+    docker image save "$crirm_image_repotag" > "$crirm_image_tar"
+    vm-put-file "$crirm_image_tar" "cri-resmgr/$(basename "$crirm_image_tar")" || {
+        command-error "copying cri-resmgr image to VM failed"
+    }
+    vm-cri-import-image cri-resmgr "cri-resmgr/$(basename "$crirm_image_tar")"
+
+    echo "installing cri-resmgr-agent to VM from image: $crirm_agent_image_info"
+    crirm_agent_image_id="$(awk '{print $1}' <<< "$crirm_agent_image_info")"
+    crirm_agent_image_repotag="$(awk '{print $2}' <<< "$crirm_agent_image_info")"
+    crirm_agent_image_tar="$(realpath "$OUTPUT_DIR/cri-resmgr-agent-image-$crirm_agent_image_id.tar")"
+    docker image save "$crirm_agent_image_repotag" > "$crirm_agent_image_tar"
+    vm-put-file "$crirm_agent_image_tar" "cri-resmgr/$(basename "$crirm_agent_image_tar")" || {
+        command-error "copying cri-resmgr-agent image to VM failed"
+    }
+    vm-cri-import-image cri-resmgr-agent "cri-resmgr/$(basename "$crirm_agent_image_tar")"
+
+    vm-command "mkdir -p /etc/cri-resmgr"
+    sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
+        -e 's|^\(\s*\)tolerations:$|\1tolerations:\n\1  - {"key": "cmk", "operator": "Equal", "value": "true", "effect": "NoSchedule"}|g' \
+        -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
+	-e "s|AGENT_IMAGE_PLACEHOLDER|$crirm_agent_image_repotag|" \
+	-e "s|CRI_RM_CONFIG_OPTION|force|" \
+        < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e.yaml" \
+        | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment.yaml
+    sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
+        -e 's|^\(\s*\)tolerations:$|\1tolerations:\n\1  - {"key": "cmk", "operator": "Equal", "value": "true", "effect": "NoSchedule"}|g' \
+        -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
+	-e "s|AGENT_IMAGE_PLACEHOLDER|$crirm_agent_image_repotag|" \
+	-e "s|CRI_RM_CONFIG_OPTION|fallback|" \
+        < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e.yaml" \
+        | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment-fallback.yaml
+    sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
+        -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
+        < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e-reset-config-policy.yaml" \
+        | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment-e2e-reset-config-policy.yaml
+}
+
 vm-install-cri-resmgr() {
     prefix=/usr/local
     # shellcheck disable=SC2154
@@ -685,67 +751,8 @@ vm-install-cri-resmgr() {
     if [ "$VM_CRI_DS" == "1" ]; then
 	# If NRI is in use, then we can support running CRI-RM as a DaemonSet.
 	# To do so we create cri-resmgr container image and deploy it in VM.
-	crirm_image_info="$(docker images --filter=reference=cri-resmgr --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
-	if [ -z "$crirm_image_info" ] || [ "$reinstall_cri_resmgr" == "1" ]; then
-	    (cd $HOST_PROJECT_DIR; make image-cri-resmgr)
+	vm-create-deployment "$reinstall_cri_resmgr"
 
-	    crirm_image_info="$(docker images --filter=reference=cri-resmgr --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
-	    if [ -z "$crirm_image_info" ]; then
-		error "cannot find cri-resmgr image on host, run \"make images\" and check \"docker images --filter=reference=cri-resmgr\""
-	    fi
-	fi
-
-	# Do the agent too so that they can be placed in the same pod
-	crirm_agent_image_info="$(docker images --filter=reference=cri-resmgr-agent --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
-	if [ -z "$crirm_agent_image_info" ] || [ "$reinstall_cri_resmgr_agent" == "1" ]; then
-	    (cd $HOST_PROJECT_DIR; make image-cri-resmgr-agent)
-
-	    crirm_agent_image_info="$(docker images --filter=reference=cri-resmgr-agent --format '{{.ID}} {{.Repository}}:{{.Tag}} (created {{.CreatedSince}}, {{.CreatedAt}})' | head -n 1)"
-	    if [ -z "$crirm_agent_image_info" ]; then
-		error "cannot find cri-resmgr-agent image on host, run \"make images\" and check \"docker images --filter=reference=cri-resmgr-agent\""
-	    fi
-	fi
-
-	echo "installing cri-resmgr to VM from image: $crirm_image_info"
-	sleep 1
-	crirm_image_id="$(awk '{print $1}' <<< "$crirm_image_info")"
-	crirm_image_repotag="$(awk '{print $2}' <<< "$crirm_image_info")"
-	crirm_image_tar="$(realpath "$OUTPUT_DIR/cri-resmgr-image-$crirm_image_id.tar")"
-	docker image save "$crirm_image_repotag" > "$crirm_image_tar"
-	vm-put-file "$crirm_image_tar" "cri-resmgr/$(basename "$crirm_image_tar")" || {
-            command-error "copying cri-resmgr image to VM failed"
-	}
-	vm-cri-import-image cri-resmgr "cri-resmgr/$(basename "$crirm_image_tar")"
-
-	echo "installing cri-resmgr-agent to VM from image: $crirm_agent_image_info"
-	crirm_agent_image_id="$(awk '{print $1}' <<< "$crirm_agent_image_info")"
-	crirm_agent_image_repotag="$(awk '{print $2}' <<< "$crirm_agent_image_info")"
-	crirm_agent_image_tar="$(realpath "$OUTPUT_DIR/cri-resmgr-agent-image-$crirm_agent_image_id.tar")"
-	docker image save "$crirm_agent_image_repotag" > "$crirm_agent_image_tar"
-	vm-put-file "$crirm_agent_image_tar" "cri-resmgr/$(basename "$crirm_agent_image_tar")" || {
-            command-error "copying cri-resmgr-agent image to VM failed"
-	}
-	vm-cri-import-image cri-resmgr-agent "cri-resmgr/$(basename "$crirm_agent_image_tar")"
-
-	vm-command "mkdir -p /etc/cri-resmgr"
-	sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
-            -e 's|^\(\s*\)tolerations:$|\1tolerations:\n\1  - {"key": "cmk", "operator": "Equal", "value": "true", "effect": "NoSchedule"}|g' \
-            -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
-	    -e "s|AGENT_IMAGE_PLACEHOLDER|$crirm_agent_image_repotag|" \
-	    -e "s|CRI_RM_CONFIG_OPTION|force|" \
-            < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e.yaml" \
-            | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment.yaml
-	sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
-            -e 's|^\(\s*\)tolerations:$|\1tolerations:\n\1  - {"key": "cmk", "operator": "Equal", "value": "true", "effect": "NoSchedule"}|g' \
-            -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
-	    -e "s|AGENT_IMAGE_PLACEHOLDER|$crirm_agent_image_repotag|" \
-	    -e "s|CRI_RM_CONFIG_OPTION|fallback|" \
-            < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e.yaml" \
-            | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment-fallback.yaml
-	sed -e "s|CRIRM_IMAGE_PLACEHOLDER|$crirm_image_repotag|" \
-            -e 's/imagePullPolicy: Always/imagePullPolicy: Never/g' \
-            < "${HOST_PROJECT_DIR}/cmd/cri-resmgr/cri-resmgr-deployment-e2e-reset-config-policy.yaml" \
-            | vm-pipe-to-file /etc/cri-resmgr/cri-resmgr-deployment-e2e-reset-config-policy.yaml
     elif [ "$binsrc" == "github" ]; then
         vm-install-golang
         vm-install-pkg make
