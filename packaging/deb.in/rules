@@ -15,8 +15,8 @@ override_dh_auto_test:
 override_dh_auto_build:
 override_dh_auto_install:
 	export PATH="$$PATH:$$(go env GOPATH)/bin"; \
-	make BUILD_DIRS="__BUILD_DIRS__" install DESTDIR=debian/__PACKAGE__
-	make BUILD_DIRS="__BUILD_DIRS__" install-licenses DESTDIR=debian/__PACKAGE__/usr/share/doc/__PACKAGE__
+	make BUILD_DIRS=cri-resmgr install DESTDIR=debian/__PACKAGE__
+	make BUILD_DIRS=cri-resmgr install-licenses DESTDIR=debian/__PACKAGE__/usr/share/doc/__PACKAGE__
 	cp README.md docs/*.md cmd/*/*.sample \
 	    debian/__PACKAGE__/usr/share/doc/__PACKAGE__
 

@@ -619,8 +619,7 @@ debian/%: packaging/deb.in/%
 	          -e "s/__VERSION__/$(DEB_VERSION)/g"       \
 	          -e "s/__AUTHOR__/$(USER_NAME)/g"          \
 	          -e "s/__EMAIL__/$(USER_EMAIL)/g"          \
-	          -e "s/__DATE__/$(BUILD_DATE)/g"           \
-	          -e "s/__BUILD_DIRS__/$(BUILD_DIRS)/g" $@
+	          -e "s/__DATE__/$(BUILD_DATE)/g" $@
 
 clean-deb:
 	$(Q)rm -fr debian
