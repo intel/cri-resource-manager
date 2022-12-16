@@ -5,6 +5,8 @@
 #   must not be migrated to PMEM.
 # - Migration speed is as configured.
 
+vm-command "echo 0 > /proc/sys/kernel/numa_balancing || true"
+
 # Relaunch cri-resmgr with dynamic page demotion configuration.
 cri_resmgr_cfg=$TEST_DIR/cri-resmgr-dynamic-page-demotion.cfg
 terminate cri-resmgr
