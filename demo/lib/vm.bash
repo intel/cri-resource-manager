@@ -1053,7 +1053,7 @@ vm-install-cni-cilium() {
 }
 
 vm-install-cni-weavenet() {
-    vm-command "kubectl apply -f \"https://cloud.weave.works/k8s/net?k8s-version=\$(kubectl version | base64 | tr -d '\n')\""
+    vm-command "kubectl apply -f https://github.com/weaveworks/weave/releases/download/v2.8.1/weave-daemonset-k8s.yaml"
     if ! vm-command "kubectl rollout status --timeout=360s -n kube-system daemonsets/weave-net"; then
         command-error "installing weavenet CNI to Kubernetes failed/timed out"
     fi
