@@ -30,7 +30,7 @@ type Controller int
 // Group represents a control group.
 type Group string
 
-//nolint
+// nolint
 const (
 	// UnkownController represents a controller of unknown type.
 	UnknownController Controller = iota
@@ -104,17 +104,25 @@ func (c Controller) String() string {
 
 // Path returns the absolute path of the given controller.
 func (c Controller) Path() string {
+	DetectSystemCgroupVersion()
+	if systemCgroupVersion == 2 {
+		return GetMountDir()
+	}
 	return path.Join(mountDir, c.String())
 }
 
 // RelPath returns the relative path of the given controller.
 func (c Controller) RelPath() string {
+	DetectSystemCgroupVersion()
+	if systemCgroupVersion == 2 {
+		return ""
+	}
 	return c.String()
 }
 
 // Group returns the given group for the controller.
 func (c Controller) Group(group string) Group {
-	return Group(path.Join(mountDir, c.String(), group))
+	return Group(path.Join(c.Path(), group))
 }
 
 // AsGroup returns the group for the given absolute directory path.
@@ -124,6 +132,10 @@ func AsGroup(absDir string) Group {
 
 // Controller returns the controller for the group.
 func (g Group) Controller() Controller {
+	DetectSystemCgroupVersion()
+	if systemCgroupVersion == 2 {
+		return UnknownController
+	}
 	relPath := strings.TrimPrefix(string(g), mountDir+"/")
 	split := strings.SplitN(relPath, "/", 2)
 	if len(split) > 0 {
