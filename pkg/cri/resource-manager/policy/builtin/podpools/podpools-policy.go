@@ -178,7 +178,7 @@ func (p *podpools) Description() string {
 // Start prepares this policy for accepting allocation/release requests.
 func (p *podpools) Start(add []cache.Container, del []cache.Container) error {
 	log.Info("%s policy started", PolicyName)
-	return p.Sync(add, del)
+	return p.Sync(p.cch.GetContainers(), del)
 }
 
 // Sync synchronizes the active policy state.

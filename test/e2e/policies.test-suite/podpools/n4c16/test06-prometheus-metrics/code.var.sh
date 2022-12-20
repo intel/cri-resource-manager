@@ -97,6 +97,8 @@ CPUREQ="" CPULIM=""
 namespace=kube-system CONTCOUNT=3 create podpools-busybox
 report allowed
 vm-command "curl --silent $metrics_url | grep -v ^cgroup_"
-verify-log-vs-metrics pod5:pod5c1 0 20
+# There should be kube-apiserver, etcd etc. running on reserved CPUs as well,
+# therefore allow a lot of CPU usage yet pod5 is not doing anything.
+verify-log-vs-metrics pod5:pod5c1 0 100
 
 cleanup
