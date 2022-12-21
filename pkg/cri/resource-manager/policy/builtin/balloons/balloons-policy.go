@@ -202,7 +202,7 @@ func (p *balloons) Description() string {
 func (p *balloons) Start(add []cache.Container, del []cache.Container) error {
 	log.Info("%s policy started", PolicyName)
 	// reassign all containers
-	return p.Sync(p.cch.GetContainers(), nil)
+	return p.Sync(p.cch.GetContainers(), del)
 }
 
 // Sync synchronizes the active policy state.
