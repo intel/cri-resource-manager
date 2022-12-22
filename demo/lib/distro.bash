@@ -529,6 +529,10 @@ fedora-install-containerd-pre() {
     fedora-install-containernetworking-plugins
 }
 
+fedora-install-containerd-post() {
+    vm-command "systemctl enable containerd"
+}
+
 fedora-install-k8s() {
     local repo="/etc/yum.repos.d/kubernetes.repo"
     local base="https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch"
