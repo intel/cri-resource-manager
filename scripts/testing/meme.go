@@ -231,7 +231,7 @@ func freeBArray() {
 
 func main() {
 	fmt.Printf("memory exerciser\npid: %d\n", os.Getpid())
-	optTTL := flag.Int("ttl", -1, "do not wait for keypress, terminate after given time (seconds)")
+	optTTL := flag.String("ttl", "", "do not wait for keypress, terminate after given time T(ns|us|s|m|h)")
 	optBCount := flag.Int("bc", 1, "number of byte arrays")
 	optBCountDelta := flag.String("bcd", "", "array count delta: DELTA/T[,DELTA/T...], \"1/20s,-6/2m\": add 1 array every 20 s, delete 6 arrays every 2 minutes")
 	optBSize := flag.String("bs", "1G", "size of each byte array [k, M or G]")
@@ -294,10 +294,10 @@ func main() {
 	}
 
 	// wait
-	if *optTTL == -1 {
+	if *optTTL == "" {
 		fmt.Printf("press enter to exit...\n")
 		bufio.NewReader(os.Stdin).ReadString('\n')
 	} else {
-		time.Sleep(time.Duration(*optTTL) * time.Second)
+		time.Sleep(numNs("-ttl", *optTTL))
 	}
 }
