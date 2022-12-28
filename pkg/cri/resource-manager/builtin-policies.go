@@ -23,6 +23,7 @@ import (
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/static-plus"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/static-pools"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/topology-aware"
+	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/dynamic-pools"
 )
 
 // TODO: add unit tests to verify that all builtin policies are found
