@@ -1,44 +1,51 @@
 memtierd-setup
 
+# Create swap
 zram-swap off
 zram-swap 2G
 
-memtierd-meme-start
-
-vm-command "pgrep meme"
-echo "meme pid: $MEME_PID"
+# Test that 700M+ is swapped out from a process that has 1G of memory
+# and writes actively 300M.
+MEME_BS=1G MEME_BWC=1 MEME_BWS=300M memtierd-meme-start
 
 MEMTIERD_YAML="
 policy:
   name: heat
   config: |
-    intervalms: 10000
+    intervalms: 4000
     pids:
       - $MEME_PID
     heatnumas:
       0: [-1]
     heatmap:
       heatmax: 0.01
-      heatretention: 0.8
+      heatretention: 0
       heatclasses: 5
     tracker:
       name: softdirty
       config: |
-        pagesinregion: 256
+        pagesinregion: 512
         maxcountperregion: 0
-        scanintervalms: 1000
+        scanintervalms: 500
         regionsupdatems: 0
     mover:
       intervalms: 20
-      bandwidth: 200
+      bandwidth: 1000
 "
 memtierd-start
 
-sleep 5
-memtierd-command "stats"
-vm-command "cat memtierd.output.txt"
-sleep 1
-memtierd-command "policy -dump heatgram"
+sleep 4
+echo "waiting 700M+ to be paged out..."
+while ! ( memtierd-command "stats"; grep PAGEOUT:0\.7[0-9][0-9] <<< $COMMAND_OUTPUT); do
+    echo ":::$COMMAND_OUTPUT:::"
+    sleep 1
+done
+
+echo "check swap status: correct pages have been paged out."
+memtierd-command "swap -pid $MEME_PID -status"
+grep " 7[0-9][0-9] " <<< $COMMAND_OUTPUT || {
+    error "expected 7XX MB of swapped out"
+}
 
 memtierd-stop
 memtierd-meme-stop

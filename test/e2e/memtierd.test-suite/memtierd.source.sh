@@ -1,4 +1,5 @@
 MEMTIERD_PORT=${MEMTIERD_PORT:-5555}
+MEMTIERD_OUTPUT=memtierd.output.txt
 
 memtierd-setup() {
     memtierd-install
@@ -22,7 +23,7 @@ memtierd-reset() {
 
 memtierd-start() {
     vm-pipe-to-file "memtierd.yaml" <<< "${MEMTIERD_YAML}"
-    vm-command "nohup sh -c 'socat tcp4-listen:${MEMTIERD_PORT},fork,reuseaddr - | memtierd -config memtierd.yaml -debug' > memtierd.output.txt 2>&1 & sleep 2; cat memtierd.output.txt"
+    vm-command "nohup sh -c 'socat tcp4-listen:${MEMTIERD_PORT},fork,reuseaddr - | memtierd -config memtierd.yaml -debug' > ${MEMTIERD_OUTPUT} 2>&1 & sleep 2; cat ${MEMTIERD_OUTPUT}"
 }
 
 memtierd-stop() {
@@ -32,11 +33,11 @@ memtierd-stop() {
 }
 
 memtierd-command() {
-    vm-command "echo '$1' | socat - tcp4:localhost:${MEMTIERD_PORT}"
+    vm-command "offset=\$(wc -l ${MEMTIERD_OUTPUT} | awk '{print \$1+1}'); echo '$1' | socat - tcp4:localhost:${MEMTIERD_PORT}; sleep 1; tail -n+\${offset} ${MEMTIERD_OUTPUT}"
 }
 
 memtierd-meme-start() {
-    vm-command "nohup meme -bs 1G -brc 0 -bwc 1 -bws 128M -bwo 256M -ttl 1h < /dev/null > meme.output.txt 2>&1 & sleep 2; cat meme.output.txt"
+    vm-command "nohup meme -bs ${MEME_BS:-1G} -brc ${MEME_BRC:-0} -bwc ${MEME_BWC:-0} -bws ${MEME_BWS:-0} -bwo ${MEME_BWO:-0} -ttl ${MEME_TTL:-1h} < /dev/null > meme.output.txt 2>&1 & sleep 2; cat meme.output.txt"
     MEME_PID=$(awk '/pid:/{print $2}' <<< $COMMAND_OUTPUT)
 }
 
