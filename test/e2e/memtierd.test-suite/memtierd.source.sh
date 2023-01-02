@@ -39,6 +39,12 @@ memtierd-command() {
 memtierd-meme-start() {
     vm-command "nohup meme -bs ${MEME_BS:-1G} -brc ${MEME_BRC:-0} -bwc ${MEME_BWC:-0} -bws ${MEME_BWS:-0} -bwo ${MEME_BWO:-0} -ttl ${MEME_TTL:-1h} < /dev/null > meme.output.txt 2>&1 & sleep 2; cat meme.output.txt"
     MEME_PID=$(awk '/pid:/{print $2}' <<< $COMMAND_OUTPUT)
+    if [[ -z "$MEME_PID" ]]; then
+        command-error "failed to start meme, pid not found"
+    fi
+    if [[ -n "$MEME_CGROUP" ]]; then
+        vm-command "mkdir /sys/fs/cgroup/$MEME_CGROUP; echo $MEME_PID > /sys/fs/cgroup/$MEME_CGROUP/cgroup.procs"
+    fi
 }
 
 memtierd-meme-stop() {
