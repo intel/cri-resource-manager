@@ -49,8 +49,8 @@ const (
 	dynamicPoolKey = "dynamic-pool." + PolicyName + "." + kubernetes.ResmgrKeyNamespace
 	// reservedDynamicPoolDefName is the name in the reserved dynamicPool definition.
 	reservedDynamicPoolDefName = "reserved"
-	// defaultDynamicPoolDefName is the name in the default dynamicPool definition.
-	defaultDynamicPoolDefName = "shared"
+	// sharedDynamicPoolDefName is the name in the shared dynamicPool definition.
+	sharedDynamicPoolDefName = "shared"
 )
 
 // dynamicPools contains configuration and runtime attributes of the dynamic-pools policy
@@ -63,8 +63,8 @@ type dynamicPools struct {
 	freeCpus  cpuset.CPUSet             // CPUs to be included in growing dynamicPools
 
 	reservedDynamicPoolDef *DynamicPoolDef // built-in definition of the reserved dynamicPool
-	defaultDynamicPoolDef  *DynamicPoolDef // built-in definition of the default dynamicPool
-	dynamicPools           []*DynamicPool  // dynamicPool instances: reserved, default and user-defined
+	sharedDynamicPoolDef   *DynamicPoolDef // built-in definition of the shared dynamicPool
+	dynamicPools           []*DynamicPool  // dynamicPool instances: reserved, shared and user-defined
 
 	cpuAllocator cpuallocator.CPUAllocator // CPU allocator used by the policy
 }
@@ -120,42 +120,40 @@ func (dp DynamicPool) AvailMilliCpus() int {
 }
 
 // updateRealCpuUsed returns cpu utilization of a dynamicPool.
-func (p *dynamicPools) updateRealCpuUsed(dp *DynamicPool) (int, error) {
+func (dp *DynamicPool) updateRealCpuUsed(cpuInfo []float64) (float64, error) {
 	if dp.Cpus.Size() == 0 {
-		log.Info("dynamic pool %s cpuset is 0", dp.Def.Name)
+		log.Debug("dynamic pool %s cpuset is 0", dp.Def.Name)
 		return 0, nil
 	}
-	cpuInfo, _ := getCpuUtilization(time.Duration(time.Second))
-	cpus := dp.Cpus.ToSlice()
+	cpus := dp.Cpus.ToSliceNoSort()
 	var sum float64
 	for i := 0; i < len(cpus); i++ {
 		sum += cpuInfo[cpus[i]]
 	}
-	res := int(sum / float64(100))
-
-	log.Info("dynamic pool %s cpuset: %s,  cpu utilization: %d", dp.Def.Name, dp.Cpus, res)
-	return res, nil
+	log.Debug("dynamic pool %s cpuset: %s,  cpu utilization: %d", dp.Def.Name, dp.Cpus, sum)
+	return sum, nil
 }
 
 // calculateAllPoolWeights returns weights of all dynamicPools and the sum of weights.
 // Use dynamicPool's cpu utilization as its weight.
-func (p *dynamicPools) calculateAllPoolWeights() (map[*DynamicPool]int, int, error) {
-	weight := make(map[*DynamicPool]int)
-	sumWeight := 0
+func (p *dynamicPools) calculateAllPoolWeights() (map[*DynamicPool]float64, float64, error) {
+	cpuInfo, _ := getCpuUtilization(time.Duration(time.Second))
+	weight := make(map[*DynamicPool]float64)
+	sumWeight := 0.0
 	for _, dp := range p.dynamicPools {
-		if dp.Def.Name == "reserved" {
+		if dp.Def.Name == reservedDynamicPoolDefName {
 			continue
 		}
-		realCpuUsed, err := p.updateRealCpuUsed(dp)
+		realCpuUsed, err := dp.updateRealCpuUsed(cpuInfo)
 		if err != nil {
 			return weight, sumWeight, dynamicPoolsError("The actual cpu usage of the dynamic pool %s cannot be obtained: %w",
 				dp.PrettyName(), err)
 		}
 		weight[dp] = realCpuUsed
 		sumWeight += weight[dp]
-		log.Info("dyanmic pool: %s, realCpuUsed: %d, weight: %d", dp, realCpuUsed, weight[dp])
+		log.Debug("dynamic pool: %s, realCpuUsed: %d, weight: %d", dp, realCpuUsed, weight[dp])
 	}
-	log.Info("sum weight: %d", sumWeight)
+	log.Debug("sum weight: %d", sumWeight)
 	return weight, sumWeight, nil
 }
 
@@ -165,14 +163,14 @@ func (p *dynamicPools) calculateAllPoolRequests() (map[*DynamicPool]int, int) {
 	requestCpu := make(map[*DynamicPool]int)
 	remainFree := p.allowed.Difference(p.reserved).Size()
 	for _, dp := range p.dynamicPools {
-		if dp.Def.Name == "reserved" {
+		if dp.Def.Name == reservedDynamicPoolDefName {
 			continue
 		}
 		requestCpu[dp] = (p.requestedMinMilliCpus(dp) + 999) / 1000
 		remainFree -= requestCpu[dp]
-		log.Info("dyanmic pool %s request cpu %d", dp, requestCpu[dp])
+		log.Debug("dynamic pool %s request cpu %d", dp, requestCpu[dp])
 	}
-	log.Info("sum remain free cpu %d", remainFree)
+	log.Debug("sum remain free cpu %d", remainFree)
 	return requestCpu, remainFree
 }
 
@@ -197,8 +195,8 @@ func (p *dynamicPools) updatePoolCpuset() error {
 		usedCpu := 0
 		// Ensure that there is at least one cpu in the shared dynamicPool.
 		for _, dp := range p.dynamicPools {
-			if dp.Def.Name == "shared" && sumWeight != 0 {
-				addCpu := remainFree * weight[dp] / sumWeight
+			if dp.Def.Name == sharedDynamicPoolDefName && sumWeight != 0 {
+				addCpu := int(float64(remainFree) * weight[dp] / sumWeight)
 				if requestCpu[dp]+addCpu < 1 {
 					requestCpu[dp] = 1
 					remainFree -= 1
@@ -206,21 +204,21 @@ func (p *dynamicPools) updatePoolCpuset() error {
 			}
 		}
 		for _, dp := range p.dynamicPools {
-			if dp.Def.Name == "reserved" {
+			if dp.Def.Name == reservedDynamicPoolDefName {
 				continue
 			}
 			if sumWeight != 0 {
-				addCpu := remainFree * weight[dp] / sumWeight
+				addCpu := int(float64(remainFree) * weight[dp] / sumWeight)
 				requestCpu[dp] += addCpu
 				usedCpu += addCpu
 			}
-			log.Info("dyanmic pool %s new request cpu %d, remain free cpu %d", dp, requestCpu[dp], remainFree-usedCpu)
+			log.Info("The cpu that dynamic pool %s needs to allocate is %d, remain free cpu %d", dp, requestCpu[dp], remainFree-usedCpu)
 		}
 		if usedCpu < remainFree {
 			// If there is still cpus, give the dynamicPool with the highest cpu utilization.
 			tmp := p.dynamicPools[1]
 			for _, dp := range p.dynamicPools {
-				if dp.Def.Name == "reserved" {
+				if dp.Def.Name == reservedDynamicPoolDefName {
 					continue
 				}
 				if weight[dp] > weight[tmp] {
@@ -228,7 +226,7 @@ func (p *dynamicPools) updatePoolCpuset() error {
 				}
 			}
 			requestCpu[tmp] += (remainFree - usedCpu)
-			log.Info("dyanmic pool %s new request cpu %d, remain free cpu %d", tmp, requestCpu[tmp], 0)
+			log.Info("The cpu that dynamic pool %s needs to allocate is %d, remain free cpu %d", tmp, requestCpu[tmp], 0)
 		}
 	}
 
@@ -236,7 +234,7 @@ func (p *dynamicPools) updatePoolCpuset() error {
 	// it means that there is no need to re-allocate
 	isNeedReallocate := false
 	for _, dp := range p.dynamicPools {
-		if dp.Def.Name == "reserved" {
+		if dp.Def.Name == reservedDynamicPoolDefName {
 			continue
 		}
 		if dp.Cpus.Size() != requestCpu[dp] {
@@ -253,7 +251,7 @@ func (p *dynamicPools) updatePoolCpuset() error {
 	}
 
 	for _, dp := range p.dynamicPools {
-		if dp.Def.Name == "reserved" {
+		if dp.Def.Name == reservedDynamicPoolDefName {
 			continue
 		}
 		if dp.Cpus.Size() == 0 {
@@ -267,7 +265,7 @@ func (p *dynamicPools) updatePoolCpuset() error {
 		p.freeCpus = p.freeCpus.Union(dp.Cpus)
 	}
 	for _, dp := range p.dynamicPools {
-		if dp.Def.Name == "reserved" {
+		if dp.Def.Name == reservedDynamicPoolDefName {
 			continue
 		}
 		newCpus, err := p.cpuAllocator.AllocateCpus(&p.freeCpus, requestCpu[dp], dp.Def.AllocatorPriority)
@@ -455,11 +453,11 @@ func (p *dynamicPools) dynamicPoolByDef(dpDef *DynamicPoolDef) *DynamicPool {
 
 // dynamicPoolDefByName returns a dynamicPool definition with a name.
 func (p *dynamicPools) dynamicPoolDefByName(defName string) *DynamicPoolDef {
-	if defName == "reserved" {
+	if defName == reservedDynamicPoolDefName {
 		return p.reservedDynamicPoolDef
 	}
-	if defName == "default" {
-		return p.defaultDynamicPoolDef
+	if defName == sharedDynamicPoolDefName {
+		return p.sharedDynamicPoolDef
 	}
 	for _, dpDef := range p.dpoptions.DynamicPoolDefs {
 		if dpDef.Name == defName {
@@ -472,10 +470,10 @@ func (p *dynamicPools) dynamicPoolDefByName(defName string) *DynamicPoolDef {
 // chooseDynamicPoolDef returns the dynamicPoolDef selected by the container
 func (p *dynamicPools) chooseDynamicPoolDef(c cache.Container) (*DynamicPoolDef, error) {
 	var dpDef *DynamicPoolDef
-	// If the requests and limits of container are 0, they are assigned to the default dynamicPool.
+	// If the requests and limits of container are 0, they are assigned to the shared dynamicPool.
 	if !namespaceMatches(c.GetNamespace(), append(p.dpoptions.ReservedPoolNamespaces, metav1.NamespaceSystem)) &&
 		p.containerRequestedMilliCpus(c.GetCacheID()) == 0 && p.containerLimitedMilliCpus(c.GetCacheID()) == 0 {
-		return p.defaultDynamicPoolDef, nil
+		return p.sharedDynamicPoolDef, nil
 	}
 
 	// DynamicPoolDef is defined by annotation?
@@ -494,14 +492,14 @@ func (p *dynamicPools) chooseDynamicPoolDef(c cache.Container) (*DynamicPoolDef,
 	}
 
 	// DynamicPoolDef is defined by the namespace?
-	for _, dpDef := range append([]*DynamicPoolDef{p.reservedDynamicPoolDef, p.defaultDynamicPoolDef},
+	for _, dpDef := range append([]*DynamicPoolDef{p.reservedDynamicPoolDef, p.sharedDynamicPoolDef},
 		p.dpoptions.DynamicPoolDefs...) {
 		if namespaceMatches(c.GetNamespace(), dpDef.Namespaces) {
 			return dpDef, nil
 		}
 	}
-	// Fallback to the default dynamicPool.
-	return p.defaultDynamicPoolDef, nil
+	// Fallback to the shared dynamicPool.
+	return p.sharedDynamicPoolDef, nil
 }
 
 func (p *dynamicPools) containerRequestedMilliCpus(contID string) int {
@@ -739,13 +737,13 @@ func (p *dynamicPools) configNotify(event pkgcfg.Event, source pkgcfg.Source) er
 // dynamicPools according to the dpDef. Does not initialize dynamicPool CPUs.
 func (p *dynamicPools) applyDynamicPoolDef(dynamicPools *[]*DynamicPool, dpDef *DynamicPoolDef) error {
 	if len(*dynamicPools) < 2 {
-		return dynamicPoolsError("internal error: reserved and default dynamicPools missing, cannot apply dynamicPool definitions")
+		return dynamicPoolsError("internal error: reserved and shared dynamicPools missing, cannot apply dynamicPool definitions")
 	}
 	reservedDynamicPool := (*dynamicPools)[0]
-	defaultDynamicPool := (*dynamicPools)[1]
+	sharedDynamicPool := (*dynamicPools)[1]
 	// Every dynamicPoolDef does one of the following:
 	// 1. reconfigures the "reserved" dynamicPool (most restricted)
-	// 2. reconfigures the "default" dynamicPool (somewhat restricted)
+	// 2. reconfigures the "shared" dynamicPool (somewhat restricted)
 	// 3. defines new user-defined dynamicPool.
 	switch dpDef.Name {
 	case "":
@@ -756,11 +754,11 @@ func (p *dynamicPools) applyDynamicPoolDef(dynamicPools *[]*DynamicPool, dpDef *
 		p.reservedDynamicPoolDef.AllocatorPriority = dpDef.AllocatorPriority
 		p.reservedDynamicPoolDef.CpuClass = dpDef.CpuClass
 		p.reservedDynamicPoolDef.Namespaces = dpDef.Namespaces
-	case defaultDynamicPool.Def.Name:
-		// Case 2: reconfigure the "default" dynamicPool.
-		p.defaultDynamicPoolDef.AllocatorPriority = dpDef.AllocatorPriority
-		p.defaultDynamicPoolDef.CpuClass = dpDef.CpuClass
-		p.defaultDynamicPoolDef.Namespaces = dpDef.Namespaces
+	case sharedDynamicPool.Def.Name:
+		// Case 2: reconfigure the "shared" dynamicPool.
+		p.sharedDynamicPoolDef.AllocatorPriority = dpDef.AllocatorPriority
+		p.sharedDynamicPoolDef.CpuClass = dpDef.CpuClass
+		p.sharedDynamicPoolDef.Namespaces = dpDef.Namespaces
 	default:
 		// Case 3: create each user-defined dynamicPool without CPU.
 		newdp, err := p.newDynamicPool(dpDef, false)
@@ -774,35 +772,35 @@ func (p *dynamicPools) applyDynamicPoolDef(dynamicPools *[]*DynamicPool, dpDef *
 
 // setConfig takes new dynamicPool configuration into use.
 func (p *dynamicPools) setConfig(dpoptions *DynamicPoolsOptions) error {
-	// Create the default reserved and default dynamicPool
+	// Create the default reserved and shared dynamicPool
 	// definitions. Some properties of these definitions may be
 	// altered by user configuration.
 	p.reservedDynamicPoolDef = &DynamicPoolDef{
 		Name:              reservedDynamicPoolDefName,
 		AllocatorPriority: 3,
 	}
-	p.defaultDynamicPoolDef = &DynamicPoolDef{
-		Name:              defaultDynamicPoolDefName,
+	p.sharedDynamicPoolDef = &DynamicPoolDef{
+		Name:              sharedDynamicPoolDefName,
 		AllocatorPriority: 3,
 	}
 	p.dynamicPools = []*DynamicPool{}
 	p.freeCpus = p.allowed.Clone()
 	p.freeCpus = p.freeCpus.Difference(p.reserved)
-	// Instantiate built-in reserved and default dynamicPool.
+	// Instantiate built-in reserved and shared dynamicPool.
 	reservedDynamicPool, err := p.newDynamicPool(p.reservedDynamicPoolDef, false)
 	if err != nil {
 		return err
 	}
 	p.dynamicPools = append(p.dynamicPools, reservedDynamicPool)
-	defaultDynamicPool, err := p.newDynamicPool(p.defaultDynamicPoolDef, false)
+	sharedDynamicPool, err := p.newDynamicPool(p.sharedDynamicPoolDef, false)
 	if err != nil {
 		return err
 	}
-	p.dynamicPools = append(p.dynamicPools, defaultDynamicPool)
+	p.dynamicPools = append(p.dynamicPools, sharedDynamicPool)
 	// First apply customizations to built-in dynamicPools: "reserved"
-	// and "default".
+	// and "shared".
 	for _, dpDef := range dpoptions.DynamicPoolDefs {
-		if dpDef.Name != reservedDynamicPoolDefName && dpDef.Name != defaultDynamicPoolDefName {
+		if dpDef.Name != reservedDynamicPoolDefName && dpDef.Name != sharedDynamicPoolDefName {
 			continue
 		}
 		if err := p.applyDynamicPoolDef(&p.dynamicPools, dpDef); err != nil {
@@ -810,9 +808,9 @@ func (p *dynamicPools) setConfig(dpoptions *DynamicPoolsOptions) error {
 		}
 	}
 	// Apply all user dynamicPool definitions, skip already customized
-	// "reserved" and "default" dynamicPools.
+	// "reserved" and "shared" dynamicPools.
 	for _, dpDef := range dpoptions.DynamicPoolDefs {
-		if dpDef.Name == reservedDynamicPoolDefName || dpDef.Name == defaultDynamicPoolDefName {
+		if dpDef.Name == reservedDynamicPoolDefName || dpDef.Name == sharedDynamicPoolDefName {
 			continue
 		}
 		if err := p.applyDynamicPoolDef(&p.dynamicPools, dpDef); err != nil {
