@@ -37,7 +37,6 @@ Dynamic-pools policy parameters:
 
 * `PinCPU` controls pinning a container to CPUs of its dynamic-pool. The default is  `true`: the container cannot use other CPUs.
 * `PinMemory` controls pinning a container to the memories that are closest to the CPUs of its dynamic-pool. The default is `true`: allow using memory only from the closest NUMA nodes. Warning: this may cause kernel to kill workloads due to out-of-memory error when closest NUMA nodes do not have enough memory. In this situation consider switching this option `false`.
-* `IdleCPUClass` specifies the CPU class of those CPUs that do not belong to any dynamic-pool.
 * `ReservedPoolNamespaces` is a list of namespaces (wildcards allowed) that are assigned to the special reserved dynamic-pool, that is, will run on reserved CPUs. This always includes the `kube-system` namespace.
 * `DynamicPoolTypes` is a list of dynamic-pool type definitions. Each type can be configured with the following parameters:
   - `Name` of the dynamic-pool type. This is used in pod annotations to assign containers to dynamic-pool of this type.

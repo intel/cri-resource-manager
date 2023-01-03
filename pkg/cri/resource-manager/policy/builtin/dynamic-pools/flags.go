@@ -31,9 +31,6 @@ type dynamicPoolsOptionsWrapped struct {
 	PinCPU *bool `json:"PinCPU,omitempty"`
 	// PinMemory controls pinning containers to memory nodes.
 	PinMemory *bool `json:"PinMemory,omitempty"`
-	// IdleCpuClass controls how unusded CPUs outside any a
-	// dynamicPool are (re)configured.
-	IdleCpuClass string `json:"IdleCPUClass",omitempty"`
 	// ReservedPoolNamespaces is a list of namespace globs that
 	// will be allocated to reserved CPUs.
 	ReservedPoolNamespaces []string `json:"ReservedPoolNamespaces,omitempty"`
@@ -44,7 +41,7 @@ type dynamicPoolsOptionsWrapped struct {
 // DynamicPoolDef contains a dynamicPool definition.
 type DynamicPoolDef struct {
 	// Name of the dynamicPool definition.
-	Name string `json:"Name"`
+	Name       string   `json:"Name"`
 	Namespaces []string `json:"Namespaces",omitempty`
 	CpuClass   string   `json:"CpuClass"`
 	// AllocatorPriority (0: High, 1: Normal, 2: Low, 3: None)

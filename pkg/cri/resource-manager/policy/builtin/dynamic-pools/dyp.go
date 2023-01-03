@@ -259,7 +259,6 @@ func (p *dynamicPools) updatePoolCpuset() error {
 		if dp.Cpus.Size() == 0 {
 			continue
 		}
-		p.forgetCpuClass(dp)
 		oldCpus := dp.Cpus.Clone()
 		keptCpus, err := p.cpuAllocator.ReleaseCpus(&oldCpus, dp.Cpus.Size(), dp.Def.AllocatorPriority)
 		if err != nil || keptCpus.Size() != 0 {
@@ -549,25 +548,6 @@ func (p *dynamicPools) requestedMinMilliCpus(dp *DynamicPool) int {
 	return cpuRequested
 }
 
-// resetCpuClass resets CPU configurations globally. All dynamicPools can
-// be ignored, their CPU configurations will be applied later.
-func (p *dynamicPools) resetCpuClass() error {
-	// Usual inputs:
-	// - p.allowed (cpuset.CPUset): all CPUs available for this
-	//   policy.
-	// - p.IdleCpuClass (string): CPU class for allowed CPUs.
-	//
-	// Other inputs, if needed:
-	// - p.reserved (cpuset.CPUset): CPUs of ReservedResources
-	//   (typically for kube-system containers).
-	//
-	// Note: p.useCpuClass(dynamicPool) will be called before assigning
-	// containers on the dynamicPool, including the reserved dynamicPool.
-	cpucontrol.Assign(p.cch, p.dpoptions.IdleCpuClass, p.allowed.ToSliceNoSort()...)
-	log.Debugf("resetCpuClass available: %s; reserved: %s", p.allowed, p.reserved)
-	return nil
-}
-
 // useCpuClass configures CPUs of a dynamicPool.
 func (p *dynamicPools) useCpuClass(dp *DynamicPool) error {
 	// Usual inputs:
@@ -591,16 +571,6 @@ func (p *dynamicPools) useCpuClass(dp *DynamicPool) error {
 	cpucontrol.Assign(p.cch, dp.Def.CpuClass, dp.Cpus.ToSliceNoSort()...)
 	log.Debugf("useCpuClass Cpus: %s; CpuClass: %s", dp.Cpus, dp.Def.CpuClass)
 	return nil
-}
-
-// forgetCpuClass is called when CPUs of a dynamicPool are released from duty.
-func (p *dynamicPools) forgetCpuClass(dp *DynamicPool) {
-	// Use p.IdleCpuClass for dp.Cpus.
-	// Usual inputs: see useCpuClass
-	// cpucontrol.Assign(p.cch, p.dpoptions.IdleCpuClass, dp.Cpus.ToSliceNoSort()...)
-	// Release CPUs to dafault dynamicPool.
-	cpucontrol.Assign(p.cch, p.dpoptions.IdleCpuClass, dp.Cpus.ToSliceNoSort()...)
-	log.Debugf("forgetCpuClass Cpus: %s; CpuClass: %s", dp.Cpus, dp.Def.CpuClass)
 }
 
 func (p *dynamicPools) newDynamicPool(dpDef *DynamicPoolDef, confCpus bool) (*DynamicPool, error) {
@@ -702,8 +672,6 @@ func changesDynamicPools(opts0, opts1 *DynamicPoolsOptions) bool {
 	o1 := opts1.DeepCopy()
 	// Ignore differences in CPU class names. Every other change
 	// potentially changes dynamicPools or workloads.
-	o0.IdleCpuClass = ""
-	o1.IdleCpuClass = ""
 	for i := range o0.DynamicPoolDefs {
 		o0.DynamicPoolDefs[i].CpuClass = ""
 		o1.DynamicPoolDefs[i].CpuClass = ""
@@ -720,9 +688,6 @@ func changesCpuClasses(opts0, opts1 *DynamicPoolsOptions) bool {
 		return false
 	}
 	if opts0 == nil || opts1 == nil {
-		return true
-	}
-	if opts0.IdleCpuClass != opts1.IdleCpuClass {
 		return true
 	}
 	if len(opts0.DynamicPoolDefs) != len(opts1.DynamicPoolDefs) {
@@ -755,7 +720,6 @@ func (p *dynamicPools) configNotify(event pkgcfg.Event, source pkgcfg.Source) er
 				p.dpoptions.DynamicPoolDefs[i].CpuClass = newDynamicPoolsOptions.DynamicPoolDefs[i].CpuClass
 			}
 			// (Re)configures all CPUs in DynamicPools.
-			p.resetCpuClass()
 			for _, dp := range p.dynamicPools {
 				p.useCpuClass(dp)
 			}
@@ -863,7 +827,6 @@ func (p *dynamicPools) setConfig(dpoptions *DynamicPoolsOptions) error {
 	// No errors in dynamicPool creation, take new configuration into use.
 	p.dpoptions = *dpoptions
 	// (Re)configures all CPUs in dynamicPools.
-	p.resetCpuClass()
 	for _, dp := range p.dynamicPools {
 		p.useCpuClass(dp)
 	}

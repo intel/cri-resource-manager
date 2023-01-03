@@ -37,11 +37,9 @@ func TestChangesDynamicPools(t *testing.T) {
 		{
 			name: "reserved pool namespaces differ by len",
 			opts1: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc0",
 				ReservedPoolNamespaces: []string{"ns0"},
 			},
 			opts2: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc0",
 				ReservedPoolNamespaces: []string{},
 			},
 			expectedValue: true,
@@ -49,40 +47,24 @@ func TestChangesDynamicPools(t *testing.T) {
 		{
 			name: "reserved pool namespaces differ by content",
 			opts1: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc0",
 				ReservedPoolNamespaces: []string{"ns0"},
 			},
 			opts2: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc0",
 				ReservedPoolNamespaces: []string{"ns1"},
 			},
 			expectedValue: true,
 		},
 		{
-			name: "idle cpu classes differ",
+			name: "dynamic-pool defs differ",
 			opts1: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc0",
-				ReservedPoolNamespaces: []string{"ns0"},
-			},
-			opts2: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc1",
-				ReservedPoolNamespaces: []string{"ns0"},
-			},
-			expectedValue: false,
-		},
-		{
-			name: "balloon defs differ",
-			opts1: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc0",
 				ReservedPoolNamespaces: []string{"ns0"},
 				DynamicPoolDefs:        []*DynamicPoolDef{},
 			},
 			opts2: &DynamicPoolsOptions{
-				IdleCpuClass:           "icc1",
-				ReservedPoolNamespaces: []string{"ns0"},
+				ReservedPoolNamespaces: []string{"ns1"},
 				DynamicPoolDefs:        []*DynamicPoolDef{},
 			},
-			expectedValue: false,
+			expectedValue: true,
 		},
 	}
 	for _, tc := range tcases {
