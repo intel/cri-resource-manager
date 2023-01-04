@@ -27,8 +27,6 @@ type cpuTimesStat struct {
 	guestNice float64 `json:"guestNice"`
 }
 
-var clocksPerSecond = float64(100)
-
 // getCpuUtilization returns the utilization of each cpu in an interval
 func getCpuUtilization(interval time.Duration) ([]float64, error) {
 	ctx := context.Background()
@@ -56,7 +54,7 @@ func getCpuTimesStat(ctx context.Context) ([]cpuTimesStat, error) {
 
 	stat := make([]cpuTimesStat, 0, len(lines))
 	for _, l := range cpuLines {
-		oneStat, err := formatStatLine(l)
+		oneStat, err := parseStatLine(l)
 		if err != nil {
 			continue
 		}
@@ -98,10 +96,11 @@ func pathProcStat(stat string) string {
 	return filepath.Join(value, stat)
 }
 
+//readCpuLines skips the first line indicating the total CPU utilization.
 func readCpuLines(filename string) ([]string, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		return []string{""}, err
+		return nil, err
 	}
 	defer f.Close()
 	var statLines []string
@@ -116,7 +115,7 @@ func readCpuLines(filename string) ([]string, error) {
 
 	var cpuLines []string
 	if len(statLines) < 2 {
-		return []string{""}, nil
+		return nil, nil
 	}
 	for _, line := range statLines[1:] {
 		if !strings.HasPrefix(line, "cpu") {
@@ -127,15 +126,13 @@ func readCpuLines(filename string) ([]string, error) {
 	return cpuLines, nil
 }
 
-func formatStatLine(cpuLine string) (*cpuTimesStat, error) {
+// parseStatLine is to parse cpuLine into cpuTimesStat.
+func parseStatLine(cpuLine string) (*cpuTimesStat, error) {
 	values := strings.Fields(cpuLine)
-	if len(values) == 0 {
+	if len(values) == 0 || len(values) < 8 {
 		return nil, dynamicPoolsError("Stat does not contain cpu info.")
 	}
 	cpu := values[0]
-	if cpu == "cpu" {
-		cpu = "cpu-total"
-	}
 	user, err := strconv.ParseFloat(values[1], 64)
 	if err != nil {
 		return nil, err
@@ -166,38 +163,39 @@ func formatStatLine(cpuLine string) (*cpuTimesStat, error) {
 	}
 	cts := &cpuTimesStat{
 		cpu:     cpu,
-		user:    user / clocksPerSecond,
-		nice:    nice / clocksPerSecond,
-		system:  system / clocksPerSecond,
-		idle:    idle / clocksPerSecond,
-		ioWait:  ioWait / clocksPerSecond,
-		irq:     irq / clocksPerSecond,
-		softirq: softirq / clocksPerSecond,
+		user:    user,
+		nice:    nice,
+		system:  system,
+		idle:    idle,
+		ioWait:  ioWait,
+		irq:     irq,
+		softirq: softirq,
 	}
 	if len(values) > 8 { // Linux >= 2.6.11
 		steal, err := strconv.ParseFloat(values[8], 64)
 		if err != nil {
 			return nil, err
 		}
-		cts.steal = steal / clocksPerSecond
+		cts.steal = steal
 	}
 	if len(values) > 9 { // Linux >= 2.6.24
 		guest, err := strconv.ParseFloat(values[9], 64)
 		if err != nil {
 			return nil, err
 		}
-		cts.guest = guest / clocksPerSecond
+		cts.guest = guest
 	}
 	if len(values) > 10 { // Linux >= 3.2.0
 		guestNice, err := strconv.ParseFloat(values[10], 64)
 		if err != nil {
 			return nil, err
 		}
-		cts.guestNice = guestNice / clocksPerSecond
+		cts.guestNice = guestNice
 	}
 	return cts, nil
 }
 
+// calculateOneCpuUtilization returns the utilization of one cpu in an interval
 func calculateOneCpuUtilization(cts1, cts2 cpuTimesStat) float64 {
 	cts1Total, cts1Busy := getBusyTime(cts1)
 	cts2Total, cts2Busy := getBusyTime(cts2)
