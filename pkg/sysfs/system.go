@@ -244,6 +244,11 @@ func SetSysRoot(path string) {
 	sysRoot = path
 }
 
+// SysRoot returns the sys root directory.
+func SysRoot() string {
+	return sysRoot
+}
+
 // DiscoverSystem performs discovery of the running systems details.
 func DiscoverSystem(args ...DiscoveryFlag) (System, error) {
 	return DiscoverSystemAt(filepath.Join("/", sysRoot, "sys"))
