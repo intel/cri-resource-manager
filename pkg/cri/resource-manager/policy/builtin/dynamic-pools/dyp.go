@@ -183,6 +183,60 @@ func (p *dynamicPools) containerPinPool(dp *DynamicPool) {
 	}
 }
 
+// calculatePoolCpuset returns the cpus that dynamic pools need to allocate.
+func (p *dynamicPools) calculatePoolCpuset(requestCpu map[*DynamicPool]int, remainFree int, weight map[*DynamicPool]float64, sumWeight float64) map[*DynamicPool]int {
+	usedCpu := 0
+	// Ensure that there is at least one cpu in the shared dynamicPool.
+	for _, dp := range p.dynamicPools {
+		if dp.Def.Name == sharedDynamicPoolDefName && sumWeight != 0 {
+			addCpu := int(float64(remainFree) * weight[dp] / sumWeight)
+			if requestCpu[dp]+addCpu < 1 {
+				requestCpu[dp] = 1
+				remainFree -= 1
+			}
+		}
+	}
+	for _, dp := range p.dynamicPools {
+		if dp.Def.Name == reservedDynamicPoolDefName {
+			requestCpu[dp] = dp.Cpus.Size()
+		}
+		if sumWeight != 0 {
+			addCpu := int(float64(remainFree) * weight[dp] / sumWeight)
+			requestCpu[dp] += addCpu
+			usedCpu += addCpu
+		}
+		log.Info("The cpu that dynamic pool %s needs to allocate is %d, remain free cpu %d", dp, requestCpu[dp], remainFree-usedCpu)
+	}
+	if usedCpu < remainFree {
+		// If there is still cpus, give the dynamicPool with the highest cpu utilization.
+		tmp := p.dynamicPools[1]
+		for _, dp := range p.dynamicPools {
+			if dp.Def.Name == reservedDynamicPoolDefName {
+				continue
+			}
+			if weight[dp] > weight[tmp] {
+				tmp = dp
+			}
+		}
+		requestCpu[tmp] += (remainFree - usedCpu)
+		log.Info("The cpu that dynamic pool %s needs to allocate is %d, remain free cpu %d", tmp, requestCpu[tmp], 0)
+	}
+	return requestCpu
+}
+
+// isNeedReallocate returns whether the cpus need to be reallocated.
+func (p *dynamicPools) isNeedReallocate(newPoolCpu map[*DynamicPool]int) bool {
+	for _, dp := range p.dynamicPools {
+		if dp.Def.Name == reservedDynamicPoolDefName {
+			continue
+		}
+		if dp.Cpus.Size() != newPoolCpu[dp] {
+			return true
+		}
+	}
+	return false
+}
+
 // updatePoolCpuset updates the cpuset of the dynamicPools.
 func (p *dynamicPools) updatePoolCpuset() error {
 	requestCpu, remainFree := p.calculateAllPoolRequests()
@@ -192,57 +246,12 @@ func (p *dynamicPools) updatePoolCpuset() error {
 	}
 
 	if remainFree >= 1 {
-		usedCpu := 0
-		// Ensure that there is at least one cpu in the shared dynamicPool.
-		for _, dp := range p.dynamicPools {
-			if dp.Def.Name == sharedDynamicPoolDefName && sumWeight != 0 {
-				addCpu := int(float64(remainFree) * weight[dp] / sumWeight)
-				if requestCpu[dp]+addCpu < 1 {
-					requestCpu[dp] = 1
-					remainFree -= 1
-				}
-			}
-		}
-		for _, dp := range p.dynamicPools {
-			if dp.Def.Name == reservedDynamicPoolDefName {
-				continue
-			}
-			if sumWeight != 0 {
-				addCpu := int(float64(remainFree) * weight[dp] / sumWeight)
-				requestCpu[dp] += addCpu
-				usedCpu += addCpu
-			}
-			log.Info("The cpu that dynamic pool %s needs to allocate is %d, remain free cpu %d", dp, requestCpu[dp], remainFree-usedCpu)
-		}
-		if usedCpu < remainFree {
-			// If there is still cpus, give the dynamicPool with the highest cpu utilization.
-			tmp := p.dynamicPools[1]
-			for _, dp := range p.dynamicPools {
-				if dp.Def.Name == reservedDynamicPoolDefName {
-					continue
-				}
-				if weight[dp] > weight[tmp] {
-					tmp = dp
-				}
-			}
-			requestCpu[tmp] += (remainFree - usedCpu)
-			log.Info("The cpu that dynamic pool %s needs to allocate is %d, remain free cpu %d", tmp, requestCpu[tmp], 0)
-		}
+		requestCpu = p.calculatePoolCpuset(requestCpu, remainFree, weight, sumWeight)
 	}
 
 	// If the number of newly allocated CPUs is the same as the number of existing CPUs in the pool,
 	// it means that there is no need to re-allocate
-	isNeedReallocate := false
-	for _, dp := range p.dynamicPools {
-		if dp.Def.Name == reservedDynamicPoolDefName {
-			continue
-		}
-		if dp.Cpus.Size() != requestCpu[dp] {
-			isNeedReallocate = true
-			break
-		}
-	}
-	if !isNeedReallocate {
+	if !p.isNeedReallocate(requestCpu) {
 		log.Info("The number of CPUs required by the pools is the same as the number of CPUs already in the pools, so there is no need to reallocate.")
 		for _, dp := range p.dynamicPools {
 			p.containerPinPool(dp)
