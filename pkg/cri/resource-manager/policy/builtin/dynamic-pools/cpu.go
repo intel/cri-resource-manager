@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/intel/cri-resource-manager/pkg/sysfs"
 )
 
 type cpuTimesStat struct {
@@ -45,7 +47,7 @@ func getCpuUtilization(interval time.Duration) ([]float64, error) {
 }
 
 func getCpuTimesStat(ctx context.Context) ([]cpuTimesStat, error) {
-	filename := pathProcStat("stat")
+	filename := filepath.Join("/", sysfs.SysRoot(), "proc", "stat")
 	lines := []string{}
 	cpuLines, err := readCpuLines(filename)
 	if err != nil || len(cpuLines) == 0 {
@@ -83,17 +85,6 @@ func calculateAllCpusUtilization(cts1, cts2 []cpuTimesStat) ([]float64, error) {
 		allCpusUtilization[i] = calculateOneCpuUtilization(cts1[i], cts2[i])
 	}
 	return allCpusUtilization, nil
-}
-
-func pathProcStat(stat string) string {
-	key := "HOST_PROC"
-	defaul := "/proc"
-
-	value := os.Getenv(key)
-	if value == "" {
-		value = defaul
-	}
-	return filepath.Join(value, stat)
 }
 
 //readCpuLines skips the first line indicating the total CPU utilization.
