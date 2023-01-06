@@ -2,9 +2,9 @@
 
 ## Overview
 
-The dynamic-pools policy puts the workload in the dynamic-pool that are disjoint CPU pools. The dynamic-pools can be resized, that is CPUs added and removed, which is based on the requests of the containers and the CPU utilization of the workload in the dynamic-pools.
+The dynamic-pools policy can put the workload into different dynamic-pools. Each dynamic-pool contains several CPUs and can be resized dynamically in terms of the specific algorithms.
 
-On the premise that the CPUs in each dynamic-pool can meet the requests of the pods in the dynamic-pool, the CPUs are allocated based on the CPU utilization of the workload. Dynamic-pools policy try to keep CPU utilization balanced.
+The main idea of the algorithm is: on the premise that the CPUs in each dynamic-pool can meet the requests of the pods in the dynamic-pool, the CPUs are allocated based on the CPU utilization of the workload. Dynamic-pools policy try to keep CPU utilization balanced.
 
  CPUs in dynamic-pools can be configured, for example, by setting min and max frequencies on CPU cores and uncore.
 
@@ -16,9 +16,10 @@ On the premise that the CPUs in each dynamic-pool can meet the requests of the p
 4. Each logical CPU belongs to and belongs to at most one dynamic-pool. There cannot be CPUs that do not belong to any dynamic-pool.
 5. The number of CPUs in a dynamic-pool can change. If CPUs are added to a dynamic-pool, then all containers in the dynamic-pool can use more CPUs. The opposite is true if the CPUs are removed.
 6. As CPUs are added to or removed from the dynamic-pool, the CPUs are reconfigured according to the dynamic-pool's CPU class attributes or the idle CPU class attributes.
-7. Update the number of CPUs in dynamic-pools:
+7. Updating the number of CPUs in dynamic-pools:
    - The dynamic-pool policy needs to update the number of CPUs in dynamic-pools when starting policy, creating pods, deleting pods, updating configurations, and at regular intervals.
-   - The number of CPUs in the dynamic-pools is determined by the requests of containers and CPU utilization in the dynamic-pools. On the premise that the CPUs in each dynamic-pool can meet the requests of the pods in the pool, the CPUs are allocated based on the utilization of the workload.
+   - The number of CPUs in the dynamic-pools is determined by the requests of containers and CPU utilization in the dynamic-pools. 
+   - The number of CPUs allocated in each dynamic-pool is the sum of the requests of the containers in the dynamic pool and the CPUs allocated based on the CPU utilization of the workload.
 8. When a new container is created on a Kubernetes node, the policy first decides the type of the dynamic-pool that will run the container. The decision is based on the annotation of the pod, or the namespace if annotations are not given.
 
 ## Deployment
