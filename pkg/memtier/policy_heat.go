@@ -358,6 +358,7 @@ func (p *PolicyHeat) loop() {
 				stats.Store(StatsHeartbeat{"use forecast"})
 			}
 		}
+		p.updatePagedOutLocations(timestamp)
 		if p.mover.TaskCount() == 0 {
 			p.startMoves(timestamp)
 		}
@@ -378,6 +379,44 @@ func (p *PolicyHeat) loop() {
 	}
 	close(p.chLoop)
 	p.chLoop = nil
+}
+
+// updatePagedOutLocations: go through expected location of memory.
+// If an address range is expected to be on swap, check if it is still
+// there. If a single page in the range has been swapped back in
+// memory, mark the location (NUMA node / swap) of the whole address
+// range unknown.
+func (p *PolicyHeat) updatePagedOutLocations(timestamp int64) {
+	// TODO: limit checks to n address ranges per call to avoid
+	// too large cost on processes with huge amounts of swapped
+	// out memory.
+	checkPidArs := make(map[int][]*AddrRange)
+	for pid, addrDatas := range p.pidAddrDatas {
+		addrDatas.ForEach(func(ar *AddrRange, data interface{}) int {
+			arpi := data.(pageInfo)
+			if arpi.node == NODE_SWAP {
+				checkPidArs[pid] = append(checkPidArs[pid], ar)
+			}
+			return 0
+		})
+	}
+	for pid, ars := range checkPidArs {
+		pmFile, err := ProcPagemapOpen(pid)
+		if err != nil {
+			continue
+		}
+		for _, ar := range ars {
+			pmFile.ForEachPage([]AddrRange{*ar}, 0,
+				func(pmBits, pageAddr uint64) int {
+					if (pmBits>>PMB_SWAP)&1 == 1 {
+						return 0 // swapped out as expected
+					}
+					p.pidAddrDatas[pid].SetData(*ar, pageInfo{node: NODE_UNDEFINED})
+					return -1
+				})
+		}
+		pmFile.Close()
+	}
 }
 
 func (p *PolicyHeat) startMoves(timestamp int64) {
@@ -420,7 +459,8 @@ func (p *PolicyHeat) startMovesFillFastFree(timestamp int64) {
 			if addrData, ok := addrDatas.Data(hr.addr); ok {
 				addrInfo, _ := addrData.(pageInfo)
 				currNode = addrInfo.node
-			} else {
+			}
+			if currNode == NODE_UNDEFINED {
 				pagesOnUnknownNode = true
 			}
 			var ppages *Pages = nil
