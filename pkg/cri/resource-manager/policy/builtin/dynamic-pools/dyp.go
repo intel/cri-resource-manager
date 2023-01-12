@@ -130,7 +130,7 @@ func (dp *DynamicPool) updateRealCpuUsed(cpuInfo []float64) (float64, error) {
 	for i := 0; i < len(cpus); i++ {
 		sum += cpuInfo[cpus[i]]
 	}
-	log.Debug("dynamic pool %s cpuset: %s,  cpu utilization: %d", dp.Def.Name, dp.Cpus, sum)
+	log.Debug("dynamic pool %s cpuset: %s,  cpu utilization: %v", dp.Def.Name, dp.Cpus, sum)
 	return sum, nil
 }
 
@@ -144,16 +144,21 @@ func (p *dynamicPools) calculateAllPoolWeights() (map[*DynamicPool]float64, floa
 		if dp.Def.Name == reservedDynamicPoolDefName {
 			continue
 		}
-		realCpuUsed, err := dp.updateRealCpuUsed(cpuInfo)
-		if err != nil {
-			return weight, sumWeight, dynamicPoolsError("The actual cpu usage of the dynamic pool %s cannot be obtained: %w",
-				dp.PrettyName(), err)
+		// If there is no container in a dynamic pool, there is no need to calculate its weight, that is, there is no need to allocate CPUs to it.
+		if dp.ContainerCount() == 0 {
+			weight[dp] = 0.0
+		} else {
+			realCpuUsed, err := dp.updateRealCpuUsed(cpuInfo)
+			if err != nil {
+				return weight, sumWeight, dynamicPoolsError("The actual cpu usage of the dynamic pool %s cannot be obtained: %w",
+					dp.PrettyName(), err)
+			}
+			weight[dp] = realCpuUsed
+			sumWeight += weight[dp]
 		}
-		weight[dp] = realCpuUsed
-		sumWeight += weight[dp]
-		log.Debug("dynamic pool: %s, realCpuUsed: %d, weight: %d", dp, realCpuUsed, weight[dp])
+		log.Debug("dynamic pool: %s, weight: %v", dp, weight[dp])
 	}
-	log.Debug("sum weight: %d", sumWeight)
+	log.Debug("sum weight: %v", sumWeight)
 	return weight, sumWeight, nil
 }
 
@@ -186,9 +191,11 @@ func (p *dynamicPools) containerPinPool(dp *DynamicPool) {
 // calculatePoolCpuset returns the cpus that dynamic pools need to allocate.
 func (p *dynamicPools) calculatePoolCpuset(requestCpu map[*DynamicPool]int, remainFree int, weight map[*DynamicPool]float64, sumWeight float64) map[*DynamicPool]int {
 	usedCpu := 0
+	// If there are containers in the shared dynamic pool, allocate at least one CPU to it,
+	// otherwise there is no need to allocate a CPU to it.
 	// Ensure that there is at least one cpu in the shared dynamicPool.
 	for _, dp := range p.dynamicPools {
-		if dp.Def.Name == sharedDynamicPoolDefName && sumWeight != 0 {
+		if dp.Def.Name == sharedDynamicPoolDefName && dp.ContainerCount() > 0 && sumWeight != 0 {
 			addCpu := int(float64(remainFree) * weight[dp] / sumWeight)
 			if requestCpu[dp]+addCpu < 1 {
 				requestCpu[dp] = 1

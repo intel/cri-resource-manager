@@ -59,14 +59,11 @@ Example configuration that runs all pods in dynamic-pools.
   cpu: |+
     classes:
       pool1-cpuclass:
-        maxFreq: 2110000
-        minFreq: 2110000
+        maxFreq: 1500000
+        minFreq: 2000000
       pool2-cpuclass:
-        maxFreq: 2500000
+        maxFreq: 2000000
         minFreq: 2500000
-      idle:
-        maxFreq: 2500000
-        minFreq: 1500000
   policy: |+
     Active: dynamic-pools
     ReservedResources:
@@ -74,7 +71,6 @@ Example configuration that runs all pods in dynamic-pools.
     dynamic-pools:
       PinCPU: true
       PinMemory: true
-      IdleCPUClass: idle
       DynamicPoolTypes:
         - Name: "pool1"
           Namespaces:
