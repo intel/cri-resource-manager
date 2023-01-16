@@ -17,13 +17,13 @@ package resmgr
 import (
 	// List of builtin policies
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/balloons"
+	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/dynamic-pools"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/none"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/podpools"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/static"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/static-plus"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/static-pools"
 	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/topology-aware"
-	_ "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy/builtin/dynamic-pools"
 )
 
 // TODO: add unit tests to verify that all builtin policies are found
