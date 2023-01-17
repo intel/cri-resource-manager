@@ -84,7 +84,7 @@ func main() {
 	memtier.SetLogDebug(*optDebug)
 
 	if *optPrompt {
-		prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
+		prompt := memtier.NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
 		prompt.Interact()
 		return
 	}
@@ -114,7 +114,7 @@ func main() {
 		}
 	}
 
-	prompt := NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
+	prompt := memtier.NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
 	if stdinFileInfo, _ := os.Stdin.Stat(); (stdinFileInfo.Mode() & os.ModeCharDevice) == 0 {
 		// Input comes from a pipe.
 		// Echo commands after prompt in the interaction to explain outputs.

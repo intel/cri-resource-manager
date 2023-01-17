@@ -15,8 +15,10 @@
 package memtier
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -29,12 +31,19 @@ type RoutineStatActionsConfig struct {
 	// IntervalCommand is the command to be executed in specified
 	// intervals.
 	IntervalCommand []string
+	// IntervalCommandRunner executes the IntervalCommand.
+	// "exec" forks and executes the command in a child process.
+	// "memtier" runs the command in the memtier prompt.
+	IntervalCommandRunner string
 	// PageOutMB is the total size of memory in megabytes that
 	// has been process_statactions. If adviced memory exceeds the
 	// interval, the shell command will be executed.
 	PageOutMB int
 	// PageOutCommand is executed when new PageOutMB is reached.
 	PageOutCommand []string
+	// PageOutCommandRunner executes the PageOutCommand.
+	// See IntervalCommandRunner for options.
+	PageOutCommandRunner string
 }
 
 type RoutineStatActions struct {
@@ -43,7 +52,22 @@ type RoutineStatActions struct {
 	cgLoop           chan interface{}
 }
 
+type commandRunnerFunc func([]string) error
+
+const (
+	commandRunnerDefault = ""
+	commandRunnerExec    = "exec"
+	commandRunnerMemtier = "memtier"
+)
+
+var commandRunners map[string]commandRunnerFunc
+
 func init() {
+	commandRunners = map[string]commandRunnerFunc{
+		commandRunnerExec:    runCommandExec,
+		commandRunnerDefault: runCommandExec,
+		commandRunnerMemtier: runCommandMemtier,
+	}
 	RoutineRegister("statactions", NewRoutineStatActions)
 }
 
@@ -102,17 +126,32 @@ func (r *RoutineStatActions) Dump(args []string) string {
 	return fmt.Sprintf("routine \"statactions\": running=%v", r.cgLoop != nil)
 }
 
-func runCommand(command []string) error {
+func runCommandExec(command []string) error {
 	if len(command) == 0 {
 		return nil
 	}
 	cmd := exec.Command(command[0], command[1:]...)
 	err := cmd.Run()
-	if err != nil {
-		stats.Store(StatsHeartbeat{fmt.Sprintf("RoutineStatActions.command error: %s", err)})
-
-	}
+	stats.Store(StatsHeartbeat{fmt.Sprintf("RoutineStatActions.command.exec: %s... status: %s error: %s", command[0], cmd.ProcessState, err)})
 	return err
+}
+
+func runCommandMemtier(command []string) error {
+	if len(command) == 0 {
+		return nil
+	}
+	prompt := NewPrompt("", nil, bufio.NewWriter(os.Stdout))
+	status := prompt.RunCmdSlice(command)
+	stats.Store(StatsHeartbeat{fmt.Sprintf("RoutineStatActions.command.memtier: %s... status: %d", command[0], status)})
+	return nil
+}
+
+func runCommand(runner string, command []string) error {
+	commandRunner, ok := commandRunners[runner]
+	if !ok {
+		return fmt.Errorf("invalid command runner '%s'", runner)
+	}
+	return commandRunner(command)
 }
 
 func (r *RoutineStatActions) loop() {
@@ -140,7 +179,7 @@ func (r *RoutineStatActions) loop() {
 
 		// IntervalCommand runs on every round
 		if len(r.config.IntervalCommand) > 0 {
-			runCommand(r.config.IntervalCommand)
+			runCommand(r.config.IntervalCommandRunner, r.config.IntervalCommand)
 			stats.Store(StatsHeartbeat{"RoutineStatActions.IntervalCommand"})
 		}
 
@@ -149,7 +188,7 @@ func (r *RoutineStatActions) loop() {
 			(nowPageOutPages-r.lastPageOutPages)*constUPagesize/uint64(1024*1024) >= uint64(r.config.PageOutMB) {
 			r.lastPageOutPages = nowPageOutPages
 			stats.Store(StatsHeartbeat{"RoutineStatActions.PageOutCommand"})
-			runCommand(r.config.PageOutCommand)
+			runCommand(r.config.PageOutCommandRunner, r.config.PageOutCommand)
 		}
 	}
 	close(r.cgLoop)

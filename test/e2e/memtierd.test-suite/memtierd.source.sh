@@ -29,7 +29,7 @@ memtierd-start() {
 memtierd-stop() {
     memtierd-command "q"
     sleep 1
-    vm-command "killall -KILL memtierd"
+    vm-command "killall -KILL memtierd; pkill -f 'socat tcp4-listen:${MEMTIERD_PORT}'"
 }
 
 memtierd-command() {

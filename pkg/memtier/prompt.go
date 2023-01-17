@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This file implements prompt for memtierd testability.
+// This file implements interactive prompt and command execution.
 
-package main
+package memtier
 
 import (
 	"bufio"
@@ -22,31 +22,27 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
-	"os"
 	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/intel/cri-resource-manager/pkg/memtier"
 )
 
 type Cmd struct {
 	description string
-	Run         func([]string) commandStatus
+	Run         func([]string) CommandStatus
 }
 
 type Prompt struct {
 	r            *bufio.Reader
 	w            *bufio.Writer
 	f            *flag.FlagSet
-	mover        *memtier.Mover
-	pages        *memtier.Pages
-	aranges      *memtier.AddrRanges
-	tracker      memtier.Tracker
-	policy       memtier.Policy
-	routines     []memtier.Routine
+	mover        *Mover
+	pages        *Pages
+	aranges      *AddrRanges
+	tracker      Tracker
+	policy       Policy
+	routines     []Routine
 	routineInUse int
 	cmds         map[string]Cmd
 	ps1          string
@@ -54,16 +50,14 @@ type Prompt struct {
 	quit         bool
 }
 
-type commandStatus int
+type CommandStatus int
 
 const (
-	csOk commandStatus = iota
-	csErr
-)
-
-var (
-	constUPagesize = uint64(os.Getpagesize())
-	constPagesize  = os.Getpagesize()
+	csOk CommandStatus = iota
+	csUnknownCommand
+	csPipeCreateError
+	csPipeProcessStartError
+	csError
 )
 
 func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
@@ -71,7 +65,7 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		r:     reader,
 		w:     writer,
 		ps1:   ps1,
-		mover: memtier.NewMover(),
+		mover: NewMover(),
 	}
 	p.cmds = map[string]Cmd{
 		"q":        Cmd{"quit interactive prompt.", p.cmdQuit},
@@ -97,75 +91,85 @@ func (p *Prompt) output(format string, a ...interface{}) {
 	p.w.Flush()
 }
 
+func (p *Prompt) RunCmdSlice(cmdSlice []string) CommandStatus {
+	if len(cmdSlice) == 0 {
+		return csOk
+	}
+	if cmdSlice[0] == "" {
+		cmdSlice[0] = "nop"
+	}
+	p.f = flag.NewFlagSet(cmdSlice[0], flag.ContinueOnError)
+	cmd, ok := p.cmds[cmdSlice[0]]
+	if !ok {
+		if len(cmdSlice[0]) > 0 {
+			p.output("unknown command %q\n", cmdSlice[0])
+		}
+		return csUnknownCommand
+	}
+	// Call cmd<Function>
+	return cmd.Run(cmdSlice[1:])
+}
+
+func (p *Prompt) RunCmdString(cmdString string) CommandStatus {
+	var err error
+	// If command has "|", run the left-hand-side of the
+	// pipe in a shell and pipe the output of the
+	// right-hand-side cmd<Function> call to it.
+	origOutputWriter := p.w
+	pipeCmd := ""
+	pipeIndex := strings.Index(cmdString, "|")
+	if pipeIndex > -1 {
+		pipeCmd = cmdString[pipeIndex+1:]
+		cmdString = cmdString[:pipeIndex]
+	}
+	// TODO: consider shlex-like splitting.
+	cmdSlice := strings.Split(strings.TrimSpace(cmdString), " ")
+
+	// If there is a pipe, redirect p.output() (that is, p.w) to
+	// the pipe before calling cmd<Function>.
+	var pipeProcess *exec.Cmd = nil
+	var pipeInput io.WriteCloser = nil
+	if pipeCmd != "" {
+		pipeProcess = exec.Command("sh", "-c", pipeCmd)
+		pipeInput, err = pipeProcess.StdinPipe()
+		if err != nil {
+			p.output("failed to create pipe for command %q", pipeCmd)
+			return csPipeCreateError
+		}
+		pipeProcess.Stdout = origOutputWriter
+		pipeProcess.Stderr = origOutputWriter
+		err := pipeProcess.Start()
+		if err != nil {
+			p.w = origOutputWriter
+			p.output("failed to start: sh -c %q: %s", pipeCmd, err)
+			pipeInput.Close()
+			return csPipeProcessStartError
+		}
+		p.w = bufio.NewWriter(pipeInput)
+	}
+	runRv := p.RunCmdSlice(cmdSlice)
+	// Wait for pipe process to exit and restore redirect.
+	if pipeCmd != "" {
+		p.w.Flush()
+		pipeInput.Close()
+		pipeProcess.Wait()
+		p.w = origOutputWriter
+	}
+	return runRv
+}
+
 func (p *Prompt) Interact() {
-	logger := log.New(p.w, "", log.Ltime|log.Lmicroseconds)
-	memtier.SetLogger(logger)
 	for !p.quit {
 		p.output(p.ps1)
-		rawcmd, err := p.r.ReadString(byte('\n'))
+		cmdString, err := p.r.ReadString(byte('\n'))
 		if err != nil {
 			p.output("quit: %s\n", err)
 			break
 		}
 		if p.echo {
-			p.output("%s", rawcmd)
+			p.output("%s", cmdString)
 		}
-		// If command has "|", run the left-hand-side of the
-		// pipe in a shell and pipe the output of the
-		// right-hand-side cmd<Function> call to it.
-		origOutputWriter := p.w
-		pipeCmd := ""
-		pipeIndex := strings.Index(rawcmd, "|")
-		if pipeIndex > -1 {
-			pipeCmd = rawcmd[pipeIndex+1:]
-			rawcmd = rawcmd[:pipeIndex]
-		}
-		cmdSlice := strings.Split(strings.TrimSpace(rawcmd), " ")
-		if len(cmdSlice) == 0 {
-			continue
-		}
-		if cmdSlice[0] == "" {
-			cmdSlice[0] = "nop"
-		}
-		p.f = flag.NewFlagSet(cmdSlice[0], flag.ContinueOnError)
-		if cmd, ok := p.cmds[cmdSlice[0]]; ok {
-			// If there is a pipe, redirect p.output()
-			// (that is, p.w) and logger output to the pipe
-			// before calling cmd<Function>.
-			var pipeProcess *exec.Cmd = nil
-			var pipeInput io.WriteCloser = nil
-			if pipeCmd != "" {
-				pipeProcess = exec.Command("sh", "-c", pipeCmd)
-				pipeInput, err = pipeProcess.StdinPipe()
-				if err != nil {
-					p.output("failed to create pipe for command %q", pipeCmd)
-					continue
-				}
-				pipeProcess.Stdout = origOutputWriter
-				pipeProcess.Stderr = origOutputWriter
-				err := pipeProcess.Start()
-				if err != nil {
-					p.w = origOutputWriter
-					p.output("failed to start: sh -c %q: %s", pipeCmd, err)
-					pipeInput.Close()
-					continue
-				}
-				p.w = bufio.NewWriter(pipeInput)
-				logger.SetOutput(p.w)
-			}
-			// Call cmd<Function>
-			cmd.Run(cmdSlice[1:])
-			// Wait for pipe process to exit and restore redirect.
-			if pipeCmd != "" {
-				p.w.Flush()
-				pipeInput.Close()
-				pipeProcess.Wait()
-				p.w = origOutputWriter
-				logger.SetOutput(origOutputWriter)
-			}
-		} else if len(cmdSlice[0]) > 0 {
-			p.output("unknown command %q\n", cmdSlice[0])
-		}
+		p.RunCmdString(cmdString)
 	}
 	p.output("quit.\n")
 }
@@ -174,13 +178,13 @@ func (p *Prompt) SetEcho(newEcho bool) {
 	p.echo = newEcho
 }
 
-func (p *Prompt) SetPolicy(policy memtier.Policy) {
+func (p *Prompt) SetPolicy(policy Policy) {
 	p.policy = policy
 	p.mover = p.policy.Mover()
 	p.tracker = p.policy.Tracker()
 }
 
-func (p *Prompt) SetRoutines(routines []memtier.Routine) {
+func (p *Prompt) SetRoutines(routines []Routine) {
 	p.routines = routines
 }
 
@@ -193,24 +197,24 @@ func sortedStringKeys(m map[string]Cmd) []string {
 	return keys
 }
 
-func sortedNodeKeys(m map[memtier.Node]uint) []memtier.Node {
+func sortedNodeKeys(m map[Node]uint) []Node {
 	keys := make([]int, 0, len(m))
-	nodes := make([]memtier.Node, len(m))
+	nodes := make([]Node, len(m))
 	for k := range m {
 		keys = append(keys, int(k))
 	}
 	sort.Ints(keys)
 	for i, key := range keys {
-		nodes[i] = memtier.Node(key)
+		nodes[i] = Node(key)
 	}
 	return nodes
 }
 
-func (p *Prompt) cmdNop(args []string) commandStatus {
+func (p *Prompt) cmdNop(args []string) CommandStatus {
 	return csOk
 }
 
-func (p *Prompt) cmdHelp(args []string) commandStatus {
+func (p *Prompt) cmdHelp(args []string) CommandStatus {
 	p.output("Available commands:\n")
 	for _, name := range sortedStringKeys(p.cmds) {
 		p.output("        %-12s %s\n", name, p.cmds[name].description)
@@ -222,7 +226,7 @@ func (p *Prompt) cmdHelp(args []string) commandStatus {
 	return csOk
 }
 
-func (p *Prompt) cmdArange(args []string) commandStatus {
+func (p *Prompt) cmdArange(args []string) CommandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	ls := p.f.Bool("ls", false, "list address ranges")
 	splitLen := p.f.Uint64("split-length", 0, "split long ranges into many ranges of max LENGTH")
@@ -231,7 +235,7 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 		return csOk
 	}
 	if *pid != -1 {
-		process := memtier.NewProcess(*pid)
+		process := NewProcess(*pid)
 		if ar, err := process.AddressRanges(); err == nil {
 			p.aranges = ar
 		} else {
@@ -248,7 +252,7 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 		p.aranges = p.aranges.SplitLength(*splitLen)
 	}
 	if *minLen != 0 {
-		p.aranges = p.aranges.Filter(func(ar memtier.AddrRange) bool {
+		p.aranges = p.aranges.Filter(func(ar AddrRange) bool {
 			return ar.Length() >= *minLen
 		})
 	}
@@ -261,7 +265,7 @@ func (p *Prompt) cmdArange(args []string) commandStatus {
 	return csOk
 }
 
-func (p *Prompt) cmdSwap(args []string) commandStatus {
+func (p *Prompt) cmdSwap(args []string) CommandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	swapIn := p.f.Bool("in", false, "swap in selected ranges")
 	swapOut := p.f.Bool("out", false, "swap out selected ranges")
@@ -276,16 +280,20 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 		p.output("missing -pid=PID\n")
 		return csOk
 	}
-	process := memtier.NewProcess(*pid)
+	process := NewProcess(*pid)
 	ar, err := process.AddressRanges()
 	if err != nil {
 		p.output("error reading address ranges of process %d: %v\n", *pid, err)
 		return csOk
 	}
 
-	selectedRanges := []memtier.AddrRange{}
+	selectedRanges := []AddrRange{}
 	if *ranges != "" {
-		selectedRanges = parseOptRanges(*ranges)
+		selectedRanges, err = parseOptRanges(*ranges)
+		if err != nil {
+			p.output("%s", err)
+			return csOk
+		}
 	}
 	if len(selectedRanges) > 0 {
 		ar.Intersection(selectedRanges)
@@ -296,7 +304,7 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 		return csOk
 	}
 	if *swapIn {
-		memFile, err := memtier.ProcMemOpen(ar.Pid())
+		memFile, err := ProcMemOpen(ar.Pid())
 		defer memFile.Close()
 		if err != nil {
 			p.output("%s\n", err)
@@ -316,7 +324,7 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 	}
 
 	if *status || *vaddrs {
-		pmFile, err := memtier.ProcPagemapOpen(*pid)
+		pmFile, err := ProcPagemapOpen(*pid)
 		if err != nil {
 			p.output("%s\n", err)
 			return csOk
@@ -330,9 +338,9 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 		pmFile.ForEachPage(ar.Ranges(), 0,
 			func(pmBits, pageAddr uint64) int {
 				pages += 1
-				if (pmBits>>memtier.PMB_SWAP)&1 == 0 {
+				if (pmBits>>PMB_SWAP)&1 == 0 {
 					if vaddrStart > 0 && *vaddrs {
-						p.output("%s\n", memtier.NewAddrRange(vaddrStart, vaddrEnd))
+						p.output("%s\n", NewAddrRange(vaddrStart, vaddrEnd))
 					}
 					vaddrStart = 0
 					return 0
@@ -345,18 +353,18 @@ func (p *Prompt) cmdSwap(args []string) commandStatus {
 				return 0
 			})
 		if vaddrStart > 0 && *vaddrs {
-			p.output("%s\n", memtier.NewAddrRange(vaddrStart, vaddrEnd))
+			p.output("%s\n", NewAddrRange(vaddrStart, vaddrEnd))
 		}
 		p.output("%d / %d pages, %d / %d MB (%.1f %%) swapped out\n",
 			swapped, pages,
-			swapped*constPagesize/(1024*1024),
-			pages*constPagesize/(1024*1024),
+			int64(swapped)*constPagesize/(1024*1024),
+			int64(pages)*constPagesize/(1024*1024),
 			float32(100*swapped)/float32(pages))
 	}
 	return csOk
 }
 
-func (p *Prompt) cmdPages(args []string) commandStatus {
+func (p *Prompt) cmdPages(args []string) CommandStatus {
 	pid := p.f.Int("pid", -1, "look for pages of PID")
 	attrs := p.f.String("attrs", "", "include only <Exclusive,Dirty,NotDirty,InHeap,InAnonymous> pages")
 	ranges := p.f.String("ranges", "", "-ranges=RANGE[,RANGE...]. RANGE syntax: STARTADDR (single page at STARTADDR), STARTADDR-ENDADDR, STARTADDR+SIZE[kMG].")
@@ -384,7 +392,7 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 		return csOk
 	}
 	if *pi > -1 || *si > -1 {
-		bmFile, err := memtier.ProcPageIdleBitmapOpen()
+		bmFile, err := ProcPageIdleBitmapOpen()
 		if err != nil {
 			p.output("failed to open idle bitmap: %s\n", err)
 			return csOk
@@ -409,7 +417,7 @@ func (p *Prompt) cmdPages(args []string) commandStatus {
 	}
 
 	if *pk > -1 {
-		kpFile, err := memtier.ProcKpageflagsOpen()
+		kpFile, err := ProcKpageflagsOpen()
 		if err != nil {
 			p.output("opening kpageflags failed: %s\n", err)
 			return csOk
@@ -447,33 +455,33 @@ ZERO_PAGE     %d
 IDLE          %d
 PGTABLE       %d
 `,
-			(flags>>memtier.KPFB_LOCKED)&1,
-			(flags>>memtier.KPFB_ERROR)&1,
-			(flags>>memtier.KPFB_REFERENCED)&1,
-			(flags>>memtier.KPFB_UPTODATE)&1,
-			(flags>>memtier.KPFB_DIRTY)&1,
-			(flags>>memtier.KPFB_LRU)&1,
-			(flags>>memtier.KPFB_ACTIVE)&1,
-			(flags>>memtier.KPFB_SLAB)&1,
-			(flags>>memtier.KPFB_WRITEBACK)&1,
-			(flags>>memtier.KPFB_RECLAIM)&1,
-			(flags>>memtier.KPFB_BUDDY)&1,
-			(flags>>memtier.KPFB_MMAP)&1,
-			(flags>>memtier.KPFB_ANON)&1,
-			(flags>>memtier.KPFB_SWAPCACHE)&1,
-			(flags>>memtier.KPFB_SWAPBACKED)&1,
-			(flags>>memtier.KPFB_COMPOUND_HEAD)&1,
-			(flags>>memtier.KPFB_COMPOUND_TAIL)&1,
-			(flags>>memtier.KPFB_HUGE)&1,
-			(flags>>memtier.KPFB_UNEVICTABLE)&1,
-			(flags>>memtier.KPFB_HWPOISON)&1,
-			(flags>>memtier.KPFB_NOPAGE)&1,
-			(flags>>memtier.KPFB_KSM)&1,
-			(flags>>memtier.KPFB_THP)&1,
-			(flags>>memtier.KPFB_OFFLINE)&1,
-			(flags>>memtier.KPFB_ZERO_PAGE)&1,
-			(flags>>memtier.KPFB_IDLE)&1,
-			(flags>>memtier.KPFB_PGTABLE)&1)
+			(flags>>KPFB_LOCKED)&1,
+			(flags>>KPFB_ERROR)&1,
+			(flags>>KPFB_REFERENCED)&1,
+			(flags>>KPFB_UPTODATE)&1,
+			(flags>>KPFB_DIRTY)&1,
+			(flags>>KPFB_LRU)&1,
+			(flags>>KPFB_ACTIVE)&1,
+			(flags>>KPFB_SLAB)&1,
+			(flags>>KPFB_WRITEBACK)&1,
+			(flags>>KPFB_RECLAIM)&1,
+			(flags>>KPFB_BUDDY)&1,
+			(flags>>KPFB_MMAP)&1,
+			(flags>>KPFB_ANON)&1,
+			(flags>>KPFB_SWAPCACHE)&1,
+			(flags>>KPFB_SWAPBACKED)&1,
+			(flags>>KPFB_COMPOUND_HEAD)&1,
+			(flags>>KPFB_COMPOUND_TAIL)&1,
+			(flags>>KPFB_HUGE)&1,
+			(flags>>KPFB_UNEVICTABLE)&1,
+			(flags>>KPFB_HWPOISON)&1,
+			(flags>>KPFB_NOPAGE)&1,
+			(flags>>KPFB_KSM)&1,
+			(flags>>KPFB_THP)&1,
+			(flags>>KPFB_OFFLINE)&1,
+			(flags>>KPFB_ZERO_PAGE)&1,
+			(flags>>KPFB_IDLE)&1,
+			(flags>>KPFB_PGTABLE)&1)
 
 		return csOk
 	}
@@ -483,7 +491,7 @@ PGTABLE       %d
 		return csOk
 	}
 	p.output("searching for address ranges of pid %d\n", *pid)
-	process := memtier.NewProcess(*pid)
+	process := NewProcess(*pid)
 	ar, err := process.AddressRanges()
 	if err != nil {
 		p.output("error reading address ranges of process %d: %v\n", *pid, err)
@@ -494,9 +502,13 @@ PGTABLE       %d
 		return csOk
 	}
 	p.output("found %d address ranges\n", len(ar.Ranges()))
-	selectedRanges := []memtier.AddrRange{}
+	selectedRanges := []AddrRange{}
 	if *ranges != "" {
-		selectedRanges = parseOptRanges(*ranges)
+		selectedRanges, err = parseOptRanges(*ranges)
+		if err != nil {
+			p.output("%s", err)
+			return csOk
+		}
 	}
 	if len(selectedRanges) > 0 {
 		ar.Intersection(selectedRanges)
@@ -507,7 +519,7 @@ PGTABLE       %d
 		return csOk
 	}
 	if *pm != -1 {
-		pmFile, err := memtier.ProcPagemapOpen(*pid)
+		pmFile, err := ProcPagemapOpen(*pid)
 		if err != nil {
 			p.output("%s", err)
 			return csOk
@@ -519,13 +531,13 @@ PGTABLE       %d
 			func(pmBits, pageAddr uint64) int {
 				p.output("%x: bits: %d%d%d%d%d%d pfn: %d\n",
 					pageAddr,
-					(pmBits>>memtier.PMB_SOFT_DIRTY)&1,
-					(pmBits>>memtier.PMB_MMAP_EXCLUSIVE)&1,
-					(pmBits>>memtier.PMB_UFFD_WP)&1,
-					(pmBits>>memtier.PMB_FILE)&1,
-					(pmBits>>memtier.PMB_SWAP)&1,
-					(pmBits>>memtier.PMB_PRESENT)&1,
-					pmBits&memtier.PM_PFN)
+					(pmBits>>PMB_SOFT_DIRTY)&1,
+					(pmBits>>PMB_MMAP_EXCLUSIVE)&1,
+					(pmBits>>PMB_UFFD_WP)&1,
+					(pmBits>>PMB_FILE)&1,
+					(pmBits>>PMB_SWAP)&1,
+					(pmBits>>PMB_PRESENT)&1,
+					pmBits&PM_PFN)
 				printed += 1
 				if printed >= *pm {
 					return -1
@@ -556,13 +568,13 @@ PGTABLE       %d
 	}
 	p.output("pages = <%d pages of pid %d>\n", len(pp.Pages()), pp.Pid())
 	if *fromNode >= 0 {
-		pp = pp.OnNode(memtier.Node(*fromNode))
+		pp = pp.OnNode(Node(*fromNode))
 	}
 	p.pages = pp
 	return csOk
 }
 
-func (p *Prompt) cmdMover(args []string) commandStatus {
+func (p *Prompt) cmdMover(args []string) CommandStatus {
 	config := p.f.String("config", "", "reconfigure mover with JSON string")
 	configDump := p.f.Bool("config-dump", false, "dump current configuration")
 	pagesTo := p.f.Int("pages-to", -1, "move pages to NODE int")
@@ -593,8 +605,8 @@ func (p *Prompt) cmdMover(args []string) commandStatus {
 			p.output("mover error: set pages before moving\n")
 			return csOk
 		}
-		toNode := memtier.Node(*pagesTo)
-		task := memtier.NewMoverTask(p.pages, toNode)
+		toNode := Node(*pagesTo)
+		task := NewMoverTask(p.pages, toNode)
 		p.mover.AddTask(task)
 	}
 	if *stop {
@@ -620,7 +632,7 @@ func (p *Prompt) cmdMover(args []string) commandStatus {
 	return csOk
 }
 
-func (p *Prompt) cmdStats(args []string) commandStatus {
+func (p *Prompt) cmdStats(args []string) CommandStatus {
 	lm := p.f.Int("lm", -1, "show latest move in PID")
 	le := p.f.Int("le", -1, "show latest move with error in PID")
 	dump := p.f.Bool("dump", false, "dump stats internals")
@@ -630,24 +642,24 @@ func (p *Prompt) cmdStats(args []string) commandStatus {
 	remainder := p.f.Args()
 	if *lm != -1 {
 		p.output("%s\n",
-			memtier.GetStats().LastMove(*lm))
+			GetStats().LastMove(*lm))
 		return csOk
 	}
 	if *le != -1 {
 		p.output("%s\n",
-			memtier.GetStats().LastMoveWithError(*le))
+			GetStats().LastMoveWithError(*le))
 		return csOk
 	}
 	if *dump {
 		p.output("%s\n",
-			memtier.GetStats().Dump(remainder))
+			GetStats().Dump(remainder))
 		return csOk
 	}
-	p.output(memtier.GetStats().Summarize() + "\n")
+	p.output(GetStats().Summarize() + "\n")
 	return csOk
 }
 
-func (p *Prompt) cmdTracker(args []string) commandStatus {
+func (p *Prompt) cmdTracker(args []string) CommandStatus {
 	ls := p.f.Bool("ls", false, "list available memory trackers")
 	create := p.f.String("create", "", "create new tracker NAME")
 	config := p.f.String("config", "", "configure tracker with JSON string")
@@ -664,11 +676,11 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 	}
 	remainder := p.f.Args()
 	if *ls {
-		p.output(strings.Join(memtier.TrackerList(), "\n") + "\n")
+		p.output(strings.Join(TrackerList(), "\n") + "\n")
 		return csOk
 	}
 	if *create != "" {
-		if tracker, err := memtier.NewTracker(*create); err != nil {
+		if tracker, err := NewTracker(*create); err != nil {
 			p.output("creating tracker failed: %v\n", err)
 			return csOk
 		} else {
@@ -741,7 +753,7 @@ func (p *Prompt) cmdTracker(args []string) commandStatus {
 	return csOk
 }
 
-func (p *Prompt) cmdPolicy(args []string) commandStatus {
+func (p *Prompt) cmdPolicy(args []string) CommandStatus {
 	ls := p.f.Bool("ls", false, "list available policies")
 	create := p.f.String("create", "", "create new policy NAME")
 	config := p.f.String("config", "", "reconfigure policy with JSON string")
@@ -755,11 +767,11 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	}
 	remainder := p.f.Args()
 	if *ls {
-		p.output(strings.Join(memtier.PolicyList(), "\n") + "\n")
+		p.output(strings.Join(PolicyList(), "\n") + "\n")
 		return csOk
 	}
 	if *create != "" {
-		policy, err := memtier.NewPolicy(*create)
+		policy, err := NewPolicy(*create)
 		if err != nil {
 			p.output("%s", err)
 			return csOk
@@ -812,7 +824,7 @@ func (p *Prompt) cmdPolicy(args []string) commandStatus {
 	return csOk
 }
 
-func (p *Prompt) cmdRoutines(args []string) commandStatus {
+func (p *Prompt) cmdRoutines(args []string) CommandStatus {
 	ls := p.f.Bool("ls", false, "list available routine types")
 	create := p.f.String("create", "", "create new routine from type NAME")
 	config := p.f.String("config", "", "reconfigure the routine with JSON string")
@@ -827,11 +839,11 @@ func (p *Prompt) cmdRoutines(args []string) commandStatus {
 	}
 	remainder := p.f.Args()
 	if *ls {
-		p.output(strings.Join(memtier.RoutineList(), "\n") + "\n")
+		p.output(strings.Join(RoutineList(), "\n") + "\n")
 		return csOk
 	}
 	if *create != "" {
-		routine, err := memtier.NewRoutine(*create)
+		routine, err := NewRoutine(*create)
 		if err != nil {
 			p.output("%s\n", err)
 			return csOk
@@ -891,7 +903,7 @@ func (p *Prompt) cmdRoutines(args []string) commandStatus {
 	return csOk
 }
 
-func (p *Prompt) cmdQuit(args []string) commandStatus {
+func (p *Prompt) cmdQuit(args []string) CommandStatus {
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
@@ -901,39 +913,39 @@ func (p *Prompt) cmdQuit(args []string) commandStatus {
 
 func parseOptPages(pagesStr string) (uint64, error) {
 	if pagesStr == "" {
-		return (memtier.PMPresentSet |
-			memtier.PMExclusiveSet), nil
+		return (PMPresentSet |
+			PMExclusiveSet), nil
 	}
 	var pageAttributes uint64 = 0
 	for _, pageAttrStr := range strings.Split(pagesStr, ",") {
 		switch pageAttrStr {
 		case "Present":
-			pageAttributes |= memtier.PMPresentSet
+			pageAttributes |= PMPresentSet
 		case "Exclusive":
-			pageAttributes |= memtier.PMExclusiveSet
+			pageAttributes |= PMExclusiveSet
 		case "Dirty":
-			pageAttributes |= memtier.PMDirtySet
+			pageAttributes |= PMDirtySet
 		case "NotDirty":
-			pageAttributes |= memtier.PMDirtyCleared
+			pageAttributes |= PMDirtyCleared
 		default:
 			return 0, fmt.Errorf("invalid -page: %q", pageAttrStr)
 		}
-		if pageAttributes&memtier.PMDirtySet == memtier.PMDirtySet &&
-			pageAttributes&memtier.PMDirtyCleared == memtier.PMDirtyCleared {
+		if pageAttributes&PMDirtySet == PMDirtySet &&
+			pageAttributes&PMDirtyCleared == PMDirtyCleared {
 			return 0, fmt.Errorf("contradicting page requirements: Dirty,NotDirty")
 		}
 	}
 	return pageAttributes, nil
 }
 
-func parseOptRanges(rangeStr string) []memtier.AddrRange {
-	addrRanges := []memtier.AddrRange{}
+func parseOptRanges(rangeStr string) ([]AddrRange, error) {
+	addrRanges := []AddrRange{}
 	for _, addrRangeStr := range strings.Split(rangeStr, ",") {
-		ar, err := memtier.NewAddrRangeFromString(addrRangeStr)
+		ar, err := NewAddrRangeFromString(addrRangeStr)
 		if err != nil {
-			exit("invalid addresss range %q, expected STARTADDR, STARTADDR-STOPADDR or STARTADDR+SIZE[UNIT]", addrRangeStr)
+			return nil, fmt.Errorf("invalid addresss range %q, expected STARTADDR, STARTADDR-STOPADDR or STARTADDR+SIZE[UNIT]", addrRangeStr)
 		}
 		addrRanges = append(addrRanges, *ar)
 	}
-	return addrRanges
+	return addrRanges, nil
 }
