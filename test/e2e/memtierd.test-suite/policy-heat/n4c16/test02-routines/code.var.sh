@@ -32,7 +32,7 @@ routines:
     config: |
       intervalms: 200
       intervalcommandrunner: memtier
-      intervalcommand: ['stats']
+      intervalcommand: ['stats', '-t', 'events']
 policy:
   name: stub
 "

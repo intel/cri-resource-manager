@@ -636,6 +636,8 @@ func (p *Prompt) cmdStats(args []string) CommandStatus {
 	lm := p.f.Int("lm", -1, "show latest move in PID")
 	le := p.f.Int("le", -1, "show latest move with error in PID")
 	dump := p.f.Bool("dump", false, "dump stats internals")
+	format := p.f.String("f", "txt", "table format: txt or csv")
+	tables := p.f.String("t", "", "select tables, use \"help\" to list available")
 	if err := p.f.Parse(args); err != nil {
 		return csOk
 	}
@@ -655,7 +657,11 @@ func (p *Prompt) cmdStats(args []string) CommandStatus {
 			GetStats().Dump(remainder))
 		return csOk
 	}
-	p.output(GetStats().Summarize() + "\n")
+	if *tables != "" {
+		p.output(GetStats().Summarize(*format, strings.Split(*tables, ",")...) + "\n")
+	} else {
+		p.output(GetStats().Summarize(*format) + "\n")
+	}
 	return csOk
 }
 

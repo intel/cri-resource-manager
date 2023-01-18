@@ -50,10 +50,10 @@ next-round() {
 match-pageout() {
     local pageout_regexp=$1
     round_number=0
-    while ! ( memtierd-command "stats | grep PAGEOUT"; grep PAGEOUT:${pageout_regexp} <<< $COMMAND_OUTPUT); do
-        echo "grep PAGEOUT:${pageout_regexp} did not match"
+    while ! ( memtierd-command "stats -t process_madvice -f csv | awk -F, \"{print \\\$6}\""; grep ${pageout_regexp} <<< $COMMAND_OUTPUT); do
+        echo "grep PAGEOUT value matching ${pageout_regexp} not found"
         next-round round_number 5 1 || {
-            error "timeout: memtierd did not pageout enough memory"
+            error "timeout: memtierd did not expected amount of memory"
         }
     done
 }

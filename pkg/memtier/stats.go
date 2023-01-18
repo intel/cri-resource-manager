@@ -259,10 +259,18 @@ func (s *Stats) Dump(args []string) string {
 	}
 }
 
-func (s *Stats) Summarize() string {
-	lines := []string{}
-	lines = append(lines, "", "table: events")
-	lines = append(lines, "   count timeint[s] latest[s ago] name")
+func (s *Stats) tableEvents(format string) []string {
+	lines := []string{"table: events"}
+	header := []interface{}{"count", "timeint[s]", "latest[s ago]", "name"}
+	headerFmt := map[string]string{
+		"csv": "%s,%s,%s,%s",
+		"txt": "%8s %10s %13s %s",
+	}
+	rowFmt := map[string]string{
+		"csv": "%d,%.6f,%.6f,%s",
+		"txt": "%8d %10.3f %13.3f %s",
+	}
+	lines = append(lines, fmt.Sprintf(headerFmt[format], header...))
 	now := time.Now().UnixNano()
 	for _, name := range s.namePulse.sortedKeys() {
 		pulse := s.namePulse[name]
@@ -273,29 +281,52 @@ func (s *Stats) Summarize() string {
 			beatsMinusOne = 1
 		}
 		lines = append(lines,
-			fmt.Sprintf("%8d %10.3f %13.3f %s",
+			fmt.Sprintf(rowFmt[format],
 				pulse.sumBeats,
 				(secondsSinceFirst-secondsSinceLatest)/float32(beatsMinusOne),
 				secondsSinceLatest,
 				name))
 	}
-	lines = append(lines, "", "table: process_madvice syscalls")
-	lines = append(lines, "     pid    calls req[pages]  ok[pages]    ok[G] advice:mem[G]")
+	return lines
+}
+
+func (s *Stats) tableProcessMadvice(format string) []string {
+	lines := []string{"table: process_madvice syscalls"}
+	headers := []interface{}{"pid", "calls", "req[pages]", "ok[pages]", "ok[G]", "PAGEOUT[G]"}
+	headerFmt := map[string]string{
+		"csv": "%s,%s,%s,%s,%s,%s",
+		"txt": "%8s %8s %10s %10s %8s %s",
+	}
+	rowFmt := map[string]string{
+		"csv": "%d,%d,%d,%d,%8.6f,%.6f",
+		"txt": "%8d %8d %10d %10d %8.3f %.3f",
+	}
+	lines = append(lines, fmt.Sprintf(headerFmt[format], headers...))
 	for _, pid := range s.pidMadvices.sortedKeys() {
 		spm := s.pidMadvices[pid]
-		advMem := fmt.Sprintf("PAGEOUT:%.3f;COLD:%.3f",
-			float64(spm.advicePageCount[unix.MADV_PAGEOUT]*constUPagesize)/float64(1024*1024*1024),
-			float64(spm.advicePageCount[unix.MADV_COLD]*constUPagesize)/float64(1024*1024*1024))
-		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8.3f %s",
+		lines = append(lines, fmt.Sprintf(rowFmt[format],
 			pid,
 			spm.sumSyscalls,
 			spm.sumPageCount,
 			spm.errnoPageCount[0],
 			float64(spm.errnoPageCount[0]*constUPagesize)/float64(1024*1024*1024),
-			advMem))
+			float64(spm.advicePageCount[unix.MADV_PAGEOUT]*constUPagesize)/float64(1024*1024*1024)))
 	}
-	lines = append(lines, "", "table: move_pages syscalls")
-	lines = append(lines, "     pid    calls req[pages]  ok[pages] moved[G] targetnode:moved[G]")
+	return lines
+}
+
+func (s *Stats) tableMovePages(format string) []string {
+	lines := []string{"table: move_pages syscalls"}
+	headers := []interface{}{"pid", "calls", "req[pages]", "ok[pages]", "moved[G]", "targetnode:moved[G]"}
+	headerFmt := map[string]string{
+		"csv": "%s,%s,%s,%s,%s,%s",
+		"txt": "%8s %8s %10s %10s %8s %s",
+	}
+	rowFmt := map[string]string{
+		"csv": "%d,%d,%d,%d,%.6f,%s",
+		"txt": "%8d %8d %10d %10d %8.3f %s",
+	}
+	lines = append(lines, fmt.Sprintf(headerFmt[format], headers...))
 	for _, pid := range s.pidMoves.sortedKeys() {
 		spm := s.pidMoves[pid]
 		node_moved_list := []string{}
@@ -305,7 +336,7 @@ func (s *Stats) Summarize() string {
 				float64(spm.sumDestNodePages[node]*constUPagesize)/float64(1024*1024*1024)))
 		}
 		node_moved := strings.Join(node_moved_list, ";")
-		lines = append(lines, fmt.Sprintf("%8d %8d %10d %10d %8.3f %s",
+		lines = append(lines, fmt.Sprintf(rowFmt[format],
 			pid,
 			spm.sumSyscalls,
 			spm.sumReqs,
@@ -313,11 +344,24 @@ func (s *Stats) Summarize() string {
 			float64(spm.sumDestNode*constUPagesize)/float64(1024*1024*1024),
 			node_moved))
 	}
-	lines = append(lines, "", "table: move_pages syscall errors in page statuses")
-	lines = append(lines, "     pid    pages  size[G]    errno error")
+	return lines
+}
+
+func (s *Stats) tableMovePagesErrors(format string) []string {
+	lines := []string{"table: move_pages syscall errors in page statuses"}
+	headers := []interface{}{"pid", "pages", "size[G]", "errno", "error"}
+	headerFmt := map[string]string{
+		"csv": "%s,%s,%s,%s,%s",
+		"txt": "%8s %8s %8s %8s %s",
+	}
+	rowFmt := map[string]string{
+		"csv": "%d,%d,%.6f,%d,%s",
+		"txt": "%8d %8d %8.3f %8d %s",
+	}
+	lines = append(lines, fmt.Sprintf(headerFmt[format], headers...))
 	for pid, spm := range s.pidMoves {
 		for _, errno := range spm.sumErrorCounts.sortedKeys() {
-			lines = append(lines, fmt.Sprintf("%8d %8d %8.3f %8d %s",
+			lines = append(lines, fmt.Sprintf(rowFmt[format],
 				pid,
 				spm.sumErrorCounts[errno],
 				float64(spm.sumErrorCounts[errno]*constUPagesize)/float64(1024*1024*1024),
@@ -325,11 +369,26 @@ func (s *Stats) Summarize() string {
 				syscall.Errno(errno)))
 		}
 	}
-	lines = append(lines, "", "table: memory scans")
-	lines = append(lines, "     pid    scans   tot[pages] avg[s]   last max[s]   avg[G]  last[G] a+w[%%] last")
+	return lines
+}
+
+func (s *Stats) tableMemoryScans(format string) []string {
+	lines := []string{"table: memory scans"}
+	headers := []interface{}{"pid", "scans", "tot[pages]", "avg[s]", "last", "max[s]", "avg[G]", "last[G]", "a+w[%%]", "last"}
+	headerFmt := map[string]string{
+		"csv": "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s",
+		"txt": "%8s %8s %12s %6s %6s %6s %8s %8s %5s %5s",
+	}
+	rowFmt := map[string]string{
+		"csv": "%d,%d,%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f %.6f",
+		"txt": "%8d %8d %12d %6.3f %6.3f %6.3f %8.3f %8.3f %5.2f %5.2f",
+	}
+	lines = append(lines, fmt.Sprintf(headerFmt[format], headers...))
+	lines = append(lines, "")
+	lines = append(lines)
 	for _, pid := range s.pidScans.sortedKeys() {
 		sps := s.pidScans[pid]
-		lines = append(lines, fmt.Sprintf("%8d %8d %12d %6.3f %6.3f %6.3f %8.3f %8.3f %5.2f %5.2f",
+		lines = append(lines, fmt.Sprintf(rowFmt[format],
 			pid,
 			sps.count,
 			sps.sumScanned,
@@ -341,6 +400,37 @@ func (s *Stats) Summarize() string {
 			float64(100*(sps.sumAccessed+sps.sumWritten))/float64(sps.sumScanned),
 			float64(100*(sps.lastAccessed+sps.lastWritten))/float64(sps.lastScanned),
 		))
+	}
+	return lines
+}
+
+func (s *Stats) Summarize(format string, tables ...string) string {
+	allTables := []string{"events", "process_madvice", "move_pages", "move_pages_errors", "memory_scans"}
+	lines := []string{}
+	if len(tables) == 0 {
+		tables = allTables
+	}
+	if format != "txt" && format != "csv" {
+		return fmt.Sprintf("unknown format %q, txt and csv expected", format)
+	}
+	for _, table := range tables {
+		if len(lines) > 0 {
+			lines = append(lines, "")
+		}
+		switch table {
+		case "events":
+			lines = append(lines, s.tableEvents(format)...)
+		case "process_madvice":
+			lines = append(lines, s.tableProcessMadvice(format)...)
+		case "move_pages":
+			lines = append(lines, s.tableMovePages(format)...)
+		case "move_pages_errors":
+			lines = append(lines, s.tableMovePagesErrors(format)...)
+		case "memory_scans":
+			lines = append(lines, s.tableMemoryScans(format)...)
+		default:
+			lines = append(lines, fmt.Sprintf("unknown table %q, available: \"%s\"", table, strings.Join(allTables, "\", \"")))
+		}
 	}
 	return strings.Join(lines, "\n")
 }
