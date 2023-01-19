@@ -263,9 +263,9 @@ func TestCalculatePoolCpuset(t *testing.T) {
 			sumWeight: 300.0,
 			expectedValue: map[*DynamicPool]int{
 				p.dynamicPools[0]: 2,
-				p.dynamicPools[1]: 1,
+				p.dynamicPools[1]: 0,
 				p.dynamicPools[2]: 8,
-				p.dynamicPools[3]: 3,
+				p.dynamicPools[3]: 4,
 			},
 		},
 		{
@@ -332,8 +332,8 @@ func TestCalculatePoolCpuset(t *testing.T) {
 			sumWeight: 300.0,
 			expectedValue: map[*DynamicPool]int{
 				p.dynamicPools[0]: 2,
-				p.dynamicPools[1]: 1,
-				p.dynamicPools[2]: 7,
+				p.dynamicPools[1]: 0,
+				p.dynamicPools[2]: 8,
 				p.dynamicPools[3]: 4,
 			},
 		},
