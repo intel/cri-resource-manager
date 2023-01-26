@@ -1,6 +1,7 @@
 memtierd-setup
 
 # Create swap
+zram-install
 zram-swap off
 zram-swap 2G
 

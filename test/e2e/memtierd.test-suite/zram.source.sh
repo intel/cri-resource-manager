@@ -15,3 +15,10 @@ zram-swap() {
         vm-command "rmmod zram" || return 1
     fi
 }
+
+zram-install() {
+    vm-command "
+    [ -d /sys/block/zram0 ] || ( find /lib/modules -name zram.ko | grep zram.ko ) || {
+        grep -i ubuntu /etc/os-release && DEBIAN_FRONTEND=noninteractive apt install -y linux-modules-extra-\$(uname -r)
+    }"
+}
