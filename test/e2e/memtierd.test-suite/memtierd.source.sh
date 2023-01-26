@@ -4,6 +4,7 @@ MEMTIERD_OUTPUT=memtierd.output.txt
 memtierd-setup() {
     memtierd-install
     memtierd-reset
+    memtierd-os-env
 }
 
 memtierd-install() {
@@ -19,6 +20,10 @@ memtierd-install() {
 
 memtierd-reset() {
     vm-command "killall -KILL memtierd meme socat"
+}
+
+memtierd-os-env() {
+    vm-command "[[ \$(< /proc/sys/kernel/numa_balancing) -ne 0 ]] && { echo disabling autonuma; echo 0 > /proc/sys/kernel/numa_balancing; }"
 }
 
 memtierd-start() {
