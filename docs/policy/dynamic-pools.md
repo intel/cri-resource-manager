@@ -53,8 +53,6 @@ Related configuration parameters:
 
 ### Example
 
-Example configuration that runs all pods in dynamic-pools.
-
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -116,9 +114,9 @@ instrumentation:
   # and cpusets of dynamic-pools. Accessible in command line:
   # curl --silent http://localhost:8891/metrics
   HTTPEndpoint: :8891
-  PrometheusExport:true
+  PrometheusExport: true
 logger:
-  Debug:policy
+  Debug: policy
 ```
 
 Use the `--metrics-interval` option to set the interval for updating metrics data.
