@@ -54,36 +54,30 @@ Related configuration parameters:
 ### Example
 
 ```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  namespace: kube-system
-  name: cri-resmgr-config.default
-data:
-  cpu:
-    classes:
-      pool1-cpuclass:
-        maxFreq: 1500000
-        minFreq: 2000000
-      pool2-cpuclass:
-        maxFreq: 2000000
-        minFreq: 2500000
-  policy:
-    Active: dynamic-pools
-    ReservedResources:
-        CPU: cpuset:0
-    dynamic-pools:
-      PinCPU: true
-      PinMemory: true
-      DynamicPoolTypes:
-        - Name: "pool1"
-          Namespaces:
-            - "pool1"
-          CPUClass: "pool1-cpuclass"
-        - Name: "pool2"
-          Namespaces:
-            - "pool2"
-          CPUClass: "pool2-cpuclass"
+cpu:
+  classes:
+    pool1-cpuclass:
+      maxFreq: 1500000
+      minFreq: 2000000
+    pool2-cpuclass:
+      maxFreq: 2000000
+      minFreq: 2500000
+policy:
+  Active: dynamic-pools
+  ReservedResources:
+      CPU: cpuset:0
+  dynamic-pools:
+    PinCPU: true
+    PinMemory: true
+    DynamicPoolTypes:
+      - Name: "pool1"
+        Namespaces:
+          - "pool1"
+        CPUClass: "pool1-cpuclass"
+      - Name: "pool2"
+        Namespaces:
+          - "pool2"
+        CPUClass: "pool2-cpuclass"
 ```
 
 ### Update Dynamic-Pools at Regular Intervals
