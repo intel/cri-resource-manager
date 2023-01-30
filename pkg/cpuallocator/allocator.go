@@ -428,6 +428,7 @@ func (c *topologyCache) discoverCPUPriorities(sys sysfs.System) {
 			prio[p] = prio[p].Union(cset)
 		}
 	}
+	c.cpuPriorities = prio
 }
 
 func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID idset.ID) ([NumCPUPriorities][]idset.ID, bool) {
