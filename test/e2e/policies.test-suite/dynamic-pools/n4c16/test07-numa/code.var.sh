@@ -75,7 +75,7 @@ kubectl delete pods pod4 --now
 report allowed
 verify 'len(cpus["pod0c0"]) >= 1' \
        'len(cpus["pod5c0"]) >= 1' \
-       'cpus["pod0c0"] == cpus["pod5c0"]' 
+       'cpus["pod0c0"] == cpus["pod5c0"]'
 
 terminate cri-resmgr
 launch cri-resmgr

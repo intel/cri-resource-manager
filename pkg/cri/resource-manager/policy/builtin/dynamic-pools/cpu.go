@@ -61,7 +61,6 @@ func getCpuTimesStat(ctx context.Context) ([]cpuTimesStat, error) {
 			continue
 		}
 		stat = append(stat, *oneStat)
-
 	}
 	return stat, nil
 }
@@ -87,7 +86,7 @@ func calculateAllCpusUtilization(cts1, cts2 []cpuTimesStat) ([]float64, error) {
 	return allCpusUtilization, nil
 }
 
-//readCpuLines skips the first line indicating the total CPU utilization.
+// readCpuLines skips the first line indicating the total CPU utilization.
 func readCpuLines(filename string) ([]string, error) {
 	f, err := os.Open(filename)
 	if err != nil {

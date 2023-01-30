@@ -21,7 +21,7 @@ POD_ANNOTATION="dynamic-pool.dynamic-pools.cri-resource-manager.intel.com/pod: p
 create dyp-busybox
 POD_ANNOTATION="dynamic-pool.dynamic-pools.cri-resource-manager.intel.com/pod: pool2"
 create dyp-busybox
-# Print initial CPU pinning. 
+# Print initial CPU pinning.
 report allowed
 # Wait at least one rebalancing round.
 sleep 3

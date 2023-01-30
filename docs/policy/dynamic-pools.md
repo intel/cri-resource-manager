@@ -6,19 +6,19 @@ The dynamic-pools policy can put the workload into different dynamic-pools. Each
 
 The main idea of the algorithm is: on the premise that the CPUs in each dynamic-pool can meet the requests of the pods in the dynamic-pool, the CPUs are allocated based on the CPU utilization of the workload. Dynamic-pools policy try to keep CPU utilization balanced.
 
- CPUs in dynamic-pools can be configured, for example, by setting min and max frequencies on CPU cores and uncore.
+CPUs in dynamic-pools can be configured, for example, by setting min and max frequencies on CPU cores and uncore.
 
 ## How It Works
 
 1. The user configures the dynamic-pool types from which the policy instantiates dynamic-pools. In addition to the dynamic-pools configured by the user, there is also a built-in dynamic-pool named shared pool.
 2. A dynamic-pool has a set of CPUs and a set of containers running on the CPUs.
-3. Every container is assigned to a dynamic-pool. Allows a container to use all CPUs of its pool and no other CPUs.
-4. Each logical CPU belongs to and belongs to at most one dynamic-pool. There cannot be CPUs that do not belong to any dynamic-pool.
+3. Every container is assigned to a dynamic-pool. Dynamic-pools policy allows a container to use all CPUs of its pool and no other CPUs.
+4. Each logical CPU belongs to exactly one dynamic-pool. There cannot be CPUs that do not belong to any dynamic-pool.
 5. The number of CPUs in a dynamic-pool can change. If CPUs are added to a dynamic-pool, then all containers in the dynamic-pool can use more CPUs. The opposite is true if the CPUs are removed.
 6. As CPUs are added to or removed from the dynamic-pool, the CPUs are reconfigured according to the dynamic-pool's CPU class attributes or the idle CPU class attributes.
 7. Updating the number of CPUs in dynamic-pools:
-   - The dynamic-pool policy needs to update the number of CPUs in dynamic-pools when starting policy, creating pods, deleting pods, updating configurations, and at regular intervals.
-   - The number of CPUs in the dynamic-pools is determined by the requests of containers and CPU utilization in the dynamic-pools. 
+   - The dynamic-pools policy needs to update the number of CPUs in dynamic-pools when starting policy, creating pods, deleting pods, updating configurations, and at regular intervals.
+   - The number of CPUs in the dynamic-pools is determined by the requests of containers and CPU utilization in the dynamic-pools.
    - The number of CPUs allocated in each dynamic-pool is the sum of the requests of the containers in the dynamic pool and the CPUs allocated based on the CPU utilization of the workload.
 8. When a new container is created on a Kubernetes node, the policy first decides the type of the dynamic-pool that will run the container. The decision is based on the annotation of the pod, or the namespace if annotations are not given.
 
@@ -56,7 +56,13 @@ Related configuration parameters:
 Example configuration that runs all pods in dynamic-pools.
 
 ```yaml
-  cpu: |+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: kube-system
+  name: cri-resmgr-config.default
+data:
+  cpu:
     classes:
       pool1-cpuclass:
         maxFreq: 1500000
@@ -64,7 +70,7 @@ Example configuration that runs all pods in dynamic-pools.
       pool2-cpuclass:
         maxFreq: 2000000
         minFreq: 2500000
-  policy: |+
+  policy:
     Active: dynamic-pools
     ReservedResources:
         CPU: cpuset:0
@@ -84,7 +90,7 @@ Example configuration that runs all pods in dynamic-pools.
 
 ### Update Dynamic-Pools at Regular Intervals
 
-The dynamic-pool policy can be set at regular intervals, based on the cpu utilization of the workload in each pool, to update the cpu allocation, and use the `--rebalance-interval` option to set the interval.
+The dynamic-pools policy can be set at regular intervals, based on the cpu utilization of the workload in each pool, to update the cpu allocation, and use the `--rebalance-interval` option to set the interval.
 
 ### Assigning a Container to a Dynamic-pool
 
@@ -109,7 +115,7 @@ instrumentation:
   # The dynamic-pools policy exports containers running in each dynamic-pool,
   # and cpusets of dynamic-pools. Accessible in command line:
   # curl --silent http://localhost:8891/metrics
-  HTTPEndpoint::8891
+  HTTPEndpoint: :8891
   PrometheusExport:true
 logger:
   Debug:policy

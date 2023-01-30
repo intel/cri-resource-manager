@@ -53,7 +53,7 @@ verify 'cpus["pod4c0"] == cpus["pod4c1"]' \
       'len(cpus["pod4c0"]) >= 3' \
       'len(cpus["pod3c0"]) >= 2' \
       'len(cpus["pod1c0"]) + len(cpus["pod3c0"]) + len(cpus["pod4c0"]) == 14' \
-      'disjoint_sets(cpus["pod4c0"], cpus["pod3c0"], cpus["pod1c0"])' 
+      'disjoint_sets(cpus["pod4c0"], cpus["pod3c0"], cpus["pod1c0"])'
 
 # pod5: run in the pool1.
 CPUREQ="1500m" MEMREQ="100M" CPULIM="1500m" MEMLIM="100M"
@@ -63,7 +63,7 @@ report allowed
 verify 'cpus["pod5c0"] == cpus["pod2c0"]'\
       'len(cpus["pod5c0"]) >= 4' \
       'len(cpus["pod4c0"]) >= 3' \
-      'len(cpus["pod1c0"]) + len(cpus["pod3c0"]) + len(cpus["pod4c0"]) == 14' 
+      'len(cpus["pod1c0"]) + len(cpus["pod3c0"]) + len(cpus["pod4c0"]) == 14'
 
 cleanup
 

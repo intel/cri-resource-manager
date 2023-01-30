@@ -56,13 +56,13 @@ DYPTYPE0_SKIP=1 DYPTYPE1_SKIP=1 DYPTYPE2_NAMESPACE0='"*"' apply-configmap
 # Possible behaviors: evict pod0, continue assign chain, refuse config...
 # For now, skip pod0c0 dynamic pool validation:
 # verify-metrics-has-line '"dyptype2".*pod0:pod0c0'
-verify-metrics-has-line 'pod1:pod1c0.*"dyptype2"' 
+verify-metrics-has-line 'pod1:pod1c0.*"dyptype2"'
 verify-metrics-has-line 'pod2:pod2c0.*"dyptype2"'
 
 # Bring back dyptype0 where pod0 belongs to by annotation.
 DYPTYPE1_SKIP=1 DYPTYPE2_NAMESPACE0='"*"' apply-configmap
 verify-metrics-has-line 'pod0:pod0c0.*"dyptype0"'
-verify-metrics-has-line 'pod1:pod1c0.*"dyptype2"' 
+verify-metrics-has-line 'pod1:pod1c0.*"dyptype2"'
 verify-metrics-has-line 'pod2:pod2c0.*"dyptype2"'
 
 # Change only CPU classes, no reassigning.
@@ -70,7 +70,7 @@ verify-metrics-has-line 'pod0:pod0c0.*cpu_class="classA".*"dyptype0"'
 verify-metrics-has-line 'pod1:pod1c0.*cpu_class="classC".*"dyptype2"'
 verify-metrics-has-line 'pod2:pod2c0.*cpu_class="classC".*"dyptype2"'
 DYPTYPE0_CPUCLASS="classC" DYPTYPE1_SKIP=1 DYPTYPE2_CPUCLASS="classB" DYPTYPE2_NAMESPACE0='"*"'  apply-configmap
-verify-metrics-has-line 'pod0:pod0c0.*cpu_class="classC".*"dyptype0"' 
+verify-metrics-has-line 'pod0:pod0c0.*cpu_class="classC".*"dyptype0"'
 verify-metrics-has-line 'pod1:pod1c0.*cpu_class="classB".*"dyptype2"'
 verify-metrics-has-line 'pod2:pod2c0.*cpu_class="classB".*"dyptype2"'
 

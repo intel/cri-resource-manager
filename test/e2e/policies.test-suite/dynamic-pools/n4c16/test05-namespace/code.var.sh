@@ -49,21 +49,21 @@ CPUREQ="100m" MEMREQ="100M" CPULIM="100m" MEMLIM="100M"
 CONTCOUNT=2 create dyp-busybox
 report allowed
 verify 'cpus["pod3c0"] == cpus["pod3c1"] == cpus["pod2c0"]' \
-       'len(cpus["pod3c0"]) >= 5' 
+       'len(cpus["pod3c0"]) >= 5'
 
 # pod4: create in the e2e-b namespace, CPUREQ is 2*2, both containers go to nsdyp dynamic pool.
 CPUREQ="2" MEMREQ="100M" CPULIM="2" MEMLIM="100M"
 namespace="e2e-b" CONTCOUNT=2 create dyp-busybox
 report allowed
 verify 'cpus["pod4c0"] == cpus["pod4c1"] == cpus["pod3c0"] == cpus["pod2c0"]' \
-       'len(cpus["pod4c0"]) >= 9' 
+       'len(cpus["pod4c0"]) >= 9'
 
 # pod5: create in the e2e-c namespace, CPUREQ is 100m*2, both containers go to nsdyp dynamic pool.
 CPUREQ="100m" MEMREQ="100M" CPULIM="100m" MEMLIM="100M"
 namespace="e2e-c" CONTCOUNT=2 create dyp-busybox
 report allowed
 verify 'cpus["pod5c0"] == cpus["pod5c1"] == cpus["pod4c0"] == cpus["pod3c0"] == cpus["pod2c0"]' \
-       'len(cpus["pod5c0"]) >= 9' 
+       'len(cpus["pod5c0"]) >= 9'
 
 cleanup
 terminate cri-resmgr
