@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cri-resmgr-config.default
+  namespace: kube-system
+data:
+  policy: |+
+    Active: dynamic-pools
+    AvailableResources:
+      CPU: ${AVAILABLE_CPU:-cpuset:0-15}
+    ReservedResources:
+      CPU: ${RESERVED_CPU:-1}
+
+    dynamic-pools:
+      PinCPU: ${PINCPU:-true}
+      PinMemory: ${PINMEMORY:-true}
+      DynamicPoolTypes:
+
+        $([ -n "$DYPTYPE0_SKIP" ] || echo "
+        - Name: dyptype0
+          AllocationPriority: ${DYPTYPE0_ALLOCATIONPRIORITY:-0}
+          CPUClass: ${DYPTYPE0_CPUCLASS:-classA}
+        ")
+
+        $([ -n "$DYPTYPE1_SKIP" ] || echo "
+        - Name: dyptype1
+          Namespaces:
+            - ${DYPTYPE1_NAMESPACE0:-dyptype1ns0}
+          AllocatorPriority: ${DYPTYPE1_ALLOCATIONPRIORITY:-1}
+          CPUClass: ${DYPTYPE1_CPUCLASS:-classB}
+        ")
+
+        $([ -n "$DYPTYPE2_SKIP" ] || echo "
+        - Name: dyptype2
+          Namespaces:
+            - ${DYPTYPE2_NAMESPACE0:-dyptype2ns0}
+            - ${DYPTYPE2_NAMESPACE1:-dyptype2ns1}
+          AllocatorPriority: ${DYPTYPE2_ALLOCATORPRIORITY:-2}
+          CPUClass: ${DYPTYPE2_CPUCLASS:-classC}
+        ")
+
+  instrumentation: |+
+    HTTPEndpoint: :8891
+    PrometheusExport: true
+
+  logger: |+
+    Debug: policy
+
+  cpu: |+
+    classes:
+      default:
+        minFreq: ${CPU_DEFAULT_MIN:-800}
+        maxFreq: ${CPU_DEFAULT_MAX:-2800}
+      classA:
+        minFreq: ${CPU_CLASSA_MIN:-900}
+        maxFreq: ${CPU_CLASSA_MAX:-2900}
+      classB:
+        minFreq: ${CPU_CLASSB_MIN:-1000}
+        maxFreq: ${CPU_CLASSB_MAX:-3000}
+      classC:
+        minFreq: ${CPU_CLASSC_MIN:-1100}
+        maxFreq: ${CPU_CLASSC_MAX:-3100}
+        energyPerformancePreference: ${CPU_CLASSC_EPP:-1}
