@@ -12,3 +12,4 @@ Policies
    blockio.md
    rdt.md
    cpu-allocator.md
+   dynamic-pools.md
