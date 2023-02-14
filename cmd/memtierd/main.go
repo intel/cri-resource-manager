@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -79,6 +80,7 @@ func main() {
 	optConfig := flag.String("config", "", "launch non-interactive mode with config file")
 	optConfigDumpJson := flag.Bool("config-dump-json", false, "dump effective configuration in JSON")
 	optDebug := flag.Bool("debug", false, "print debug output")
+	optCommandString := flag.String("c", "-", "run command string, \"-\": from stdin (the default), \"\": non-interactive")
 
 	flag.Parse()
 	memtier.SetLogDebug(*optDebug)
@@ -114,15 +116,24 @@ func main() {
 		}
 	}
 
-	prompt := memtier.NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
-	if stdinFileInfo, _ := os.Stdin.Stat(); (stdinFileInfo.Mode() & os.ModeCharDevice) == 0 {
-		// Input comes from a pipe.
-		// Echo commands after prompt in the interaction to explain outputs.
-		prompt.SetEcho(true)
+	if *optCommandString != "" {
+		var prompt *memtier.Prompt
+		if *optCommandString == "-" {
+			prompt = memtier.NewPrompt("memtierd> ", bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
+			if stdinFileInfo, _ := os.Stdin.Stat(); (stdinFileInfo.Mode() & os.ModeCharDevice) == 0 {
+				// Input comes from a pipe.
+				// Echo commands after prompt in the interaction to explain outputs.
+				prompt.SetEcho(true)
+			}
+		} else {
+			prompt = memtier.NewPrompt("", bufio.NewReader(strings.NewReader(*optCommandString)), bufio.NewWriter(os.Stdout))
+		}
+		prompt.SetPolicy(policy)
+		if len(routines) > 0 {
+			prompt.SetRoutines(routines)
+		}
+		prompt.Interact()
+	} else { // *optCommandString == ""
+		select {}
 	}
-	prompt.SetPolicy(policy)
-	if len(routines) > 0 {
-		prompt.SetRoutines(routines)
-	}
-	prompt.Interact()
 }

@@ -55,7 +55,13 @@ EOF
         vm-command "cd linux; nice make -j8 bindeb-pkg" || {
             error "building debian packages failed"
         }
-        vm-command 'echo $(ls linux-image-*.deb | grep -v dbg)'
+
+        distro-install-pkg libtraceevent-dev libb2-1 libbabeltrace-dev libopencsd1 libpython3.11 libpython3.11-minimal libpython3.11-stdlib libu nwind8 python3.11 python3.11-minimal
+        vm-command "cd linux; make -C tools/perf" || {
+            error "building perf failed"
+        }
+        vm-command 'cd linux; linuxver=$(git describe | sed -e "s/v\([0-9]\).\([0-9]*\)-.*/\1.\2/g"); ln -sv $(pwd)/tools/perf /usr/local/bin/perf_$linuxver'
+        vm-command 'dpkg -i $(ls linux-image-*.deb | grep -v dbg)'
         vm-reboot
     fi
 }

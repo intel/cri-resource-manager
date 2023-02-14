@@ -135,12 +135,28 @@ func procWrite(path string, data []byte) error {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
+func procWriteInt(path string, i int) error {
+	return procWrite(path, []byte(strconv.Itoa(i)))
+}
+
+func procWriteUint64(path string, i uint64) error {
+	return procWrite(path, []byte(strconv.FormatUint(i, 10)))
+}
+
 func procRead(path string) (string, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func procReadTrimmed(path string) (string, error) {
+	if s, err := procRead(path); err != nil {
+		return "", err
+	} else {
+		return strings.TrimSpace(s), nil
+	}
 }
 
 func procReadInt(path string) (int, error) {
@@ -151,7 +167,7 @@ func procReadInt(path string) (int, error) {
 	if len(data) == 0 {
 		return 0, fmt.Errorf("read empty string, expected int from %q", path)
 	}
-	n, err := strconv.Atoi(string(data[:len(data)-1]))
+	n, err := strconv.Atoi(strings.TrimSpace(string(data)))
 	if err != nil {
 		return 0, err
 	}
