@@ -307,6 +307,10 @@ func GetHugetlbUsage(cgroupPath string) ([]HugetlbUsage, error) {
 	result := make([]HugetlbUsage, 0, len(usageFiles))
 
 	for _, file := range usageFiles {
+		if strings.Contains(filepath.Base(file), ".rsvd") {
+			// Skip reservations files.
+			continue
+		}
 		size := strings.SplitN(filepath.Base(file), ".", 3)[1]
 		bytes, err := readCgroupSingleNumber(file)
 		if err != nil {
