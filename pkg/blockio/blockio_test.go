@@ -24,7 +24,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/testutils"
 )
 
-var knownIOSchedulers map[string]bool = map[string]bool{
+var knownIOSchedulers = map[string]bool{
 	"bfq":         true,
 	"cfq":         true,
 	"deadline":    true,
