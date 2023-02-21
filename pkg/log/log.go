@@ -193,17 +193,17 @@ func (l Level) String() string {
 // setLevel sets the logging severity level.
 func (log *logging) setLevel(level Level) error {
 	log.level = level
-	kThreshold := ""
+	threshold := ""
 	switch level {
 	case LevelDebug, LevelInfo:
-		kThreshold = "INFO"
+		threshold = "INFO"
 	case LevelWarn:
-		kThreshold = "WARNING"
+		threshold = "WARNING"
 	case LevelError, LevelPanic, LevelFatal:
-		kThreshold = "ERROR"
+		threshold = "ERROR"
 	}
-	if err := klogctl.Set("stderrthreshold", kThreshold); err != nil {
-		return loggerError("failed to set log level/threshold to %s: %v", kThreshold, err)
+	if err := klogctl.Set("stderrthreshold", threshold); err != nil {
+		return loggerError("failed to set log level/threshold to %s: %v", threshold, err)
 	}
 	return nil
 }
