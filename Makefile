@@ -11,7 +11,7 @@ GO_FMT      := gofmt
 GO_CYCLO    := gocyclo
 GO_LINT     := golint
 GO_CILINT   := golangci-lint
-GO_VERSION  ?= 1.19.6
+GO_VERSION  ?= 1.20.2
 GOLICENSES_VERSION  ?= v1.5.0
 
 # TEST_TAGS is the set of extra build tags passed for tests.
