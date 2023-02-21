@@ -633,9 +633,10 @@ func (p CPUPriority) String() string {
 }
 
 // cmpCPUSet compares two cpusets in terms of preferred cpu priority. Returns:
-//   > 0 if cpuset A is preferred
-//   < 0 if cpuset B is preferred
-//   0 if cpusets A and B are equal in terms of cpu priority
+//
+//	> 0 if cpuset A is preferred
+//	< 0 if cpuset B is preferred
+//	0 if cpusets A and B are equal in terms of cpu priority
 func (c *cpuPriorities) cmpCPUSet(csetA, csetB cpuset.CPUSet, prefer CPUPriority, cpuCnt int) int {
 	if prefer == PriorityNone {
 		return 0

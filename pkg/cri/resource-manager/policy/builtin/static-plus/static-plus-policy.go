@@ -707,16 +707,14 @@ func (ca *cachedAllocations) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-//
 // Functions for calculating CFS cpu.shares and cpu.cfs_quota_us.
 //
-//   Notes: These functions are almost verbatim taken from the kubelet
-//   code (from k8s.io/kubernetes/pkg/kubelet/cm/helpers_linux.go).
-//   Since these are exported there, we could try to import them, set the
-//   related feature gates (kubefeatures.CPUCFSQuotaPeriod) for ourselves
-//   into the desired positions (disabled most probably for now) and use
-//   the imported code.
-//
+//	Notes: These functions are almost verbatim taken from the kubelet
+//	code (from k8s.io/kubernetes/pkg/kubelet/cm/helpers_linux.go).
+//	Since these are exported there, we could try to import them, set the
+//	related feature gates (kubefeatures.CPUCFSQuotaPeriod) for ourselves
+//	into the desired positions (disabled most probably for now) and use
+//	the imported code.
 const (
 	MinShares     = 2
 	SharesPerCPU  = 1024
