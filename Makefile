@@ -21,7 +21,7 @@ GO_TEST   := $(GO_CMD) test $(GO_PARALLEL) -tags $(TEST_TAGS)
 GO_VET    := $(GO_CMD) vet -tags $(TEST_TAGS)
 
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
-GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E golint,gofmt
+GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E revive,gofmt
 GO_CILINT_RUNFLAGS := --build-tags $(TEST_TAGS)
 
 # Protoc compiler and protobuf definitions we might need to recompile.
