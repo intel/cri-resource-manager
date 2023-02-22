@@ -200,7 +200,7 @@ func NewCollector() (prometheus.Collector, error) {
 	progVer := spec.Programs["tracepoint__x86_fpu_regs_deactivated"].KernelVersion
 
 	if hostVer < progVer {
-		return nil, errors.Wrapf(err, "The host kernel version (v%s) is too old to run the AVX512 collector program. Minimum version is v%s.", kernelVersionStr(hostVer), kernelVersionStr(progVer))
+		return nil, errors.Wrapf(err, "The host kernel version (v%s) is too old to run the AVX512 collector program. Minimum version is v%s", kernelVersionStr(hostVer), kernelVersionStr(progVer))
 	}
 
 	collection, err := bpf.NewCollection(spec)
