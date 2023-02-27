@@ -196,19 +196,3 @@ func isNativeResource(name string) bool {
 		return false
 	}
 }
-
-// GetConfig gets the cri-resmgr configuration
-func (g *grpcServer) GetConfig(ctx context.Context, req *v1.GetConfigRequest) (*v1.GetConfigReply, error) {
-	g.Debug("received GetConfigRequest: %v", req)
-	rpl := &v1.GetConfigReply{
-		NodeName: nodeName,
-		Config:   resmgrConfig{},
-	}
-
-	if g.cfg != nil {
-		rpl.Config = g.cfg.getConfig()
-	} else {
-		g.Warn("no getter method configured, returning empty config!")
-	}
-	return rpl, nil
-}

@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -347,18 +346,9 @@ func (m *resmgr) loadConfig() error {
 	// We try to load initial configuration from a number of sources:
 	//
 	//    1. use forced configuration file if we were given one
-	//    2. use configuration from agent, if we can fetch it and it applies
-	//    3. use last configuration stored in cache, if we have one and it applies
-	//    4. use fallback configuration file if we were given one
-	//    5. use empty/builtin default configuration, whatever that is...
-	//
-	// Notes/TODO:
-	//   If the agent is already running at this point, the initial configuration is
-	//   obtained by polling the agent via GetConfig(). Unlike for the latter updates
-	//   which are pushed by the agent, there is currently no way to report problems
-	//   about polled configuration back to the agent. If/once the agent will have a
-	//   mechanism to propagate configuration errors back to the origin, this might
-	//   become a problem that we'll need to solve.
+	//    2. use last configuration stored in cache, if we have one and it applies
+	//    3. use fallback configuration file if we were given one
+	//    4. use empty/builtin default configuration, whatever that is...
 	//
 
 	if opt.ForceConfig != "" {
@@ -368,15 +358,6 @@ func (m *resmgr) loadConfig() error {
 				opt.ForceConfig, err)
 		}
 		return m.setupConfigSignal(opt.ForceConfigSignal)
-	}
-
-	m.Info("trying configuration from agent...")
-	if conf, err := m.agent.GetConfig(1 * time.Second); err == nil {
-		if err = pkgcfg.SetConfig(conf.Data); err == nil {
-			m.conf = conf // schedule storing in cache if we ever manage to start up
-			return nil
-		}
-		m.Error("configuration from agent failed to apply: %v", err)
 	}
 
 	m.Info("trying last cached configuration...")
