@@ -19,18 +19,21 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"time"
 
 	"google.golang.org/grpc"
 
 	agent_v1 "github.com/intel/cri-resource-manager/pkg/agent/api/v1"
+	v1 "github.com/intel/cri-resource-manager/pkg/agent/api/v1"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
 	"github.com/intel/cri-resource-manager/pkg/log"
 )
 
 func main() {
 	socket := flag.String("agent-socket", sockets.ResourceManagerAgent, "Unix domain socket where agent is serving")
+	query := flag.String("query", "", fmt.Sprintf("query to send, use %q to query status of last config push to resmgr", v1.ConfigStatus))
 
 	// Disable logger buffering and make sure that everything has been flushed
 	// when program exits
@@ -56,7 +59,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	rpl, err := cli.HealthCheck(ctx, &agent_v1.HealthCheckRequest{})
+	rpl, err := cli.HealthCheck(ctx, &agent_v1.HealthCheckRequest{
+		Query: *query,
+	})
 	if err != nil {
 		log.Fatal("%v", err)
 	}
