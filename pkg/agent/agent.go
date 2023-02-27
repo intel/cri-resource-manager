@@ -27,7 +27,10 @@ import (
 )
 
 // Get cri-resmgr config
-type getConfigFn func() resmgrConfig
+type configInterface interface {
+	getConfig() resmgrConfig
+	getError() error
+}
 
 // resmgrConfig represents cri-resmgr configuration
 type resmgrConfig map[string]string
@@ -72,7 +75,7 @@ func NewResourceManagerAgent() (ResourceManagerAgent, error) {
 		return nil, agentError("failed to initialize watcher instance: %v", err)
 	}
 
-	if a.server, err = newAgentServer(a.cli, a.watcher.GetConfig); err != nil {
+	if a.server, err = newAgentServer(a.cli, a); err != nil {
 		return nil, agentError("failed to initialize gRPC server")
 	}
 
@@ -118,6 +121,20 @@ func (a *agent) Run() error {
 			}
 		}
 	}
+}
+
+func (a *agent) getConfig() resmgrConfig {
+	if a.watcher == nil {
+		return nil
+	}
+	return a.watcher.GetConfig()
+}
+
+func (a *agent) getError() error {
+	if a.updater == nil {
+		return nil
+	}
+	return a.updater.GetError()
 }
 
 func agentError(format string, args ...interface{}) error {

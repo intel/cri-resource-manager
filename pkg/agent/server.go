@@ -43,17 +43,17 @@ type agentServer interface {
 // server implements agentServer.
 type server struct {
 	log.Logger
-	cli       *k8sclient.Clientset // client for accessing k8s api
-	server    *grpc.Server         // gRPC server instance
-	getConfig getConfigFn          // Getter function for current config
+	cli    *k8sclient.Clientset // client for accessing k8s api
+	server *grpc.Server         // gRPC server instance
+	cfg    configInterface
 }
 
 // newAgentServer creates new agentServer instance.
-func newAgentServer(cli *k8sclient.Clientset, getFn getConfigFn) (agentServer, error) {
+func newAgentServer(cli *k8sclient.Clientset, cfg configInterface) (agentServer, error) {
 	s := &server{
-		Logger:    log.NewLogger("server"),
-		cli:       cli,
-		getConfig: getFn,
+		Logger: log.NewLogger("server"),
+		cli:    cli,
+		cfg:    cfg,
 	}
 
 	return s, nil
@@ -80,9 +80,9 @@ func (s *server) Start(socket string) error {
 	serverOpts := []grpc.ServerOption{}
 	s.server = grpc.NewServer(serverOpts...)
 	gs := &grpcServer{
-		Logger:    s.Logger,
-		cli:       s.cli,
-		getConfig: s.getConfig,
+		Logger: s.Logger,
+		cli:    s.cli,
+		cfg:    s.cfg,
 	}
 	v1.RegisterAgentServer(s.server, gs)
 
@@ -106,8 +106,8 @@ func (s *server) Stop() {
 type grpcServer struct {
 	v1.UnimplementedAgentServer
 	log.Logger
-	cli       *k8sclient.Clientset
-	getConfig getConfigFn
+	cli *k8sclient.Clientset
+	cfg configInterface
 }
 
 // GetNode gets K8s node object.
@@ -174,7 +174,16 @@ func (g *grpcServer) UpdateNodeCapacity(ctx context.Context, req *v1.UpdateNodeC
 // HealthCheck checks if the agent is in healthy state
 func (g *grpcServer) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) (*v1.HealthCheckReply, error) {
 	g.Debug("received HealthCheckRequest: %v", req)
-	return &v1.HealthCheckReply{}, nil
+
+	reply := &v1.HealthCheckReply{}
+
+	if req.Query == v1.ConfigStatus {
+		if err := g.cfg.getError(); err != nil {
+			reply.Error = fmt.Sprintf("configuration error: %v", err)
+		}
+	}
+
+	return reply, nil
 }
 
 func isNativeResource(name string) bool {
@@ -196,8 +205,8 @@ func (g *grpcServer) GetConfig(ctx context.Context, req *v1.GetConfigRequest) (*
 		Config:   resmgrConfig{},
 	}
 
-	if g.getConfig != nil {
-		rpl.Config = g.getConfig()
+	if g.cfg != nil {
+		rpl.Config = g.cfg.getConfig()
 	} else {
 		g.Warn("no getter method configured, returning empty config!")
 	}

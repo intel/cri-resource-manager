@@ -66,6 +66,7 @@ message GetConfigReply {
 }
 
 message HealthCheckRequest {
+    string query = 1;
 }
 
 message HealthCheckReply {
