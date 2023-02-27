@@ -306,12 +306,16 @@ func (c collector) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			re := regexp.MustCompile(`[a-z0-9]{64}`)
+			matches := re.FindStringSubmatch(filepath.Base(path))
+			if len(matches) == 0 {
+				return
+			}
 
 			ch <- prometheus.MustNewConstMetric(
 				descriptors[avxSwitchCountDesc],
 				prometheus.GaugeValue,
 				float64(counter_),
-				re.FindStringSubmatch(filepath.Base(path))[0])
+				matches[0])
 
 			if err := c.ebpf.Maps["all_context_switch_count_hash"].Lookup(uint64(cgroupid_), &allCount); err != nil {
 				log.Error("unable to find 'all' context switch count: %+v", err)
