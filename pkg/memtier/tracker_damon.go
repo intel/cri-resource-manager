@@ -902,7 +902,7 @@ func (t *TrackerDamon) storeAggregated(pid int, start, end uint64, nrAccesses, a
 	// Filter out address ranges that are too large to be
 	// meaningful. The DAMON tracker may sometimes report start
 	// and end addresses from separate address ranges.
-	if end-start > t.config.FilterAddressRangeSizeMax {
+	if t.config.FilterAddressRangeSizeMax > 1 && end-start > t.config.FilterAddressRangeSizeMax {
 		stats.Store(StatsHeartbeat{"TrackerDamon.storeAggregated:ignored too large address range"})
 		return nil
 	}

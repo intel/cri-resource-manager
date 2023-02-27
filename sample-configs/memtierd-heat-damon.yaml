@@ -38,27 +38,56 @@ policy:
     tracker:
       name: damon
       config: |
-        # Connection specifies how to connect to the damon. "perf"
-        # connects by tracing damon:aggregated using perf. Options
-        # can be appended to the perf trace command. For example,
-        # trace only address ranges where accesses have been detected
-        # by adding a filter: "perf --filter nr_accesses>0".
-        connection: perf --filter nr_accesses>0
-        # SamplingUs is the sampling interval in debugfs/damon attrs
-        # (microseconds).
+        # Connection specifies how to read data from DAMON in Linux kernel.
+        # The default is "bpftrace", that is preferred for Linux 6.0+.
+        # In case of issues with older Linux kernels, try "perf".
+        # These connections require "bpftrace" or "perf" tools
+        # in the system, respectively.
+        connection: bpftrace
+
+        # KdamondsList specifies which kdamond instances in the system
+        # (ls /sys/kernel/mm/damon/admin/kdamonds) are available for
+        # this damon tracker instance to use. (No effect if using debugfs.)
+        kdamondslist: [0, 1]
+
+        # NrKdamonds specifies how many kdamond instances are
+        # initialized in the system in case there is currently 0
+        # in /sys/kernel/mm/damon/admin/kdamonds/nr_kdamonds.
+        # The number should be sufficient for all damon trackers
+        # that may run in the system.
+        # If this file contains a non-zero value, this system
+        # parameter is considered to be managed by someone else, and
+        # this damon tracker will not change it.
+        nrkdamonds: 4
+
+        # Interface specifies the interface how to configure DAMON.
+        # The default is 0: autodetect. This option uses sysfs when
+        # available with an option to fallback into debugfs. Value 1
+        # means sysfs, value 2 forces using to-be-deprecated debugfs
+        # interface.
+        interface: 1
+
+        # FilterAddressRangeSizeMax specifies the maximum length for
+        # an address range in which DAMON reports number of accesses
+        # and age. The default is 33554432 (32 MB).
+        # Limiting the size ignores (most) cases where DAMON reports
+        # accesses in non-contiguous virtual address ranges.
+        # Value 1 means unlimited.
+        filteraddressrangesizemax: 67108864
+
+        # Next parameters (sampling, aggregation, regionsupdate intervals
+        # min and max target regions) are passed directly to the DAMON.
+        # Refer to the DAMON documentation for details.
+        # SamplingUs is the sampling interval in microseconds.
         samplingus: 1000
-        # AggregationUs is the aggregation interval in debugfs/damon
-        # attrs (microseconds).
+        # AggregationUs is the aggregation interval in microseconds.
         aggregationus: 1000000
-        # RegionsUpdateUs is the regions update interval in
-        # debugfs/damon attrs (microseconds).
+        # RegionsUpdateUs is the regions update interval in microseconds.
         regionsupdateus: 5000000
-        # MinTargetRegions is the minimum number of monitoring target
-        # regions in debugfs/damon attrs.
-        mintargetregions: 1000
-        # MaxTargetRegions is the maximum number of monitoring target
-        # regions in debugfs/damon attrs.
-        maxtargetregions: 20000
+        # MinTargetRegions is the minimum monitoring target regions.
+        mintargetregions: 10
+        # MaxTargetRegions is the maximum monitoring target regions.
+        maxtargetregions: 2000
 
     # Low-level page mover configuration
     mover:

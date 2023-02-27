@@ -350,10 +350,10 @@ trackers, what they detect and their dependencies.
 
 - damon:
   - Detects reads and writes.
-  - Kernel configuration: `DAMON`, `DAMON_DBGFS` (in 5.15 and later)
+  - Kernel configuration: `DAMON`, `DAMON_SYSFS` (or `DAMON_DBGFS`)
   - Userspace interface:
-    - `/sys/kernel/debug/damon`
-    - The `perf` tool.
+    - `/sys/kernel/mm/damon/admin` for configuring DAMON.
+    - The `bpftrace` tool for reading access data.
 - idlepage:
   - Detects reads and writes.
   - Kernel configuration: `IDLE_PAGE_TRACKING`
@@ -367,6 +367,132 @@ trackers, what they detect and their dependencies.
     - `/proc/PID/pagemap`
 - multi:
   - Combination of trackers.
+
+### The damon tracker
+
+The damon tracker uses DAMON (data access monitor) in Linux kernel for
+tracking memory activity of processes. The tracker takes following
+parameters in its `config`:
+
+- `connection` specifies how to the tracker reads access data from the
+  kernel. The default is "bpftrace", that is recommended and works
+  with 6.X Linux kernels. "perf" is an alternative for the first DAMON
+  versions in Linux kernels 5.15 and 5.16. Both connect to the
+  `damon_aggregation` trace point.
+
+- `kdamondslist` specifies which kdamond instances in the system (see
+  `/sys/kernel/mm/damon/admin/kdamonds`) are used by this damon
+  tracker instance. (This option has no effect if using legacy debugfs
+  interface.) Example: track memory using two kernel threads:
+  kdamond.3 and kdamond.5: `kdamondslist: [3, 5]`.
+
+- `nrkdamonds` specifies how many kdamond instances are initialized in
+  the system in case there is currently 0 in
+  `/sys/kernel/mm/damon/admin/kdamonds/nr_kdamonds`.  The number
+  should be sufficient for all damon trackers that may run in the
+  system, and not updated once it is initialized, because changing the
+  value is not possible when there are `kdamond` threads running. If
+  this file contains a non-zero value, the system parameter is
+  considered to be managed by someone else, and this damon tracker
+  will not change it. Example: `nrkdamonds: 8` allows using values 0-7
+  in `kdmaondslist`'s of damon tracker configurations in the system.
+
+- `interface` specifies the configuration interface of DAMON. Value 0
+  is autodetect: prefer `sysfs` and fallback to `debugfs` if not
+  available. Value 1 forces using `sysfs`, value 2 `debugfs`. The
+  default is 0.
+
+- `filteraddressrangesizemax` specifies the maximum length for address
+  ranges which DAMON reports having similar access pattern. Limiting
+  the size ignores (most) cases where DAMON reports accesses in
+  non-contiguous virtual address ranges, and cases where the address
+  range is condered to be too large to be accurate. Value -1 is
+  unlimited. The default is 33554432 (that is 32 MB).
+
+While parameters above configure the DAMON tracker in memtierd,
+parameters below are direct pass-through parameters to the DAMON
+configuration interface, both sysfs and debugfs. Refer to monitoring
+attributes the [DAMON
+documentation](https://docs.kernel.org/admin-guide/mm/damon/usage.html)
+for more information.
+
+- `samplingus` is the sampling interval in microseconds.
+   The default is 5000.
+- `aggregationus` is the aggregation interval in microseconds.
+   The default is 100000.
+- `regionsupdateus` is the regions update interval in microseconds.
+   The default is 1000000.
+- `mintargetregions` is the minimum monitoring target regions.
+   The default is 10.
+- `maxtargetregions` is the maximum monitoring target regions.
+   The default is 1000.
+
+### The idlepage tracker
+
+The idlepage tracker handles memory in regions of a configurable
+size. It scans all regions once in every `scanintervalms`, and reports
+the number of non-idle pages of each region. The idlepage tracker can
+be configured with the following parameters:
+
+- `pagesinregion` specifies the size of every memory region. The
+  default is 512 (that is 2 MB).
+- `scanintervalms` idlepage bit scanning interval in milliseconds. The
+  default is 5000.
+- `maxcountperregion` is the maximum number of non-idle pages reported
+  on each region. Values greater than `pagesinregion` are not
+  sensible. Value 0 is unlimited. The default is 1, that is, skip the
+  rest of the pages in region immediately when one non-idle page is
+  found, and report at most 1 non-idle page for every region. Note
+  that when Linux kernel uses THP (transparent huge pages), this
+  default gives uniform scoring for normal and THP memory regions.
+- `regionsupdatems` specifies how often new memory regions of tracked
+  processes are searched for. Value 0 means updating them every time
+  before new scan. The default is 10000.
+
+Use `stats -t memory_scans` in the memtierd prompt to see how long it
+takes to scan the memory of traked processes. This helps adjusting
+intervals suitable for the workload at hand.
+
+### The softdirty tracker
+
+The softdirty tracker handles memory like the idlepage tracker and
+takes exactly the same parameters (`pagesinregion`, `scanintervalms`,
+`maxcountperregion`, `regionsupdatems`). Instead of the idlepage bit,
+the softdirty tracker uses the softdirty bit of every page, that is
+way faster to read, but it is changed only by writing the memory. This
+tracker is good choice if memory management decisions can be made
+based on write accesses, for instance, migrating mostly read-only
+pages to slow-to-write memory.
+
+### The multi tracker
+
+The multi tracker combines several trackers. It is configured with a
+list of trackers that it will run and whose findings it will combine.
+
+Example of a multi tracker configuration that runs slow but accurate
+idlepage tracker with 20 second interval, and the fast softdirty
+tracker with 5 second interval:
+
+```
+policy:
+  name: ...
+  config: |
+    ...
+    tracker:
+      name: multi
+      config: |
+        trackers:
+          - name: idlepage
+            config: |
+              pagesinregion: 512
+              maxcountperregion: 1
+              scanintervalms: 20000
+          - name: softdirty
+            config: |
+              pagesinregion: 512
+              maxcountperregion: 1
+              scanintervalms: 5000
+```
 
 ## Routines
 

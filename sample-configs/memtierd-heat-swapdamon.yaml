@@ -55,12 +55,14 @@ policy:
     tracker:
       name: damon
       config: |
-        connection: perf
+        connection: bpftrace
+        kdamondslist: [0, 1]
+        nrkdamonds: 2
         samplingus: 2000
         aggregationus: 1000000
         regionsupdateus: 5000000
-        mintargetregions: 1000
-        maxtargetregions: 20000
+        mintargetregions: 10
+        maxtargetregions: 2000
 
     # Low-level page mover and swapper configuration.
     mover:
