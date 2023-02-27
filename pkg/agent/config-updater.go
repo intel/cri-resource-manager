@@ -19,6 +19,7 @@ package agent
 import (
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"context"
@@ -47,6 +48,7 @@ type configUpdater interface {
 	UpdateConfig(*resmgrConfig)
 	UpdateAdjustment(*resmgrAdjustment)
 	StatusChan() chan *resmgrStatus
+	GetError() error
 }
 
 // updater implements configUpdater
@@ -56,6 +58,8 @@ type updater struct {
 	newConfig     chan *resmgrConfig
 	newAdjustment chan *resmgrAdjustment
 	newStatus     chan *resmgrStatus
+	cfgErrLock    sync.RWMutex
+	cfgErr        error
 }
 
 func newConfigUpdater(socket string) (configUpdater, error) {
@@ -148,6 +152,19 @@ func (u *updater) StatusChan() chan *resmgrStatus {
 	return u.newStatus
 }
 
+func (u *updater) setError(err error) error {
+	u.cfgErrLock.Lock()
+	defer u.cfgErrLock.Unlock()
+	u.cfgErr = err
+	return err
+}
+
+func (u *updater) GetError() error {
+	u.cfgErrLock.RLock()
+	defer u.cfgErrLock.RUnlock()
+	return u.cfgErr
+}
+
 func (u *updater) setConfig(cfg *resmgrConfig) (error, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), setConfigTimeout)
 	defer cancel()
@@ -159,11 +176,11 @@ func (u *updater) setConfig(cfg *resmgrConfig) (error, error) {
 
 	switch {
 	case err != nil:
-		return nil, err
+		return nil, u.setError(err)
 	case reply.Error != "":
-		return fmt.Errorf("%s", reply.Error), nil
+		return u.setError(fmt.Errorf("%s", reply.Error)), nil
 	default:
-		return nil, nil
+		return u.setError(nil), nil
 	}
 }
 
