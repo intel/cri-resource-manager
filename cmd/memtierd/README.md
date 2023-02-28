@@ -1,13 +1,13 @@
-# memtierd - daemon for moving memory between NUMA nodes
+# memtierd - daemon for managing memory in userspace
 
 Memtierd is a userspace daemon that manages memory of chosen
-processes. Memtierd supports reclaiming memory and moving memory
+processes. Memtierd can swap memory in and out, and move memory
 between NUMA nodes. Moving enables both promotion and demotion of
 pages, that is, moving actively used pages to low-latency memory, and
 idle pages away from low-latency memory to free it for better use.
 
-Memtierd includes alternative memory trackers and policies. A tracker
-counts accesses of memory pages, while a policy classifies the pages
+Memtierd includes multiple memory trackers and policies. A tracker
+counts accesses in memory regions, while a policy classifies the pages
 based on observed accesses: is a page active, idle, or somewhere
 between.
 
@@ -378,24 +378,27 @@ parameters in its `config`:
   kernel. The default is "bpftrace", that is recommended and works
   with 6.X Linux kernels. "perf" is an alternative for the first DAMON
   versions in Linux kernels 5.15 and 5.16. Both connect to the
-  `damon_aggregation` trace point.
+  `damon_aggregation` tracepoint.
 
 - `kdamondslist` specifies which kdamond instances in the system (see
   `/sys/kernel/mm/damon/admin/kdamonds`) are used by this damon
-  tracker instance. (This option has no effect if using legacy debugfs
-  interface.) Example: track memory using two kernel threads:
+  tracker instance. This option has no effect if using legacy debugfs
+  interface. Example: track memory using two kernel threads:
   kdamond.3 and kdamond.5: `kdamondslist: [3, 5]`.
 
 - `nrkdamonds` specifies how many kdamond instances are initialized in
   the system in case there is currently 0 in
   `/sys/kernel/mm/damon/admin/kdamonds/nr_kdamonds`.  The number
   should be sufficient for all damon trackers that may run in the
-  system, and not updated once it is initialized, because changing the
-  value is not possible when there are `kdamond` threads running. If
-  this file contains a non-zero value, the system parameter is
-  considered to be managed by someone else, and this damon tracker
+  system, and should not be updated once it is initialized, because
+  changing the value is not possible when there are `kdamond` threads
+  running. If this file contains a non-zero value, the damon tracker
+  considers this system parameter to be managed by someone else, and
   will not change it. Example: `nrkdamonds: 8` allows using values 0-7
-  in `kdmaondslist`'s of damon tracker configurations in the system.
+  in `kdmaondslist`'s of damon tracker configurations in the
+  system. The default is 0, that is, someone else like system admin
+  is expected to initialize `nr_kdamonds` to be large enough to
+  include kdamonds specified in `kdamondslist`.
 
 - `interface` specifies the configuration interface of DAMON. Value 0
   is autodetect: prefer `sysfs` and fallback to `debugfs` if not
@@ -404,14 +407,14 @@ parameters in its `config`:
 
 - `filteraddressrangesizemax` specifies the maximum length for address
   ranges which DAMON reports having similar access pattern. Limiting
-  the size ignores (most) cases where DAMON reports accesses in
+  the size ignores most cases where DAMON reports accesses in
   non-contiguous virtual address ranges, and cases where the address
   range is condered to be too large to be accurate. Value -1 is
   unlimited. The default is 33554432 (that is 32 MB).
 
 While parameters above configure the DAMON tracker in memtierd,
-parameters below are direct pass-through parameters to the DAMON
-configuration interface, both sysfs and debugfs. Refer to monitoring
+parameters below are direct pass-through parameters to DAMON
+configuration interfaces, both sysfs and debugfs. Refer to monitoring
 attributes the [DAMON
 documentation](https://docs.kernel.org/admin-guide/mm/damon/usage.html)
 for more information.
