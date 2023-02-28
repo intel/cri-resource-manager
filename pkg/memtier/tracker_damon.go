@@ -59,7 +59,8 @@ type TrackerDamonConfig struct {
 	// they may be from the same memory mapping but so large that
 	// the information is not very reliable.
 	// The default is 33554432 (32 MB).
-	FilterAddressRangeSizeMax uint64
+	// -1 is unlimited.
+	FilterAddressRangeSizeMax int64
 	// Interface: 0 is autodetect, 1 is sysfs, 2 is debugfs
 	Interface int
 	// SysfsRegionsManager: 0 is DAMON, 1 is memtierd (write targets/TID/regions/RID/{start,stop})
@@ -714,7 +715,7 @@ func (t *TrackerDamon) bpftraceStart(kpids []int) (*exec.Cmd, *bufio.Reader, err
 		}
 		filters = append(filters, strings.Join(pidFilters, " || "))
 	}
-	if t.config.FilterAddressRangeSizeMax > 1 {
+	if t.config.FilterAddressRangeSizeMax > 0 {
 		filters = append(filters, fmt.Sprintf("args->end - args->start <= %d", t.config.FilterAddressRangeSizeMax))
 	}
 	filterStr := ""
@@ -902,7 +903,7 @@ func (t *TrackerDamon) storeAggregated(pid int, start, end uint64, nrAccesses, a
 	// Filter out address ranges that are too large to be
 	// meaningful. The DAMON tracker may sometimes report start
 	// and end addresses from separate address ranges.
-	if t.config.FilterAddressRangeSizeMax > 1 && end-start > t.config.FilterAddressRangeSizeMax {
+	if t.config.FilterAddressRangeSizeMax > 0 && int64(end-start) > t.config.FilterAddressRangeSizeMax {
 		stats.Store(StatsHeartbeat{"TrackerDamon.storeAggregated:ignored too large address range"})
 		return nil
 	}

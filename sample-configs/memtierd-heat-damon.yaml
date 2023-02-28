@@ -72,7 +72,7 @@ policy:
         # and age. The default is 33554432 (32 MB).
         # Limiting the size ignores (most) cases where DAMON reports
         # accesses in non-contiguous virtual address ranges.
-        # Value 1 means unlimited.
+        # Value -1 is unlimited.
         filteraddressrangesizemax: 67108864
 
         # Next parameters (sampling, aggregation, regionsupdate intervals
