@@ -81,6 +81,7 @@ func bExerciser(read, write bool, ba *BArray, offset int64, count int64, interva
 		if write {
 			for i := roundStartIndex; i < roundStartIndex+roundCount; i++ {
 				b[i] = bValue
+				bValue += 1
 			}
 		}
 		if read {
