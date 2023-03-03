@@ -531,3 +531,28 @@ routines:
     pageoutmb: 3000
     pageoutcommand: ["sh", "-c", "echo 1 > /proc/sys/vm/drop_caches"]
 ```
+
+Configuration parameters:
+- `intervalms` specifies statistics check interval in
+  milliseconds. For instance, the amount of paged out memory is
+  checked on this interval.
+- `intervalcommand` specifies command to be executed on every
+  `intervalms` even if no statistics intervals are matched.
+- `intervalcommandrunner` specifies how the command is executed. Options are:
+  - `exec`: fork and execute the command in the system without a
+    shell. This is the default. Example: ```
+    intervalcommand: ["sh", "-c", "echo x"]
+    ```
+  - `memtier`: run simple memtier command. Example: ```
+    intervalcommand: ["stats", "-t", "events"]
+    ```
+  - `memtier-prompt`: run a single-string command as if it was written
+    to interactive prompt. Allows piping memtier command output to shell. Example: ```
+    intervalcommand: ["stats -t process_madvice | awk '/[0-9]+/{print $6}'"]
+    ```
+- `pageoutmb` specifies interval in megabytes of memory that has been
+  paged out.
+- `pageoutcommand` specifies command to be executed on every
+  `pageoutmb` interval.
+- `pageoutcommandrunner` specifies how `pageoutcommand` is executed,
+  see `intervalcommandrunner` for options.
