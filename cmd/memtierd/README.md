@@ -540,16 +540,12 @@ Configuration parameters:
   `intervalms` even if no statistics intervals are matched.
 - `intervalcommandrunner` specifies how the command is executed. Options are:
   - `exec`: fork and execute the command in the system without a
-    shell. This is the default. Example: ```
-    intervalcommand: ["sh", "-c", "echo x"]
-    ```
-  - `memtier`: run simple memtier command. Example: ```
-    intervalcommand: ["stats", "-t", "events"]
-    ```
+    shell. This is the default. Example: `intervalcommand: ["sh", "-c", "echo x"]`
+  - `memtier`: run simple memtier command. Example: `intervalcommand: ["stats", "-t", "events"]`
   - `memtier-prompt`: run a single-string command as if it was written
-    to interactive prompt. Allows piping memtier command output to shell. Example: ```
-    intervalcommand: ["stats -t process_madvise | awk '/[0-9]+/{print $6}'"]
-    ```
+    to interactive prompt. Allows piping memtier command output to
+    shell. Example:
+    `intervalcommand: ["stats -t process_madvise | awk '/[0-9]+/{print $6}' > paged_out.txt"]`
 - `pageoutmb` specifies interval in megabytes of memory that has been
   paged out.
 - `pageoutcommand` specifies command to be executed on every
