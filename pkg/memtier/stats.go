@@ -13,7 +13,7 @@ import (
 type Stats struct {
 	sync.RWMutex
 	namePulse   mapStringPStatsPulse
-	pidMadvices mapIntPStatsPidMadviced
+	pidMadvises mapIntPStatsPidMadvised
 	pidMoves    mapIntPStatsPidMoved
 	pidScans    mapIntPStatsPidScanned
 	recMoves    *[]*StatsMoved
@@ -21,10 +21,10 @@ type Stats struct {
 
 var recMovesBufSize int = 1024 * 256
 
-type StatsPidMadviced struct {
+type StatsPidMadvised struct {
 	sumSyscalls     uint64
 	sumPageCount    uint64
-	advicePageCount map[int]uint64
+	advisePageCount map[int]uint64
 	errnoPageCount  map[int]uint64
 }
 
@@ -62,11 +62,11 @@ type StatsHeartbeat struct {
 	name string
 }
 
-type StatsMadviced struct {
+type StatsMadvised struct {
 	pid       int
 	sysRet    int
 	errno     int
-	advice    int
+	advise    int
 	pageCount uint64
 }
 
@@ -94,7 +94,7 @@ var stats *Stats = newStats()
 func newStats() *Stats {
 	return &Stats{
 		namePulse:   make(mapStringPStatsPulse),
-		pidMadvices: make(mapIntPStatsPidMadviced),
+		pidMadvises: make(mapIntPStatsPidMadvised),
 		pidMoves:    make(mapIntPStatsPidMoved),
 		pidScans:    make(mapIntPStatsPidScanned),
 	}
@@ -104,9 +104,9 @@ func newStatsPulse() *StatsPulse {
 	return &StatsPulse{}
 }
 
-func newStatsPidMadviced() *StatsPidMadviced {
-	return &StatsPidMadviced{
-		advicePageCount: make(map[int]uint64),
+func newStatsPidMadvised() *StatsPidMadvised {
+	return &StatsPidMadvised{
+		advisePageCount: make(map[int]uint64),
 		errnoPageCount:  make(map[int]uint64),
 	}
 }
@@ -126,17 +126,17 @@ func GetStats() *Stats {
 	return stats
 }
 
-// MadvicedPageCount returns the number of pages on which
-// process_madvice(pid, advice) has been called. If pid==-1 or
-// advice==-1, then return the sum of pages of all pids and advices.
-func (s *Stats) MadvicedPageCount(pid int, advice int) uint64 {
+// MadvisedPageCount returns the number of pages on which
+// process_madvise(pid, advise) has been called. If pid==-1 or
+// advise==-1, then return the sum of pages of all pids and advises.
+func (s *Stats) MadvisedPageCount(pid int, advise int) uint64 {
 	totalPages := uint64(0)
-	for spid, spm := range s.pidMadvices {
+	for spid, spm := range s.pidMadvises {
 		if pid != -1 && pid != spid {
 			continue
 		}
-		for adv, pageCount := range spm.advicePageCount {
-			if advice != -1 && adv != advice {
+		for adv, pageCount := range spm.advisePageCount {
+			if advise != -1 && adv != advise {
 				continue
 			}
 			totalPages += pageCount
@@ -158,15 +158,15 @@ func (s *Stats) Store(entry interface{}) {
 		}
 		pulse.sumBeats += 1
 		pulse.latestBeat = time.Now().UnixNano()
-	case StatsMadviced:
-		spm, ok := s.pidMadvices[v.pid]
+	case StatsMadvised:
+		spm, ok := s.pidMadvises[v.pid]
 		if !ok {
-			spm = newStatsPidMadviced()
-			s.pidMadvices[v.pid] = spm
+			spm = newStatsPidMadvised()
+			s.pidMadvises[v.pid] = spm
 		}
 		spm.sumSyscalls += 1
 		spm.sumPageCount += v.pageCount
-		spm.advicePageCount[v.advice] += v.pageCount
+		spm.advisePageCount[v.advise] += v.pageCount
 		spm.errnoPageCount[v.errno] += v.pageCount
 	case StatsMoved:
 		// keep separate statistics for every pid
@@ -290,8 +290,8 @@ func (s *Stats) tableEvents(format string) []string {
 	return lines
 }
 
-func (s *Stats) tableProcessMadvice(format string) []string {
-	lines := []string{"table: process_madvice syscalls"}
+func (s *Stats) tableProcessMadvise(format string) []string {
+	lines := []string{"table: process_madvise syscalls"}
 	headers := []interface{}{"pid", "calls", "req[pages]", "ok[pages]", "ok[G]", "PAGEOUT[G]"}
 	headerFmt := map[string]string{
 		"csv": "%s,%s,%s,%s,%s,%s",
@@ -302,15 +302,15 @@ func (s *Stats) tableProcessMadvice(format string) []string {
 		"txt": "%8d %8d %10d %10d %8.3f %.3f",
 	}
 	lines = append(lines, fmt.Sprintf(headerFmt[format], headers...))
-	for _, pid := range s.pidMadvices.sortedKeys() {
-		spm := s.pidMadvices[pid]
+	for _, pid := range s.pidMadvises.sortedKeys() {
+		spm := s.pidMadvises[pid]
 		lines = append(lines, fmt.Sprintf(rowFmt[format],
 			pid,
 			spm.sumSyscalls,
 			spm.sumPageCount,
 			spm.errnoPageCount[0],
 			float64(spm.errnoPageCount[0]*constUPagesize)/float64(1024*1024*1024),
-			float64(spm.advicePageCount[unix.MADV_PAGEOUT]*constUPagesize)/float64(1024*1024*1024)))
+			float64(spm.advisePageCount[unix.MADV_PAGEOUT]*constUPagesize)/float64(1024*1024*1024)))
 	}
 	return lines
 }
@@ -405,7 +405,7 @@ func (s *Stats) tableMemoryScans(format string) []string {
 }
 
 func (s *Stats) Summarize(format string, tables ...string) string {
-	allTables := []string{"events", "process_madvice", "move_pages", "move_pages_errors", "memory_scans"}
+	allTables := []string{"events", "process_madvise", "move_pages", "move_pages_errors", "memory_scans"}
 	lines := []string{}
 	if len(tables) == 0 {
 		tables = allTables
@@ -420,8 +420,8 @@ func (s *Stats) Summarize(format string, tables ...string) string {
 		switch table {
 		case "events":
 			lines = append(lines, s.tableEvents(format)...)
-		case "process_madvice":
-			lines = append(lines, s.tableProcessMadvice(format)...)
+		case "process_madvise":
+			lines = append(lines, s.tableProcessMadvise(format)...)
 		case "move_pages":
 			lines = append(lines, s.tableMovePages(format)...)
 		case "move_pages_errors":

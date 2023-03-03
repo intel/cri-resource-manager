@@ -179,28 +179,28 @@ func (ar *AddrRanges) SplitLength(maxLength uint64) *AddrRanges {
 }
 
 func (ar *AddrRanges) SwapOut() error {
-	return ar.ProcessMadvice(unix.MADV_PAGEOUT)
+	return ar.ProcessMadvise(unix.MADV_PAGEOUT)
 }
 
-func (ar *AddrRanges) ProcessMadvice(advice int) error {
+func (ar *AddrRanges) ProcessMadvise(advise int) error {
 	pidfd, err := PidfdOpenSyscall(ar.Pid(), 0)
 	if pidfd < 0 || err != nil {
 		return fmt.Errorf("pidfd_open error: %s", err)
 	}
 	defer PidfdCloseSyscall(pidfd)
-	sysRet, errno, err := ProcessMadviceSyscall(pidfd, ar.Ranges(), advice, 0)
+	sysRet, errno, err := ProcessMadviseSyscall(pidfd, ar.Ranges(), advise, 0)
 	if stats != nil {
-		stats.Store(StatsMadviced{
+		stats.Store(StatsMadvised{
 			pid:       ar.Pid(),
 			sysRet:    sysRet,
 			errno:     int(errno),
-			advice:    advice,
+			advise:    advise,
 			pageCount: ar.PageCount(),
 		})
 	}
 	if err != nil {
-		stats.Store(StatsHeartbeat{fmt.Sprintf("process_madvice(...) error: %s", err)})
-		return fmt.Errorf("process_madvice error: %s", err)
+		stats.Store(StatsHeartbeat{fmt.Sprintf("process_madvise(...) error: %s", err)})
+		return fmt.Errorf("process_madvise error: %s", err)
 	}
 	return nil
 }

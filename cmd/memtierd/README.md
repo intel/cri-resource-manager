@@ -548,7 +548,7 @@ Configuration parameters:
     ```
   - `memtier-prompt`: run a single-string command as if it was written
     to interactive prompt. Allows piping memtier command output to shell. Example: ```
-    intervalcommand: ["stats -t process_madvice | awk '/[0-9]+/{print $6}'"]
+    intervalcommand: ["stats -t process_madvise | awk '/[0-9]+/{print $6}'"]
     ```
 - `pageoutmb` specifies interval in megabytes of memory that has been
   paged out.

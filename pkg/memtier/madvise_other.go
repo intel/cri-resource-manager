@@ -19,6 +19,6 @@ package memtier
 
 import "syscall"
 
-func ProcessMadviceSyscall(pidfd int, ranges []AddrRange, advice int, flags uint) (int, syscall.Errno, error) {
-	panic("ProcessMadviceSyscall not implemented on this platform")
+func ProcessMadviseSyscall(pidfd int, ranges []AddrRange, advise int, flags uint) (int, syscall.Errno, error) {
+	panic("ProcessMadviseSyscall not implemented on this platform")
 }

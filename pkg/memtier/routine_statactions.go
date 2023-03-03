@@ -33,10 +33,12 @@ type RoutineStatActionsConfig struct {
 	IntervalCommand []string
 	// IntervalCommandRunner executes the IntervalCommand.
 	// "exec" forks and executes the command in a child process.
-	// "memtier" runs the command in the memtier prompt.
+	// "memtier" runs memtier command.
+	// "memtier-prompt" runs a single-string memtier-prompt
+	// command that is allowed to contain pipe to shell.
 	IntervalCommandRunner string
 	// PageOutMB is the total size of memory in megabytes that
-	// has been process_statactions. If adviced memory exceeds the
+	// has been process_statactions. If advised memory exceeds the
 	// interval, the shell command will be executed.
 	PageOutMB int
 	// PageOutCommand is executed when new PageOutMB is reached.
@@ -55,18 +57,20 @@ type RoutineStatActions struct {
 type commandRunnerFunc func([]string) error
 
 const (
-	commandRunnerDefault = ""
-	commandRunnerExec    = "exec"
-	commandRunnerMemtier = "memtier"
+	commandRunnerDefault       = ""
+	commandRunnerExec          = "exec"
+	commandRunnerMemtier       = "memtier"
+	commandRunnerMemtierPrompt = "memtier-prompt"
 )
 
 var commandRunners map[string]commandRunnerFunc
 
 func init() {
 	commandRunners = map[string]commandRunnerFunc{
-		commandRunnerExec:    runCommandExec,
-		commandRunnerDefault: runCommandExec,
-		commandRunnerMemtier: runCommandMemtier,
+		commandRunnerExec:          runCommandExec,
+		commandRunnerDefault:       runCommandExec,
+		commandRunnerMemtier:       runCommandMemtier,
+		commandRunnerMemtierPrompt: runCommandMemtierPrompt,
 	}
 	RoutineRegister("statactions", NewRoutineStatActions)
 }
@@ -146,6 +150,19 @@ func runCommandMemtier(command []string) error {
 	return nil
 }
 
+func runCommandMemtierPrompt(command []string) error {
+	if len(command) == 0 {
+		return nil
+	}
+	if len(command) > 1 {
+		return fmt.Errorf("invalid command for command runner %q: expected a list with a single string, got %q", commandRunnerMemtierPrompt, command)
+	}
+	prompt := NewPrompt("", nil, bufio.NewWriter(os.Stdout))
+	status := prompt.RunCmdString(command[0])
+	stats.Store(StatsHeartbeat{fmt.Sprintf("RoutineStatActions.command.memtier-prompt: %q status: %d", command[0], status)})
+	return nil
+}
+
 func runCommand(runner string, command []string) error {
 	commandRunner, ok := commandRunners[runner]
 	if !ok {
@@ -161,7 +178,7 @@ func (r *RoutineStatActions) loop() {
 	defer ticker.Stop()
 
 	// Get initial values of stats that trigger actions
-	r.lastPageOutPages = stats.MadvicedPageCount(-1, -1)
+	r.lastPageOutPages = stats.MadvisedPageCount(-1, -1)
 	quit := false
 	for {
 		// Wait for the next tick or Stop()
@@ -175,11 +192,13 @@ func (r *RoutineStatActions) loop() {
 		if quit {
 			break
 		}
-		nowPageOutPages := stats.MadvicedPageCount(-1, -1)
+		nowPageOutPages := stats.MadvisedPageCount(-1, -1)
 
 		// IntervalCommand runs on every round
 		if len(r.config.IntervalCommand) > 0 {
-			runCommand(r.config.IntervalCommandRunner, r.config.IntervalCommand)
+			if err := runCommand(r.config.IntervalCommandRunner, r.config.IntervalCommand); err != nil {
+				log.Errorf("routines statactions intervalcommand: %s", err)
+			}
 			stats.Store(StatsHeartbeat{"RoutineStatActions.IntervalCommand"})
 		}
 
@@ -188,7 +207,9 @@ func (r *RoutineStatActions) loop() {
 			(nowPageOutPages-r.lastPageOutPages)*constUPagesize/uint64(1024*1024) >= uint64(r.config.PageOutMB) {
 			r.lastPageOutPages = nowPageOutPages
 			stats.Store(StatsHeartbeat{"RoutineStatActions.PageOutCommand"})
-			runCommand(r.config.PageOutCommandRunner, r.config.PageOutCommand)
+			if err := runCommand(r.config.PageOutCommandRunner, r.config.PageOutCommand); err != nil {
+				log.Errorf("routines statactions pageoutcommand: %s", err)
+			}
 		}
 	}
 	close(r.cgLoop)

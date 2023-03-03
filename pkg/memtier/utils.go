@@ -117,9 +117,9 @@ func (m mapIntUint64) sortedKeys() []int {
 	return keys
 }
 
-type mapIntPStatsPidMadviced map[int]*StatsPidMadviced
+type mapIntPStatsPidMadvised map[int]*StatsPidMadvised
 
-func (m mapIntPStatsPidMadviced) sortedKeys() []int {
+func (m mapIntPStatsPidMadvised) sortedKeys() []int {
 	keys := make([]int, 0, len(m))
 	for key := range m {
 		keys = append(keys, key)

@@ -46,11 +46,11 @@ type cIovec struct {
 	iovLen  C.size_t
 }
 
-func ProcessMadviceSyscall(pidfd int, ranges []AddrRange, advice int, flags uint) (int, syscall.Errno, error) {
+func ProcessMadviseSyscall(pidfd int, ranges []AddrRange, advise int, flags uint) (int, syscall.Errno, error) {
 
 	// syscall:
 	// ssize_t syscall(SYS_process_madvise, int pidfd,
-	//                 const struct iovec *iovec, size_t vlen, int advice,
+	//                 const struct iovec *iovec, size_t vlen, int advise,
 	//                 unsigned int flags);
 	// where:
 	// struct iovec {
@@ -68,7 +68,7 @@ func ProcessMadviceSyscall(pidfd int, ranges []AddrRange, advice int, flags uint
 	iovecPtr := uintptr(unsafe.Pointer(&iovec[0]))
 	iovecLen := uintptr(len(iovec))
 
-	ret, _, en := unix.Syscall6(unix.SYS_PROCESS_MADVISE, uintptr(pidfd), iovecPtr, iovecLen, uintptr(advice), uintptr(flags), 0)
+	ret, _, en := unix.Syscall6(unix.SYS_PROCESS_MADVISE, uintptr(pidfd), iovecPtr, iovecLen, uintptr(advise), uintptr(flags), 0)
 	if en != 0 {
 		err = unix.Errno(en)
 	}
