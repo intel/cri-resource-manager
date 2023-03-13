@@ -284,9 +284,10 @@ different ways of interpreting memory tracker counters as page
 activity.
 
 Policies measure and manage the memory of processes that are defined
-in the configuration. Processes are searched from directories listed
-under `cgroups:`, or their process id's are listed under
-`pids:`. These options work similarly in both policies. See
+in the configuration. Processes are searched by pidwatchers. The
+cgroups pidwatcher looks for processes under listed a list of cgroups
+directories, while the pidlist pidwatcher passes a static list of pids
+to policies. See
 [memtierd-age-idlepage-trackonly.yaml](../../sample-configs/memtierd-age-idlepage-trackonly.yaml).
 
 ### The age policy

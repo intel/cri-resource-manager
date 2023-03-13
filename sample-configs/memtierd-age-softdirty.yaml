@@ -8,8 +8,11 @@ policy:
     # Cgroups is a list of cgroup paths in the filesystem. The
     # policy manages processes in listed cgroups and recursively
     # in their subgroups.
-    cgroups:
-      - /sys/fs/cgroup/foobar
+    pidwatcher:
+      name: cgroups
+      config: |
+        cgroups:
+          - /sys/fs/cgroup/foobar
     # IdleDurationMs is the number of milliseconds. If a tracker
     # has not seen activity in a set of pages during this time,
     # the pages are considered idle and good to move to IdleNumas.

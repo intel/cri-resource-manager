@@ -15,6 +15,7 @@
 package memtier
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -25,56 +26,81 @@ import (
 	"time"
 )
 
-type PidWatcherCgroup struct {
-	cgroupPaths  map[string]setMemberType
+type PidWatcherCgroupsConfig struct {
+	IntervalMs int
+	Cgroups    []string // list of absolute cgroup directory paths
+}
+
+type PidWatcherCgroups struct {
+	config       *PidWatcherCgroupsConfig
 	pidsReported map[int]setMemberType
-	listener     PidListener
+	pidListener  PidListener
 	stop         bool
 }
 
-func NewPidWatcherCgroup() (*PidWatcherCgroup, error) {
-	w := &PidWatcherCgroup{
-		cgroupPaths:  map[string]setMemberType{},
+func init() {
+	PidWatcherRegister("cgroups", NewPidWatcherCgroups)
+}
+
+func NewPidWatcherCgroups() (PidWatcher, error) {
+	w := &PidWatcherCgroups{
 		pidsReported: map[int]setMemberType{},
 	}
 	return w, nil
 }
 
-func (w *PidWatcherCgroup) SetSources(sources []string) {
-	w.cgroupPaths = map[string]setMemberType{}
-	for _, cgroupPath := range sources {
-		w.cgroupPaths[cgroupPath] = setMember
+func (w *PidWatcherCgroups) SetConfigJson(configJson string) error {
+	config := &PidWatcherCgroupsConfig{}
+	if err := unmarshal(configJson, config); err != nil {
+		return err
 	}
+	if config.IntervalMs == 0 {
+		config.IntervalMs = 5000
+	}
+	w.config = config
+	return nil
 }
 
-func (w *PidWatcherCgroup) Poll(l PidListener) error {
-	w.listener = l
+func (w *PidWatcherCgroups) GetConfigJson() string {
+	if w.config == nil {
+		return ""
+	}
+	if configStr, err := json.Marshal(w.config); err == nil {
+		return string(configStr)
+	}
+	return ""
+}
+
+func (w *PidWatcherCgroups) SetPidListener(l PidListener) {
+	w.pidListener = l
+}
+
+func (w *PidWatcherCgroups) Poll() error {
 	w.stop = false
 	w.loop(true)
 	return nil
 }
 
-func (w *PidWatcherCgroup) Start(l PidListener) error {
-	w.listener = l
+func (w *PidWatcherCgroups) Start() error {
 	w.stop = false
 	go w.loop(false)
 	return nil
 }
 
-func (w *PidWatcherCgroup) Stop() {
+func (w *PidWatcherCgroups) Stop() {
 	w.stop = true
 }
 
-func (w *PidWatcherCgroup) loop(singleshot bool) {
-	log.Debugf("PidWatcherCgroup: online\n")
-	defer log.Debugf("PidWatcherCgroup: offline\n")
-	ticker := time.NewTicker(time.Duration(5) * time.Second)
+func (w *PidWatcherCgroups) loop(singleshot bool) {
+	log.Debugf("PidWatcherCgroups: online\n")
+	defer log.Debugf("PidWatcherCgroups: offline\n")
+	ticker := time.NewTicker(time.Duration(w.config.IntervalMs) * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		stats.Store(StatsHeartbeat{"PidWatcherCgroup.loop"})
+		stats.Store(StatsHeartbeat{"PidWatcherCgroups.loop"})
 		// Look for all pid files in the current cgroup hierarchy.
 		procPaths := map[string]setMemberType{}
-		for cgroupPath := range w.cgroupPaths {
+		for _, cgroupPath := range w.config.Cgroups {
 			for _, path := range findFiles(cgroupPath, "cgroup.procs") {
 				procPaths[path] = setMember
 			}
@@ -117,10 +143,18 @@ func (w *PidWatcherCgroup) loop(singleshot bool) {
 
 		// Report if there are any changes in pids.
 		if len(newPids) > 0 {
-			w.listener.AddPids(newPids)
+			if w.pidListener != nil {
+				w.pidListener.AddPids(newPids)
+			} else {
+				log.Warnf("pidwatcher cgroup: ignoring new pids %v because nobody is listening", newPids)
+			}
 		}
 		if len(oldPids) > 0 {
-			w.listener.RemovePids(oldPids)
+			if w.pidListener != nil {
+				w.pidListener.RemovePids(oldPids)
+			} else {
+				log.Warnf("pidwatcher cgroup: ignoring disappeared pids %v because nobody is listening", oldPids)
+			}
 		}
 
 		// If only one execution was requested, quit without waiting.
@@ -174,4 +208,8 @@ func findFiles(root string, filename string) []string {
 		return nil
 	})
 	return matchingFiles
+}
+
+func (w *PidWatcherCgroups) Dump([]string) string {
+	return fmt.Sprintf("%+v", w)
 }

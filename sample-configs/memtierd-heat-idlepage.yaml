@@ -8,8 +8,11 @@ policy:
     # Cgroups is a list of cgroup paths in the filesystem. The
     # policy manages processes in listed cgroups and recursively
     # in their subgroups.
-    cgroups:
-      - /sys/fs/cgroup/foobar
+    pidwatcher:
+      name: cgroups
+      config: |
+        cgroups:
+          - /sys/fs/cgroup/foobar
     # HeatNumas maps heat class values into NUMA node lists where
     # pages of each heat class should be located. If a heat class
     # is missing, the NUMA node is "don't care".

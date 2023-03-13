@@ -37,6 +37,7 @@ type Prompt struct {
 	r            *bufio.Reader
 	w            *bufio.Writer
 	f            *flag.FlagSet
+	pidwatcher   PidWatcher
 	mover        *Mover
 	pages        *Pages
 	aranges      *AddrRanges
@@ -68,17 +69,18 @@ func NewPrompt(ps1 string, reader *bufio.Reader, writer *bufio.Writer) *Prompt {
 		mover: NewMover(),
 	}
 	p.cmds = map[string]Cmd{
-		"q":        Cmd{"quit interactive prompt.", p.cmdQuit},
-		"tracker":  Cmd{"manage tracker, track memory accesses.", p.cmdTracker},
-		"stats":    Cmd{"print statistics.", p.cmdStats},
-		"swap":     Cmd{"swap in/out, print swapped pages.", p.cmdSwap},
-		"pages":    Cmd{"select pages, print selected page nodes and flags.", p.cmdPages},
-		"arange":   Cmd{"select/split/filter address ranges.", p.cmdArange},
-		"mover":    Cmd{"manage mover, move selected pages.", p.cmdMover},
-		"policy":   Cmd{"manage policy, start/stop memory tiering.", p.cmdPolicy},
-		"routines": Cmd{"manage routines.", p.cmdRoutines},
-		"help":     Cmd{"print help.", p.cmdHelp},
-		"nop":      Cmd{"no operation.", p.cmdNop},
+		"q":          Cmd{"quit interactive prompt.", p.cmdQuit},
+		"pidwatcher": Cmd{"manage pidwatcher, track processes.", p.cmdPidWatcher},
+		"tracker":    Cmd{"manage tracker, track memory accesses.", p.cmdTracker},
+		"stats":      Cmd{"print statistics.", p.cmdStats},
+		"swap":       Cmd{"swap in/out, print swapped pages.", p.cmdSwap},
+		"pages":      Cmd{"select pages, print selected page nodes and flags.", p.cmdPages},
+		"arange":     Cmd{"select/split/filter address ranges.", p.cmdArange},
+		"mover":      Cmd{"manage mover, move selected pages.", p.cmdMover},
+		"policy":     Cmd{"manage policy, start/stop memory tiering.", p.cmdPolicy},
+		"routines":   Cmd{"manage routines.", p.cmdRoutines},
+		"help":       Cmd{"print help.", p.cmdHelp},
+		"nop":        Cmd{"no operation.", p.cmdNop},
 	}
 	return &p
 }
@@ -182,6 +184,7 @@ func (p *Prompt) SetPolicy(policy Policy) {
 	p.policy = policy
 	p.mover = p.policy.Mover()
 	p.tracker = p.policy.Tracker()
+	p.pidwatcher = p.policy.PidWatcher()
 }
 
 func (p *Prompt) SetRoutines(routines []Routine) {
@@ -663,6 +666,81 @@ func (p *Prompt) cmdStats(args []string) CommandStatus {
 		p.output(GetStats().Summarize(*format) + "\n")
 	}
 	return csOk
+}
+
+func (p *Prompt) cmdPidWatcher(args []string) CommandStatus {
+	ls := p.f.Bool("ls", false, "list available pidwatchers")
+	create := p.f.String("create", "", "create new pidwatcher NAME")
+	config := p.f.String("config", "", "configure the pidwatcher with JSON string")
+	configDump := p.f.Bool("config-dump", false, "dump current pidwatcher configuration")
+	start := p.f.Bool("start", false, "start the pidwatcher")
+	stop := p.f.Bool("stop", false, "stop the pidwatcher")
+	poll := p.f.Bool("poll", false, "poll the pidwatcher")
+	listener := p.f.String("listener", "", "use a listener: 'tracker' or 'log'")
+	dump := p.f.Bool("dump", false, "dump pidwatcher internals")
+
+	if err := p.f.Parse(args); err != nil {
+		return csOk
+	}
+	remainder := p.f.Args()
+	if *ls {
+		p.output(strings.Join(PidWatcherList(), "\n") + "\n")
+		return csOk
+	}
+	if *create != "" {
+		if pidwatcher, err := NewPidWatcher(*create); err != nil {
+			p.output("creating pidwatcher failed: %v\n", err)
+			return csOk
+		} else {
+			p.pidwatcher = pidwatcher
+			p.output("pidwatcher created\n")
+		}
+	}
+	// Next actions will require existing pidwatcher
+	if p.pidwatcher == nil {
+		p.output("no pidwatcher, create one with -create NAME [-config CONFIG]\n")
+		return csOk
+	}
+	if *config != "" {
+		if err := p.pidwatcher.SetConfigJson(*config); err != nil {
+			p.output("pidwatcher configuration error: %v\n", err)
+		} else {
+			p.output("pidwatcher configured successfully\n")
+		}
+	}
+	if *configDump {
+		p.output("%s\n", p.pidwatcher.GetConfigJson())
+	}
+	if *listener != "" {
+		switch *listener {
+		case "tracker":
+			p.pidwatcher.SetPidListener(p.tracker)
+		case "log":
+			p.pidwatcher.SetPidListener(p)
+		}
+	}
+	if *stop {
+		p.pidwatcher.Stop()
+	}
+	if *start {
+		p.pidwatcher.Start()
+	}
+	if *poll {
+		p.pidwatcher.Poll()
+	}
+	if *dump {
+		p.output("%s\n", p.pidwatcher.Dump(remainder))
+		p.output("\n")
+	}
+	return csOk
+}
+
+func (p *Prompt) AddPids(pids []int) {
+	p.output("pidwatcher: AddPids(%v)", pids)
+}
+
+func (p *Prompt) RemovePids(pids []int) {
+	p.output("pidwatcher: RemovePids(%v)", pids)
 }
 
 func (p *Prompt) cmdTracker(args []string) CommandStatus {

@@ -4,17 +4,20 @@ vm-command "[ -d /sys/kernel/mm/damon ]" || {
     vm-command "[ -d /sys/kernel/mm/damon ]" || error "failed to setup damon"
 }
 
-MEME_CGROUP=e2e-meme MEME_BS=1G MEME_BWC=1 MEME_BWS=300M memtierd-meme-start
-
 memtierd-setup
+
+MEME_CGROUP=e2e-meme MEME_BS=1G MEME_BWC=1 MEME_BWS=300M memtierd-meme-start
 
 MEMTIERD_YAML="
 policy:
   name: heat
   config: |
     intervalms: 4000
-    cgroups:
-      - /sys/fs/cgroup/e2e-meme
+    pidwatcher:
+      name: pidlist
+      config: |
+        pids:
+          - $MEME_PID
     heatnumas:
       0: [0]
       1: [1]

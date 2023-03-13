@@ -2,13 +2,43 @@ policy:
   name: age
   config: |
     intervalms: 2000
-    # cgroups is a list of cgroup directories from which pids to be
-    # tracked are searched for.
-    cgroups:
-      - /sys/fs/cgroup/track-me
-    # pids is a static list of process ids to be tracked.
-    # pids:
-    #   - 42024
+
+    # The cgroups pidwatcher finds processes from a list of cgroup
+    # directories.
+    pidwatcher:
+      name: cgroups
+      config: |
+        cgroups:
+          - /sys/fs/cgroup/track-me
+
+    # If processed should be found from the whole system instead of
+    # certain cgroups only, this can be one with the "proc" pidwatcher.
+    # pidwatcher:
+    #   name: proc
+    #   config: |
+    #     intervalms: 5000 # look for new processes on 5 second interval
+
+    # If processes to be tracked are already detected, their
+    # process ids can be given to memtierd with the "pidlist" pidwatcher.
+    # pidwatcher:
+    #   name: pidlist
+    #   config: |
+    #     pids:
+    #       - 42024
+
+    # Found processes can be filtered using the "filter" pidwatcher.
+    # The source pidwatcher can be "cgroup" or "proc", for instance,
+    # and processes can be selected based on /proc/pid/exe filepath:
+    # pidwatcher:
+    #   name: filter
+    #   config: |
+    #     source:
+    #       name: proc
+    #       config: |
+    #         intervalms: 10000
+    #     filters:
+    #       - procexeregexp: ".*/meme"
+
     tracker:
       name: idlepage
       config: |

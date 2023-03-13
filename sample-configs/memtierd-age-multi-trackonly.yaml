@@ -2,8 +2,11 @@ policy:
   name: age
   config: |
     intervalms: 5000
-    cgroups:
-      - /sys/fs/cgroup/track-me
+    pidwatcher:
+      name: cgroups
+      config: |
+        cgroups:
+          - /sys/fs/cgroup/track-me
     tracker:
       # The multi tracker is configured with a list of trackers,
       # each of them separately configured.

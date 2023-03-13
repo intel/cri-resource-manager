@@ -26,8 +26,11 @@ policy:
 
     # The policy manages processes that can be found under listed
     # cgroups paths.
-    cgroups:
-      - /sys/fs/cgroup/swapus
+    pidwatcher:
+      name: cgroups
+      config: |
+        cgroups:
+          - /sys/fs/cgroup/swapus
 
     # If the tracker has not seen activity on a page region during last
     # swapoutms, the region will be swapped out.

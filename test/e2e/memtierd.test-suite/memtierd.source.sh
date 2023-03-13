@@ -29,6 +29,9 @@ memtierd-os-env() {
 memtierd-start() {
     vm-pipe-to-file "memtierd.yaml" <<< "${MEMTIERD_YAML}"
     vm-command "nohup sh -c 'socat tcp4-listen:${MEMTIERD_PORT},fork,reuseaddr - | memtierd -config memtierd.yaml -debug' > ${MEMTIERD_OUTPUT} 2>&1 & sleep 2; cat ${MEMTIERD_OUTPUT}"
+    vm-command "pgrep memtierd" || {
+        command-error "failed to launch memtierd"
+    }
 }
 
 memtierd-stop() {

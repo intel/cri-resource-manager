@@ -1,4 +1,4 @@
-// Copyright 2021 Intel Corporation. All Rights Reserved.
+// Copyright 2023 Intel Corporation. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,44 +14,39 @@
 
 package memtier
 
-type PolicyStub struct {
+type PidWatcherStub struct {
 }
 
 func init() {
-	PolicyRegister("stub", NewPolicyStub)
+	PidWatcherRegister("stub", NewPidWatcherStub)
 }
 
-func NewPolicyStub() (Policy, error) {
-	return &PolicyStub{}, nil
+func NewPidWatcherStub() (PidWatcher, error) {
+	return &PidWatcherStub{}, nil
 }
 
-func (p *PolicyStub) SetConfigJson(configJson string) error {
+func (w *PidWatcherStub) SetConfigJson(configJson string) error {
 	return nil
 }
 
-func (p *PolicyStub) GetConfigJson() string {
+func (w *PidWatcherStub) GetConfigJson() string {
 	return ""
 }
 
-func (p *PolicyStub) Start() error {
+func (w *PidWatcherStub) SetPidListener(PidListener) {
+}
+
+func (w *PidWatcherStub) Poll() error {
 	return nil
 }
 
-func (p *PolicyStub) Stop() {
-}
-
-func (p *PolicyStub) PidWatcher() PidWatcher {
+func (w *PidWatcherStub) Start() error {
 	return nil
 }
 
-func (p *PolicyStub) Mover() *Mover {
-	return nil
+func (w *PidWatcherStub) Stop() {
 }
 
-func (p *PolicyStub) Tracker() Tracker {
-	return nil
-}
-
-func (p *PolicyStub) Dump(args []string) string {
+func (w *PidWatcherStub) Dump([]string) string {
 	return ""
 }

@@ -24,13 +24,17 @@ import (
 )
 
 type PolicyAgeConfig struct {
-	Tracker TrackerConfig
-	Mover   MoverConfig
+	PidWatcher PidWatcherConfig
+	Tracker    TrackerConfig
+	Mover      MoverConfig
+
 	// Cgroups is a list of cgroup paths in the filesystem. The
 	// policy manages processes in listed cgroups and recursively
 	// in their subgroups.
+	// DEPRECATED, use PidWatcher "cgroup" instead.
 	Cgroups []string
 	// Pids is a list of process id's to be tracked.
+	// DEPRECATED, use PidWatcher "pid" instead.
 	Pids []int
 	// IntervalMs is the length of the period in milliseconds in
 	// which new ages are calculated based on gathered tracker
@@ -58,12 +62,12 @@ type PolicyAgeConfig struct {
 }
 
 type PolicyAge struct {
-	config       *PolicyAgeConfig
-	cgPidWatcher *PidWatcherCgroup
-	cgLoop       chan interface{}
-	tracker      Tracker
-	palt         *pidAddrLenTc // pid - address - length - memory trackercounter's age
-	mover        *Mover
+	config     *PolicyAgeConfig
+	pidwatcher PidWatcher
+	cgLoop     chan interface{}
+	tracker    Tracker
+	palt       *pidAddrLenTc // pid - address - length - memory trackercounter's age
+	mover      *Mover
 }
 
 type tcAge struct {
@@ -80,12 +84,8 @@ func init() {
 }
 
 func NewPolicyAge() (Policy, error) {
-	var err error
 	p := &PolicyAge{
 		mover: NewMover(),
-	}
-	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
-		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
 	}
 	return p, nil
 }
@@ -111,6 +111,23 @@ func (p *PolicyAge) SetConfig(config *PolicyAgeConfig) error {
 	if config.SwapOutMs < 0 {
 		return fmt.Errorf("invalid age policy SwapOutMs: %d, >= 0 expected", config.SwapOutMs)
 	}
+	if len(config.Cgroups) > 0 {
+		return deprecatedPolicyCgroupsConfig("age")
+	}
+	if len(config.Pids) > 0 {
+		return deprecatedPolicyPidsConfig("age")
+	}
+	if config.PidWatcher.Name == "" {
+		return fmt.Errorf("pidwatcher name missing from the age policy configuration")
+	}
+	newPidWatcher, err := NewPidWatcher(config.PidWatcher.Name)
+	if err != nil {
+		return err
+	}
+	if err = newPidWatcher.SetConfigJson(config.PidWatcher.Config); err != nil {
+		return fmt.Errorf("configuring pidwatcher %q for the age policy failed: %w", config.PidWatcher.Name, err)
+	}
+
 	if config.Tracker.Name == "" {
 		return fmt.Errorf("tracker name missing from the age policy configuration")
 	}
@@ -126,6 +143,7 @@ func (p *PolicyAge) SetConfig(config *PolicyAgeConfig) error {
 	if err = p.mover.SetConfig(&config.Mover); err != nil {
 		return fmt.Errorf("configuring mover failed: %s", err)
 	}
+	p.pidwatcher = newPidWatcher
 	p.switchToTracker(newTracker)
 	p.config = config
 	return nil
@@ -150,6 +168,10 @@ func (p *PolicyAge) GetConfigJson() string {
 		return string(configStr)
 	}
 	return ""
+}
+
+func (p *PolicyAge) PidWatcher() PidWatcher {
+	return p.pidwatcher
 }
 
 func (p *PolicyAge) Mover() *Mover {
@@ -250,8 +272,8 @@ func (p *PolicyAge) Dump(args []string) string {
 }
 
 func (p *PolicyAge) Stop() {
-	if p.cgPidWatcher != nil {
-		p.cgPidWatcher.Stop()
+	if p.pidwatcher != nil {
+		p.pidwatcher.Stop()
 	}
 	if p.tracker != nil {
 		p.tracker.Stop()
@@ -271,21 +293,16 @@ func (p *PolicyAge) Start() error {
 	if p.config == nil {
 		return fmt.Errorf("unconfigured policy")
 	}
+	if p.pidwatcher == nil {
+		return fmt.Errorf("missing pidwatcher")
+	}
 	if p.tracker == nil {
 		return fmt.Errorf("missing tracker")
 	}
-	if len(p.config.Cgroups) == 0 && len(p.config.Pids) == 0 {
-		return fmt.Errorf("policy has no cgroups or pids to watch")
-	}
 	p.tracker.Start()
 	p.cgLoop = make(chan interface{})
-	p.cgPidWatcher.SetSources(p.config.Cgroups)
-	if len(p.config.Cgroups) > 0 {
-		p.cgPidWatcher.Start(p.tracker)
-	}
-	if len(p.config.Pids) > 0 {
-		p.tracker.AddPids(p.config.Pids)
-	}
+	p.pidwatcher.SetPidListener(p.tracker)
+	p.pidwatcher.Start()
 	p.mover.Start()
 	go p.loop()
 	return nil

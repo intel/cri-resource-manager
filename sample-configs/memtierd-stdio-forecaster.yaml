@@ -11,8 +11,11 @@ policy:
   config: |
     intervalms: 10000
 
-    pids:
-      - $(pidof meme)
+    pidwatcher:
+      name: pidlist
+      config: |
+        pids:
+          - $(pidof meme)
 
     heatmap:
       heatmax: 0.01

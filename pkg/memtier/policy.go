@@ -29,7 +29,8 @@ type Policy interface {
 	GetConfigJson() string      // Get current configuration.
 	Start() error
 	Stop()
-	// Mover and Tracker are mostly for debugging in interactive prompt...
+	// PidWatcher, Mover and Tracker are mostly for debugging in interactive prompt...
+	PidWatcher() PidWatcher
 	Mover() *Mover
 	Tracker() Tracker
 	Dump(args []string) string

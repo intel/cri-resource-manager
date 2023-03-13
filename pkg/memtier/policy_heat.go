@@ -23,6 +23,7 @@ import (
 )
 
 type PolicyHeatConfig struct {
+	PidWatcher PidWatcherConfig
 	Tracker    TrackerConfig
 	Heatmap    HeatmapConfig
 	Forecaster *HeatForecasterConfig
@@ -30,8 +31,10 @@ type PolicyHeatConfig struct {
 	// Cgroups is a list of cgroup paths in the filesystem. The
 	// policy manages processes in listed cgroups and recursively
 	// in their subgroups.
+	// DEPRECATED, use PidWatcher "cgroup" instead.
 	Cgroups []string
 	// Pids is a list of process id's to be tracked.
+	// DEPRECATED, use PidWatcher "pid" instead.
 	Pids []int
 	// IntervalMs is the length of the period in milliseconds
 	// in which new heats are calculated for pages based on gathered
@@ -53,7 +56,7 @@ type PolicyHeatConfig struct {
 
 type PolicyHeat struct {
 	config       *PolicyHeatConfig
-	cgPidWatcher *PidWatcherCgroup
+	pidwatcher   PidWatcher
 	chLoop       chan interface{} // for communication to the main loop of the policy
 	tracker      Tracker
 	heatmap      *Heatmap
@@ -77,16 +80,12 @@ func init() {
 }
 
 func NewPolicyHeat() (Policy, error) {
-	var err error
 	p := &PolicyHeat{
 		heatmap:      NewCounterHeatmap(),
 		pidAddrDatas: make(map[int]*AddrDatas),
 		mover:        NewMover(),
 		numaUsed:     make(map[Node]int),
 		numaSize:     make(map[Node]int),
-	}
-	if p.cgPidWatcher, err = NewPidWatcherCgroup(); err != nil {
-		return nil, fmt.Errorf("cgroup pid watcher error: %s", err)
 	}
 	return p, nil
 }
@@ -103,6 +102,23 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 	if config.IntervalMs <= 0 {
 		return fmt.Errorf("invalid heat policy IntervalMs: %d, > 0 expected", config.IntervalMs)
 	}
+	if len(config.Cgroups) > 0 {
+		return deprecatedPolicyCgroupsConfig("heat")
+	}
+	if len(config.Pids) > 0 {
+		return deprecatedPolicyPidsConfig("heat")
+	}
+	if config.PidWatcher.Name == "" {
+		return fmt.Errorf("pidwatcher name missing from the age policy configuration")
+	}
+	newPidWatcher, err := NewPidWatcher(config.PidWatcher.Name)
+	if err != nil {
+		return err
+	}
+	if err = newPidWatcher.SetConfigJson(config.PidWatcher.Config); err != nil {
+		return fmt.Errorf("configuring pidwatcher %q for the age policy failed: %w", config.PidWatcher.Name, err)
+	}
+
 	if config.Tracker.Name == "" {
 		return fmt.Errorf("tracker name missing from the heat policy configuration")
 	}
@@ -147,6 +163,7 @@ func (p *PolicyHeat) SetConfig(config *PolicyHeatConfig) error {
 		}
 	}
 	p.switchToTracker(newTracker)
+	p.pidwatcher = newPidWatcher
 	p.numaUsed = newNumaUsed
 	p.numaSize = newNumaSize
 	p.config = config
@@ -172,6 +189,10 @@ func (p *PolicyHeat) GetConfigJson() string {
 		return string(configStr)
 	}
 	return ""
+}
+
+func (p *PolicyHeat) PidWatcher() PidWatcher {
+	return p.pidwatcher
 }
 
 func (p *PolicyHeat) Mover() *Mover {
@@ -284,8 +305,8 @@ func (p *PolicyHeat) Dump(args []string) string {
 }
 
 func (p *PolicyHeat) Stop() {
-	if p.cgPidWatcher != nil {
-		p.cgPidWatcher.Stop()
+	if p.pidwatcher != nil {
+		p.pidwatcher.Stop()
 	}
 	if p.tracker != nil {
 		p.tracker.Stop()
@@ -305,23 +326,25 @@ func (p *PolicyHeat) Start() error {
 	if p.config == nil {
 		return fmt.Errorf("unconfigured policy")
 	}
+	if p.pidwatcher == nil {
+		return fmt.Errorf("missing pidwatcher")
+	}
 	if p.tracker == nil {
 		return fmt.Errorf("missing tracker")
-	}
-	if len(p.config.Cgroups) == 0 && len(p.config.Pids) == 0 {
-		return fmt.Errorf("policy has no cgroups or pids to watch")
 	}
 	if err := p.tracker.Start(); err != nil {
 		return fmt.Errorf("tracker start error: %w", err)
 	}
 	p.chLoop = make(chan interface{})
-	p.cgPidWatcher.SetSources(p.config.Cgroups)
-	if len(p.config.Cgroups) > 0 {
-		p.cgPidWatcher.Start(p.tracker)
-	}
-	if len(p.config.Pids) > 0 {
-		p.tracker.AddPids(p.config.Pids)
-	}
+	p.pidwatcher.SetPidListener(p.tracker)
+	p.pidwatcher.Start()
+	// p.pidwatcher.SetSources(p.config.Cgroups)
+	// if len(p.config.Cgroups) > 0 {
+	// 	p.pidwatcher.Start(p.tracker)
+	// }
+	// if len(p.config.Pids) > 0 {
+	// 	p.tracker.AddPids(p.config.Pids)
+	// }
 	if err := p.mover.Start(); err != nil {
 		return fmt.Errorf("mover start error: %w", err)
 	}

@@ -14,14 +14,52 @@
 
 package memtier
 
+import (
+	"fmt"
+	"sort"
+)
+
+type PidWatcherConfig struct {
+	Name   string
+	Config string
+}
+
 type PidWatcher interface {
-	SetSources([]string)
-	Poll(PidListener) error
-	Start(PidListener) error
+	SetConfigJson(string) error // Set new configuration.
+	GetConfigJson() string      // Get current configuration.
+	SetPidListener(PidListener)
+	Poll() error
+	Start() error
 	Stop()
+	Dump([]string) string
 }
 
 type PidListener interface {
 	AddPids([]int)
 	RemovePids([]int)
+}
+
+type PidWatcherCreator func() (PidWatcher, error)
+
+// pidwatchers is a map of pidwatcher name -> pidwatcher creator
+var pidwatchers map[string]PidWatcherCreator = make(map[string]PidWatcherCreator, 0)
+
+func PidWatcherRegister(name string, creator PidWatcherCreator) {
+	pidwatchers[name] = creator
+}
+
+func PidWatcherList() []string {
+	keys := make([]string, 0, len(pidwatchers))
+	for key := range pidwatchers {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func NewPidWatcher(name string) (PidWatcher, error) {
+	if creator, ok := pidwatchers[name]; ok {
+		return creator()
+	}
+	return nil, fmt.Errorf("invalid pidwatcher name %q", name)
 }
