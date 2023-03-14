@@ -72,7 +72,7 @@ process-stats() {
 perf-stats() {
 	echo "--- perf statistics from /tmp/perf.* ---"
 	awk '/sys_exit_process_madvise/{print "process_madvice.duration.ms:"$1}' < /tmp/perf.process_madvice.txt
-	awk '/instructions:u/{print "global.instructions.count:"$1}' < /tmp/perf.instructions.txt
+	awk '/instructions:u/{print "global.instructions.count:"$1}' < /tmp/perf.instructions.txt | sed 's/,//g'
 	awk '/elapsed/{print "global.instructions.interval.s:"$1}' < /tmp/perf.instructions.txt
 }
 
