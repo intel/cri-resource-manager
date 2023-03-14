@@ -28,7 +28,6 @@ import (
 	core_v1 "k8s.io/api/core/v1"
 
 	agent_v1 "github.com/intel/cri-resource-manager/pkg/agent/api/v1"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 )
 
 const (
@@ -42,7 +41,6 @@ type Interface interface {
 	GetNode(time.Duration) (core_v1.Node, error)
 	PatchNode([]*agent_v1.JsonPatch, time.Duration) error
 	UpdateNodeCapacity(map[string]string, time.Duration) error
-	GetConfig(time.Duration) (*config.RawConfig, error)
 
 	GetLabels(time.Duration) (map[string]string, error)
 	SetLabels(map[string]string, time.Duration) error
@@ -157,22 +155,6 @@ func (a *agentInterface) UpdateNodeCapacity(caps map[string]string, timeout time
 		return agentError("failed to update node capacities: %v", err)
 	}
 	return nil
-}
-
-func (a *agentInterface) GetConfig(timeout time.Duration) (*config.RawConfig, error) {
-	if a.IsDisabled() {
-		return nil, agentError("agent interface is disabled")
-	}
-
-	ctx, cancel, callOpts := prepareCall(timeout)
-	defer cancel()
-
-	rpl, err := a.cli.GetConfig(ctx, &agent_v1.GetConfigRequest{}, callOpts...)
-	if err != nil {
-		return nil, agentError("failed to get config: %v", err)
-	}
-
-	return &config.RawConfig{NodeName: rpl.NodeName, Data: rpl.Config}, nil
 }
 
 const (

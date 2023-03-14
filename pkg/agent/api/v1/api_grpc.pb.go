@@ -25,7 +25,6 @@ type AgentClient interface {
 	GetNode(ctx context.Context, in *GetNodeRequest, opts ...grpc.CallOption) (*GetNodeReply, error)
 	PatchNode(ctx context.Context, in *PatchNodeRequest, opts ...grpc.CallOption) (*PatchNodeReply, error)
 	UpdateNodeCapacity(ctx context.Context, in *UpdateNodeCapacityRequest, opts ...grpc.CallOption) (*UpdateNodeCapacityReply, error)
-	GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigReply, error)
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckReply, error)
 }
 
@@ -64,15 +63,6 @@ func (c *agentClient) UpdateNodeCapacity(ctx context.Context, in *UpdateNodeCapa
 	return out, nil
 }
 
-func (c *agentClient) GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GetConfigReply, error) {
-	out := new(GetConfigReply)
-	err := c.cc.Invoke(ctx, "/v1.Agent/GetConfig", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *agentClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckReply, error) {
 	out := new(HealthCheckReply)
 	err := c.cc.Invoke(ctx, "/v1.Agent/HealthCheck", in, out, opts...)
@@ -89,7 +79,6 @@ type AgentServer interface {
 	GetNode(context.Context, *GetNodeRequest) (*GetNodeReply, error)
 	PatchNode(context.Context, *PatchNodeRequest) (*PatchNodeReply, error)
 	UpdateNodeCapacity(context.Context, *UpdateNodeCapacityRequest) (*UpdateNodeCapacityReply, error)
-	GetConfig(context.Context, *GetConfigRequest) (*GetConfigReply, error)
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckReply, error)
 	mustEmbedUnimplementedAgentServer()
 }
@@ -106,9 +95,6 @@ func (UnimplementedAgentServer) PatchNode(context.Context, *PatchNodeRequest) (*
 }
 func (UnimplementedAgentServer) UpdateNodeCapacity(context.Context, *UpdateNodeCapacityRequest) (*UpdateNodeCapacityReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateNodeCapacity not implemented")
-}
-func (UnimplementedAgentServer) GetConfig(context.Context, *GetConfigRequest) (*GetConfigReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
 }
 func (UnimplementedAgentServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
@@ -180,24 +166,6 @@ func _Agent_UpdateNodeCapacity_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Agent_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetConfigRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AgentServer).GetConfig(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/v1.Agent/GetConfig",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentServer).GetConfig(ctx, req.(*GetConfigRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Agent_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HealthCheckRequest)
 	if err := dec(in); err != nil {
@@ -234,10 +202,6 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateNodeCapacity",
 			Handler:    _Agent_UpdateNodeCapacity_Handler,
-		},
-		{
-			MethodName: "GetConfig",
-			Handler:    _Agent_GetConfig_Handler,
 		},
 		{
 			MethodName: "HealthCheck",

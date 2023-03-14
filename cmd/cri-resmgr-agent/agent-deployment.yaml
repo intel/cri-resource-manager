@@ -80,6 +80,24 @@ spec:
               command: ["/bin/cri-resmgr-agent-probe"]
             initialDelaySeconds: 5
             periodSeconds: 30
+          #
+          # Notes: This is NOT a readiness probe for the agent itself.
+          #
+          # We (mis)use this readiness probe to propagate information
+          # back to the control plane about any failure on the node to
+          # activate the last updated configuration. Since success or
+          # failure is reflected by whether the agent's pod on the node
+          # is marked Ready, any error in configuration should now be a
+          # watchable condition, at least indirectly. One can get more
+          # details about the specifics of any configuration errors by
+          # watching the readiness of the agent's and fetching its log
+          # messages if it ever becomes not ready.
+          #
+          readinessProbe:
+            exec:
+              command: ["/bin/cri-resmgr-agent-probe", "-query", "config-status"]
+            initialDelaySeconds: 5
+            periodSeconds: 30
       volumes:
       - name: resmgrsockets
         hostPath:
