@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Node Agent &mdash; CRI Resource Manager 0.8.0-38-gaaf62b61 documentation</title>
+  <title>Node Agent &mdash; CRI Resource Manager 0.8.0-43-g88b90c8a documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -53,7 +53,12 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="setup.html">Setup and Usage</a></li>
 <li class="toctree-l1"><a class="reference internal" href="policy/index.html">Policies</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Node Agent</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Node Agent</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#running-as-a-daemonset">Running as a DaemonSet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-as-a-host-service">Running as a Host Service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configmap-to-node-mapping-conventions">ConfigMap to Node Mapping Conventions</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="webhook.html">Webhook</a></li>
 <li class="toctree-l1"><a class="reference internal" href="developers-guide/index.html">Developer’s Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="demos/index.html">Demos</a></li>
@@ -90,14 +95,32 @@
   <section id="node-agent">
 <h1>Node Agent<a class="headerlink" href="#node-agent" title="Permalink to this heading"></a></h1>
 <p>CRI Resource Manager can be configured dynamically using the CRI Resource
-Manager Node Agent and Kubernetes* ConfigMaps. The agent can be build using
-the <span class="xref myst">provided Dockerfile</span>. It can be
+Manager Node Agent and Kubernetes* ConfigMaps.</p>
+<section id="running-as-a-daemonset">
+<h2>Running as a DaemonSet<a class="headerlink" href="#running-as-a-daemonset" title="Permalink to this heading"></a></h2>
+<p>The agent can be build using the
+<span class="xref myst">provided Dockerfile</span>. It can be
 deployed as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the
 <span class="xref myst">provided deployment file</span>.</p>
+<p>When using the provided or a similar deployment, the agent uses a
+readiness probe to propagate the status of the last configuration
+update back to the control plane. If the configuration could not
+be taken into use for any reason, the agent’s probe will fail which
+eventually marks the agent as not being <code class="docutils literal notranslate"><span class="pre">Ready</span></code>. In this case, more
+details about the failure should be present among the latest messages
+logged by the agent or the probe itself. if the reason for failure is
+a configuration error, once the error is fixed, the agent should become
+eventually <code class="docutils literal notranslate"><span class="pre">Ready</span></code> again.</p>
+</section>
+<section id="running-as-a-host-service">
+<h2>Running as a Host Service<a class="headerlink" href="#running-as-a-host-service" title="Permalink to this heading"></a></h2>
 <p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment
 variable <code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running
 on. If necessary pass it the credentials for accessing the cluster using
 the <code class="docutils literal notranslate"><span class="pre">-kubeconfig</span> <span class="pre">&lt;file&gt;</span></code> command line option.</p>
+</section>
+<section id="configmap-to-node-mapping-conventions">
+<h2>ConfigMap to Node Mapping Conventions<a class="headerlink" href="#configmap-to-node-mapping-conventions" title="Permalink to this heading"></a></h2>
 <p>The agent monitors two ConfigMaps for the node, a primary node-specific one
 and a secondary group-specific or default one, depending on whether the node
 belongs to a configuration group. The node-specific ConfigMap always takes
@@ -119,6 +142,7 @@ the node group label.</p>
 that contains a node-specific, a group-specific, and a default ConfigMap
 example. See <a class="reference internal" href="policy/index.html"><span class="doc std std-doc">any available policy-specific documentation</span></a>
 for more information on the policy configurations.</p>
+</section>
 </section>
 
 
