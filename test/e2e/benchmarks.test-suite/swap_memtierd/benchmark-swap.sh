@@ -6,6 +6,12 @@ MEME_SIZE=${MEME_SIZE:-2G}
 MEME_WRITE=${MEME_WRITE:-1}
 SWAP_SIZE=${SWAP_SIZE:-4G}
 COMP_ALGO=${COMP_ALGO:-lzo}
+USE_ZSWAP=${USE_ZSWAP:-0}
+
+if [ "$USE_ZSWAP" != "0" ] && [ "$USE_ZSWAP" != "1" ]; then
+	echo "invalid USE_ZSWAP=$USE_ZSWAP, expected 0 or 1" >&2
+	exit 1
+fi
 
 test-params() {
 	echo "--- test parameters from environment variables and defaults ---"
@@ -13,6 +19,17 @@ test-params() {
 	echo "test.env.MEME_WRITE:$MEME_WRITE"
 	echo "test.env.SWAP_SIZE:$SWAP_SIZE"
 	echo "test.env.COMP_ALGO:$COMP_ALGO"
+}
+
+sys-params() {
+	echo "--- system parameters ---"
+	echo "sys.hugepages:$(< /sys/kernel/mm/transparent_hugepage/enabled)"
+	echo "sys.overcommit_memory:$(< /proc/sys/vm/overcommit_memory)"
+	if [ -f /sys/module/iaa_crypto/parameters/iaa_crypto_enable ]; then
+		echo "sys.iaa_crypto_enable:$(< /sys/module/iaa_crypto/parameters/iaa_crypto_enable)"
+	else
+		echo "sys.iaa_crypto_enable:ERROR"
+	fi
 }
 
 zram-params() {
@@ -76,19 +93,56 @@ perf-stats() {
 	awk '/elapsed/{print "global.instructions.interval.s:"$1}' < /tmp/perf.instructions.txt
 }
 
-echo ===== Clean up and reinitialize =====
+iaa-stats() {
+	local dir=/sys/kernel/debug/iaa-crypto
+	echo "--- iaa statistics ---"
+	if ! [ -d "$dir" ]; then
+		echo "$1.iaa:ERROR-missing-$dir"
+		return 0
+	fi
+	grep . $dir/total* | sed "s:$dir/:$1.iaa.stats.:g"
+	if [ -f "$dir/wq_stats" ]; then
+		awk -v "t=$1" '/id:/{id=$2;name=""}/name:/{name=$2}/_(bytes|calls):/{print t".iaa.dev"id".wq"name"."$1""$2}' < "$dir/wq_stats"
+	else
+		echo "$1.iaa.devX.wqY:ERROR-missing-$dir/wq_stats"
+	fi
+}
+
+echo ===== Clean up =====
 test-params
 pkill meme || true
 pkill memtierd || true
 echo N | tee /sys/module/zswap/parameters/enabled
 grep -q zram /proc/swaps && swapoff /dev/zram0
 grep -q zram /proc/modules && rmmod zram
+
+echo ===== Initialize =====
 modprobe zram || { echo "failed to load zram"; exit 1; }
-echo "$COMP_ALGO" | tee /sys/module/zswap/parameters/compressor || { echo "bad COMP_ALGO=$COMP_ALGO"; exit 1; }
+if [ "$USE_ZSWAP" == "0" ]; then
+    echo "$COMP_ALGO" | tee /sys/block/zram0/comp_algorithm
+else
+    echo "$COMP_ALGO" | tee /sys/module/zswap/parameters/compressor || { echo "bad COMP_ALGO=$COMP_ALGO"; exit 1; }
+    echo 50 > /sys/module/zswap/parameters/max_pool_percent
+    echo zsmalloc > /sys/module/zswap/parameters/zpool
+    echo 0 > /sys/module/zswap/parameters/same_filled_pages_enabled
+fi
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+echo 1 > /proc/sys/vm/overcommit_memory
+
+if [ -f /sys/module/iaa_crypto/parameters/iaa_crypto_enable ]; then
+    echo 1 > /sys/module/iaa_crypto/parameters/iaa_crypto_enable
+    echo 0 > /sys/kernel/debug/iaa-crypto/stats_reset
+else
+    echo WARNING: cannot enable iaa_crypto >&2
+fi
+
 echo "$SWAP_SIZE" | tee /sys/block/zram0/disksize || { echo "bad SWAP_SIZE=$SWAP_SIZE"; exit 1; }
 mkswap /dev/zram0
 swapon /dev/zram0
-echo Y | tee /sys/module/zswap/parameters/enabled
+if [ "$USE_ZSWAP" == "1" ]; then
+    echo Y | tee /sys/module/zswap/parameters/enabled
+fi
+sys-params
 zram-params
 zswap-params
 swap-stats "start"
