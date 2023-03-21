@@ -97,7 +97,7 @@ iaa-stats() {
 	local dir=/sys/kernel/debug/iaa-crypto
 	echo "--- iaa statistics ---"
 	if ! [ -d "$dir" ]; then
-		echo "$1.iaa:ERROR-missing-$dir"
+		echo "$1.iaa.stats:ERROR-missing-$dir"
 		return 0
 	fi
 	grep . $dir/total* | sed "s:$dir/:$1.iaa.stats.:g"
@@ -115,6 +115,9 @@ pkill memtierd || true
 echo N | tee /sys/module/zswap/parameters/enabled
 grep -q zram /proc/swaps && swapoff /dev/zram0
 grep -q zram /proc/modules && rmmod zram
+if [ -f /sys/module/iaa_crypto/parameters/iaa_crypto_enable ]; then
+	echo 0 > /sys/module/iaa_crypto/parameters/iaa_crypto_enable
+fi
 
 echo ===== Initialize =====
 modprobe zram || { echo "failed to load zram"; exit 1; }
@@ -129,11 +132,13 @@ fi
 echo never > /sys/kernel/mm/transparent_hugepage/enabled
 echo 1 > /proc/sys/vm/overcommit_memory
 
-if [ -f /sys/module/iaa_crypto/parameters/iaa_crypto_enable ]; then
-    echo 1 > /sys/module/iaa_crypto/parameters/iaa_crypto_enable
-    echo 0 > /sys/kernel/debug/iaa-crypto/stats_reset
-else
-    echo WARNING: cannot enable iaa_crypto >&2
+if [[ "$COMP_ALGO" == *"iaa"* ]]; then
+	if [ -f /sys/module/iaa_crypto/parameters/iaa_crypto_enable ]; then
+		echo 1 > /sys/module/iaa_crypto/parameters/iaa_crypto_enable
+		echo 0 > /sys/kernel/debug/iaa-crypto/stats_reset
+	else
+		echo ERROR: cannot enable iaa_crypto
+	fi
 fi
 
 echo "$SWAP_SIZE" | tee /sys/block/zram0/disksize || { echo "bad SWAP_SIZE=$SWAP_SIZE"; exit 1; }
@@ -148,6 +153,7 @@ zswap-params
 swap-stats "start"
 zram-stats "start"
 zswap-stats "start"
+iaa-stats "start"
 
 perf trace -e syscalls:sys_*_process_madvise --max-events 2 >&/tmp/perf.process_madvice.txt &
 
@@ -166,6 +172,7 @@ echo ===== Collect data =====
 swap-stats "end"
 zram-stats "end"
 zswap-stats "end"
+iaa-stats "end"
 process-stats "end" meme
 process-stats "end" memtierd
 perf-stats
