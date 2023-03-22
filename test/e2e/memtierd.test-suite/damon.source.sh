@@ -56,7 +56,7 @@ EOF
             error "building debian packages failed"
         }
 
-        distro-install-pkg libtraceevent-dev libb2-1 libbabeltrace-dev libopencsd1 libpython3.11 libpython3.11-minimal libpython3.11-stdlib libu nwind8 python3.11 python3.11-minimal
+        distro-install-pkg libtraceevent-dev libb2-1 libbabeltrace-dev libopencsd1 libpython3.11 libpython3.11-minimal libpython3.11-stdlib libunwind8 python3.11 python3.11-minimal
         vm-command "cd linux; make -C tools/perf" || {
             error "building perf failed"
         }
