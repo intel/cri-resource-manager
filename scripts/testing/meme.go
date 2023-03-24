@@ -43,6 +43,8 @@ var bas []*BArray = []*BArray{} // array of byte arrays
 
 var bValue byte = 0
 
+var exerciserCount int = 0
+
 var readers, writers []func()
 
 var bReaderCount int
@@ -59,19 +61,30 @@ var bWriteOffset int64
 var bWriteOffsetDelta int64
 var bWriteInterval time.Duration
 
+var perfPrintInterval time.Duration
+
 var constPagesize int = os.Getpagesize()
 
-func bExerciser(read, write bool, ba *BArray, offset int64, count int64, interval time.Duration, offsetDelta int64, countDelta int64) {
+func bExerciser(exerciserId int, read, write bool, ba *BArray, offset int64, count int64, interval time.Duration, offsetDelta int64, countDelta int64) {
 	b := ba.b
 	if count >= int64(len(b[offset:])) {
 		count = int64(len(b[offset:])) - 1
 	}
-	fmt.Printf("    exerciser start: r=%t w=%t %s\n", read, write, bAddrRange(ba.b[offset:], int(count)))
+	exerciserDesc := ""
+	if read {
+		exerciserDesc += "read"
+	}
+	if write {
+		exerciserDesc += "write"
+	}
+	fmt.Printf("start exerciser %d: %s %s\n", exerciserId, exerciserDesc, bAddrRange(ba.b[offset:], int(count)))
 	round := int64(0)
 	defer func() {
-		fmt.Printf("    exerciser stop: read=%t write=%t %s\n", read, write, bAddrRange(ba.b[offset:], int(count)))
+		fmt.Printf("stop exerciser %d: %s %s\n", exerciserId, exerciserDesc, bAddrRange(ba.b[offset:], int(count)))
 		runtime.GC()
 	}()
+	perfPrintStart := time.Now()
+	perfPrintRounds := int64(0)
 	for ba.readers > 0 || ba.writers > 0 {
 		roundStartIndex := (offset + (offsetDelta * round)) % int64(len(b))
 		roundCount := count + (countDelta * round)
@@ -92,10 +105,18 @@ func bExerciser(read, write bool, ba *BArray, offset int64, count int64, interva
 		if interval > 0 {
 			time.Sleep(interval)
 			if interval >= 1000000 {
-				fmt.Printf("    - round: %d, read=%v, write=%v, range %x-%x\n", round, read, write, &b[roundStartIndex], &b[roundStartIndex+roundCount-1])
+				fmt.Printf("wake exerciser %d: round %d range %x-%x\n", exerciserId, round, &b[roundStartIndex], &b[roundStartIndex+roundCount-1])
 			}
 		}
 		round += 1
+		if perfPrintInterval > 0 {
+			perfPrintDuration := time.Since(perfPrintStart)
+			if perfPrintDuration >= perfPrintInterval {
+				fmt.Printf("avgspeed exerciser %d: %.6f s/round\n", exerciserId, float32(perfPrintDuration)/float32(round-perfPrintRounds)/float32(time.Second))
+				perfPrintRounds = round
+				perfPrintStart = time.Now()
+			}
+		}
 	}
 }
 
@@ -207,13 +228,15 @@ func allocateBArray(bSize int64) {
 	if bReaderCount > 0 {
 		ba.readers = 1
 		bReaderCount--
-		go bExerciser(true, false, ba, bReadOffset, bReadSize, bReadInterval, bReadOffsetDelta, bReadSizeDelta)
+		go bExerciser(exerciserCount, true, false, ba, bReadOffset, bReadSize, bReadInterval, bReadOffsetDelta, bReadSizeDelta)
+		exerciserCount += 1
 	}
 	// create writers
 	if bWriterCount > 0 {
 		ba.writers = 1
 		bWriterCount--
-		go bExerciser(false, true, ba, bWriteOffset, bWriteSize, bWriteInterval, bWriteOffsetDelta, bWriteSizeDelta)
+		go bExerciser(exerciserCount, false, true, ba, bWriteOffset, bWriteSize, bWriteInterval, bWriteOffsetDelta, bWriteSizeDelta)
+		exerciserCount += 1
 	}
 }
 
@@ -233,6 +256,7 @@ func freeBArray() {
 func main() {
 	fmt.Printf("memory exerciser\npid: %d\n", os.Getpid())
 	optTTL := flag.String("ttl", "", "do not wait for keypress, terminate after given time T(ns|us|s|m|h)")
+	optPerfPrintInterval := flag.String("p", "0", "performance printing interval T(ns|us|s|m|h)")
 	optBCount := flag.Int("bc", 1, "number of byte arrays")
 	optBCountDelta := flag.String("bcd", "", "array count delta: DELTA/T[,DELTA/T...], \"1/20s,-6/2m\": add 1 array every 20 s, delete 6 arrays every 2 minutes")
 	optBSize := flag.String("bs", "1G", "size of each byte array [k, M or G]")
@@ -265,6 +289,8 @@ func main() {
 	bWriteOffset = numBytes("-bwo", *optBWriteOffset)
 	bWriteOffsetDelta = numBytes("-bwod", *optBWriteOffsetDelta)
 	bWriteInterval = numNs("-bwi", *optBWriteInterval)
+
+	perfPrintInterval = numNs("-p", *optPerfPrintInterval)
 
 	// create byte arrays
 	fmt.Printf("creating %d byte arrays\n", *optBCount)
