@@ -1,0 +1,72 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ master ]
+    tags: [ '*' ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  snyk:
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://github.com
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+    - name: Set Up Snyk
+      uses: snyk/actions/setup@master
+
+    - name: Run Snyk to check for vulnerabilities
+      continue-on-error: true
+      uses: snyk/actions/golang@master
+      env:
+        SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
+      with:
+        args: --sarif-file-output=snyk.sarif
+
+    - name: Upload result to GitHub Code Scanning
+      if: ${{ github.event_name != 'pull_request' }}
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+       sarif_file: snyk.sarif
+
+  codeQL-init:
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://github.com
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: go
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+  codeQL-upload:
+    runs-on: ubuntu-latest
+    needs: codeQL-init
+    environment:
+      name: dev
+      url: https://github.com
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+    - name: Upload result to GitHub Code Scanning
+      if: ${{ github.event_name != 'pull_request' }}
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+          sarif_file: codeql.sarif
+          wait-for-processing: true
