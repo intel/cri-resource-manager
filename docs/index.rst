@@ -17,6 +17,8 @@ Welcome to CRI Resource Manager's documentation!
 
    developers-guide/index.rst
 
+   migration-to-NRI.md
+
    demos/index.rst
 
    reference/index.md

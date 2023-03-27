@@ -224,6 +224,9 @@ def normalizePath(docPath,uriPath):
 def fixLocalMDAnchors(app, doctree, docname):
     for node in doctree.traverse(nodes.reference):
         uri = node.get('refuri')
+        if uri is None:
+             print("fixLocalMDAnchor: skipping anchor with no URI at node: ", node)
+             continue
 
         if isHTTPLink(uri):
             continue
