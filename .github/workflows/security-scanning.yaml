@@ -20,6 +20,9 @@ jobs:
 
     - name: Set Up Snyk
       uses: snyk/actions/setup@master
+      
+    - name: Snyk Auth
+      run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
     - name: Run Snyk to check for vulnerabilities
       continue-on-error: true
@@ -27,13 +30,13 @@ jobs:
       env:
         SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
       with:
-        args: --sarif-file-output=snyk.sarif
+        args: --sarif-file-output=/github/workspace/snyk.sarif
 
     - name: Upload result to GitHub Code Scanning
       if: ${{ github.event_name != 'pull_request' }}
       uses: github/codeql-action/upload-sarif@v2
       with:
-       sarif_file: snyk.sarif
+       sarif_file: /github/workspace/snyk.sarif
 
   codeQL-scanning:
     runs-on: ubuntu-latest
