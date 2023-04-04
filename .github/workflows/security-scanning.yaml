@@ -22,7 +22,9 @@ jobs:
       uses: snyk/actions/setup@master
       
     - name: Snyk Auth
-      run: snyk auth ${{ secrets.SNYK_TOKEN }}
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      run: snyk auth ${{ env.SNYK_TOKEN }}
 
     - name: Run Snyk to check for vulnerabilities
       continue-on-error: true
