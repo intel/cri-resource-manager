@@ -427,14 +427,14 @@ func (p *policy) configNotify(event config.Event, source config.Source) error {
 	if !allowed.Equals(p.allowed) {
 		if !(allowed.Size() == 0 && p.allowed.Size() == 0) {
 			log.Warn("allowed cpuset changed (%s, was %s)",
-				p.allowed.String(), allowed.String())
+				allowed.String(), p.allowed.String())
 			reinit = true
 		}
 	}
 	if !reserved.Equals(p.reserved) {
 		if !(reserved.Size() == 0 && p.reserved.Size() == 0) {
 			log.Warn("reserved cpuset changed (%s, was %s)",
-				p.reserved.String(), reserved.String())
+				reserved.String(), p.reserved.String())
 			reinit = true
 		}
 	}
