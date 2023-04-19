@@ -78,7 +78,6 @@
 <li class="toctree-l1"><a class="reference internal" href="node-agent.html">Node Agent</a></li>
 <li class="toctree-l1"><a class="reference internal" href="webhook.html">Webhook</a></li>
 <li class="toctree-l1"><a class="reference internal" href="developers-guide/index.html">Developer’s Guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="migration-to-NRI.html">Migrating from CRI-RM to NRI</a></li>
 <li class="toctree-l1"><a class="reference internal" href="demos/index.html">Demos</a></li>
 <li class="toctree-l1"><a class="reference internal" href="reference/index.html">Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
@@ -131,7 +130,7 @@ Resource Manager.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=`curl -s &quot;https://api.github.com/repos/intel/cri-resource-manager/releases/latest&quot; | \
                jq .tag_name | tr -d &#39;&quot;v&#39;`
 source /etc/os-release
-[ &quot;$ID&quot; = &quot;sles&quot; -o &quot;$ID&quot; = &quot;opensuse-leap&quot; ] &amp;&amp; export ID=suse
+[ &quot;$ID&quot; = &quot;sles&quot; ] &amp;&amp; export ID=opensuse-leap
 sudo rpm -Uvh https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/cri-resource-manager-${CRIRM_VERSION}-0.${ID}-${VERSION_ID}.x86_64.rpm
 </pre></div>
 </div>
