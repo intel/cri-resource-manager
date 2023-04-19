@@ -194,12 +194,6 @@ func (ctl *rdtctl) assignClass(c cache.Container, class string) error {
 		return rdtError("%q: failed to get pod", c.PrettyName())
 	}
 
-	dir := c.GetCgroupDir()
-	if dir == "" {
-		return rdtError("%q: failed to determine cgroup directory",
-			c.PrettyName())
-	}
-
 	pids, err := c.GetProcesses()
 	if err != nil {
 		return rdtError("%q: failed to get process list: %v", c.PrettyName(), err)
