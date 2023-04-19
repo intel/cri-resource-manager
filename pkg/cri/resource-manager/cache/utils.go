@@ -276,6 +276,8 @@ func findContainerDir(podCgroupDir, podID, ID string) string {
 		path.Join(cpusetDir, podCgroupDir, "crio-"+ID+".scope"),
 		// crio, cgroupfs
 		path.Join(cpusetDir, podCgroupDir, "crio-"+ID),
+		// docker
+		path.Join(cpusetDir, podCgroupDir, "docker-"+ID+".scope"),
 	}
 
 	for _, dir := range dirs {
