@@ -20,7 +20,7 @@ First, install and setup cri-resource-manager.
 CRIRM_VERSION=`curl -s "https://api.github.com/repos/intel/cri-resource-manager/releases/latest" | \
                jq .tag_name | tr -d '"v'`
 source /etc/os-release
-[ "$ID" = "sles" -o "$ID" = "opensuse-leap" ] && export ID=suse
+[ "$ID" = "sles" ] && export ID=opensuse-leap
 sudo rpm -Uvh https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/cri-resource-manager-${CRIRM_VERSION}-0.${ID}-${VERSION_ID}.x86_64.rpm
 ```
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quick-start &mdash; CRI Resource Manager 0.8.0-54-gfd31c37e documentation</title>
+  <title>Quick-start &mdash; CRI Resource Manager 0.8.0-56-g01c6ef9f documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -131,7 +131,7 @@ Resource Manager.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=`curl -s &quot;https://api.github.com/repos/intel/cri-resource-manager/releases/latest&quot; | \
                jq .tag_name | tr -d &#39;&quot;v&#39;`
 source /etc/os-release
-[ &quot;$ID&quot; = &quot;sles&quot; -o &quot;$ID&quot; = &quot;opensuse-leap&quot; ] &amp;&amp; export ID=suse
+[ &quot;$ID&quot; = &quot;sles&quot; ] &amp;&amp; export ID=opensuse-leap
 sudo rpm -Uvh https://github.com/intel/cri-resource-manager/releases/download/v${CRIRM_VERSION}/cri-resource-manager-${CRIRM_VERSION}-0.${ID}-${VERSION_ID}.x86_64.rpm
 </pre></div>
 </div>
