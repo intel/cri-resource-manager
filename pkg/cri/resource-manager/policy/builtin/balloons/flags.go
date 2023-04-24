@@ -43,8 +43,27 @@ type balloonsOptionsWrapped struct {
 	// amount of allocations. The default is false: balloons are
 	// packed tightly to optimize power efficiency.
 	AllocatorTopologyBalancing bool
-	// BallonDefs contains balloon type definitions.
+	// BalloonDefs contains balloon type definitions.
 	BalloonDefs []*BalloonDef `json:"BalloonTypes,omitempty"`
+	// BalloonInstances define balloon instance-specific options.
+	BalloonInsts []*BalloonInst `json:"BalloonInstances,omitempty"`
+}
+
+// BalloonInst contains additional constraints and overrides on
+// balloon instantiation.
+type BalloonInst struct {
+	// Type of the balloon, that is, the name of a balloon Def.
+	Type string `json:"Type"`
+	// Balloon instances on which following constraints apply.
+	Instances []int
+	// Allow CPU allocation only from listed CPU packages.
+	AllowedCpuPackages []int
+	// Allow CPU allocation only from listed NUMAs.
+	AllowedCpuNumas []int
+	// Allow CPU allocation only from listed CPUs.
+	AllowedCpus []int
+	// Force memory pinning exactly on listed NUMAs.
+	ForcedMemNumas []int
 }
 
 // BalloonDef contains a balloon definition.
