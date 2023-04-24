@@ -104,7 +104,15 @@ RANDOM_ID := "$(shell head -c20 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 
 ifdef STATIC
     STATIC_LDFLAGS:=-extldflags=-static
-    BUILD_TAGS:=-tags osusergo,netgo
+    BUILD_TAGS := $(BUILD_TAGS),osusergo,netgo
+endif
+
+ifdef BENCHMARKING
+    BUILD_TAGS := $(BUILD_TAGS),benchmarking
+endif
+
+ifdef BUILD_TAGS
+    BUILD_TAGS:=-tags $(BUILD_TAGS)
 endif
 
 LDFLAGS    = \
