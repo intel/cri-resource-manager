@@ -40,6 +40,7 @@ const (
 
 // cpuTreeNode is a node in the CPU tree.
 type cpuTreeNode struct {
+	id       int
 	name     string
 	level    CPUTopologyLevel
 	parent   *cpuTreeNode
@@ -139,8 +140,9 @@ func (tna cpuTreeNodeAttributes) String() string {
 }
 
 // NewCpuTree returns a named CPU tree node.
-func NewCpuTree(name string) *cpuTreeNode {
+func NewCpuTree(id int, name string) *cpuTreeNode {
 	return &cpuTreeNode{
+		id:   id,
 		name: name,
 		cpus: cpuset.NewCPUSet(),
 	}
@@ -163,6 +165,25 @@ func (t *cpuTreeNode) AddCpus(cpus cpuset.CPUSet) {
 // Cpus returns CPUs of a CPU tree node.
 func (t *cpuTreeNode) Cpus() cpuset.CPUSet {
 	return t.cpus
+}
+
+// CpusIn returns CPUs under matching elements on a topology level.
+func (t *cpuTreeNode) CpusIn(topoLevel CPUTopologyLevel, ids []int) cpuset.CPUSet {
+	cpus := cpuset.NewCPUSet()
+	t.DepthFirstWalk(func(tn *cpuTreeNode) error {
+		// Not on matching level, go deeper.
+		if tn.level != topoLevel {
+			return nil
+		}
+		// On matching level, get CPUs of listed ids and turn back.
+		for _, id := range ids {
+			if id == tn.id {
+				cpus = cpus.Union(tn.cpus)
+			}
+		}
+		return WalkSkipChildren
+	})
+	return cpus
 }
 
 // WalkSkipChildren error returned from a DepthFirstWalk handler
@@ -220,30 +241,30 @@ func NewCpuTreeFromSystem() (*cpuTreeNode, error) {
 		return nil, err
 	}
 	// TODO: split deep nested loops into functions
-	sysTree := NewCpuTree("system")
+	sysTree := NewCpuTree(0, "system")
 	sysTree.level = CPUTopologyLevelSystem
 	for _, packageID := range sys.PackageIDs() {
-		packageTree := NewCpuTree(fmt.Sprintf("p%d", packageID))
+		packageTree := NewCpuTree(packageID, fmt.Sprintf("p%d", packageID))
 		packageTree.level = CPUTopologyLevelPackage
 		cpuPackage := sys.Package(packageID)
 		sysTree.AddChild(packageTree)
 		for _, dieID := range cpuPackage.DieIDs() {
-			dieTree := NewCpuTree(fmt.Sprintf("p%dd%d", packageID, dieID))
+			dieTree := NewCpuTree(dieID, fmt.Sprintf("p%dd%d", packageID, dieID))
 			dieTree.level = CPUTopologyLevelDie
 			packageTree.AddChild(dieTree)
 			for _, nodeID := range cpuPackage.DieNodeIDs(dieID) {
-				nodeTree := NewCpuTree(fmt.Sprintf("p%dd%dn%d", packageID, dieID, nodeID))
+				nodeTree := NewCpuTree(nodeID, fmt.Sprintf("p%dd%dn%d", packageID, dieID, nodeID))
 				nodeTree.level = CPUTopologyLevelNuma
 				dieTree.AddChild(nodeTree)
 				node := sys.Node(nodeID)
 				for _, cpuID := range node.CPUSet().ToSlice() {
-					cpuTree := NewCpuTree(fmt.Sprintf("p%dd%dn%dcpu%d", packageID, dieID, nodeID, cpuID))
+					cpuTree := NewCpuTree(cpuID, fmt.Sprintf("p%dd%dn%dcpu%d", packageID, dieID, nodeID, cpuID))
 
 					cpuTree.level = CPUTopologyLevelCore
 					nodeTree.AddChild(cpuTree)
 					cpu := sys.CPU(cpuID)
 					for _, threadID := range cpu.ThreadCPUSet().ToSlice() {
-						threadTree := NewCpuTree(fmt.Sprintf("p%dd%dn%dcpu%dt%d", packageID, dieID, nodeID, cpuID, threadID))
+						threadTree := NewCpuTree(threadID, fmt.Sprintf("p%dd%dn%dcpu%dt%d", packageID, dieID, nodeID, cpuID, threadID))
 						threadTree.level = CPUTopologyLevelThread
 						cpuTree.AddChild(threadTree)
 						threadTree.AddCpus(cpuset.NewCPUSet(threadID))
