@@ -20,6 +20,9 @@ TEST_TAGS := noavx,test
 GO_TEST   := $(GO_CMD) test $(GO_PARALLEL) -tags $(TEST_TAGS)
 GO_VET    := $(GO_CMD) vet -tags $(TEST_TAGS)
 
+TEST_SETUP   := test-setup.sh
+TEST_CLEANUP := test-cleanup.sh
+
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
 GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E revive,gofmt
 GO_CILINT_RUNFLAGS := --build-tags $(TEST_TAGS)
@@ -431,7 +434,28 @@ shellcheck:
 # Rules for running unit/module tests.
 #
 
-test:
+test: test-setup test-run test-cleanup
+race-test racetest: test-setup racetest-run test-cleanup
+
+test-setup:
+	$(Q)for i in $$(find . -name $(TEST_SETUP)); do \
+	    echo "+ Running test setup $$i..."; \
+	    (cd $${i%/*}; \
+	        if [ -x "$(TEST_SETUP)" ]; then \
+	            ./$(TEST_SETUP); \
+	        fi); \
+	done
+
+test-cleanup:
+	$(Q)for i in $$(find . -name $(TEST_CLEANUP)); do \
+	    echo "- Running test cleanup $$i..."; \
+	    (cd $${i%/*}; \
+	        if [ -x "$(TEST_CLEANUP)" ]; then \
+	            ./$(TEST_CLEANUP); \
+	        fi); \
+	done
+
+test-run:
 ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
 	    $(shell $(GO_LIST_MODULES))
@@ -447,7 +471,7 @@ else
             exit $$rc
 endif
 
-race-test racetest:
+racetest-run:
 ifndef WHAT
 	$(Q)$(GO_TEST) -race -coverprofile=coverage.txt -covermode=atomic \
 	    $(shell $(GO_LIST_MODULES))
