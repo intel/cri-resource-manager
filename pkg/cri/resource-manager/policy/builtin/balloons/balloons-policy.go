@@ -551,9 +551,10 @@ func (p *balloons) newBalloon(blnDef *BalloonDef, confCpus bool) (*Balloon, erro
 		// So does the default balloon unless its CPU counts are tweaked.
 		cpus = p.reserved
 	} else {
-		addFromCpus, _, err := p.cpuTreeAllocator.ResizeCpus(cpuset.NewCPUSet(), p.freeCpus, blnDef.MinCpus)
+		availFreeCpus := p.instAllowedCpus(blnDef, freeInstance, p.freeCpus)
+		addFromCpus, _, err := p.cpuTreeAllocator.ResizeCpus(cpuset.NewCPUSet(), availFreeCpus, blnDef.MinCpus)
 		if err != nil {
-			return nil, balloonsError("failed to choose a cpuset for allocating first %d CPUs from %#s", blnDef.MinCpus, p.freeCpus)
+			return nil, balloonsError("failed to choose a cpuset for allocating first %d CPUs from %#s", blnDef.MinCpus, availFreeCpus)
 		}
 		cpus, err = p.cpuAllocator.AllocateCpus(&addFromCpus, blnDef.MinCpus, blnDef.AllocatorPriority)
 		if err != nil {
@@ -567,8 +568,8 @@ func (p *balloons) newBalloon(blnDef *BalloonDef, confCpus bool) (*Balloon, erro
 		PodIDs:         make(map[string][]string),
 		Cpus:           cpus,
 		SharedIdleCpus: cpuset.NewCPUSet(),
-		Mems:           p.closestMems(cpus),
 	}
+	p.updateMems(bln, bln.Cpus)
 	if confCpus {
 		if err = p.useCpuClass(bln); err != nil {
 			log.Errorf("failed to apply CPU configuration to new balloon %s[%d] (cpus: %s): %w", blnDef.Name, freeInstance, cpus, err)
@@ -1017,18 +1018,25 @@ func (p *balloons) validateConfig(bpoptions *BalloonsOptions) error {
 				blnDef.MinCpus, blnDef.MaxCpus, blnDef.Name)
 		}
 	}
-	return nil
+	return p.instValidateConfig(bpoptions)
 }
 
 // setConfig takes new balloon configuration into use.
 func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
-	// TODO: revert allocations (p.freeCpus) to old ones if the
-	// configuration is invalid. Currently bad configuration
-	// leaves a mess in bookkeeping.
 	if err := p.validateConfig(bpoptions); err != nil {
 		return balloonsError("invalid configuration: %w", err)
 	}
-
+	previousOptions := p.bpoptions
+	restorePreviousOptions := true
+	defer func() {
+		if restorePreviousOptions {
+			log.Debugf("restoring previous balloons policy configuration")
+			if err := p.setConfig(&previousOptions); err != nil {
+				log.Errorf("restoring previous options failed unexpectedly: %s", err)
+			}
+		}
+	}()
+	p.bpoptions = *bpoptions
 	// Create the default reserved and default balloon
 	// definitions. Some properties of these definitions may be
 	// altered by user configuration.
@@ -1084,15 +1092,24 @@ func (p *balloons) setConfig(bpoptions *BalloonsOptions) error {
 	for blnIdx, bln := range p.balloons {
 		log.Info("- balloon %d: %s", blnIdx, bln)
 	}
-	// No errors in balloon creation, take new configuration into use.
-	p.bpoptions = *bpoptions
 	p.updatePinning(p.shareIdleCpus(p.freeCpus, cpuset.NewCPUSet())...)
 	// (Re)configures all CPUs in balloons.
 	p.resetCpuClass()
 	for _, bln := range p.balloons {
 		p.useCpuClass(bln)
 	}
+	restorePreviousOptions = false
 	return nil
+}
+
+// updateMems updates balloon Mems based on all CPUs available for the
+// balloon, taking into account possibly forced memory nodes.
+func (p *balloons) updateMems(bln *Balloon, cpus cpuset.CPUSet) {
+	if mems := p.instForcedMems(bln.Def, bln.Instance); mems.Size() > 0 {
+		bln.Mems = mems
+	} else {
+		bln.Mems = p.closestMems(cpus)
+	}
 }
 
 // closestMems returns memory node IDs good for pinning containers
@@ -1189,7 +1206,7 @@ func (p *balloons) resizeBalloon(bln *Balloon, newMilliCpus int) error {
 func (p *balloons) updatePinning(blns ...*Balloon) {
 	for _, bln := range blns {
 		cpus := bln.Cpus.Union(bln.SharedIdleCpus)
-		bln.Mems = p.closestMems(cpus)
+		p.updateMems(bln, cpus)
 		for _, cID := range bln.ContainerIDs() {
 			if c, ok := p.cch.LookupContainer(cID); ok {
 				p.pinCpuMem(c, cpus, bln.Mems)
