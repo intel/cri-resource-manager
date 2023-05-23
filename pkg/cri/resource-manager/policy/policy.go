@@ -22,7 +22,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/blockio"
 	"github.com/intel/cri-resource-manager/pkg/config"
@@ -31,6 +30,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control/rdt"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	"github.com/prometheus/client_golang/prometheus"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"

@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package kubernetes
+package cpuset
 
 import (
 	"testing"
-
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 func TestShortCPUSet(t *testing.T) {
@@ -39,7 +37,7 @@ func TestShortCPUSet(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		cset := cpuset.MustParse(tc.source)
+		cset := MustParse(tc.source)
 		native := cset.String()
 		if native != tc.native {
 			t.Errorf("incorrect native CPUSet for %q, expected %q, got %q",

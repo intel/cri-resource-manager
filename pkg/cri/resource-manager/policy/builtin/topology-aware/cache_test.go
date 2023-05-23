@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 func TestToGrant(t *testing.T) {
@@ -104,8 +104,8 @@ func TestAllocationMarshalling(t *testing.T) {
 							node: node{
 								name:    "testnode",
 								kind:    UnknownNode,
-								noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(0, 0, 0), createMemoryMap(0, 0, 0)),
-								freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(0, 0, 0), createMemoryMap(0, 0, 0)),
+								noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(0, 0, 0), createMemoryMap(0, 0, 0)),
+								freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(0, 0, 0), createMemoryMap(0, 0, 0)),
 							},
 						},
 					},

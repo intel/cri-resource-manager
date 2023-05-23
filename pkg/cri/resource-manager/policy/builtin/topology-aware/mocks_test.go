@@ -23,11 +23,11 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	"github.com/intel/goresctrl/pkg/sst"
 	idset "github.com/intel/goresctrl/pkg/utils"
 	v1 "k8s.io/api/core/v1"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 type mockSystemNode struct {
@@ -63,7 +63,7 @@ func (fake *mockSystemNode) HasNormalMemory() bool {
 }
 
 func (fake *mockSystemNode) CPUSet() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 
 func (fake *mockSystemNode) Distance() []int {
@@ -85,7 +85,7 @@ func (p *mockCPUPackage) ID() idset.ID {
 }
 
 func (p *mockCPUPackage) CPUSet() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 
 func (p *mockCPUPackage) NodeIDs() []idset.ID {
@@ -97,7 +97,7 @@ func (p *mockCPUPackage) DieIDs() []idset.ID {
 }
 
 func (p *mockCPUPackage) DieCPUSet(idset.ID) cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 
 func (p *mockCPUPackage) DieNodeIDs(idset.ID) []idset.ID {
@@ -138,7 +138,7 @@ func (c *mockCPU) CoreID() idset.ID {
 	return c.id
 }
 func (c *mockCPU) ThreadCPUSet() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 func (c *mockCPU) FrequencyRange() system.CPUFreq {
 	return system.CPUFreq{}
@@ -190,17 +190,17 @@ func (fake *mockSystem) Package(idset.ID) system.CPUPackage {
 	return &mockCPUPackage{}
 }
 func (fake *mockSystem) Offlined() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 func (fake *mockSystem) Isolated() cpuset.CPUSet {
 	if fake.isolatedCPU > 0 {
-		return cpuset.NewCPUSet(fake.isolatedCPU)
+		return cpuset.New(fake.isolatedCPU)
 	}
 
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 func (fake *mockSystem) CPUSet() cpuset.CPUSet {
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 func (fake *mockSystem) CPUIDs() []idset.ID {
 	return []idset.ID{}

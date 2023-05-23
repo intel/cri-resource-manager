@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/prometheus/client_golang/prometheus"
@@ -33,6 +32,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 const (
@@ -291,7 +291,7 @@ func (p *staticplus) setupPools(available, reserved policy.ConstraintSet) error 
 		qty := cpus.(resource.Quantity)
 		count := (int(qty.MilliValue()) + 999) / 1000
 		if count < 2 && p.available.Contains(0) {
-			p.reserved = cpuset.NewCPUSet(0)
+			p.reserved = cpuset.New(0)
 			p.available = p.available.Difference(p.reserved)
 		} else {
 			p.reserved, err = p.takeCPUs(&p.available, nil, count, cpuallocator.PriorityNormal)
