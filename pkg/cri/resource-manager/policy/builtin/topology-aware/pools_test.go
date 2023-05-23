@@ -28,7 +28,7 @@ import (
 
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 func findNodeWithID(id int, nodes []Node) Node {
@@ -95,8 +95,8 @@ func TestMemoryLimitFiltering(t *testing.T) {
 						id:      100,
 						name:    "testnode0",
 						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
+						noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
+						freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
 					},
 					id: 0, // system node id
 				},
@@ -121,8 +121,8 @@ func TestMemoryLimitFiltering(t *testing.T) {
 						id:      100,
 						name:    "testnode0",
 						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(9999, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(9999, 0, 0), createMemoryMap(0, 0, 0)),
+						noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(9999, 0, 0), createMemoryMap(0, 0, 0)),
+						freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(9999, 0, 0), createMemoryMap(0, 0, 0)),
 					},
 					id: 0, // system node id
 				},
@@ -147,8 +147,8 @@ func TestMemoryLimitFiltering(t *testing.T) {
 						id:      100,
 						name:    "testnode0",
 						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
+						noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
+						freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
 					},
 				},
 				&numanode{
@@ -156,8 +156,8 @@ func TestMemoryLimitFiltering(t *testing.T) {
 						id:      101,
 						name:    "testnode1",
 						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
+						noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
+						freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(10001, 0, 0), createMemoryMap(0, 0, 0)),
 					},
 					id: 0, // system node id
 				},
@@ -182,8 +182,8 @@ func TestMemoryLimitFiltering(t *testing.T) {
 						id:      100,
 						name:    "testnode0",
 						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(12000, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(12000, 0, 0), createMemoryMap(0, 0, 0)),
+						noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(12000, 0, 0), createMemoryMap(0, 0, 0)),
+						freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(12000, 0, 0), createMemoryMap(0, 0, 0)),
 					},
 				},
 				&numanode{
@@ -191,8 +191,8 @@ func TestMemoryLimitFiltering(t *testing.T) {
 						id:      101,
 						name:    "testnode1",
 						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
+						noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
+						freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
 					},
 					id: 0, // system node id
 				},
@@ -201,8 +201,8 @@ func TestMemoryLimitFiltering(t *testing.T) {
 						id:      102,
 						name:    "testnode2",
 						kind:    UnknownNode,
-						noderes: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
-						freeres: newSupply(&node{}, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
+						noderes: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
+						freeres: newSupply(&node{}, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, createMemoryMap(6000, 0, 0), createMemoryMap(0, 0, 0)),
 					},
 					id: 1, // system node id
 				},

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 type CPUTopologyLevel int
@@ -142,7 +142,7 @@ func (tna cpuTreeNodeAttributes) String() string {
 func NewCpuTree(name string) *cpuTreeNode {
 	return &cpuTreeNode{
 		name: name,
-		cpus: cpuset.NewCPUSet(),
+		cpus: cpuset.New(),
 	}
 }
 
@@ -236,17 +236,17 @@ func NewCpuTreeFromSystem() (*cpuTreeNode, error) {
 				nodeTree.level = CPUTopologyLevelNuma
 				dieTree.AddChild(nodeTree)
 				node := sys.Node(nodeID)
-				for _, cpuID := range node.CPUSet().ToSlice() {
+				for _, cpuID := range node.CPUSet().List() {
 					cpuTree := NewCpuTree(fmt.Sprintf("p%dd%dn%dcpu%d", packageID, dieID, nodeID, cpuID))
 
 					cpuTree.level = CPUTopologyLevelCore
 					nodeTree.AddChild(cpuTree)
 					cpu := sys.CPU(cpuID)
-					for _, threadID := range cpu.ThreadCPUSet().ToSlice() {
+					for _, threadID := range cpu.ThreadCPUSet().List() {
 						threadTree := NewCpuTree(fmt.Sprintf("p%dd%dn%dcpu%dt%d", packageID, dieID, nodeID, cpuID, threadID))
 						threadTree.level = CPUTopologyLevelThread
 						cpuTree.AddChild(threadTree)
-						threadTree.AddCpus(cpuset.NewCPUSet(threadID))
+						threadTree.AddCpus(cpuset.New(threadID))
 					}
 				}
 			}
@@ -414,8 +414,8 @@ func (ta *cpuTreeAllocator) ResizeCpus(currentCpus, freeCpus cpuset.CPUSet, delt
 	// In multi-CPU removal, remove CPUs one by one instead of
 	// trying to find a single topology element from which all of
 	// them could be removed.
-	removeFrom := cpuset.NewCPUSet()
-	addFrom := cpuset.NewCPUSet()
+	removeFrom := cpuset.New()
+	addFrom := cpuset.New()
 	for n := 0; n < -delta; n++ {
 		_, removeSingleFrom, err := ta.resizeCpus(currentCpus, freeCpus, -1)
 		if err != nil {

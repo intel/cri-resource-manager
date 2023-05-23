@@ -19,10 +19,9 @@ import (
 	"path"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 func TestAllocatorHelper(t *testing.T) {
@@ -66,7 +65,7 @@ func TestAllocatorHelper(t *testing.T) {
 			from:        cpuset.MustParse("2,3,10-14,20"),
 			prefer:      PriorityNormal,
 			cnt:         9,
-			expected:    cpuset.NewCPUSet(),
+			expected:    cpuset.New(),
 		},
 		{
 			description: "request all available CPUs",
@@ -80,7 +79,7 @@ func TestAllocatorHelper(t *testing.T) {
 			from:        cpuset.MustParse("2,3,10-25"),
 			prefer:      PriorityHigh,
 			cnt:         4,
-			expected:    cpuset.NewCPUSet(2, 3, 15, 17),
+			expected:    cpuset.New(2, 3, 15, 17),
 		},
 	}
 

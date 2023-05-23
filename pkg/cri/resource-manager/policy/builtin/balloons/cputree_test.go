@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 type cpuInTopology struct {
@@ -95,7 +95,7 @@ func newCpuTreeFromInt5(pdnct [5]int) (*cpuTreeNode, cpusInTopology) {
 						threadTree := NewCpuTree(fmt.Sprintf("p%dd%dn%dc%02dt%d", packageID, dieID, numaID, coreID, threadID))
 						threadTree.level = CPUTopologyLevelThread
 						coreTree.AddChild(threadTree)
-						threadTree.AddCpus(cpuset.NewCPUSet(cpuID))
+						threadTree.AddCpus(cpuset.New(cpuID))
 						csit[cpuID] = cpuInTopology{
 							packageID, dieID, numaID, coreID, threadID, cpuID,
 							packageTree.name, dieTree.name, numaTree.name, coreTree.name, threadTree.name,
@@ -111,7 +111,7 @@ func newCpuTreeFromInt5(pdnct [5]int) (*cpuTreeNode, cpusInTopology) {
 }
 
 func verifyNotOn(t *testing.T, nameContents string, cpus cpuset.CPUSet, csit cpusInTopology) {
-	for _, cpuID := range cpus.ToSlice() {
+	for _, cpuID := range cpus.List() {
 		name := csit[cpuID].threadName
 		if strings.Contains(name, nameContents) {
 			t.Errorf("cpu%d (%s) in unexpected region %s", cpuID, name, nameContents)
@@ -122,7 +122,7 @@ func verifyNotOn(t *testing.T, nameContents string, cpus cpuset.CPUSet, csit cpu
 func verifySame(t *testing.T, topoLevel string, cpus cpuset.CPUSet, csit cpusInTopology) {
 	seenName := ""
 	seenCpuID := -1
-	for _, cpuID := range cpus.ToSlice() {
+	for _, cpuID := range cpus.List() {
 		cit := csit[cpuID]
 		thisName := cit.TopoName(topoLevel)
 		thisCpuID := cit.cpuID
@@ -144,7 +144,7 @@ func verifySame(t *testing.T, topoLevel string, cpus cpuset.CPUSet, csit cpusInT
 
 func (csit cpusInTopology) getElements(topoLevel string, cpus cpuset.CPUSet) []string {
 	elts := []string{}
-	for _, cpuID := range cpus.ToSlice() {
+	for _, cpuID := range cpus.List() {
 		elts = append(elts, csit[cpuID].TopoName(topoLevel))
 	}
 	return elts
@@ -418,11 +418,11 @@ func TestResizeCpus(t *testing.T) {
 			treeA := tree.NewAllocator(cpuTreeAllocatorOptions{
 				topologyBalancing: tc.allocatorTB,
 			})
-			currentCpus := cpuset.NewCPUSet()
+			currentCpus := cpuset.New()
 			freeCpus := tree.Cpus()
 			if len(tc.allocations) > 0 {
-				currentCpus = currentCpus.Union(cpuset.NewCPUSet(tc.allocations...))
-				freeCpus = freeCpus.Difference(cpuset.NewCPUSet(tc.allocations...))
+				currentCpus = currentCpus.Union(cpuset.New(tc.allocations...))
+				freeCpus = freeCpus.Difference(cpuset.New(tc.allocations...))
 			}
 			ccidCurrentCpus := map[int]cpuset.CPUSet{0: currentCpus}
 			allocs := map[string]cpuset.CPUSet{"--:allo": currentCpus}
@@ -452,26 +452,26 @@ func TestResizeCpus(t *testing.T) {
 				}
 				if tc.allocate {
 					allocName := fmt.Sprintf("%02d:allo", i+1)
-					allocs[allocName] = cpuset.NewCPUSet()
+					allocs[allocName] = cpuset.New()
 
-					for n, cpuID := range addFrom.ToSlice() {
+					for n, cpuID := range addFrom.List() {
 						if n >= delta {
 							break
 						}
-						freeCpus = freeCpus.Difference(cpuset.NewCPUSet(cpuID))
-						currentCpus = currentCpus.Union(cpuset.NewCPUSet(cpuID))
-						allocs[allocName] = allocs[allocName].Union(cpuset.NewCPUSet(cpuID))
+						freeCpus = freeCpus.Difference(cpuset.New(cpuID))
+						currentCpus = currentCpus.Union(cpuset.New(cpuID))
+						allocs[allocName] = allocs[allocName].Union(cpuset.New(cpuID))
 					}
 					allocName = fmt.Sprintf("%02d:free", i+1)
-					for n, cpuID := range removeFrom.ToSlice() {
+					for n, cpuID := range removeFrom.List() {
 						if n >= -delta {
 							break
 						}
-						freeCpus = freeCpus.Union(cpuset.NewCPUSet(cpuID))
+						freeCpus = freeCpus.Union(cpuset.New(cpuID))
 						if i < len(tc.operateOnCcid) && tc.operateOnCcid[i] > 0 {
-							currentCpus = currentCpus.Difference(cpuset.NewCPUSet(cpuID))
+							currentCpus = currentCpus.Difference(cpuset.New(cpuID))
 						}
-						allocs[allocName] = allocs[allocName].Union(cpuset.NewCPUSet(cpuID))
+						allocs[allocName] = allocs[allocName].Union(cpuset.New(cpuID))
 					}
 					if i < len(tc.operateOnCcid) && tc.operateOnCcid[i] > 0 {
 						ccidCurrentCpus[tc.operateOnCcid[i]] = currentCpus
@@ -486,7 +486,7 @@ func TestResizeCpus(t *testing.T) {
 						verifyNotOn(t, tc.expectCurrentNotOn[i], currentCpus, csit)
 					}
 					if i < len(tc.expectAllOnSame) && tc.expectAllOnSame[i] != "" {
-						allCpus := cpuset.NewCPUSet()
+						allCpus := cpuset.New()
 						for _, cpus := range ccidCurrentCpus {
 							allCpus = allCpus.Union(cpus)
 						}
@@ -580,7 +580,7 @@ func TestWalk(t *testing.T) {
 
 func TestCpuLocations(t *testing.T) {
 	tree, _ := newCpuTreeFromInt5([5]int{2, 2, 2, 4, 2})
-	cpus := cpuset.NewCPUSet(0, 1, 3, 4, 16)
+	cpus := cpuset.New(0, 1, 3, 4, 16)
 	systemlocations := tree.CpuLocations(cpus)
 	package1locations := tree.children[1].CpuLocations(cpus)
 	if len(package1locations) != 5 {

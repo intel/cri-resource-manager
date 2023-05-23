@@ -20,8 +20,8 @@ import (
 	"strings"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 // Prometheus Metric descriptor indices and descriptor table

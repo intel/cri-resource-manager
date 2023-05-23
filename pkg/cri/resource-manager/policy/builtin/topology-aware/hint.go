@@ -20,8 +20,8 @@ import (
 
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 // Calculate the hint score of the given hint and CPUSet.
