@@ -18,11 +18,10 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	"github.com/intel/goresctrl/pkg/sst"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
@@ -192,7 +191,7 @@ func (a *allocatorHelper) takeIdleCores() {
 			if cset.IsEmpty() {
 				return false
 			}
-			return cset.Intersection(a.from).Equals(cset) && cset.ToSlice()[0] == int(id)
+			return cset.Intersection(a.from).Equals(cset) && cset.List()[0] == int(id)
 		})
 
 	// sorted by id
@@ -271,8 +270,8 @@ func (a *allocatorHelper) takeIdleThreads() {
 				return iPkg < jPkg
 			}
 
-			iCset := cpuset.NewCPUSet(int(cores[i]))
-			jCset := cpuset.NewCPUSet(int(cores[j]))
+			iCset := cpuset.New(int(cores[i]))
+			jCset := cpuset.New(int(cores[j]))
 			if res := a.topology.cpuPriorities.cmpCPUSet(iCset, jCset, a.prefer, 0); res != 0 {
 				return res > 0
 			}
@@ -298,7 +297,7 @@ func (a *allocatorHelper) takeIdleThreads() {
 	for _, id := range cores {
 		cset := a.topology.core[id].Difference(offline)
 		a.Debug(" => considering thread %v (#%s)...", id, cset)
-		cset = cpuset.NewCPUSet(int(id))
+		cset = cpuset.New(int(id))
 		a.result = a.result.Union(cset)
 		a.from = a.from.Difference(cset)
 		a.cnt -= cset.Size()
@@ -313,10 +312,10 @@ func (a *allocatorHelper) takeIdleThreads() {
 func (a *allocatorHelper) takeAny() {
 	a.Debug("* takeAnyCores()...")
 
-	cpus := a.from.ToSlice()
+	cpus := a.from.List()
 
 	if len(cpus) >= a.cnt {
-		cset := cpuset.NewCPUSet(cpus[0:a.cnt]...)
+		cset := cpuset.New(cpus[0:a.cnt]...)
 		a.result = a.result.Union(cset)
 		a.from = a.from.Difference(cset)
 		a.cnt = 0
@@ -342,7 +341,7 @@ func (a *allocatorHelper) allocate() cpuset.CPUSet {
 		return a.result
 	}
 
-	return cpuset.NewCPUSet()
+	return cpuset.New()
 }
 
 func (ca *cpuAllocator) allocateCpus(from *cpuset.CPUSet, cnt int, prefer CPUPriority) (cpuset.CPUSet, error) {
@@ -351,9 +350,9 @@ func (ca *cpuAllocator) allocateCpus(from *cpuset.CPUSet, cnt int, prefer CPUPri
 
 	switch {
 	case from.Size() < cnt:
-		result, err = cpuset.NewCPUSet(), fmt.Errorf("cpuset %s does not have %d CPUs", from, cnt)
+		result, err = cpuset.New(), fmt.Errorf("cpuset %s does not have %d CPUs", from, cnt)
 	case from.Size() == cnt:
-		result, err, *from = from.Clone(), nil, cpuset.NewCPUSet()
+		result, err, *from = from.Clone(), nil, cpuset.New()
 	default:
 		a := newAllocatorHelper(ca.sys, ca.topologyCache)
 		a.from = from.Clone()
@@ -436,7 +435,7 @@ func (c *topologyCache) discoverSstCPUPriority(sys sysfs.System, pkgID idset.ID)
 
 	pkg := sys.Package(pkgID)
 	sst := pkg.SstInfo()
-	cpuIDs := c.pkg[pkgID].ToSlice()
+	cpuIDs := c.pkg[pkgID].List()
 	prios := make(map[idset.ID]CPUPriority, len(cpuIDs))
 
 	// Determine SST-based priority. Based on experimentation there is some
@@ -514,7 +513,7 @@ func (c *topologyCache) sstClosPriority(sys sysfs.System, pkgID idset.ID) map[in
 	// Get a list of unique CLOS proportional priority values
 	closPps := make(map[int]int)
 	closIds := make(map[int]int)
-	for _, cpuID := range c.pkg[pkgID].ToSlice() {
+	for _, cpuID := range c.pkg[pkgID].List() {
 		clos := sys.CPU(idset.ID(cpuID)).SstClos()
 		pp := sstinfo.ClosInfo[clos].ProportionalPriority
 		closPps[pp] = clos
@@ -558,7 +557,7 @@ func (c *topologyCache) discoverCpufreqPriority(sys sysfs.System, pkgID idset.ID
 	// Group cpus by base frequency and energy performance profile
 	freqs := map[uint64][]idset.ID{}
 	epps := map[sysfs.EPP][]idset.ID{}
-	cpuIDs := c.pkg[pkgID].ToSlice()
+	cpuIDs := c.pkg[pkgID].List()
 	for _, num := range cpuIDs {
 		id := idset.ID(num)
 		cpu := sys.CPU(id)

@@ -18,8 +18,8 @@ import (
 	"testing"
 
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 func TestCpuHintScore(t *testing.T) {
@@ -51,7 +51,7 @@ func TestCpuHintScore(t *testing.T) {
 			hint: topology.Hint{
 				CPUs: "1,2",
 			},
-			cpus:     cpuset.NewCPUSet(1),
+			cpus:     cpuset.New(1),
 			expected: 0.5,
 		},
 	}
@@ -198,7 +198,7 @@ func TestHintCpus(t *testing.T) {
 			hint: topology.Hint{
 				CPUs: "1",
 			},
-			expected: cpuset.NewCPUSet(1),
+			expected: cpuset.New(1),
 		},
 	}
 	for _, tc := range tcases {

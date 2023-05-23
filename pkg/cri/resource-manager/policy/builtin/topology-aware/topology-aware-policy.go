@@ -17,7 +17,6 @@ package topologyaware
 import (
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,6 +26,7 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/events"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/introspect"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"

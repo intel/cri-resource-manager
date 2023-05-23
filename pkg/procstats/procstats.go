@@ -99,7 +99,7 @@ func (t *CPUTimeStat) GetCPUTimeStat() error {
 			t.PrevTotalTime[i] = t.CurTotalTime[i]
 		}
 	}
-	for _, i := range sys.Offlined().ToSlice() {
+	for _, i := range sys.Offlined().List() {
 		t.DeltaIdleTime[i] = 0.0
 		t.DeltaTotalTime[i] = 0.0
 		t.PrevIdleTime[i] = t.CurIdleTime[i]

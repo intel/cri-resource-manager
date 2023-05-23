@@ -25,10 +25,10 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/config"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 const (

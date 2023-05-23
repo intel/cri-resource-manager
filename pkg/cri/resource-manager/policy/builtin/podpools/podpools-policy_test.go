@@ -19,9 +19,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 func validateError(t *testing.T, expectedError string, err error) bool {
@@ -65,18 +64,18 @@ type mockCpuAllocator struct{}
 func (mca *mockCpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, dontcare cpuallocator.CPUPriority) (cpuset.CPUSet, error) {
 	switch {
 	case from.Size() < cnt:
-		return cpuset.NewCPUSet(), fmt.Errorf("cpuset %s does not have %d CPUs", from, cnt)
+		return cpuset.New(), fmt.Errorf("cpuset %s does not have %d CPUs", from, cnt)
 	case from.Size() == cnt:
 		result := from.Clone()
-		*from = cpuset.NewCPUSet()
+		*from = cpuset.New()
 		return result, nil
 	default:
-		result := cpuset.NewCPUSet()
-		for _, cpu := range from.ToSlice() {
+		result := cpuset.New()
+		for _, cpu := range from.List() {
 			if result.Size() >= cnt {
 				break
 			}
-			result = result.Union(cpuset.NewCPUSet(cpu))
+			result = result.Union(cpuset.New(cpu))
 		}
 		*from = from.Difference(result)
 		return result, nil
@@ -84,7 +83,7 @@ func (mca *mockCpuAllocator) AllocateCpus(from *cpuset.CPUSet, cnt int, dontcare
 }
 
 func (mca *mockCpuAllocator) ReleaseCpus(*cpuset.CPUSet, int, cpuallocator.CPUPriority) (cpuset.CPUSet, error) {
-	return cpuset.NewCPUSet(), nil
+	return cpuset.New(), nil
 }
 
 func TestApplyPoolDef(t *testing.T) {
@@ -393,7 +392,7 @@ func TestApplyPoolDef(t *testing.T) {
 				copyOfPool := (*tc.pools)[i]
 				pools = append(pools, &copyOfPool)
 			}
-			freeCpus := cpuset.NewCPUSet()
+			freeCpus := cpuset.New()
 			if tc.freeCpus != "" {
 				freeCpus = cpuset.MustParse(tc.freeCpus)
 			}
@@ -404,7 +403,7 @@ func TestApplyPoolDef(t *testing.T) {
 			if ok := validateError(t, tc.expectedError, err); ok {
 				// check freeCpus modified by applyPoolDef
 				if tc.expectedFreeCpus != "" {
-					expectedFreeCpus := cpuset.NewCPUSet()
+					expectedFreeCpus := cpuset.New()
 					if tc.expectedFreeCpus != "-" {
 						expectedFreeCpus = cpuset.MustParse(tc.expectedFreeCpus)
 					}

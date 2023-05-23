@@ -17,7 +17,7 @@ package dyp
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 func TestChangesDynamicPools(t *testing.T) {
@@ -86,25 +86,25 @@ func TestIsNeedReallocate(t *testing.T) {
 				Def: &DynamicPoolDef{
 					Name: reservedDynamicPoolDefName,
 				},
-				Cpus: cpuset.NewCPUSet(1, 2),
+				Cpus: cpuset.New(1, 2),
 			},
 			{
 				Def: &DynamicPoolDef{
 					Name: sharedDynamicPoolDefName,
 				},
-				Cpus: cpuset.NewCPUSet(3, 4, 5, 6),
+				Cpus: cpuset.New(3, 4, 5, 6),
 			},
 			{
 				Def: &DynamicPoolDef{
 					Name: "poo1",
 				},
-				Cpus: cpuset.NewCPUSet(7, 8, 9, 10, 11, 12),
+				Cpus: cpuset.New(7, 8, 9, 10, 11, 12),
 			},
 			{
 				Def: &DynamicPoolDef{
 					Name: "poo2",
 				},
-				Cpus: cpuset.NewCPUSet(0),
+				Cpus: cpuset.New(0),
 			},
 		},
 	}
@@ -146,32 +146,32 @@ func TestIsNeedReallocate(t *testing.T) {
 
 func TestCalculatePoolCpuset(t *testing.T) {
 	p := &dynamicPools{
-		allowed:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13),
-		reserved: cpuset.NewCPUSet(1, 2),
+		allowed:  cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13),
+		reserved: cpuset.New(1, 2),
 		dynamicPools: []*DynamicPool{
 			{
 				Def: &DynamicPoolDef{
 					Name: reservedDynamicPoolDefName,
 				},
-				Cpus: cpuset.NewCPUSet(1, 2),
+				Cpus: cpuset.New(1, 2),
 			},
 			{
 				Def: &DynamicPoolDef{
 					Name: sharedDynamicPoolDefName,
 				},
-				Cpus: cpuset.NewCPUSet(3, 4, 5, 6),
+				Cpus: cpuset.New(3, 4, 5, 6),
 			},
 			{
 				Def: &DynamicPoolDef{
 					Name: "poo1",
 				},
-				Cpus: cpuset.NewCPUSet(7, 8, 9, 10, 11, 12, 13),
+				Cpus: cpuset.New(7, 8, 9, 10, 11, 12, 13),
 			},
 			{
 				Def: &DynamicPoolDef{
 					Name: "poo2",
 				},
-				Cpus: cpuset.NewCPUSet(0),
+				Cpus: cpuset.New(0),
 			},
 		},
 	}
