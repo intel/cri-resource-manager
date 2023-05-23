@@ -24,10 +24,9 @@ import (
 	"testing"
 	"time"
 
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-
 	resmgr "github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/dump"
 	"google.golang.org/grpc"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -448,7 +447,7 @@ func createPodRequest(name, uid, namespace string,
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[kubetypes.KubernetesPodUIDLabel] = uid
+	labels[kubernetes.PodUIDLabel] = uid
 	return &criv1.RunPodSandboxRequest{
 		Config: &criv1.PodSandboxConfig{
 			Metadata: &criv1.PodSandboxMetadata{

@@ -884,7 +884,7 @@ func (p *dynamicPools) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems ids
 		c.SetCpusetCpus(cpus.String())
 		if reqCpu, ok := c.GetResourceRequirements().Requests[corev1.ResourceCPU]; ok {
 			mCpu := int(reqCpu.MilliValue())
-			c.SetCPUShares(int64(cache.MilliCPUToShares(mCpu)))
+			c.SetCPUShares(int64(cache.MilliCPUToShares(int64(mCpu))))
 		}
 	}
 	if p.dpoptions.PinMemory == nil || *p.dpoptions.PinMemory {

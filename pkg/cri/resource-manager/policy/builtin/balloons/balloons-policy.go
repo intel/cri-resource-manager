@@ -1278,7 +1278,7 @@ func (p *balloons) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems idset.I
 		c.SetCpusetCpus(cpus.String())
 		if reqCpu, ok := c.GetResourceRequirements().Requests[corev1.ResourceCPU]; ok {
 			mCpu := int(reqCpu.MilliValue())
-			c.SetCPUShares(int64(cache.MilliCPUToShares(mCpu)))
+			c.SetCPUShares(int64(cache.MilliCPUToShares(int64(mCpu))))
 		}
 	}
 	if p.bpoptions.PinMemory == nil || *p.bpoptions.PinMemory {
