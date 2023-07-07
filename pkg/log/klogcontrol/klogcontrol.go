@@ -17,7 +17,7 @@ package klogcontrol
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -188,7 +188,7 @@ func wrapKlogFlag(f *flag.Flag) {
 // init discovers klog flags and sets up dynamic control for them.
 func init() {
 	ctl = &Control{flags: flag.NewFlagSet("klog flags", flag.ContinueOnError)}
-	ctl.flags.SetOutput(ioutil.Discard)
+	ctl.flags.SetOutput(io.Discard)
 	klog.InitFlags(ctl.flags)
 	ctl.flags.VisitAll(func(f *flag.Flag) {
 		wrapKlogFlag(f)

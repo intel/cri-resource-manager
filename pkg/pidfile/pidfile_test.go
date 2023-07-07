@@ -15,7 +15,6 @@
 package pidfile
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -242,7 +241,7 @@ func TestOwnerPid(t *testing.T) {
 }
 
 func mkTestDir(t *testing.T) (string, error) {
-	tmp, err := ioutil.TempDir("", ".pidfile-test*")
+	tmp, err := os.MkdirTemp("", ".pidfile-test*")
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to create test directory")
 	}
