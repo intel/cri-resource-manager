@@ -16,7 +16,7 @@ package sysfs
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -728,7 +728,7 @@ func (c *cpu) SetFrequencyLimits(min, max uint64) error {
 func readCPUsetFile(base, entry string) (cpuset.CPUSet, error) {
 	path := filepath.Join(base, entry)
 
-	blob, err := ioutil.ReadFile(path)
+	blob, err := os.ReadFile(path)
 	if err != nil {
 		return cpuset.NewCPUSet(), sysfsError(path, "failed to read sysfs entry: %v", err)
 	}

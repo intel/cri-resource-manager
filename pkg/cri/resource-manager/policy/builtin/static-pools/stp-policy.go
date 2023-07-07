@@ -17,7 +17,7 @@ package stp
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -422,7 +422,7 @@ func parseCmkCmdline(args []string) *cmkLegacyArgs {
 
 	// Create parser
 	cmkCmd := flag.NewFlagSet("cmk-legacy", flag.ContinueOnError)
-	cmkCmd.SetOutput(ioutil.Discard)
+	cmkCmd.SetOutput(io.Discard)
 	cmkCmd.StringVar(&parsedArgs.Pool, "pool", "", "pool to use")
 	cmkCmd.Int64Var(&parsedArgs.SocketID, "socket-id", -1, "socket id to use")
 	cmkCmd.BoolVar(&parsedArgs.NoAffinity, "no-affinity", false, "Do not set cpu affinity before forking the child command")

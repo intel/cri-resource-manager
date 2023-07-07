@@ -15,7 +15,7 @@
 package instrumentation
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -87,7 +87,7 @@ func checkPrometheus(t *testing.T, server string, shouldFail bool) {
 			return
 		}
 
-		_, err = ioutil.ReadAll(rpl.Body)
+		_, err = io.ReadAll(rpl.Body)
 		rpl.Body.Close()
 		if err != nil {
 			t.Errorf("failed to read Prometheus response: %v", err)

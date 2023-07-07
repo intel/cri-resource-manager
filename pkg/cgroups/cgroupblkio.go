@@ -16,7 +16,6 @@ package cgroups
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -342,7 +341,7 @@ var currentPlatform platformInterface = defaultPlatform{}
 
 // readFromFile returns file contents as a string.
 func (dpm defaultPlatform) readFromFile(filename string) (string, error) {
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 	return string(content), err
 }
 
