@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.8.0-61-gaf53ca40 documentation</title>
+  <title>RDT (Intel® Resource Director Technology) &mdash; CRI Resource Manager 0.8.0-63-gde89ae2c documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -211,43 +211,43 @@ exceeded.</p>
 exclusively to the Guarenteed class. The remaining 40% L3 is for Burstable and
 Besteffort, Besteffort getting only 50% of this. Guaranteed class gets full
 memory bandwidth whereas the other classes are throttled to 50%.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">rdt</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="c1"># Common options</span><span class="w"></span>
-<span class="w">  </span><span class="nt">options</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="c1"># One of Full, Discovery or Disabled</span><span class="w"></span>
-<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Full</span><span class="w"></span>
-<span class="w">    </span><span class="c1"># Set to true to disable creation of monitoring groups</span><span class="w"></span>
-<span class="w">    </span><span class="nt">monitoringDisabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w"></span>
-<span class="w">    </span><span class="nt">l3</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="c1"># Make this false if L3 CAT must be available</span><span class="w"></span>
-<span class="w">      </span><span class="nt">optional</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
-<span class="w">    </span><span class="nt">mb</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="c1"># Make this false if MBA must be available</span><span class="w"></span>
-<span class="w">      </span><span class="nt">optional</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">rdt</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Common options</span>
+<span class="w">  </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">    </span><span class="c1"># One of Full, Discovery or Disabled</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Full</span>
+<span class="w">    </span><span class="c1"># Set to true to disable creation of monitoring groups</span>
+<span class="w">    </span><span class="nt">monitoringDisabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w">    </span><span class="nt">l3</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># Make this false if L3 CAT must be available</span>
+<span class="w">      </span><span class="nt">optional</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">mb</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># Make this false if MBA must be available</span>
+<span class="w">      </span><span class="nt">optional</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 
-<span class="w">  </span><span class="c1"># Configuration of classes</span><span class="w"></span>
-<span class="w">  </span><span class="nt">partitions</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="c1"># Allocate 60% of all L3 cache to the &quot;exclusive&quot; partition</span><span class="w"></span>
-<span class="w">      </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;60%&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="nt">mbAllocation</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span><span class="w"></span>
-<span class="w">      </span><span class="nt">classes</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">Guaranteed</span><span class="p">:</span><span class="w"></span>
-<span class="w">          </span><span class="c1"># Allocate all of the partitions cache lines to &quot;Guaranteed&quot;</span><span class="w"></span>
-<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100%&quot;</span><span class="w"></span>
-<span class="w">    </span><span class="nt">shared</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="c1"># Allocate 40% L3 cache IDs to the &quot;shared&quot; partition</span><span class="w"></span>
-<span class="w">      </span><span class="c1"># These will NOT overlap with the cache lines allocated for &quot;exclusive&quot; partition</span><span class="w"></span>
-<span class="w">      </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;40%&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="nt">mbAllocation</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span><span class="w"></span>
-<span class="w">      </span><span class="nt">classes</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">Burstable</span><span class="p">:</span><span class="w"></span>
-<span class="w">          </span><span class="c1"># Allow &quot;Burstable&quot; to use all cache lines of the &quot;shared&quot; partition</span><span class="w"></span>
-<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100%&quot;</span><span class="w"></span>
-<span class="w">        </span><span class="nt">BestEffort</span><span class="p">:</span><span class="w"></span>
-<span class="w">          </span><span class="c1"># Allow &quot;Besteffort&quot; to use only half of the L3 cache # lines of the &quot;shared&quot; partition.</span><span class="w"></span>
-<span class="w">          </span><span class="c1"># These will overlap with those used by &quot;Burstable&quot;</span><span class="w"></span>
-<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;50%&quot;</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Configuration of classes</span>
+<span class="w">  </span><span class="nt">partitions</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">exclusive</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># Allocate 60% of all L3 cache to the &quot;exclusive&quot; partition</span>
+<span class="w">      </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;60%&quot;</span>
+<span class="w">      </span><span class="nt">mbAllocation</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;100%&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">classes</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">Guaranteed</span><span class="p">:</span>
+<span class="w">          </span><span class="c1"># Allocate all of the partitions cache lines to &quot;Guaranteed&quot;</span>
+<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100%&quot;</span>
+<span class="w">    </span><span class="nt">shared</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># Allocate 40% L3 cache IDs to the &quot;shared&quot; partition</span>
+<span class="w">      </span><span class="c1"># These will NOT overlap with the cache lines allocated for &quot;exclusive&quot; partition</span>
+<span class="w">      </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;40%&quot;</span>
+<span class="w">      </span><span class="nt">mbAllocation</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;50%&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">classes</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">Burstable</span><span class="p">:</span>
+<span class="w">          </span><span class="c1"># Allow &quot;Burstable&quot; to use all cache lines of the &quot;shared&quot; partition</span>
+<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100%&quot;</span>
+<span class="w">        </span><span class="nt">BestEffort</span><span class="p">:</span>
+<span class="w">          </span><span class="c1"># Allow &quot;Besteffort&quot; to use only half of the L3 cache # lines of the &quot;shared&quot; partition.</span>
+<span class="w">          </span><span class="c1"># These will overlap with those used by &quot;Burstable&quot;</span>
+<span class="w">          </span><span class="nt">l3Allocation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;50%&quot;</span>
 </pre></div>
 </div>
 <p>The configuration also supports far more fine-grained control, e.g. per

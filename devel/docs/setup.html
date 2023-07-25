@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Setup and Usage &mdash; CRI Resource Manager 0.8.0-61-gaf53ca40 documentation</title>
+  <title>Setup and Usage &mdash; CRI Resource Manager 0.8.0-63-gde89ae2c documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -391,15 +391,15 @@ have the runtimes enabled in their configuration files.</p></li>
 target  Kata Container, must have the flag “SandboxCgroupOnly” set to true.
 As of Kata 2.0 this is the only way Kata Containers can work with the
 Kubernetes cgroup naming conventions.</p>
-<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="p">...</span><span class="w"></span>
-<span class="c1"># If enabled, the runtime will add all the kata processes inside one dedicated cgroup.</span><span class="w"></span>
-<span class="c1"># The container cgroups in the host are not created, just one single cgroup per sandbox.</span><span class="w"></span>
-<span class="c1"># The runtime caller is free to restrict or collect cgroup stats of the overall Kata sandbox.</span><span class="w"></span>
-<span class="c1"># The sandbox cgroup path is the parent cgroup of a container with the PodSandbox annotation.</span><span class="w"></span>
-<span class="c1"># The sandbox cgroup is constrained if there is no container type annotation.</span><span class="w"></span>
-<span class="c1"># See: https://godoc.org/github.com/kata-containers/runtime/virtcontainers#ContainerType</span><span class="w"></span>
-<span class="n">sandbox_cgroup_only</span><span class="o">=</span><span class="kc">true</span><span class="w"></span>
-<span class="p">...</span><span class="w"></span>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="p">...</span>
+<span class="c1"># If enabled, the runtime will add all the kata processes inside one dedicated cgroup.</span>
+<span class="c1"># The container cgroups in the host are not created, just one single cgroup per sandbox.</span>
+<span class="c1"># The runtime caller is free to restrict or collect cgroup stats of the overall Kata sandbox.</span>
+<span class="c1"># The sandbox cgroup path is the parent cgroup of a container with the PodSandbox annotation.</span>
+<span class="c1"># The sandbox cgroup is constrained if there is no container type annotation.</span>
+<span class="c1"># See: https://godoc.org/github.com/kata-containers/runtime/virtcontainers#ContainerType</span>
+<span class="n">sandbox_cgroup_only</span><span class="o">=</span><span class="kc">true</span>
+<span class="p">...</span>
 </pre></div>
 </div>
 <section id="reference">

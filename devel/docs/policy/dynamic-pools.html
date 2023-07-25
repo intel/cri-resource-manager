@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dynamic-Pools Policy &mdash; CRI Resource Manager 0.8.0-61-gaf53ca40 documentation</title>
+  <title>Dynamic-Pools Policy &mdash; CRI Resource Manager 0.8.0-63-gde89ae2c documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -178,30 +178,30 @@
 </section>
 <section id="example">
 <h3>Example<a class="headerlink" href="#example" title="Permalink to this heading"></a></h3>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">cpu</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">classes</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">pool1-cpuclass</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="nt">maxFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1500000</span><span class="w"></span>
-<span class="w">      </span><span class="nt">minFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000000</span><span class="w"></span>
-<span class="w">    </span><span class="nt">pool2-cpuclass</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="nt">maxFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000000</span><span class="w"></span>
-<span class="w">      </span><span class="nt">minFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2500000</span><span class="w"></span>
-<span class="nt">policy</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">Active</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dynamic-pools</span><span class="w"></span>
-<span class="w">  </span><span class="nt">ReservedResources</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="nt">CPU</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpuset:0</span><span class="w"></span>
-<span class="w">  </span><span class="nt">dynamic-pools</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">PinCPU</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
-<span class="w">    </span><span class="nt">PinMemory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
-<span class="w">    </span><span class="nt">DynamicPoolTypes</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">Name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool1&quot;</span><span class="w"></span>
-<span class="w">        </span><span class="nt">Namespaces</span><span class="p">:</span><span class="w"></span>
-<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;pool1&quot;</span><span class="w"></span>
-<span class="w">        </span><span class="nt">CPUClass</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool1-cpuclass&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">Name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool2&quot;</span><span class="w"></span>
-<span class="w">        </span><span class="nt">Namespaces</span><span class="p">:</span><span class="w"></span>
-<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;pool2&quot;</span><span class="w"></span>
-<span class="w">        </span><span class="nt">CPUClass</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool2-cpuclass&quot;</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">cpu</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">classes</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">pool1-cpuclass</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">maxFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1500000</span>
+<span class="w">      </span><span class="nt">minFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000000</span>
+<span class="w">    </span><span class="nt">pool2-cpuclass</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">maxFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000000</span>
+<span class="w">      </span><span class="nt">minFreq</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2500000</span>
+<span class="nt">policy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">Active</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dynamic-pools</span>
+<span class="w">  </span><span class="nt">ReservedResources</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">CPU</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpuset:0</span>
+<span class="w">  </span><span class="nt">dynamic-pools</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">PinCPU</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">PinMemory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">DynamicPoolTypes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">Name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool1&quot;</span>
+<span class="w">        </span><span class="nt">Namespaces</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;pool1&quot;</span>
+<span class="w">        </span><span class="nt">CPUClass</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool1-cpuclass&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">Name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool2&quot;</span>
+<span class="w">        </span><span class="nt">Namespaces</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;pool2&quot;</span>
+<span class="w">        </span><span class="nt">CPUClass</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pool2-cpuclass&quot;</span>
 </pre></div>
 </div>
 </section>
@@ -212,9 +212,9 @@
 <section id="assigning-a-container-to-a-dynamic-pool">
 <h3>Assigning a Container to a Dynamic-pool<a class="headerlink" href="#assigning-a-container-to-a-dynamic-pool" title="Permalink to this heading"></a></h3>
 <p>The dynamic-pool type of a container can be defined in pod annotations. In the example below, the first annotation sets the dynamic-pool type (<code class="docutils literal notranslate"><span class="pre">DPT</span></code>) of a single container (<code class="docutils literal notranslate"><span class="pre">CONTAINER_NAME</span></code>). The last two annotations set the default dynamic-pools type for all containers in the pod.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dynamic-pool.dynamic-pools.cri-resource-manager.intel.com/container.CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DPT</span><span class="w"></span>
-<span class="nt">dynamic-pool.dynamic-pools.cri-resource-manager.intel.com/pod</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DPT</span><span class="w"></span>
-<span class="nt">dynamic-pool.dynamic-pools.cri-resource-manager.intel.com</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DPT</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dynamic-pool.dynamic-pools.cri-resource-manager.intel.com/container.CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DPT</span>
+<span class="nt">dynamic-pool.dynamic-pools.cri-resource-manager.intel.com/pod</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DPT</span>
+<span class="nt">dynamic-pool.dynamic-pools.cri-resource-manager.intel.com</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DPT</span>
 </pre></div>
 </div>
 <p>If a pod has no annotations, its namespace is matched to the <code class="docutils literal notranslate"><span class="pre">namespace</span></code> of dynamic-pool types. The first matching dynamic-pool type is used.</p>
@@ -224,14 +224,14 @@
 <section id="metrics-and-debugging">
 <h2>Metrics and Debugging<a class="headerlink" href="#metrics-and-debugging" title="Permalink to this heading"></a></h2>
 <p>In order to enable more verbose logging and metrics exporting from the dynamic-pools policy, enable instrumentation and policy debugging from the CRI-RM global config:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">instrumentation</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="c1"># The dynamic-pools policy exports containers running in each dynamic-pool,</span><span class="w"></span>
-<span class="w">  </span><span class="c1"># and cpusets of dynamic-pools. Accessible in command line:</span><span class="w"></span>
-<span class="w">  </span><span class="c1"># curl --silent http://localhost:8891/metrics</span><span class="w"></span>
-<span class="w">  </span><span class="nt">HTTPEndpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">:8891</span><span class="w"></span>
-<span class="w">  </span><span class="nt">PrometheusExport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
-<span class="nt">logger</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">Debug</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">instrumentation</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># The dynamic-pools policy exports containers running in each dynamic-pool,</span>
+<span class="w">  </span><span class="c1"># and cpusets of dynamic-pools. Accessible in command line:</span>
+<span class="w">  </span><span class="c1"># curl --silent http://localhost:8891/metrics</span>
+<span class="w">  </span><span class="nt">HTTPEndpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">:8891</span>
+<span class="w">  </span><span class="nt">PrometheusExport</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">logger</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">Debug</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy</span>
 </pre></div>
 </div>
 <p>Use the <code class="docutils literal notranslate"><span class="pre">--metrics-interval</span></code> option to set the interval for updating metrics data.</p>

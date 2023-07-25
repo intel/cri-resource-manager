@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Migrating from CRI-RM to NRI &mdash; CRI Resource Manager 0.8.0-61-gaf53ca40 documentation</title>
+  <title>Migrating from CRI-RM to NRI &mdash; CRI Resource Manager 0.8.0-63-gde89ae2c documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -122,7 +122,7 @@
 <p>Replace the containerd version in the system with 1.7 or newer version (NRI server not supported in older versions).</p>
 <p>Replace kubelet’s –container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock with –container-runtime-endpoint=/var/run/containerd/containerd.sock</p>
 <p>Replacing the runtime endpoint on a node that was setup using Kubeadm:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Get the Kubelet args
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Get<span class="w"> </span>the<span class="w"> </span>Kubelet<span class="w"> </span>args
 <span class="go">systemctl cat kubelet &lt;- Look for: EnvironmentFile=/.../kubeadm-flags.env</span>
 
 <span class="go">vim /.../kubeadm-flags.env</span>
@@ -138,14 +138,14 @@
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">vim /etc/containerd/config.toml</span>
 </pre></div>
 </div>
-<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[plugins.&quot;io.containerd.nri.v1.nri&quot;]</span><span class="w"></span>
-<span class="w">  </span><span class="n">disable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="w"></span>
-<span class="w">  </span><span class="n">disable_connections</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span><span class="w"></span>
-<span class="w">  </span><span class="n">plugin_config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;/etc/nri/conf.d&quot;</span><span class="w"></span>
-<span class="w">  </span><span class="n">plugin_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;/opt/nri/plugins&quot;</span><span class="w"></span>
-<span class="w">  </span><span class="n">plugin_registration_timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;5s&quot;</span><span class="w"></span>
-<span class="w">  </span><span class="n">plugin_request_timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;2s&quot;</span><span class="w"></span>
-<span class="w">  </span><span class="n">socket_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;/var/run/nri/nri.sock&quot;</span><span class="w"></span>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[plugins.&quot;io.containerd.nri.v1.nri&quot;]</span>
+<span class="w">  </span><span class="n">disable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="n">disable_connections</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">  </span><span class="n">plugin_config_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;/etc/nri/conf.d&quot;</span>
+<span class="w">  </span><span class="n">plugin_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;/opt/nri/plugins&quot;</span>
+<span class="w">  </span><span class="n">plugin_registration_timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;5s&quot;</span>
+<span class="w">  </span><span class="n">plugin_request_timeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;2s&quot;</span>
+<span class="w">  </span><span class="n">socket_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;/var/run/nri/nri.sock&quot;</span>
 </pre></div>
 </div>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">systemctl restart containerd</span>
@@ -157,7 +157,7 @@
 <p>Ensure that crio version 1.26.2 or newer is used.</p>
 <p>Replace kubelet’s –container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock with –container-runtime-endpoint=/var/run/crio/crio.sock</p>
 <p>Replacing the runtime endpoint on a node that was setup using Kubeadm:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Get the Kubelet args
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Get<span class="w"> </span>the<span class="w"> </span>Kubelet<span class="w"> </span>args
 <span class="go">systemctl cat kubelet &lt;- Look for: EnvironmentFile=/.../kubeadm-flags.env</span>
 
 <span class="go">vim /.../kubeadm-flags.env</span>
@@ -182,7 +182,7 @@
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/containers/nri-plugins.git</span>
 <span class="go">cd nri-plugins</span>
 <span class="go">make</span>
-<span class="gp"># </span>Build the images, specify your image repo to easily push the image later.
+<span class="gp"># </span>Build<span class="w"> </span>the<span class="w"> </span>images,<span class="w"> </span>specify<span class="w"> </span>your<span class="w"> </span>image<span class="w"> </span>repo<span class="w"> </span>to<span class="w"> </span>easily<span class="w"> </span>push<span class="w"> </span>the<span class="w"> </span>image<span class="w"> </span>later.
 <span class="go">make images IMAGE_REPO=my-repo IMAGE_VERSION=my-tag</span>
 </pre></div>
 </div>
@@ -218,7 +218,7 @@
 <section id="see-the-resources-the-pod-got-assigned-with">
 <h3>See the resources the pod got assigned with<a class="headerlink" href="#see-the-resources-the-pod-got-assigned-with" title="Permalink to this heading"></a></h3>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">kubectl exec $pod -c $container  -- grep allowed_list: /proc/self/status</span>
-<span class="gp"># </span>Output should look similar to the output of CRI-RM
+<span class="gp"># </span>Output<span class="w"> </span>should<span class="w"> </span>look<span class="w"> </span>similar<span class="w"> </span>to<span class="w"> </span>the<span class="w"> </span>output<span class="w"> </span>of<span class="w"> </span>CRI-RM
 </pre></div>
 </div>
 </section>
@@ -228,7 +228,7 @@
 <ul>
 <li><p>Same steps as above for enabling NRI with Containerd/CRI-O and building the images.</p></li>
 <li><p>Push the images built to your repository:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Replace my-repo and my-tag with the IMAGE_REPO and IMAGE_VERSION you specified when building the images with make images
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Replace<span class="w"> </span>my-repo<span class="w"> </span>and<span class="w"> </span>my-tag<span class="w"> </span>with<span class="w"> </span>the<span class="w"> </span>IMAGE_REPO<span class="w"> </span>and<span class="w"> </span>IMAGE_VERSION<span class="w"> </span>you<span class="w"> </span>specified<span class="w"> </span>when<span class="w"> </span>building<span class="w"> </span>the<span class="w"> </span>images<span class="w"> </span>with<span class="w"> </span>make<span class="w"> </span>images
 <span class="go">docker push my-repo:my-tag</span>
 </pre></div>
 </div>
@@ -247,14 +247,14 @@
 <li><p>The ConfigMap used by the ported policies/infra has a different name/naming scheme than the original one used in CRI-RM, ex:</p>
 <ul>
 <li><p>configMapName:</p>
-<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="gd">- configmap-name: cri-resmgr-config</span><span class="w"></span>
-<span class="gi">+ configmap-name: nri-resource-policy-config</span><span class="w"></span>
+<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="gd">- configmap-name: cri-resmgr-config</span>
+<span class="gi">+ configmap-name: nri-resource-policy-config</span>
 </pre></div>
 </div>
 </li>
 <li><p>The details of grouping nodes by labeling to share configuration:</p>
-<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="gd">- cri-resource-manager.intel.com/group: $GROUP_NAME</span><span class="w"></span>
-<span class="gi">+ resource-policy.nri.io/group: $GROUP_NAME</span><span class="w"></span>
+<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="gd">- cri-resource-manager.intel.com/group: $GROUP_NAME</span>
+<span class="gi">+ resource-policy.nri.io/group: $GROUP_NAME</span>
 </pre></div>
 </div>
 </li>
@@ -267,38 +267,38 @@
 <ul>
 <li><p>The annotations one can use to customize how a policy treats a workload use slightly different keys than the original ones in CRI-RM. The collective ‘key namespace’ for policy- and resource-manager-specific annotation has been changed from cri-resource-manager.intel.com to resource-policy.nri.io.</p></li>
 <li><p>For instance, an explicit type annotation for the balloons policy, which used to be:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span><span class="w"></span>
-<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">balloon.balloons.cri-resource-manager.intel.com/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$BALLOON_TYPE`</span><span class="w"></span>
-<span class="nn">...</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">balloon.balloons.cri-resource-manager.intel.com/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$BALLOON_TYPE`</span>
+<span class="nn">...</span>
 </pre></div>
 </div>
 </li>
 <li><p>Should now be:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span><span class="w"></span>
-<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">balloon.balloons.resource-policy.nri.io/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$BALLOON_TYPE`</span><span class="w"></span>
-<span class="nn">...</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">balloon.balloons.resource-policy.nri.io/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$BALLOON_TYPE`</span>
+<span class="nn">...</span>
 </pre></div>
 </div>
 </li>
 <li><p>Similarly a workload opt-out annotation from exclusive CPU allocation for the topology-aware policy, which used to be:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span><span class="w"></span>
-<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">prefer-shared-cpus.cri-resource-manager.intel.com/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span><span class="w"></span>
-<span class="nn">...</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">prefer-shared-cpus.cri-resource-manager.intel.com/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="nn">...</span>
 </pre></div>
 </div>
 </li>
 <li><p>Should now be:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span><span class="w"></span>
-<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">prefer-shared-cpus.resource-policy.nri.io/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span><span class="w"></span>
-<span class="nn">...</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">prefer-shared-cpus.resource-policy.nri.io/container.$CONTAINER_NAME</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="nn">...</span>
 </pre></div>
 </div>
 </li>
