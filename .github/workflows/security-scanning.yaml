@@ -1,0 +1,94 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  trivy-scan-code:
+    name: Trivy scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Run Trivy in fs mode
+      continue-on-error: true
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: fs
+        scan-ref: .
+        exit-code: 1
+        list-all-pkgs: true
+        format: json
+        output: trivy-report.json
+
+    - name: Show report in human-readable format
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: table
+
+    - name: Convert report to sarif
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: sarif
+        output: trivy-report.sarif
+
+    - name: Convert report to csv
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: template
+        template: "@.github/workflows/trivy-csv.tpl"
+        output: trivy-report.csv
+
+    - name: Upload sarif report to GitHub Security tab
+      if: ${{ github.event_name != 'pull_request' }}
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+       sarif_file: trivy-report.sarif
+
+    - name: Upload CSV report as an artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: trivy-report
+        path: trivy-report.csv
+
+  codeQL-scanning:
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://github.com
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: go
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+    - name: Upload result to GitHub Code Scanning
+      if: ${{ github.event_name != 'pull_request' }}
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+          sarif_file: codeql.sarif
+          wait-for-processing: true
