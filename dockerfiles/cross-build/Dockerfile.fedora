@@ -3,30 +3,18 @@ FROM fedora:latest as fedora-build
 
 ARG GO_VERSION=x.yz
 ARG GOLICENSES_VERSION
-ARG GOLANG_URLDIR=https://dl.google.com/go
 ARG CREATE_USER="build"
 ARG USER_OPTIONS=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
 RUN dnf install -y rpm-build systemd-rpm-macros \
-    kernel-devel gcc clang \
-    git-core make wget
+    kernel-devel gcc \
+    git-core make
 
-RUN arch="$(rpm --eval %{_arch})"; \
-    case "${arch}" in \
-        x86_64) goarch=linux-amd64;; \
-        i386) goarch=linux-386;; \
-        armhf) goarch=linux-armv6l;; \
-        ppc64el) goarch=linux-ppc64le;; \
-        s390x) goarch=linux-s390x;; \
-    esac; \
-    \
-    wget $GOLANG_URLDIR/go$GO_VERSION.$goarch.tar.gz -O go.tgz && \
-    tar -C /usr/local -xvzf go.tgz && rm go.tgz && \
-    \
-    export PATH="/usr/local/go/bin:$PATH" && \
-    echo "PATH=/usr/local/go/bin:$PATH" > /etc/profile.d/go.sh && \
-    go version
+ADD http://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz /
+
+RUN tar xf /go${GO_VERSION}.linux-amd64.tar.gz -C "/usr/local" && \
+    rm /go${GO_VERSION}.linux-amd64.tar.gz
 
 RUN GOBIN=/go/bin go install github.com/google/go-licenses@${GOLICENSES_VERSION}
 
