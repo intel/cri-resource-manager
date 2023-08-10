@@ -1,45 +1,16 @@
 #!/bin/bash
 
-VOLUMES=(-v /sys:/sys -v /home:/mnt/host/home)
 IMAGE=$1
 DOCKERFILE=dockerfiles/cross-build/Dockerfile.${IMAGE%-build}
-shift 2
-
-while [ -n "$1" ]; do
-    case $1 in
-        --volume|-v)
-            VOLUMES=("${VOLUMES[@]}" -v "$2")
-            shift 2
-            ;;
-        --container|-c)
-            if [ -n "$2" ] && [ "${2#-}" = "$2" ]; then
-                CONTAINER="$2"
-                shift
-            else
-                CONTAINER="$IMAGE"
-            fi
-            shift
-            ;;
-        *)
-            PASSTHROUGH=("${PASSTHROUGH[@]}" "$1")
-            shift
-            ;;
-    esac
-done
+shift 1
 
 echo "* Building docker images with"
 echo "  - Dockerfile: $DOCKERFILE"
 echo "  - image name: $IMAGE"
-echo "  - container : $CONTAINER"
-echo "  - volumes   : " "${VOLUMES[@]}"
-echo "  - options   : " "${PASSTHROUGH[@]}"
+echo "  - options   : $@"
 
 docker build . \
        -f "$DOCKERFILE" -t "$IMAGE" \
        --build-arg "CREATE_USER=$USER" \
        --build-arg USER_OPTIONS="-u $(id -u)" \
-       "${PASSTHROUGH[@]}" || exit 1
-
-if [ -n "$CONTAINER" ]; then
-    docker create --name "$CONTAINER" "${VOLUMES[@]}" "$IMAGE"
-fi
+       "$@" || exit 1

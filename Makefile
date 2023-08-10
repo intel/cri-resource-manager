@@ -707,7 +707,7 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	echo "Building cross-build docker image for $$distro..." && \
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
 	scripts/build/docker-build-image $$distro-build \
-	    --container $(DOCKER_PULL) \
+	    $(DOCKER_PULL) \
 	    --build-arg GO_VERSION=$(GO_VERSION) \
 	    --build-arg GOLICENSES_VERSION=$(GOLICENSES_VERSION) \
 	    $(DOCKER_OPTIONS)
