@@ -2,10 +2,10 @@ name: Security Scanning
 
 on:
   push:
-    branches: [ master ]
+    branches: [ "master", "release-*"  ]
     tags: [ 'v*' ]
   pull_request:
-    branches: [ master ]
+    branches: [ "master", "release-*" ]
 
 jobs:
   trivy-scan-code:
