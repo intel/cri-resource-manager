@@ -386,7 +386,7 @@ image-%:
 	    --build-arg GOLICENSES_VERSION=$(GOLICENSES_VERSION) \
 	    -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
-image-push-%: image-%
+image-push-%:
 	$(Q)bin=$(patsubst image-push-%,%,$@); \
 		if [ -z "$(IMAGE_REPO)" ]; then echo "ERROR: no IMAGE_REPO specified"; exit 1; fi; \
 		$(DOCKER) push $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
