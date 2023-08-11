@@ -15,9 +15,8 @@
 package blockio
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/intel/cri-resource-manager/pkg/blockio"
 	"github.com/intel/cri-resource-manager/pkg/config"
@@ -162,7 +161,7 @@ func (ctl *blockioctl) configNotify(event config.Event, source config.Source) er
 
 // reconfigureRunningContainers force setting current blockio configuration to all containers running on the node
 func (ctl *blockioctl) reconfigureRunningContainers() error {
-	var errors *multierror.Error
+	errs := []error{}
 	if ctl.cache == nil {
 		return nil
 	}
@@ -171,10 +170,10 @@ func (ctl *blockioctl) reconfigureRunningContainers() error {
 		log.Debug("%q: configure blockio class %q", c.PrettyName(), class)
 		err := blockio.SetContainerClass(c, class)
 		if err != nil {
-			errors = multierror.Append(errors, err)
+			errs = append(errs, err)
 		}
 	}
-	return errors.ErrorOrNil()
+	return errors.Join(errs...)
 }
 
 // blockioError creates a block I/O-controller-specific formatted error message.

@@ -15,11 +15,12 @@
 package topologyaware
 
 import (
+	"errors"
+
 	v1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/intel/cri-resource-manager/pkg/config"
@@ -358,7 +359,7 @@ func (p *policy) ExportResourceData(c cache.Container) map[string]string {
 
 // reallocateResources reallocates the given containers using the given pool hints
 func (p *policy) reallocateResources(containers []cache.Container, pools map[string]string) error {
-	var errors *multierror.Error
+	errs := []error{}
 
 	log.Info("reallocating resources...")
 
@@ -372,14 +373,14 @@ func (p *policy) reallocateResources(containers []cache.Container, pools map[str
 
 		grant, err := p.allocatePool(c, pools[c.GetCacheID()])
 		if err != nil {
-			errors = multierror.Append(errors, err)
+			errs = append(errs, err)
 		} else {
 			p.applyGrant(grant)
 		}
 	}
 
-	if err := errors.ErrorOrNil(); err != nil {
-		return err
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	p.updateSharedAllocations(nil)
