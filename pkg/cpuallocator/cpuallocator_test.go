@@ -15,7 +15,6 @@
 package cpuallocator
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -28,7 +27,7 @@ import (
 
 func TestAllocatorHelper(t *testing.T) {
 	// Create tmpdir and decompress testdata there
-	tmpdir, err := ioutil.TempDir("", "cri-resource-manager-test-")
+	tmpdir, err := os.MkdirTemp("", "cri-resource-manager-test-")
 	if err != nil {
 		t.Fatalf("failed to create tmpdir: %v", err)
 	}

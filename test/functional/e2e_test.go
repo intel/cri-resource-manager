@@ -18,7 +18,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -64,7 +63,7 @@ func (env *testEnv) Run(name string, testFunction func(context.Context, *testEnv
 
 	t.Helper()
 	t.Run(name, func(t *testing.T) {
-		tmpDir, err := ioutil.TempDir(testDir, "requests-")
+		tmpDir, err := os.MkdirTemp(testDir, "requests-")
 		if err != nil {
 			t.Fatalf("unable to create temp directory: %+v", err)
 		}
@@ -94,7 +93,7 @@ func (env *testEnv) Run(name string, testFunction func(context.Context, *testEnv
 
 		if env.forceConfig != "" {
 			path := filepath.Join(tmpDir, "forcedconfig.cfg")
-			if err := ioutil.WriteFile(path, []byte(env.forceConfig), 0644); err != nil {
+			if err := os.WriteFile(path, []byte(env.forceConfig), 0644); err != nil {
 				t.Fatalf("failed to create configuration file %s: %v", path, err)
 			}
 			if err := flag.Set("force-config", path); err != nil {

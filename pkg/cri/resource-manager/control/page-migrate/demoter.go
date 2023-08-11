@@ -18,7 +18,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"strconv"
@@ -243,7 +242,7 @@ func (d *demoter) startDirtyBitResetTimer() {
 func resetDirtyBit(pid string) error {
 	// Write magic value "4" to the clear_refs file. This resets the dirty bit.
 	path := "/proc/" + pid + "/clear_refs"
-	err := ioutil.WriteFile(path, []byte("4"), 0600)
+	err := os.WriteFile(path, []byte("4"), 0600)
 	return err
 }
 
@@ -328,13 +327,13 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes idset.IDSet) (p
 		pidNumber := int(pidNumber64)
 		// Read /proc/pid/numa_maps and /proc/pid/maps
 		numaMapsPath := "/proc/" + pid + "/numa_maps"
-		numaMapsBytes, err := ioutil.ReadFile(numaMapsPath)
+		numaMapsBytes, err := os.ReadFile(numaMapsPath)
 		if err != nil {
 			log.Error("Could not read numa_maps: %v", err)
 			continue
 		}
 		mapsPath := "/proc/" + pid + "/maps"
-		mapsBytes, err := ioutil.ReadFile(mapsPath)
+		mapsBytes, err := os.ReadFile(mapsPath)
 		if err != nil {
 			log.Error("Could not read maps: %v\n", err)
 			os.Exit(1)

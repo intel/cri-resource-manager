@@ -15,7 +15,7 @@
 package sysfs
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -119,7 +119,7 @@ func parseNumeric(path, value string, ptr interface{}) error {
 func ParseFileEntries(path string, values map[string]interface{}, pickFn PickEntryFn) error {
 	var err error
 
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		sysfsError(path, "failed to read file: %v", err)
 	}

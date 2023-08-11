@@ -16,7 +16,7 @@ package cgroups
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -89,7 +89,7 @@ type GlobalNumaStats struct {
 
 func readCgroupFileLines(filePath string) ([]string, error) {
 
-	f, err := ioutil.ReadFile(filePath)
+	f, err := os.ReadFile(filePath)
 
 	if err != nil {
 		return nil, err

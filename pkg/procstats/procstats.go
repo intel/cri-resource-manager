@@ -15,7 +15,7 @@
 package procstats
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,7 +51,7 @@ func (t *CPUTimeStat) GetCPUTimeStat() error {
 	// cpu0 40321 11452 49784 403099 2615 6076 6748 0 0 0
 	// cpu1 26585 2425 36639 151166 404 2533 3541 0 0 0
 	// ...
-	stats, err := ioutil.ReadFile(procStat)
+	stats, err := os.ReadFile(procStat)
 	if err != nil {
 		return err
 	}

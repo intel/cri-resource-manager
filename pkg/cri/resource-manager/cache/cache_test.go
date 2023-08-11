@@ -16,7 +16,6 @@ package cache
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -52,7 +51,7 @@ type fakeContainer struct {
 }
 
 func createTmpCache() (Cache, string, error) {
-	dir, err := ioutil.TempDir("", "cache-test")
+	dir, err := os.MkdirTemp("", "cache-test")
 	if err != nil {
 		return nil, "", err
 	}
