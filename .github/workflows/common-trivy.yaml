@@ -1,15 +1,18 @@
-name: Security Scanning
-
+name: Trivy scanning
 on:
-  push:
-    branches: [ master ]
-    tags: [ 'v*' ]
-  pull_request:
-    branches: [ master ]
+  workflow_call:
+    inputs:
+      upload-to-github-security-tab:
+        default: false
+        required: false
+        type: boolean
+      export-csv:
+        default: false
+        required: false
+        type: boolean
 
 jobs:
   trivy-scan-code:
-    name: Trivy scan
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -36,6 +39,7 @@ jobs:
         format: table
 
     - name: Convert report to sarif
+      if: ${{ inputs.upload-to-github-security-tab }}
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: convert
@@ -45,7 +49,14 @@ jobs:
         format: sarif
         output: trivy-report.sarif
 
+    - name: Upload sarif report to GitHub Security tab
+      if: ${{ inputs.upload-to-github-security-tab }}
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+       sarif_file: trivy-report.sarif
+
     - name: Convert report to csv
+      if: ${{ inputs.export-csv }}
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: convert
@@ -56,39 +67,9 @@ jobs:
         template: "@.github/workflows/trivy-csv.tpl"
         output: trivy-report.csv
 
-    - name: Upload sarif report to GitHub Security tab
-      if: ${{ github.event_name != 'pull_request' }}
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-       sarif_file: trivy-report.sarif
-
     - name: Upload CSV report as an artifact
+      if: ${{ inputs.export-csv }}
       uses: actions/upload-artifact@v3
       with:
         name: trivy-report
         path: trivy-report.csv
-
-  codeQL-scanning:
-    runs-on: ubuntu-latest
-    environment:
-      name: dev
-      url: https://github.com
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@master
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
-      with:
-        languages: go
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
-
-    - name: Upload result to GitHub Code Scanning
-      if: ${{ github.event_name != 'pull_request' }}
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-          sarif_file: codeql.sarif
-          wait-for-processing: true
