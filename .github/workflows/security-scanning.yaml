@@ -3,37 +3,70 @@ name: Security Scanning
 on:
   push:
     branches: [ master ]
-    tags: [ '*' ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ master ]
 
 jobs:
-  snyk-scanning:
+  trivy-scan-code:
+    name: Trivy scan
     runs-on: ubuntu-latest
-    environment:
-      name: dev
-      url: https://github.com
-
     steps:
     - name: Checkout
-      uses: actions/checkout@master
+      uses: actions/checkout@v3
 
-    - name: Set Up Snyk
-      uses: snyk/actions/setup@master
-
-    - name: Run Snyk to check for vulnerabilities
+    - name: Run Trivy in fs mode
       continue-on-error: true
-      uses: snyk/actions/golang@master
-      env:
-        SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
+      uses: aquasecurity/trivy-action@master
       with:
-        args: --sarif-file-output=snyk.sarif
+        scan-type: fs
+        scan-ref: .
+        exit-code: 1
+        list-all-pkgs: true
+        format: json
+        output: trivy-report.json
 
-    - name: Upload result to GitHub Code Scanning
+    - name: Show report in human-readable format
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: table
+
+    - name: Convert report to sarif
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: sarif
+        output: trivy-report.sarif
+
+    - name: Convert report to csv
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: template
+        template: "@.github/workflows/trivy-csv.tpl"
+        output: trivy-report.csv
+
+    - name: Upload sarif report to GitHub Security tab
       if: ${{ github.event_name != 'pull_request' }}
       uses: github/codeql-action/upload-sarif@v2
       with:
-       sarif_file: snyk.sarif
+       sarif_file: trivy-report.sarif
+
+    - name: Upload CSV report as an artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: trivy-report
+        path: trivy-report.csv
 
   codeQL-scanning:
     runs-on: ubuntu-latest
