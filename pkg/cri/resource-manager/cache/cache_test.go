@@ -22,8 +22,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
@@ -74,7 +72,7 @@ func createFakePod(cch Cache, fp *fakePod) (Pod, error) {
 	}
 	fp.id = fmt.Sprintf("pod%4.4d", nextFakePodID)
 	fp.uid = fmt.Sprintf("poduid%4.4d", nextFakePodID)
-	fp.labels[kubetypes.KubernetesPodUIDLabel] = fp.uid
+	fp.labels[kubernetes.PodUIDLabel] = fp.uid
 	nextFakePodID++
 
 	if string(fp.qos) == "" {
@@ -361,15 +359,15 @@ const (
 	// anything below 2 millicpus will yield 0 as an estimate
 	minNonZeroRequest = 2
 	// check CPU request/limit estimate accuracy up to this many CPU cores
-	maxCPU = (kubecm.MaxShares / kubecm.SharesPerCPU) * kubecm.MilliCPUToCPU
+	maxCPU = (kubernetes.MaxShares / kubernetes.SharesPerCPU) * kubernetes.MilliCPUToCPU
 	// we expect our estimates to be within 1 millicpu from the real ones
 	expectedAccuracy = 1
 )
 
 func TestCPURequestCalculationAccuracy(t *testing.T) {
 	for request := 0; request < maxCPU; request++ {
-		shares := MilliCPUToShares(request)
-		estimate := SharesToMilliCPU(shares)
+		shares := MilliCPUToShares(int64(request))
+		estimate := SharesToMilliCPU(int64(shares))
 
 		diff := int64(request) - estimate
 		if diff > expectedAccuracy || diff < -expectedAccuracy {
@@ -402,7 +400,7 @@ func TestCPULimitCalculationAccuracy(t *testing.T) {
 			if diff < 0 {
 				diff = -diff
 			}
-			if quota != kubecm.MinQuotaPeriod {
+			if quota != kubernetes.MinQuotaPeriod {
 				t.Errorf("CPU limit %v: estimate %v, unexpected inaccuracy %v > %v",
 					limit, estimate, diff, expectedAccuracy)
 			} else {

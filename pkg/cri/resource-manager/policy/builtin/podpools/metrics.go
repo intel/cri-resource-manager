@@ -22,8 +22,8 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	"github.com/intel/cri-resource-manager/pkg/procstats"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
 // Metrics defines the podpools-specific metrics from policy level.
@@ -94,7 +94,7 @@ func (p *podpools) PollMetrics() policy.Metrics {
 		policyMetrics.PoolMetrics[pool.PrettyName()].DefName = pool.Def.Name
 		policyMetrics.PoolMetrics[pool.PrettyName()].PrettyName = pool.PrettyName()
 		policyMetrics.PoolMetrics[pool.PrettyName()].CPUs = pool.CPUs
-		policyMetrics.PoolMetrics[pool.PrettyName()].CPUIds = pool.CPUs.ToSlice()
+		policyMetrics.PoolMetrics[pool.PrettyName()].CPUIds = pool.CPUs.List()
 		policyMetrics.PoolMetrics[pool.PrettyName()].MilliCPUs = strconv.Itoa(pool.CPUs.Size() * 1000)
 		policyMetrics.PoolMetrics[pool.PrettyName()].Memory = pool.Mems.String()
 		policyMetrics.PoolMetrics[pool.PrettyName()].ContainerNames = ""
@@ -178,7 +178,7 @@ func updateCPUUsageMetrics() ([]prometheus.Metric, error) {
 	}
 	onlined := sys.CPUSet().Difference(sys.Offlined())
 	onlinedUsage := make([]prometheus.Metric, onlined.Size())
-	for i, j := range onlined.ToSlice() {
+	for i, j := range onlined.List() {
 		onlinedUsage[i] = prometheus.MustNewConstMetric(
 			descriptors[cpuUsageDesc],
 			prometheus.GaugeValue,
@@ -220,7 +220,7 @@ func updatePoolCPUUsageMetrics(ppm *Metrics) ([]prometheus.Metric, error) {
 				return nil, err
 			}
 			poolCPUOnlined := ppm.PoolMetrics[poolName].CPUs.Difference(sys.Offlined())
-			poolCPUUsageList[poolName] = (1.0 - float64(poolDeltaIdleTime)/float64(poolDeltaTotalTime)) * 100.0 * float64(len(poolCPUOnlined.ToSlice()))
+			poolCPUUsageList[poolName] = (1.0 - float64(poolDeltaIdleTime)/float64(poolDeltaTotalTime)) * 100.0 * float64(len(poolCPUOnlined.List()))
 		}
 		poolCPUUsageMetrics[index] = prometheus.MustNewConstMetric(
 			descriptors[poolCPUUsageDesc],

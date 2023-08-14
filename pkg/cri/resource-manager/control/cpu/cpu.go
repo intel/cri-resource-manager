@@ -17,14 +17,13 @@ package cpu
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/control"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	"github.com/intel/goresctrl/pkg/utils"
 )
 
@@ -155,7 +154,7 @@ func (ctl *cpuctl) enforceUncore(assignments cpuClassAssignments, affectedCPUs .
 		return nil
 	}
 
-	cpus := cpuset.NewCPUSet(affectedCPUs...)
+	cpus := cpuset.New(affectedCPUs...)
 
 	for _, cpuPkgID := range ctl.system.PackageIDs() {
 		cpuPkg := ctl.system.Package(cpuPkgID)
@@ -164,7 +163,7 @@ func (ctl *cpuctl) enforceUncore(assignments cpuClassAssignments, affectedCPUs .
 
 			// Check if this die is affected by the specified cpuset
 			if cpus.Size() == 0 || dieCPUs.Intersection(cpus).Size() > 0 {
-				min, max, minCls, maxCls := effectiveUncoreFreqs(utils.NewIDSet(dieCPUs.ToSlice()...), ctl.config.Classes, assignments)
+				min, max, minCls, maxCls := effectiveUncoreFreqs(utils.NewIDSet(dieCPUs.List()...), ctl.config.Classes, assignments)
 
 				if min == 0 && max == 0 {
 					log.Debug("no uncore frequency limits for cpu package/die %d/%d", cpuPkgID, cpuDieID)

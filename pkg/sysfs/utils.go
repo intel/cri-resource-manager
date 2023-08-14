@@ -16,12 +16,13 @@ package sysfs
 
 import (
 	"fmt"
-	idset "github.com/intel/goresctrl/pkg/utils"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
+	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
 // Get the trailing enumeration part of a name.
@@ -355,14 +356,14 @@ func formatValueList(sep string, value interface{}) (string, error) {
 
 // IDSetFromCPUSet returns an id set corresponding to a cpuset.CPUSet.
 func IDSetFromCPUSet(cset cpuset.CPUSet) idset.IDSet {
-	return idset.NewIDSetFromIntSlice(cset.ToSlice()...)
+	return idset.NewIDSetFromIntSlice(cset.List()...)
 }
 
 // CPUSetFromIDSet returns a cpuset.CPUSet corresponding to an id set.
 func CPUSetFromIDSet(s idset.IDSet) cpuset.CPUSet {
-	b := cpuset.NewBuilder()
+	cpus := []int{}
 	for id := range s {
-		b.Add(int(id))
+		cpus = append(cpus, int(id))
 	}
-	return b.Result()
+	return cpuset.New(cpus...)
 }

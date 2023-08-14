@@ -22,7 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
@@ -35,6 +34,7 @@ import (
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
@@ -125,7 +125,7 @@ func (dp *DynamicPool) updateRealCpuUsed(cpuInfo []float64) (float64, error) {
 		log.Debug("dynamic pool %s cpuset is 0", dp.Def.Name)
 		return 0, nil
 	}
-	cpus := dp.Cpus.ToSliceNoSort()
+	cpus := dp.Cpus.UnsortedList()
 	var sum float64
 	for i := 0; i < len(cpus); i++ {
 		sum += cpuInfo[cpus[i]]
@@ -313,7 +313,7 @@ func CreateDynamicPoolsPolicy(policyOptions *policy.BackendOptions) policy.Backe
 		p.allowed = policyOptions.System.CPUSet().Difference(policyOptions.System.Offlined())
 	}
 	// p.reserved: CPUs reserved for kube-system pods, subset of p.allowed.
-	p.reserved = cpuset.NewCPUSet()
+	p.reserved = cpuset.New()
 	if reserved, ok := p.options.Reserved[policyapi.DomainCPU]; ok {
 		switch v := reserved.(type) {
 		case cpuset.CPUSet:
@@ -582,7 +582,7 @@ func (p *dynamicPools) useCpuClass(dp *DynamicPool) error {
 	// - User-defined CPU AllocatorPriority: dp.Def.AllocatorPriority.
 	// - All existing dynamicPool instances: p.dynamicPools.
 	// - CPU configurations by user: dp.Def.CpuClass (for dp in p.dynamicPools)
-	cpucontrol.Assign(p.cch, dp.Def.CpuClass, dp.Cpus.ToSliceNoSort()...)
+	cpucontrol.Assign(p.cch, dp.Def.CpuClass, dp.Cpus.UnsortedList()...)
 	log.Debugf("useCpuClass Cpus: %s; CpuClass: %s", dp.Cpus, dp.Def.CpuClass)
 	return nil
 }
@@ -884,7 +884,7 @@ func (p *dynamicPools) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems ids
 		c.SetCpusetCpus(cpus.String())
 		if reqCpu, ok := c.GetResourceRequirements().Requests[corev1.ResourceCPU]; ok {
 			mCpu := int(reqCpu.MilliValue())
-			c.SetCPUShares(int64(cache.MilliCPUToShares(mCpu)))
+			c.SetCPUShares(int64(cache.MilliCPUToShares(int64(mCpu))))
 		}
 	}
 	if p.dpoptions.PinMemory == nil || *p.dpoptions.PinMemory {
