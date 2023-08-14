@@ -36,11 +36,6 @@ jobs:
     - name: Codecov report
       run: bash <(curl -s https://codecov.io/bash)
 
-    - name: Build docs
-      run: |
-        make site-build
-        make clean-html
-
     - name: Install gh-pages build dependencies
       run: |
         pip3 install --user -r docs/requirements.txt
