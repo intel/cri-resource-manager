@@ -1,4 +1,4 @@
-name: Publish
+name: Publish documentation
 
 on:
   push:
@@ -13,27 +13,6 @@ concurrency:
 
 jobs:
   update-gh-pages:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-
-    - name: Fetch gh-pages
-      run: git fetch --no-tags --prune --depth=1 origin refs/heads/gh-pages:refs/heads/gh-pages
-
-    - name: Install build dependencies
-      run: |
-        pip3 install --user -r docs/requirements.txt
-        echo "`python3 -m site --user-base`/bin" >> $GITHUB_PATH
-
-    - name: Add docs from this revision to gh-pages
-      run: |
-        git config user.name "Github"
-        git config user.email "no-reply@github.com"
-        ./scripts/build/update-gh-pages.sh
-
-    - name: Publish/push to gh-pages
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git push https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git gh-pages
+    uses: "./.github/workflows/common-build-docs.yaml"
+    with:
+      publish: true
