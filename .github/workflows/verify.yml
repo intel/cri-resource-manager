@@ -39,3 +39,9 @@ jobs:
   build-docs:
     name: Verify docs build and gh-pages update
     uses: "./.github/workflows/common-build-docs.yaml"
+
+  trivy-scan:
+    uses: "./.github/workflows/common-trivy.yaml"
+
+  codeql-scan:
+    uses: "./.github/workflows/common-codeql.yaml"
