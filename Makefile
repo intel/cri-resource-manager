@@ -621,7 +621,8 @@ cross-rpm.%: docker/cross-build/% clean-spec spec dist
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_RPM_BUILD)' && \
-	rm -fr $$builddir
+	rm -fr $$builddir && \
+	install -D -m644  $$outdir/cri-resource-manager-$(RPM_VERSION)-0.x86_64.rpm $(PACKAGES_DIR)/release-assets/cri-resource-manager-$(RPM_VERSION)-0.$$distro.x86_64.rpm
 
 src.rpm source-rpm: spec dist
 	mkdir -p ~/rpmbuild/{SOURCES,SPECS} && \
@@ -664,7 +665,8 @@ cross-deb.%: docker/cross-build/% \
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_DEB_BUILD)' && \
-	rm -fr $$builddir
+	rm -fr $$builddir && \
+	install -D -m644 $$outdir/cri-resource-manager_$(DEB_VERSION)_amd64.deb $(PACKAGES_DIR)/release-assets/cri-resource-manager_$(DEB_VERSION)_$$distro_amd64.deb
 
 deb: debian/changelog debian/control debian/rules debian/compat dist
 	dpkg-buildpackage -uc
@@ -699,7 +701,8 @@ cross-tar cross-tarball: dist docker/cross-build/fedora
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    centos-7-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
-	rm -fr $$builddir
+	rm -fr $$builddir && \
+	install -D -m644 -t $(PACKAGES_DIR)/release-assets $$outdir/cri-resource-manager-$(TAR_VERSION).x86_64.tar.gz
 
 # Build a docker image (for distro cross-building).
 docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
