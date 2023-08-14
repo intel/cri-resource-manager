@@ -22,7 +22,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -110,7 +110,7 @@ type collector struct {
 
 func enablePerfTracepoint(prog *bpf.Program, tracepoint string) (int, error) {
 
-	id, err := ioutil.ReadFile(filepath.Join(kernelTracepointPath, tracepoint, "id"))
+	id, err := os.ReadFile(filepath.Join(kernelTracepointPath, tracepoint, "id"))
 	if err != nil {
 		return -1, errors.Wrap(err, "unable to read tracepoint ID")
 	}

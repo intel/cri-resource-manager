@@ -19,7 +19,6 @@ package blockio
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -152,7 +151,7 @@ func getCurrentIOSchedulers() (map[string]string, error) {
 	}
 	for _, schedulerFile := range schedulerFiles {
 		devName := strings.SplitN(schedulerFile, "/", 5)[3]
-		schedulerDataB, err := ioutil.ReadFile(schedulerFile)
+		schedulerDataB, err := os.ReadFile(schedulerFile)
 		if err != nil {
 			// A block device may be disconnected. Continue without error.
 			log.Error("failed to read current IO scheduler %#v: %v\n", schedulerFile, err)

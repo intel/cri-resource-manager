@@ -16,7 +16,7 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sigs.k8s.io/yaml"
 	"strings"
 )
@@ -52,7 +52,7 @@ func DataFromStringMap(smap map[string]string) (Data, error) {
 
 // DataFromFile unmarshals the content of the given file into configuration data.
 func DataFromFile(path string) (Data, error) {
-	raw, err := ioutil.ReadFile(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, configError("failed to read file %q: %v", path, err)
 	}

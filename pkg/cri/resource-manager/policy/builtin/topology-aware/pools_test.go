@@ -16,7 +16,6 @@ package topologyaware
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
@@ -286,7 +285,7 @@ func TestPoolCreation(t *testing.T) {
 	// Test pool creation with "real" sysfs data.
 
 	// Create a temporary directory for the test data.
-	dir, err := ioutil.TempDir("", "cri-resource-manager-test-sysfs-")
+	dir, err := os.MkdirTemp("", "cri-resource-manager-test-sysfs-")
 	if err != nil {
 		panic(err)
 	}
@@ -437,7 +436,7 @@ func TestWorkloadPlacement(t *testing.T) {
 	// server system.
 
 	// Create a temporary directory for the test data.
-	dir, err := ioutil.TempDir("", "cri-resource-manager-test-sysfs-")
+	dir, err := os.MkdirTemp("", "cri-resource-manager-test-sysfs-")
 	if err != nil {
 		panic(err)
 	}
@@ -554,7 +553,7 @@ func TestContainerMove(t *testing.T) {
 	// to be moved upwards in the tree.
 
 	// Create a temporary directory for the test data.
-	dir, err := ioutil.TempDir("", "cri-resource-manager-test-sysfs-")
+	dir, err := os.MkdirTemp("", "cri-resource-manager-test-sysfs-")
 	if err != nil {
 		panic(err)
 	}
@@ -720,7 +719,7 @@ func TestAffinities(t *testing.T) {
 	//
 
 	// Create a temporary directory for the test data.
-	dir, err := ioutil.TempDir("", "cri-resource-manager-test-sysfs-")
+	dir, err := os.MkdirTemp("", "cri-resource-manager-test-sysfs-")
 	if err != nil {
 		panic(err)
 	}

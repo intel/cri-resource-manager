@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1532,7 +1531,7 @@ func (cch *cache) Save() error {
 	}
 
 	tmpPath := cch.filePath + ".saving"
-	if err = ioutil.WriteFile(tmpPath, data, cacheFilePerm.prefer); err != nil {
+	if err = os.WriteFile(tmpPath, data, cacheFilePerm.prefer); err != nil {
 		return cacheError("failed to write cache to file %q: %v", tmpPath, err)
 	}
 	if err := os.Rename(tmpPath, cch.filePath); err != nil {
@@ -1547,7 +1546,7 @@ func (cch *cache) Save() error {
 func (cch *cache) Load() error {
 	cch.Debug("loading cache from file '%s'...", cch.filePath)
 
-	data, err := ioutil.ReadFile(cch.filePath)
+	data, err := os.ReadFile(cch.filePath)
 
 	switch {
 	case os.IsNotExist(err):

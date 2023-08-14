@@ -15,7 +15,6 @@
 package cache
 
 import (
-	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -139,7 +138,7 @@ func getMemoryCapacity() int64 {
 		return memoryCapacity
 	}
 
-	if data, err = ioutil.ReadFile("/proc/meminfo"); err != nil {
+	if data, err = os.ReadFile("/proc/meminfo"); err != nil {
 		return -1
 	}
 

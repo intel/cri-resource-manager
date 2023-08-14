@@ -17,7 +17,6 @@ package sysfs
 import (
 	"fmt"
 	idset "github.com/intel/goresctrl/pkg/utils"
-	"io/ioutil"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"os"
 	"path/filepath"
@@ -53,7 +52,7 @@ func readSysfsEntry(base, entry string, ptr interface{}, args ...interface{}) (s
 
 	path := filepath.Join(base, entry)
 
-	blob, err := ioutil.ReadFile(path)
+	blob, err := os.ReadFile(path)
 	if err != nil {
 		return "", sysfsError(path, "failed to read sysfs entry: %v", err)
 	}
