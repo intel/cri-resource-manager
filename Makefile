@@ -591,7 +591,7 @@ cross-rpm.%: docker/cross-build/% clean-spec spec dist
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp packaging/rpm/cri-resource-manager.spec $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
@@ -635,7 +635,7 @@ cross-deb.%: docker/cross-build/% \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp -r debian $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
@@ -655,7 +655,7 @@ cross-bin.%: docker/cross-build/% dist
 	mkdir -p $(BINARIES_DIR)/$$distro && \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
@@ -671,7 +671,7 @@ cross-tar cross-tarball: dist docker/cross-build/fedora
 	mkdir -p $$outdir && \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
