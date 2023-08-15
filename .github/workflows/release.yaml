@@ -35,6 +35,9 @@ jobs:
     - name: Build packages
       run: "make cross-packages  Q="
 
+    - name: Build vendored dist tarball
+      run: "make vendored-dist  Q="
+
     - name: Upload release assets
       uses: softprops/action-gh-release@v1
       with:
@@ -43,3 +46,4 @@ jobs:
         append_body: true
         files: |
           packages/release-assets/*
+          vendored-cri-resource-manager-*.tar.gz
