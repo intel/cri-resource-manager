@@ -666,7 +666,7 @@ cross-deb.%: docker/cross-build/% \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_DEB_BUILD)' && \
 	rm -fr $$builddir && \
-	install -D -m644 $$outdir/cri-resource-manager_$(DEB_VERSION)_amd64.deb $(PACKAGES_DIR)/release-assets/cri-resource-manager_$(DEB_VERSION)_$$distro_amd64.deb
+	install -D -m644 $$outdir/cri-resource-manager_$(DEB_VERSION)_amd64.deb $(PACKAGES_DIR)/release-assets/cri-resource-manager_$(DEB_VERSION)_$${distro}_amd64.deb
 
 deb: debian/changelog debian/control debian/rules debian/compat dist
 	dpkg-buildpackage -uc
