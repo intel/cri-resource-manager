@@ -1,13 +1,13 @@
 name: Verify
-on: [push, pull_request]
-jobs:
 
-  build:
-    name: Build
+on:
+  - workflow_call
+
+jobs:
+  build-and-test:
     runs-on: ubuntu-22.04
     steps:
-
-    - name: Check out code into the Go module directory
+    - name: Check out code
       uses: actions/checkout@v1
 
     - name: Set up Go
@@ -37,7 +37,6 @@ jobs:
       run: bash <(curl -s https://codecov.io/bash)
 
   build-docs:
-    name: Verify docs build and gh-pages update
     uses: "./.github/workflows/common-build-docs.yaml"
 
   trivy-scan:
