@@ -248,7 +248,7 @@ ifneq ($(V),1)
 endif
 
 # Default target: just build everything.
-all: build update-workflows
+all: build
 
 #
 # Generic targets: build, install, clean, build images.
@@ -746,12 +746,6 @@ install-protoc-gen-go-grpc:
 
 install-protoc-tools: install-protoc install-protoc-gen-go install-protoc-gen-go-grpc
 
-# Rules for updating github workflows.
-update-workflows: .github/workflows/verify.yml
-
-.github/workflows/verify.yml: go.mod
-	$(Q)sed -E -i "s/go-version:.*$$/go-version: $(GO_VERSION)/g" $@
-
 #
 # go dependencies for our binaries (careful with that axe, Eugene...)
 #
@@ -843,7 +837,6 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 .PHONY: all build install clean test images images-push release-tests e2e-tests \
 	format vet cyclomatic-check lint golangci-lint \
 	cross-packages cross-rpm cross-deb \
-        update-workflows
 
 #
 # Rules for documentation
