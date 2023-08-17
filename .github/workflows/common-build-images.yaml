@@ -11,11 +11,16 @@ on:
         default: false
         required: false
         type: boolean
+      github-environment:
+        default: null
+        required: false
+        type: string
 
 jobs:
   build-images:
     name: Build and publish container images
     runs-on: ubuntu-22.04
+    environment: ${{ inputs.github-environment }}
     env:
       IMAGE_REPO: intel
       IMAGE_VERSION: ${{ inputs.image-tag }}

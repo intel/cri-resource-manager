@@ -18,12 +18,10 @@ jobs:
     uses: "./.github/workflows/common-build-images.yaml"
     needs: [trivy-scan]
     secrets: inherit
-    environment:
-      name: release
-      url: https://github.com
     with:
       publish: true
       image-tag: ${{ github.ref_name }}
+      github-environment: "release"
 
   build-packages:
     needs: [trivy-scan]
