@@ -1,0 +1,26 @@
+name: Build and publish release artifacts
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  trivy-scan:
+    uses: "./.github/workflows/common-trivy.yaml"
+    with:
+      export-csv: true
+
+  publish-images:
+    uses: "./.github/workflows/common-build-images.yaml"
+    needs: [trivy-scan]
+    secrets: inherit
+    environment:
+      name: release
+      url: https://github.com
+    with:
+      publish: true
+      image-tag: ${{ github.ref_name }}

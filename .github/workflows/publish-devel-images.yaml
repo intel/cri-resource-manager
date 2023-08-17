@@ -1,0 +1,25 @@
+name: Build and publish devel container images
+
+on:
+  push:
+    branches: ["master"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  trivy-scan:
+    uses: "./.github/workflows/common-trivy.yaml"
+
+  publish-images:
+    uses: "./.github/workflows/common-build-images.yaml"
+    needs: [trivy-scan]
+    secrets: inherit
+    environment:
+      name: staging
+      url: https://github.com
+    with:
+      publish: true
+      image-tag: "devel"
+
