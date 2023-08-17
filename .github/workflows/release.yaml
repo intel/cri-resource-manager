@@ -24,3 +24,26 @@ jobs:
     with:
       publish: true
       image-tag: ${{ github.ref_name }}
+
+  build-packages:
+    needs: [trivy-scan]
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Build packages
+      run: "make cross-packages  Q="
+
+    - name: Build vendored dist tarball
+      run: "make vendored-dist  Q="
+
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ${{ github.ref_name }}
+        draft: true
+        append_body: true
+        files: |
+          packages/release-assets/*
+          vendored-cri-resource-manager-*.tar.gz
