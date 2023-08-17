@@ -5,6 +5,10 @@ on:
     branches:
         - master
         - release-*
+    # Path filters are ignored for tags
+    paths:
+      - "docs/**"
+      - "Makefile"
     tags:
         - v*
 concurrency:
