@@ -16,10 +16,8 @@ jobs:
     uses: "./.github/workflows/common-build-images.yaml"
     needs: [trivy-scan]
     secrets: inherit
-    environment:
-      name: staging
-      url: https://github.com
     with:
       publish: true
       image-tag: "devel"
+      github-environment: "staging"
 
