@@ -1,4 +1,4 @@
-name: Verify
+name: Verify code
 
 on:
   - workflow_call
@@ -36,11 +36,10 @@ jobs:
     - name: Codecov report
       run: bash <(curl -s https://codecov.io/bash)
 
-  build-docs:
-    uses: "./.github/workflows/common-build-docs.yaml"
-
   trivy-scan:
     uses: "./.github/workflows/common-trivy.yaml"
+    with:
+      upload-to-github-security-tab: true
 
   codeql-scan:
     uses: "./.github/workflows/common-codeql.yaml"
