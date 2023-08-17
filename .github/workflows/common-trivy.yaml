@@ -12,7 +12,22 @@ on:
         type: boolean
 
 jobs:
-  trivy-scan-code:
+  trivy-scan-licenses:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Run Trivy in fs mode
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: fs
+        scan-ref: .
+        exit-code: 1
+        scanners: license
+        severity: "UNKNOWN,MEDIUM,HIGH,CRITICAL"
+
+  trivy-scan-vulns:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout
