@@ -9,6 +9,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    uses: "./.github/workflows/common-verify.yaml"
+  verify-code:
+    uses: "./.github/workflows/common-verify-code.yaml"
 
