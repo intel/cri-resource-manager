@@ -23,3 +23,11 @@ static-pools-relaunch-cri-resmgr() {
         launch cri-resmgr-webhook
     fi
 }
+
+static-pools-cleanup() {
+    ( terminate cri-resmgr-agent )
+    ( uninstall cri-resmgr-webhook )
+    ( extended-resources remove cmk.intel.com/exclusive-cpus >/dev/null )
+    ( terminate cri-resmgr )
+    vm-command 'kubectl taint node $(hostname) cmk=true:NoSchedule-' || true
+}
