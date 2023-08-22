@@ -891,7 +891,7 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-ExecStart=/snap/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --container-runtime=remote --container-runtime-endpoint=${k8scri_sock} --pod-infra-container-image=k8s.gcr.io/pause:3.4.1
+ExecStart=/snap/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf --config=/var/lib/kubelet/config.yaml --container-runtime-endpoint=${k8scri_sock} --pod-infra-container-image=k8s.gcr.io/pause:3.4.1
 Restart=always
 StartLimitInterval=0
 RestartSec=10
