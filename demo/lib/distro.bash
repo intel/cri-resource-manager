@@ -391,11 +391,11 @@ centos-install-golang() {
 }
 
 fedora-image-url() {
-    fedora-36-image-url
+    fedora-38-image-url
 }
 
-fedora-36-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/36/Cloud/x86_64/images/Fedora-Cloud-Base-36-1.5.x86_64.qcow2"
+fedora-38-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/38/Cloud/x86_64/images/Fedora-Cloud-Base-38-1.6.x86_64.qcow2"
 }
 
 fedora-35-image-url() {
