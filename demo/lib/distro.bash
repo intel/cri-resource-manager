@@ -130,7 +130,7 @@ ubuntu-22_04-image-url() {
 }
 
 debian-10-image-url() {
-    echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
+    echo "https://cloud.debian.org/images/cloud/buster/latest/debian-10-generic-amd64.qcow2"
 }
 
 debian-11-image-url() {
