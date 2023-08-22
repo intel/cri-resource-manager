@@ -1046,6 +1046,25 @@ vm-destroy-cluster() {
     vm-command "yes | kubeadm reset; rm -f ~$user/.kube/config ~root/.kube/config /etc/kubernetes"
 }
 
+vm-install-cni-bridge() {
+    vm-command "rm -rf /etc/cni/net.d/* && mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
+{
+  \"cniVersion\": \"0.4.0\",
+  \"name\": \"demonet\",
+  \"type\": \"bridge\",
+  \"isGateway\": true,
+  \"ipMasq\": true,
+  \"ipam\": {
+    \"type\": \"host-local\",
+    \"subnet\": \"$CNI_SUBNET\",
+    \"routes\": [
+      { \"dst\": \"0.0.0.0/0\" }
+    ]
+  }
+}
+EOF"
+}
+
 vm-install-cni-cilium() {
     if ! vm-command "curl -L --remote-name-all https://github.com/cilium/cilium-cli/releases/latest/download/cilium-linux-amd64.tar.gz && tar xzvfC cilium-linux-amd64.tar.gz /usr/local/bin && cilium install && rm -f cilium-linux-amd64.tar.gz"; then
         command-error "installing cilium CNI to Kubernetes failed"
