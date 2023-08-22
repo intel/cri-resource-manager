@@ -381,10 +381,6 @@ centos-8-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
 }
 
-centos-7-k8s-cni() {
-    echo "weavenet"
-}
-
 centos-install-golang() {
     distro-install-pkg wget tar gzip git-core
     from-tarball-install-golang
@@ -1059,7 +1055,7 @@ default-install-utils() {
 }
 
 default-k8s-cni() {
-    echo ${k8scni:-cilium}
+    echo ${k8scni:-bridge}
 }
 
 default-k8s-cni-subnet() {
