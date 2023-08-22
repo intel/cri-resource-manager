@@ -3,7 +3,7 @@
 TESTS_DIR="$1"
 RUN_SH="${0%/*}/run.sh"
 
-DEFAULT_DISTRO="ubuntu-20.04"
+DEFAULT_DISTRO="ubuntu-22.04"
 
 usage() {
     echo "Usage: run_tests.sh TESTS_DIR"
