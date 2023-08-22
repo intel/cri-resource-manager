@@ -336,7 +336,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes idset.IDSet) (p
 		mapsBytes, err := os.ReadFile(mapsPath)
 		if err != nil {
 			log.Error("Could not read maps: %v\n", err)
-			os.Exit(1)
+			continue
 		}
 		mapsLines := strings.Split(string(mapsBytes), "\n")
 
