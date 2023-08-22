@@ -8,7 +8,13 @@ pyexec 'assert "pod0c0" in allocations'
 
 out '### Crash and restart pod0c0'
 vm-command "kubectl get pods pod0"
-vm-command "kill -KILL \$(pgrep -f pod0c0)"
+
+vm-command "set -x; [[ -n \"\$(pgrep -f pod0c0)\" ]] && [[ \"\$(pgrep -f pod0c0 --oldest)\" != \"\$(pgrep -f pod0c0 --newest)\" ]]" || {
+    command-error "There must be separate parent and child 'pod0c0' processes in order to run this test"
+}
+
+out '### Kill the root process in pod0c0. The container should get Restarted.'
+vm-command "kill -KILL \$(pgrep -f pod0c0 --oldest)"
 sleep 2
 vm-command 'kubectl wait --for=condition=Ready pods/pod0'
 vm-run-until --timeout 30 "pgrep -f pod0c0 > /dev/null 2>&1"
@@ -17,10 +23,10 @@ report allowed
 verify 'len(cpus["pod0c0"]) == 1'
 pyexec 'assert "pod0c0" in allocations'
 
-out '### Exit and complete pod0c0 by killing "sleep inf"'
-out '### => sh (the init process in the container) will exit with status 0'
+out '### Kill the child process in pod0c0. The root process exits with status 0, the container should get Completed.'
 vm-command "kubectl get pods pod0"
-vm-command "kill -KILL \$(pgrep --parent \$(pgrep -f pod0c0) sleep)"
+vm-command "ps axf | grep pod0c0; echo newest: \$(pgrep -f pod0c0 --newest)"
+vm-command "kill -KILL \$(pgrep -f pod0c0 --newest)"
 sleep 2
 vm-command "kubectl get pods pod0"
 # pod0c0 process is not on vm anymore
