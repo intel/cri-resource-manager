@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.8.3-4-gadb0945e documentation</title>
+  <title>Static-Pools (STP) Policy &mdash; CRI Resource Manager 0.8.3-41-g246d9f13 documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -186,14 +186,14 @@ details on managing the configuration.</p>
 <p>At minimum, you need to specify the active policy in the configuration.
 Policy-specific options control the pool configuration and legacy node label
 and taint.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">Active</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static-pools</span><span class="w"></span>
-<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="c1"># Set to true to create CMK node label</span><span class="w"></span>
-<span class="w">    </span><span class="c1">#LabelNode: false</span><span class="w"></span>
-<span class="w">    </span><span class="c1"># Set to true to create CMK node taint</span><span class="w"></span>
-<span class="w">    </span><span class="c1">#TaintNode: false</span><span class="w"></span>
-<span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">Active</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static-pools</span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span>
+<span class="w">    </span><span class="c1"># Set to true to create CMK node label</span>
+<span class="w">    </span><span class="c1">#LabelNode: false</span>
+<span class="w">    </span><span class="c1"># Set to true to create CMK node taint</span>
+<span class="w">    </span><span class="c1">#TaintNode: false</span>
+<span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">...</span>
 </pre></div>
 </div>
 <p>See the <span class="xref myst">sample configmap</span>
@@ -225,19 +225,19 @@ configuration directory structure.</p>
 <h4>Global Config<a class="headerlink" href="#global-config" title="Permalink to this heading"></a></h4>
 <p>Configuration from the global CRI-RM config takes the highest preference, if
 specified (under <code class="docutils literal notranslate"><span class="pre">policy.static-pools.pools</span></code>). A referential example:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">pools</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"></span>
-<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
-<span class="w">      </span><span class="nt">shared</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
-<span class="w">      </span><span class="nt">infra</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">pools</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">exclusive</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">exclusive</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span>
+<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+<span class="w">      </span><span class="nt">shared</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span>
+<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+<span class="w">      </span><span class="nt">infra</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">cpuLists</span><span class="p">:</span>
+<span class="w">        </span><span class="l l-Scalar l-Scalar-Plain">...</span>
 </pre></div>
 </div>
 </section>
@@ -246,9 +246,9 @@ specified (under <code class="docutils literal notranslate"><span class="pre">po
 <p>Path to a stand-alone configuration file can be specified by the
 <code class="docutils literal notranslate"><span class="pre">policy.static-pools.ConfFilePath</span></code> option (empty by default) in the CRI-RM
 global config:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">ConfFilePath</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/conf.yaml&quot;</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">ConfFilePath</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/conf.yaml&quot;</span>
 </pre></div>
 </div>
 <p>Format of the configuration file is similar to the pools config used in the
@@ -262,9 +262,9 @@ for a starting point.</p>
 CMK. It reads the configuration from a location specified by the
 <code class="docutils literal notranslate"><span class="pre">policy.static-pools.ConfFileDir</span></code> field (<code class="docutils literal notranslate"><span class="pre">/etc/cmk</span></code> by default) in the CRI-RM
 global config:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span><span class="w"></span>
-<span class="w">    </span><span class="nt">ConfFileDir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/cmk&quot;</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">policy</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">static-pools</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">ConfFileDir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/etc/cmk&quot;</span>
 </pre></div>
 </div>
 </section>
@@ -274,8 +274,8 @@ global config:</p>
 <p>In order to enable more verbose logging for the STP policy set the
 <code class="docutils literal notranslate"><span class="pre">LOGGER_DEBUG=static-pools</span></code> environment variable or enable debug from the CRI-RM
 global config:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">logger</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">Debug</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static-pools</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">logger</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">Debug</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static-pools</span>
 </pre></div>
 </div>
 </section>
@@ -314,28 +314,28 @@ original CMK.</p>
 </table>
 <p>An example Pod spec for running a workload in the <code class="docutils literal notranslate"><span class="pre">exclusive</span></code> pool with one
 core reserved from socket id 0:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span><span class="w"></span>
-<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span><span class="w"></span>
-<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-test</span><span class="w"></span>
-<span class="nt">spec</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">containers</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-test</span><span class="w"></span>
-<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">busybox</span><span class="w"></span>
-<span class="w">    </span><span class="nt">env</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STP_POOL</span><span class="w"></span>
-<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;exclusive&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STP_SOCKET_ID</span><span class="w"></span>
-<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0&quot;</span><span class="w"></span>
-<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;sh&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;-c&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;while</span><span class="nv"> </span><span class="s">:;</span><span class="nv"> </span><span class="s">do</span><span class="nv"> </span><span class="s">echo</span><span class="nv"> </span><span class="s">ASSIGNED:</span><span class="nv"> </span><span class="s">$CMK_CPUS_ASSIGNED;</span><span class="nv"> </span><span class="s">sleep</span><span class="nv"> </span><span class="s">1;</span><span class="nv"> </span><span class="s">done&quot;</span><span class="w"></span>
-<span class="w">    </span><span class="nt">resources</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="nt">requests</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">cmk.intel.com/exclusive-cores</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="nt">limits</span><span class="p">:</span><span class="w"></span>
-<span class="w">        </span><span class="nt">cmk.intel.com/exclusive-cores</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-test</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-test</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">busybox</span>
+<span class="w">    </span><span class="nt">env</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STP_POOL</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;exclusive&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STP_SOCKET_ID</span>
+<span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0&quot;</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;sh&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;-c&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;while</span><span class="nv"> </span><span class="s">:;</span><span class="nv"> </span><span class="s">do</span><span class="nv"> </span><span class="s">echo</span><span class="nv"> </span><span class="s">ASSIGNED:</span><span class="nv"> </span><span class="s">$CMK_CPUS_ASSIGNED;</span><span class="nv"> </span><span class="s">sleep</span><span class="nv"> </span><span class="s">1;</span><span class="nv"> </span><span class="s">done&quot;</span>
+<span class="w">    </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">cmk.intel.com/exclusive-cores</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span>
+<span class="w">      </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">cmk.intel.com/exclusive-cores</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1&quot;</span>
 </pre></div>
 </div>
 </section>
@@ -348,19 +348,19 @@ container command and args so that <code class="docutils literal notranslate"><s
 removed.</p>
 <p>In the example below STP policy will run <code class="docutils literal notranslate"><span class="pre">sh</span> <span class="pre">-c</span> <span class="pre">&quot;sleep</span> <span class="pre">10000&quot;</span></code> in the <code class="docutils literal notranslate"><span class="pre">infra</span></code>
 pool.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span><span class="w"></span>
-<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span><span class="w"></span>
-<span class="nt">metadata</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmk-test</span><span class="w"></span>
-<span class="nt">spec</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="nt">containers</span><span class="p">:</span><span class="w"></span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmk-test</span><span class="w"></span>
-<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">busybox</span><span class="w"></span>
-<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;sh&quot;</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;-c&quot;</span><span class="w"></span>
-<span class="w">    </span><span class="nt">args</span><span class="p">:</span><span class="w"></span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;/opt/bin/cmk</span><span class="nv"> </span><span class="s">isolate</span><span class="nv"> </span><span class="s">--conf-dir=/etc/cmk</span><span class="nv"> </span><span class="s">--pool=infra</span><span class="nv"> </span><span class="s">sleep</span><span class="nv"> </span><span class="s">10000&quot;</span><span class="w"></span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmk-test</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmk-test</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">busybox</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;sh&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;-c&quot;</span>
+<span class="w">    </span><span class="nt">args</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;/opt/bin/cmk</span><span class="nv"> </span><span class="s">isolate</span><span class="nv"> </span><span class="s">--conf-dir=/etc/cmk</span><span class="nv"> </span><span class="s">--pool=infra</span><span class="nv"> </span><span class="s">sleep</span><span class="nv"> </span><span class="s">10000&quot;</span>
 </pre></div>
 </div>
 <!-- Links -->

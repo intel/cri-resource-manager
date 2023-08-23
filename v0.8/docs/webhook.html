@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Webhook &mdash; CRI Resource Manager 0.8.3-4-gadb0945e documentation</title>
+  <title>Webhook &mdash; CRI Resource Manager 0.8.3-41-g246d9f13 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -112,13 +112,13 @@ to match the image.</p></li>
 <li><p>Create a <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook-secret</span></code> that carries a key and a certificate
 to <code class="docutils literal notranslate"><span class="pre">cri-resmgr-webhook</span></code>. You can create a key, a self-signed certificate
 and the secret that holds them with the following commands:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SVC</span><span class="o">=</span>cri-resmgr-webhook <span class="nv">NS</span><span class="o">=</span>cri-resmgr
-openssl req -x509 -newkey rsa:2048 -sha256 -days <span class="m">365</span> -nodes <span class="se">\</span>
-  -keyout cmd/cri-resmgr-webhook/server-key.pem <span class="se">\</span>
-  -out cmd/cri-resmgr-webhook/server-crt.pem <span class="se">\</span>
-  -subj <span class="s2">&quot;/CN=</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span> <span class="se">\</span>
-  -addext <span class="s2">&quot;subjectAltName=DNS:</span><span class="nv">$SVC</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span>
-cat &gt;cmd/cri-resmgr-webhook/webhook-secret.yaml <span class="s">&lt;&lt;EOF</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">SVC</span><span class="o">=</span>cri-resmgr-webhook<span class="w"> </span><span class="nv">NS</span><span class="o">=</span>cri-resmgr
+openssl<span class="w"> </span>req<span class="w"> </span>-x509<span class="w"> </span>-newkey<span class="w"> </span>rsa:2048<span class="w"> </span>-sha256<span class="w"> </span>-days<span class="w"> </span><span class="m">365</span><span class="w"> </span>-nodes<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-keyout<span class="w"> </span>cmd/cri-resmgr-webhook/server-key.pem<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-out<span class="w"> </span>cmd/cri-resmgr-webhook/server-crt.pem<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-subj<span class="w"> </span><span class="s2">&quot;/CN=</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-addext<span class="w"> </span><span class="s2">&quot;subjectAltName=DNS:</span><span class="nv">$SVC</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">,DNS:</span><span class="nv">$SVC</span><span class="s2">.</span><span class="nv">$NS</span><span class="s2">.svc&quot;</span>
+cat<span class="w"> </span>&gt;cmd/cri-resmgr-webhook/webhook-secret.yaml<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
 <span class="s">apiVersion: v1</span>
 <span class="s">kind: Secret</span>
 <span class="s">metadata:</span>
@@ -129,8 +129,8 @@ cat &gt;cmd/cri-resmgr-webhook/webhook-secret.yaml <span class="s">&lt;&lt;EOF</
 <span class="s">  svc.key: $(base64 -w0 &lt; cmd/cri-resmgr-webhook/server-key.pem)</span>
 <span class="s">type: Opaque</span>
 <span class="s">EOF</span>
-kubectl create namespace <span class="nv">$NS</span>
-kubectl create -f cmd/cri-resmgr-webhook/webhook-secret.yaml
+kubectl<span class="w"> </span>create<span class="w"> </span>namespace<span class="w"> </span><span class="nv">$NS</span>
+kubectl<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>cmd/cri-resmgr-webhook/webhook-secret.yaml
 </pre></div>
 </div>
 </li>
@@ -138,15 +138,15 @@ kubectl create -f cmd/cri-resmgr-webhook/webhook-secret.yaml
 <span class="xref myst">mutating-webhook-config.yaml</span>.
 If you created the key and the certificate with the commands above,
 you can do this with the following command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sed -e <span class="s2">&quot;s/CA_BUNDLE_PLACEHOLDER/</span><span class="k">$(</span>base64 -w0 &lt; cmd/cri-resmgr-webhook/server-crt.pem<span class="k">)</span><span class="s2">/&quot;</span> <span class="se">\</span>
-    -i cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sed<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;s/CA_BUNDLE_PLACEHOLDER/</span><span class="k">$(</span>base64<span class="w"> </span>-w0<span class="w"> </span>&lt;<span class="w"> </span>cmd/cri-resmgr-webhook/server-crt.pem<span class="k">)</span><span class="s2">/&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-i<span class="w"> </span>cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
 </pre></div>
 </div>
 </li>
 <li><p>Finally set up the webhook with these commands:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl apply -f cmd/cri-resmgr-webhook/webhook-deployment.yaml
-kubectl <span class="nb">wait</span> --for<span class="o">=</span><span class="nv">condition</span><span class="o">=</span>Available -n cri-resmgr deployments/cri-resmgr-webhook
-kubectl apply -f cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>cmd/cri-resmgr-webhook/webhook-deployment.yaml
+kubectl<span class="w"> </span><span class="nb">wait</span><span class="w"> </span>--for<span class="o">=</span><span class="nv">condition</span><span class="o">=</span>Available<span class="w"> </span>-n<span class="w"> </span>cri-resmgr<span class="w"> </span>deployments/cri-resmgr-webhook
+kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>cmd/cri-resmgr-webhook/mutating-webhook-config.yaml
 </pre></div>
 </div>
 </li>
