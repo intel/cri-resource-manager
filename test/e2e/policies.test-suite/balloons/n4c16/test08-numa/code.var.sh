@@ -76,7 +76,7 @@ verify 'len(cpus["pod0c0"]) == 4' \
        'disjoint_sets(cpus["pod0c0"], cpus["pod6c0"])'
 
 # Leave only one guaranteed container to the first balloon.
-kubectl delete pods pod1 pod2 pod3 --now
+kubectl delete pods pod1 pod2 pod3 --now --wait --ignore-not-found
 report allowed
 verify 'len(cpus["pod0c0"]) == 1' \
        'len(cpus["pod4c0"]) == 1' \
@@ -87,7 +87,7 @@ verify 'len(cpus["pod0c0"]) == 1' \
 
 # Leave only bestefforts to the first balloon. Make sure they still
 # have a CPU.
-kubectl delete pods pod4 --now
+kubectl delete pods pod4 --now --wait --ignore-not-found
 report allowed
 verify 'len(cpus["pod0c0"]) == 1' \
        'len(cpus["pod5c0"]) == 1' \

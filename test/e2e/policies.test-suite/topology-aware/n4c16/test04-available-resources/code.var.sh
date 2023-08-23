@@ -17,7 +17,7 @@ verify "cpus['pod1c0'] == {'cpu08', 'cpu09', 'cpu10'}" \
        "cpus['pod1c1'] == {'cpu08', 'cpu09', 'cpu10'}" \
        "mems['pod1c0'] == {'node2'}" \
        "mems['pod1c1'] == {'node2'}"
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 reset counters
 
 # Test cgroup cpuset directory in AvailableResources.CPU
@@ -35,7 +35,7 @@ test-and-verify-allowed() {
     verify "disjoint_sets(cpus['pod1c0'], cpus['pod0c0'])" \
            "disjoint_sets(cpus['pod1c0'], cpus['pod0c1'])"
 
-    kubectl delete pods --all --now
+    kubectl delete pods --all --now --wait
     reset counters
 }
 

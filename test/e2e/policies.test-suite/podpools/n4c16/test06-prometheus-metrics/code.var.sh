@@ -1,7 +1,7 @@
 # Test reporting Prometheus metrics from podpools
 
 cleanup() {
-    vm-command "kubectl get pods -A | grep -E ' pod[0-9]' | while read namespace pod rest; do kubectl -n \$namespace delete pod \$pod --now; done"
+    vm-command "kubectl get pods -A | grep -E ' pod[0-9]' | while read namespace pod rest; do kubectl -n \$namespace delete pod \$pod --now --wait --ignore-not-found; done"
 }
 
 parse-commandoutput-log_pool_cpuset() {
@@ -41,7 +41,7 @@ verify-metrics-has-line() {
 
 # Delete left-over test pods from the kube-system namespace
 for podX in $(kubectl get pods -n kube-system | awk '/^pod[0-9]/{print $1}'); do
-    kubectl delete pods $podX -n kube-system --now
+    kubectl delete pods $podX -n kube-system --now --wait --ignore-not-found
 done
 
 metrics_url="http://localhost:8891/metrics"

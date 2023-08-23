@@ -37,7 +37,7 @@ verify "cpus['pod0c0'] == {'cpu08'} or cpus['pod0c0'] == {'cpu09'}" \
        "mems['pod2c0'] == {'node2'}"
 
 # free isolated (and all other) cpus
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod3: opt-in isolated CPUs, take all of them
 ANNOTATIONS='prefer-isolated-cpus.cri-resource-manager.intel.com/pod: "true"'
@@ -47,7 +47,7 @@ verify "cpus['pod3c0'] == {'cpu08', 'cpu09'}" \
        "len(cpus['pod3c0']) == 2"
 
 # free isolated cpus
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod4: opt-in isolated CPUs but require a fraction more CPUs than there are isolated CPUs
 ANNOTATIONS=('prefer-isolated-cpus.cri-resource-manager.intel.com/pod: "true"'
@@ -58,7 +58,7 @@ verify "'cpu08' in cpus['pod4c0'] and 'cpu09' in cpus['pod4c0']" \
        "len(cpus['pod4c0']) == 4"
 
 # free isolated cpus
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod5: opt-in isolated CPUs but require a fraction less CPUs than there are isolated CPUs
 ANNOTATIONS=('prefer-isolated-cpus.cri-resource-manager.intel.com/pod: "true"'
@@ -70,7 +70,7 @@ verify "'cpu08' in cpus['pod5c0'] or 'cpu09' in cpus['pod5c0']" \
        "len(cpus['pod5c0']) == 3"
 
 # free isolated cpus
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod6: opt-in isolated CPUs but require a full CPU more than there
 # are isolated CPUs

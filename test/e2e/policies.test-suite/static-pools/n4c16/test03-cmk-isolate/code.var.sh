@@ -45,7 +45,7 @@ verify 'cores["pod3c0"] == infra_cores'
 
 out ""
 out "### Deleting only exclusive CMK pods, leave shared/infra running"
-kubectl delete pods/pod0 pods/pod1 --now
+kubectl delete pods/pod0 pods/pod1 --now --wait --ignore-not-found
 
 export CMK_ISOLATE=", '--pool=exclusive'"
 out ""

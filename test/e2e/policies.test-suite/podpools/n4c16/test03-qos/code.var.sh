@@ -34,7 +34,7 @@ verify-cpushare pod0c0 2 1
 verify-cpushare pod1c0 512 20
 verify-cpushare pod2c0 1024 39
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 reset counters
 
 out "### Assigning BestEffort, Burstable and Guaranteed pods shared CPUs"
@@ -50,7 +50,7 @@ verify-cpushare pod0c0 2 1
 verify-cpushare pod1c0 512 20
 verify-cpushare pod2c0 1024 39
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 reset counters
 
 out "### Assigning BestEffort, Burstable and Guaranteed pods reserved CPUs"
@@ -66,4 +66,4 @@ verify-cpushare pod0c0 2 1
 verify-cpushare pod1c0 512 20
 verify-cpushare pod2c0 1024 39
 
-kubectl delete pods pod0 pod1 pod2 -n kube-system
+kubectl delete pods pod0 pod1 pod2 -n kube-system --now --wait --ignore-not-found

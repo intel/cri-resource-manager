@@ -1,7 +1,7 @@
 # This test verifies prometheus metrics from the balloons policy.
 
 cleanup() {
-    vm-command "kubectl delete pods --all --now"
+    vm-command "kubectl delete pods --all --now --wait"
     return 0
 }
 
@@ -55,17 +55,17 @@ verify-metrics-has-line 'balloon_type="flex"'
 verify-metrics-has-line 'balloon_type="flex".* 5'
 
 # check deflating a balloon in metrics
-kubectl delete pods --now pod3
+kubectl delete pods --now --wait --ignore-not-found pod3
 verify-metrics-has-line 'balloon_type="flex"'
 verify-metrics-has-line 'balloon_type="flex".* 2'
 
-kubectl delete pods --now pod4
+kubectl delete pods --now --wait --ignore-not-found pod4
 sleep 5
 # check popping a balloon from metrics
 verify-metrics-has-no-line 'balloon_type="flex"'
 
 # pop fast-dualcore[0], keep fast-dualcore[1]
-kubectl delete pods --now pod1
+kubectl delete pods --now --wait --ignore-not-found pod1
 verify-metrics-has-line 'balloon="fast-dualcore\[1\]"'
 sleep 5
 verify-metrics-has-no-line 'balloon="fast-dualcore\[0\]"'

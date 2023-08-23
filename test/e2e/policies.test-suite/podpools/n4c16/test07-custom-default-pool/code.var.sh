@@ -6,10 +6,9 @@ terminate cri-resmgr
 cri_resmgr_cfg=${TEST_DIR}/podpools-custom-default.cfg launch cri-resmgr
 
 cleanup() {
-    ( kubectl delete pods --all --now )
-    ( kubectl delete pod -n kube-system pod0c-mysystem )
-    ( kubectl delete pod -n daemons pod0c-mydaemon )
-    ( kubectl delete namespace daemons )
+    ( kubectl delete pods --all --now --wait )
+    ( kubectl delete pod -n kube-system pod0c-mysystem --now --wait --ignore-not-found )
+    ( kubectl delete namespace daemons --now --wait --ignore-not-found )
 }
 
 cleanup

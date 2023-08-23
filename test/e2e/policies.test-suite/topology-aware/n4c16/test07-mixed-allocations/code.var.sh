@@ -72,7 +72,7 @@ verify `# every container is placed on a single node (no socket, no root)` \
 # no-effect from isolated preference.
 # - opt-out from shared CPUs (=> opt-in to exclusive CPUs)
 # - opt-out from isolated CPUs (this does not affect getting exclusive CPUs)
-kubectl delete pods pod3 --now
+kubectl delete pods pod3 --now --wait --ignore-not-found
 ANNOTATIONS=('prefer-shared-cpus.cri-resource-manager.intel.com/pod: "false"'
              'prefer-isolated-cpus.cri-resource-manager.intel.com/pod: "false"')
 CONTCOUNT=1 CPU=2400m create guaranteed-annotated
@@ -89,7 +89,7 @@ verify `# every container is placed on a single node (no socket, no root)` \
 # Replace pod1 with pod5.
 # pod1 implicitly opted-in to exlusive CPUs due to 1500 mCPU request.
 # Now explicitly opt-out of it by opting-in to shared-cpus.
-kubectl delete pods pod1 --now
+kubectl delete pods pod1 --now --wait --ignore-not-found
 # Make sure that shared pool size increased correctly after mixed pod deletion.
 verify `# pod0c0 or pod0c1 shared a node with pod1c1 and had only 3 CPUs` \
        "len(cpus['pod0c0']) == 4" \

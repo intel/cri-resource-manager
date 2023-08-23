@@ -42,7 +42,7 @@ verify-metrics-has-line 'sharedidlecpus_count="1"'
 verify 'len(nodes["pod8c0"])==2' \
        'len(dies["pod8c0"])==1' \
        'len(packages["pod8c0"])==1'
-kubectl delete pod pod8 --now
+kubectl delete pod pod8 --now --wait --ignore-not-found
 verify-metrics-has-no-line 'cpus_count="5"'
 
 # pod9: Add one more pod with 4 CPUs to inflate over dies, which should cross
@@ -54,7 +54,7 @@ create multicontainerpod
 verify 'len(nodes["pod9c0"])==4' \
        'len(dies["pod9c0"])==2' \
        'len(packages["pod9c0"])==1'
-kubectl delete pod pod9 --now
+kubectl delete pod pod9 --now --wait --ignore-not-found
 verify 'disjoint_sets(nodes["pod0c0"], nodes["pod1c0"], nodes["pod2c0"], nodes["pod3c0"], nodes["pod4c0"], nodes["pod5c0"], nodes["pod6c0"], nodes["pod7c0"])' \
 
 # pod9: Add one more pod with 7 CPUs to inflate over packages, which should cross
@@ -71,6 +71,6 @@ verify-metrics-has-no-line 'sharedidlecpus_count="1"'
 
 # pod0, pod9 deflate. This should free up 10 CPUs that will cause having
 # shared CPUs available again.
-kubectl delete pod pod10 --now
-kubectl delete pod pod0 --now
+kubectl delete pod pod10 --now --wait --ignore-not-found
+kubectl delete pod pod0 --now --wait --ignore-not-found
 verify-metrics-has-line 'sharedidlecpus_count="1"'
