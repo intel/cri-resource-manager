@@ -1024,6 +1024,7 @@ vm-create-singlenode-cluster() {
     if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=240s"; then
         command-error "kubectl waiting for node readiness timed out"
     fi
+    vm-run-until --timeout 30 "kubectl get sa default > /dev/null" || error "serviceaccount 'default' not found"
 }
 
 vm-create-cluster() {
