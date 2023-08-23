@@ -616,25 +616,10 @@ vm-reboot() { # script API
     # Reboots the virtual machine and waits that the ssh server starts
     # responding again.
     vm-command "reboot"
-    sleep 5
-    host-wait-vm-ssh-server
-}
-
-vm-force-restart() { # script API
-    # Usage: vm-force-restart
-    #
-    # Give the virtual machine a chance to shut itself down, then
-    # forcibly restart it using govm stop/start. Wait for the ssh
-    # server to start responding again after restarting. If VM_NAME
-    # is not set assume the target machine to not be govm-managed
-    # and fall back to vm-reboot instead.
-    if vm-is-govm; then
-        vm-command "shutdown -h now"
-        sleep 10
+    sleep 10
+    if ! host-wait-vm-ssh-server; then
         vm-monitor system_reset
         host-wait-vm-ssh-server
-    else
-      vm-reboot
     fi
 }
 
