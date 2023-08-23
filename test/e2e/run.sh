@@ -1044,7 +1044,7 @@ help() { # script API
 ### End of user code helpers
 
 test-user-code() {
-    vm-command-q "kubectl get pods 2>&1 | grep -q NAME" && vm-command "kubectl delete pods --all --now"
+    vm-command-q "kubectl get pods 2>&1 | grep -q NAME" && vm-command "kubectl delete pods --all --now --wait"
     ( eval "$code" ) || {
         TEST_FAILURES="${TEST_FAILURES} test script failed"
     }

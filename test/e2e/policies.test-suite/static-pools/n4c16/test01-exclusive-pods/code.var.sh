@@ -18,7 +18,7 @@ verify 'len(cores["pod0c0"]) == 1' \
 
 out ""
 out "### Deleting exclusive CMK pod"
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 out ""
 out "### Creating exclusive CMK pod with 2 exclusive cores"
@@ -29,7 +29,7 @@ verify 'len(cores["pod1c0"]) == 2' \
 
 out ""
 out "### Deleting exclusive CMK pod"
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 out ""
 out "### Creating two exclusive CMK pods with 1 exclusive core each"
@@ -49,7 +49,7 @@ verify 'len(cores["pod2c0"]) == 1' \
        'len(cores["pod4c0"]) == 1' \
        'disjoint_sets(cores["pod2c0"], cores["pod3c0"], cores["pod4c0"])' \
        'set.union(cores["pod2c0"], cores["pod3c0"], cores["pod4c0"]) == exclusive_cores'
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 out ""
 out "### Test consuming all exclusive cores without specifying STP_SOCKET_ID"

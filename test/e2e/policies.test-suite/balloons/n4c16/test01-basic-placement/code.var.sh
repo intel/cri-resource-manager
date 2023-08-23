@@ -2,7 +2,7 @@
 # reserved and shared CPUs.
 
 cleanup() {
-    vm-command "kubectl delete pods -n kube-system pod0; kubectl delete pods -n three --all --now; kubectl delete pods --all --now; kubectl delete namespace three"
+    vm-command "kubectl delete pods -n kube-system pod0; kubectl delete pods --all --now --wait; kubectl delete namespace three --now --wait --ignore-not-found"
     return 0
 }
 

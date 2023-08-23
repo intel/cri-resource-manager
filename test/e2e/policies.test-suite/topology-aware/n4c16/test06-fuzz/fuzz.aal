@@ -108,18 +108,18 @@ input
 
 # Delete single pod
 input
-    "NAME=gu0 kubectl delete pod gu0 --now",
-    "NAME=gu1 kubectl delete pod gu1 --now",
-    "NAME=gu2 kubectl delete pod gu2 --now",
-    "NAME=gu3 kubectl delete pod gu3 --now",
-    "NAME=gu4 kubectl delete pod gu4 --now",
-    "NAME=bu0 kubectl delete pod bu0 --now",
-    "NAME=bu1 kubectl delete pod bu1 --now",
-    "NAME=be0 kubectl delete pod be0 --now",
-    "NAME=be1 kubectl delete pod be1 --now",
-    "NAME=rgu0 kubectl delete pod rgu0 -n kube-system --now",
-    "NAME=rbu0 kubectl delete pod rbu0 -n kube-system --now",
-    "NAME=rbe0 kubectl delete pod rbe0 -n kube-system --now"
+    "NAME=gu0 kubectl delete pod gu0 --now --wait --ignore-not-found",
+    "NAME=gu1 kubectl delete pod gu1 --now --wait --ignore-not-found",
+    "NAME=gu2 kubectl delete pod gu2 --now --wait --ignore-not-found",
+    "NAME=gu3 kubectl delete pod gu3 --now --wait --ignore-not-found",
+    "NAME=gu4 kubectl delete pod gu4 --now --wait --ignore-not-found",
+    "NAME=bu0 kubectl delete pod bu0 --now --wait --ignore-not-found",
+    "NAME=bu1 kubectl delete pod bu1 --now --wait --ignore-not-found",
+    "NAME=be0 kubectl delete pod be0 --now --wait --ignore-not-found",
+    "NAME=be1 kubectl delete pod be1 --now --wait --ignore-not-found",
+    "NAME=rgu0 kubectl delete pod rgu0 -n kube-system --now --wait --ignore-not-found",
+    "NAME=rbu0 kubectl delete pod rbu0 -n kube-system --now --wait --ignore-not-found",
+    "NAME=rbe0 kubectl delete pod rbe0 -n kube-system --now --wait --ignore-not-found"
 {
     guard {
         v = inputvars(input_name)

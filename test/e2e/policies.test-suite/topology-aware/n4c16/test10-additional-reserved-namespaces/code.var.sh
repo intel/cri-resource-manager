@@ -10,8 +10,8 @@ cri_resmgr_cfg_orig=$cri_resmgr_cfg
 # if exiting with success. Otherwise leave the pod running for
 # debugging in case of a failure.
 cleanup-test-pods() {
-    ( kubectl delete pods pod0 -n kube-system --now ) || true
-    ( kubectl delete pods pod1 --now ) || true
+    ( kubectl delete pods pod0 -n kube-system --now --wait --ignore-not-found ) || true
+    ( kubectl delete pods pod1 --now --wait --ignore-not-found ) || true
 }
 cleanup-test-pods
 
@@ -37,7 +37,7 @@ cleanup-test-pods
 (kubectl create namespace foobar) || true
 
 cleanup-foobar-namespace() {
-    (kubectl delete pods -n foobar --all) || true
+    (kubectl delete pods -n foobar --all --now --wait) || true
 }
 cleanup-foobar-namespace
 

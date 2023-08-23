@@ -35,7 +35,7 @@ verify 'cpus["pod0c0"] == cpus["pod0c1"]' \
        'cpus["pod5c0"] == cpus["pod2c0"]' # the last pool should have been filled by pods 2 and 5
 
 # make a little room to the first pool and clear the last pool
-kubectl delete pods pod0 pod2 pod5 --now
+kubectl delete pods pod0 pod2 pod5 --now --wait --ignore-not-found
 
 # pod6: Balanced fill order should place this pod to the last pool (it has maximal free space)
 POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: singlecpu" CONTCOUNT=1 create podpools-busybox
@@ -43,7 +43,7 @@ report allowed
 verify 'disjoint_sets(cpus["pod6c0"],
                       set.union(cpus["pod1c0"], cpus["pod3c0"], cpus["pod4c0"]))'
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 reset counters
 
 out "### Filling dualcpu pool in Packed fill order"
@@ -60,7 +60,7 @@ verify 'cpus["pod0c0"] == cpus["pod1c0"] == cpus["pod2c0"]' \
        'disjoint_sets(cpus["pod0c0"], cpus["pod3c0"])'
 
 # Deleting two pods from the first pool, one from the last.
-kubectl delete pods pod0 pod1 pod5
+kubectl delete pods pod0 pod1 pod5 --now --wait --ignore-not-found
 
 # pod6: Packed fill order should place this to the last pool (it has minimal free space)
 POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" CONTCOUNT=1 create podpools-busybox

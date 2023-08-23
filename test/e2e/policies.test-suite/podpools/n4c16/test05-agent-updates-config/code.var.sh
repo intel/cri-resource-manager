@@ -1,6 +1,6 @@
 # Relaunch cri-resmgr so that it will listen to cri-resmgr-agent
 cleanup() {
-    vm-command "kubectl delete pod -n kube-system pod0 --now; kubectl delete pods --all --now; kubectl delete cm -n kube-system cri-resmgr-config.default"
+    vm-command "kubectl delete pod -n kube-system pod0 --now --wait --ignore-not-found; kubectl delete pods --all --now --wait; kubectl delete cm -n kube-system cri-resmgr-config.default"
     terminate cri-resmgr
     terminate cri-resmgr-agent
     vm-command "cri-resmgr -reset-policy; cri-resmgr -reset-config"

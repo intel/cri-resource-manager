@@ -3,15 +3,11 @@ cri_resmgr_cfg=${TEST_DIR}/balloons-namespace.cfg launch cri-resmgr
 
 cleanup() {
     vm-command \
-        "kubectl delete pods -n e2e-a --all --now
-         kubectl delete pods -n e2e-b --all --now
-         kubectl delete pods -n e2e-c --all --now
-         kubectl delete pods -n e2e-d --all --now
-         kubectl delete pods --all --now
-         kubectl delete namespace e2e-a
-         kubectl delete namespace e2e-b
-         kubectl delete namespace e2e-c
-         kubectl delete namespace e2e-d"
+        "kubectl delete pods --all --now --wait
+         kubectl delete namespace e2e-a --wait --ignore-not-found
+         kubectl delete namespace e2e-b --wait --ignore-not-found
+         kubectl delete namespace e2e-c --wait --ignore-not-found
+         kubectl delete namespace e2e-d --wait --ignore-not-found"
     return 0
 }
 cleanup

@@ -103,4 +103,4 @@ while (( round < max_rounds )); do
     round=$(( round + 1 ))
 done
 echo "All rounds were good."
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait

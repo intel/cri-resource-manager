@@ -2,7 +2,7 @@ CRI_RESMGR_OUTPUT="cat cri-resmgr.output.txt | tr -d '\0'"
 CRI_RESMGR_ROTATE="echo > cri-resmgr.output.txt"
 
 podno=0
-kubectl delete pod --all --now
+kubectl delete pod --all --now --wait
 
 # account for being done with test for the current pod
 nextpod () {
@@ -80,7 +80,7 @@ for pernode in 2 3 4; do
         c=$((c+1))
     done
 
-    kubectl delete pod --all --now
+    kubectl delete pod --all --now --wait
 
     nextpod
 done
@@ -115,7 +115,7 @@ vm-command "$CRI_RESMGR_OUTPUT | grep upward" && {
     error "Unexpected memset upward expansion detected!"
 }
 
-kubectl delete pod $(pod) --now
+kubectl delete pod $(pod) --now --wait --ignore-not-found
 
 nextpod
 
