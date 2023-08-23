@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -27,13 +26,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/apis/resmgr"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/config"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
@@ -1532,7 +1531,7 @@ func (cch *cache) Save() error {
 	}
 
 	tmpPath := cch.filePath + ".saving"
-	if err = ioutil.WriteFile(tmpPath, data, cacheFilePerm.prefer); err != nil {
+	if err = os.WriteFile(tmpPath, data, cacheFilePerm.prefer); err != nil {
 		return cacheError("failed to write cache to file %q: %v", tmpPath, err)
 	}
 	if err := os.Rename(tmpPath, cch.filePath); err != nil {
@@ -1547,7 +1546,7 @@ func (cch *cache) Save() error {
 func (cch *cache) Load() error {
 	cch.Debug("loading cache from file '%s'...", cch.filePath)
 
-	data, err := ioutil.ReadFile(cch.filePath)
+	data, err := os.ReadFile(cch.filePath)
 
 	switch {
 	case os.IsNotExist(err):

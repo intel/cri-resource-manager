@@ -1,0 +1,45 @@
+name: Verify code
+
+on:
+  - workflow_call
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v1
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: go.mod
+      id: go
+
+    - name: Install golangci-lint
+      run: curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+
+    - name: Gofmt
+      run: make format
+
+    - name: Build
+      run: make
+
+    - name: Test
+      run: make test
+
+    - name: Golangci-lint
+      run: |
+        export PATH=$PATH:$(go env GOPATH)/bin
+        make golangci-lint
+
+    - name: Codecov report
+      run: bash <(curl -s https://codecov.io/bash)
+
+  trivy-scan:
+    uses: "./.github/workflows/common-trivy.yaml"
+    with:
+      upload-to-github-security-tab: true
+
+  codeql-scan:
+    uses: "./.github/workflows/common-codeql.yaml"

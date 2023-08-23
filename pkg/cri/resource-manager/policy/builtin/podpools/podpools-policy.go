@@ -22,7 +22,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	resapi "k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	pkgcfg "github.com/intel/cri-resource-manager/pkg/config"
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
@@ -34,6 +33,7 @@ import (
 	policyapi "github.com/intel/cri-resource-manager/pkg/cri/resource-manager/policy"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
 	"github.com/intel/cri-resource-manager/pkg/utils"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
@@ -136,7 +136,7 @@ func CreatePodpoolsPolicy(policyOptions *policy.BackendOptions) policy.Backend {
 		p.allowed = policyOptions.System.CPUSet().Difference(policyOptions.System.Offlined())
 	}
 	// p.reserved: CPUs reserved for kube-system pods, subset of p.allowed.
-	p.reserved = cpuset.NewCPUSet()
+	p.reserved = cpuset.New()
 	if reserved, ok := p.options.Reserved[policyapi.DomainCPU]; ok {
 		switch v := reserved.(type) {
 		case cpuset.CPUSet:
@@ -731,7 +731,7 @@ func (p *podpools) pinCpuMem(c cache.Container, cpus cpuset.CPUSet, mems idset.I
 		c.SetCpusetCpus(cpus.String())
 		if reqCpu, ok := c.GetResourceRequirements().Requests[corev1.ResourceCPU]; ok {
 			mCpu := int(reqCpu.MilliValue())
-			c.SetCPUShares(int64(cache.MilliCPUToShares(mCpu)))
+			c.SetCPUShares(int64(cache.MilliCPUToShares(int64(mCpu))))
 		}
 	}
 	if p.ppoptions.PinMemory {

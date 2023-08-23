@@ -1,0 +1,47 @@
+name: Build and publish release artifacts
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  trivy-scan:
+    uses: "./.github/workflows/common-trivy.yaml"
+    with:
+      export-csv: true
+
+  publish-images:
+    uses: "./.github/workflows/common-build-images.yaml"
+    needs: [trivy-scan]
+    secrets: inherit
+    with:
+      publish: true
+      image-tag: ${{ github.ref_name }}
+      github-environment: "release"
+
+  build-packages:
+    needs: [trivy-scan]
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Build packages
+      run: "make cross-packages  Q="
+
+    - name: Build vendored dist tarball
+      run: "make vendored-dist  Q="
+
+    - name: Upload release assets
+      uses: softprops/action-gh-release@v1
+      with:
+        name: ${{ github.ref_name }}
+        draft: true
+        append_body: true
+        files: |
+          packages/release-assets/*
+          vendored-cri-resource-manager-*.tar.gz

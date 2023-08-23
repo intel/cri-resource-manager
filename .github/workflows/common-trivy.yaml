@@ -1,0 +1,90 @@
+name: Trivy scanning
+on:
+  workflow_call:
+    inputs:
+      upload-to-github-security-tab:
+        default: false
+        required: false
+        type: boolean
+      export-csv:
+        default: false
+        required: false
+        type: boolean
+
+jobs:
+  trivy-scan-licenses:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Run Trivy in fs mode
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: fs
+        scan-ref: .
+        exit-code: 1
+        scanners: license
+        severity: "UNKNOWN,MEDIUM,HIGH,CRITICAL"
+
+  trivy-scan-vulns:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Run Trivy in fs mode
+      continue-on-error: true
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: fs
+        scan-ref: .
+        exit-code: 1
+        list-all-pkgs: true
+        format: json
+        output: trivy-report.json
+
+    - name: Show report in human-readable format
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: table
+
+    - name: Convert report to sarif
+      if: ${{ inputs.upload-to-github-security-tab }}
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: sarif
+        output: trivy-report.sarif
+
+    - name: Upload sarif report to GitHub Security tab
+      if: ${{ inputs.upload-to-github-security-tab }}
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+       sarif_file: trivy-report.sarif
+
+    - name: Convert report to csv
+      if: ${{ inputs.export-csv }}
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: convert
+        vuln-type: ''
+        severity: ''
+        image-ref: trivy-report.json
+        format: template
+        template: "@.github/workflows/trivy-csv.tpl"
+        output: trivy-report.csv
+
+    - name: Upload CSV report as an artifact
+      if: ${{ inputs.export-csv }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: trivy-report
+        path: trivy-report.csv

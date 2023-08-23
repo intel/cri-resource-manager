@@ -15,7 +15,7 @@
 package procstats
 
 import (
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,7 +51,7 @@ func (t *CPUTimeStat) GetCPUTimeStat() error {
 	// cpu0 40321 11452 49784 403099 2615 6076 6748 0 0 0
 	// cpu1 26585 2425 36639 151166 404 2533 3541 0 0 0
 	// ...
-	stats, err := ioutil.ReadFile(procStat)
+	stats, err := os.ReadFile(procStat)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (t *CPUTimeStat) GetCPUTimeStat() error {
 			t.PrevTotalTime[i] = t.CurTotalTime[i]
 		}
 	}
-	for _, i := range sys.Offlined().ToSlice() {
+	for _, i := range sys.Offlined().List() {
 		t.DeltaIdleTime[i] = 0.0
 		t.DeltaTotalTime[i] = 0.0
 		t.PrevIdleTime[i] = t.CurIdleTime[i]

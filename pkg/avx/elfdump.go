@@ -22,7 +22,6 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
@@ -37,7 +36,7 @@ type Program struct {
 }
 
 func main() {
-	f, err := ioutil.ReadFile("../../libexec/avx512.o")
+	f, err := os.ReadFile("../../libexec/avx512.o")
 	if err != nil {
 		fmt.Println("Note: AVX512 eBPF ELF not available.")
 	}

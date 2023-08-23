@@ -36,7 +36,7 @@ pages_per_second_per_process="$(awk '
 
 # After how many rounds (seconds) first migrations should be visible.
 first_migrations_visible="$(awk '
-    /PageScanInterval:/{gsub(/[^0-9]/, "", $2); print $2+3}
+    /PageScanInterval:/{gsub(/[^0-9]/, "", $2); print $2+8}
     ' < "$cri_resmgr_cfg")"
 
 # Expected migrated number of pages when fully migrated.

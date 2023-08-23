@@ -1,0 +1,44 @@
+name: Build container images
+
+on:
+  workflow_call:
+    inputs:
+      image-tag:
+        default: ${{ github.ref_name }}
+        required: false
+        type: string
+      publish:
+        default: false
+        required: false
+        type: boolean
+      github-environment:
+        default: null
+        required: false
+        type: string
+
+jobs:
+  build-images:
+    name: Build and publish container images
+    runs-on: ubuntu-22.04
+    environment: ${{ inputs.github-environment }}
+    env:
+      IMAGE_REPO: intel
+      IMAGE_VERSION: ${{ inputs.image-tag }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Build images
+      run: "make images IMAGE_VERSION=${IMAGE_VERSION}  Q="
+
+    - name: Login to Docker Hub
+      if: ${{ inputs.publish }}
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Push images
+      if: ${{ inputs.publish }}
+      run: "make images-push IMAGE_VERSION=${IMAGE_VERSION} Q="
+

@@ -18,7 +18,7 @@ package stp
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -124,7 +124,7 @@ func parseConfData(raw []byte) (pools, error) {
 
 func readConfFile(filepath string) (pools, error) {
 	// Read config data
-	data, err := ioutil.ReadFile(filepath)
+	data, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, stpError("Failed to read config file: %v", err)
 	}
@@ -137,7 +137,7 @@ func readConfDir(confDir string) (pools, error) {
 
 	// List pools in the pools configuration directory
 	poolsDir := path.Join(confDir, "pools")
-	pools, err := ioutil.ReadDir(poolsDir)
+	pools, err := os.ReadDir(poolsDir)
 	if err != nil {
 		return nil, stpError("Failed to list pools config directory %s: %v", poolsDir, err)
 	}
@@ -159,7 +159,7 @@ func readPoolConfDir(poolDir string) (poolConfig, error) {
 	conf := poolConfig{Exclusive: false, CPULists: []*cpuList{}}
 
 	// Read pool's exclusivity flag
-	exclusive, err := ioutil.ReadFile(path.Join(poolDir, "exclusive"))
+	exclusive, err := os.ReadFile(path.Join(poolDir, "exclusive"))
 	if err != nil {
 		return conf, fmt.Errorf("Failed to read pool exclusive setting in %s: %v", poolDir, err)
 	}
@@ -168,7 +168,7 @@ func readPoolConfDir(poolDir string) (poolConfig, error) {
 	}
 
 	// Read socket configurations (per-socket cpu lists)
-	files, err := ioutil.ReadDir(poolDir)
+	files, err := os.ReadDir(poolDir)
 	if err != nil {
 		return conf, fmt.Errorf("Failed to list pool config directory %s: %v", poolDir, err)
 	}
@@ -199,7 +199,7 @@ func readSocketConfDir(socketDir string) ([]*cpuList, error) {
 	}
 
 	// Socket directory contains a set of subdirectories, one per cpu list
-	cpuListDirs, err := ioutil.ReadDir(socketDir)
+	cpuListDirs, err := os.ReadDir(socketDir)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to list socket directory %s: %v", socketDir, err)
 	}

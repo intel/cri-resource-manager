@@ -19,10 +19,8 @@ import (
 
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 )
 
 //
@@ -396,7 +394,7 @@ func (n *node) discoverSupply(assignedNUMANodes []idset.ID) Supply {
 				n.Name())
 		}
 
-		n.noderes = newSupply(n, cpuset.NewCPUSet(), cpuset.NewCPUSet(), cpuset.NewCPUSet(), 0, 0, nil, nil)
+		n.noderes = newSupply(n, cpuset.New(), cpuset.New(), cpuset.New(), 0, 0, nil, nil)
 		for _, c := range n.children {
 			supply := c.GetSupply()
 			n.noderes.Cumulate(supply)
@@ -410,7 +408,7 @@ func (n *node) discoverSupply(assignedNUMANodes []idset.ID) Supply {
 		log.Debug("%s: discovering attached/assigned resources...", n.Name())
 
 		mmap := createMemoryMap(0, 0, 0)
-		cpus := cpuset.NewCPUSet()
+		cpus := cpuset.New()
 
 		for _, nodeID := range assignedNUMANodes {
 			node := n.System().Node(nodeID)
@@ -425,7 +423,7 @@ func (n *node) discoverSupply(assignedNUMANodes []idset.ID) Supply {
 			case system.MemoryTypeDRAM:
 				n.mem.Add(nodeID)
 				mmap.AddDRAM(meminfo.MemTotal)
-				shortCPUs := kubernetes.ShortCPUSet(nodeCPUs)
+				shortCPUs := cpuset.ShortCPUSet(nodeCPUs)
 				log.Debug("  + assigned DRAM NUMA node #%d (cpuset: %s, DRAM %.2fM)",
 					nodeID, shortCPUs, float64(meminfo.MemTotal)/float64(1024*1024))
 			case system.MemoryTypePMEM:
@@ -448,13 +446,13 @@ func (n *node) discoverSupply(assignedNUMANodes []idset.ID) Supply {
 			sharable := allowed.Difference(isolated).Difference(reserved)
 
 			if !reserved.IsEmpty() {
-				log.Debug("    allowed reserved CPUs: %s", kubernetes.ShortCPUSet(reserved))
+				log.Debug("    allowed reserved CPUs: %s", cpuset.ShortCPUSet(reserved))
 			}
 			if !sharable.IsEmpty() {
-				log.Debug("    allowed sharable CPUs: %s", kubernetes.ShortCPUSet(sharable))
+				log.Debug("    allowed sharable CPUs: %s", cpuset.ShortCPUSet(sharable))
 			}
 			if !isolated.IsEmpty() {
-				log.Debug("    allowed isolated CPUs: %s", kubernetes.ShortCPUSet(isolated))
+				log.Debug("    allowed isolated CPUs: %s", cpuset.ShortCPUSet(isolated))
 			}
 
 			cpus = cpus.Union(allowed)

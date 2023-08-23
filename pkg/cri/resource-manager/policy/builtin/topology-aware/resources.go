@@ -20,12 +20,11 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cpuallocator"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
-	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/topology"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
@@ -783,16 +782,16 @@ func (cs *supply) DumpCapacity() string {
 	cpu, mem, sep := "", cs.mem.String(), ""
 
 	if !cs.isolated.IsEmpty() {
-		cpu = fmt.Sprintf("isolated:%s", kubernetes.ShortCPUSet(cs.isolated))
+		cpu = fmt.Sprintf("isolated:%s", cpuset.ShortCPUSet(cs.isolated))
 		sep = ", "
 	}
 	if !cs.reserved.IsEmpty() {
-		cpu += sep + fmt.Sprintf("reserved:%s (%dm)", kubernetes.ShortCPUSet(cs.reserved),
+		cpu += sep + fmt.Sprintf("reserved:%s (%dm)", cpuset.ShortCPUSet(cs.reserved),
 			1000*cs.reserved.Size())
 		sep = ", "
 	}
 	if !cs.sharable.IsEmpty() {
-		cpu += sep + fmt.Sprintf("sharable:%s (%dm)", kubernetes.ShortCPUSet(cs.sharable),
+		cpu += sep + fmt.Sprintf("sharable:%s (%dm)", cpuset.ShortCPUSet(cs.sharable),
 			1000*cs.sharable.Size())
 	}
 
@@ -820,11 +819,11 @@ func (cs *supply) DumpAllocatable() string {
 	cpu, mem, sep := "", cs.mem.String(), ""
 
 	if !cs.isolated.IsEmpty() {
-		cpu = fmt.Sprintf("isolated:%s", kubernetes.ShortCPUSet(cs.isolated))
+		cpu = fmt.Sprintf("isolated:%s", cpuset.ShortCPUSet(cs.isolated))
 		sep = ", "
 	}
 	if !cs.reserved.IsEmpty() {
-		cpu += sep + fmt.Sprintf("reserved:%s (allocatable: %dm)", kubernetes.ShortCPUSet(cs.reserved), cs.AllocatableReservedCPU())
+		cpu += sep + fmt.Sprintf("reserved:%s (allocatable: %dm)", cpuset.ShortCPUSet(cs.reserved), cs.AllocatableReservedCPU())
 		sep = ", "
 		if cs.grantedReserved > 0 {
 			cpu += sep + fmt.Sprintf("grantedReserved:%dm", cs.grantedReserved)
@@ -833,7 +832,7 @@ func (cs *supply) DumpAllocatable() string {
 	local_grantedShared := cs.grantedShared
 	total_grantedShared := cs.node.GrantedSharedCPU()
 	if !cs.sharable.IsEmpty() {
-		cpu += sep + fmt.Sprintf("sharable:%s (", kubernetes.ShortCPUSet(cs.sharable))
+		cpu += sep + fmt.Sprintf("sharable:%s (", cpuset.ShortCPUSet(cs.sharable))
 		sep = ""
 		if local_grantedShared > 0 || total_grantedShared > 0 {
 			cpu += fmt.Sprintf("grantedShared:")

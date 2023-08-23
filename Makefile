@@ -245,7 +245,7 @@ ifneq ($(V),1)
 endif
 
 # Default target: just build everything.
-all: build update-workflows
+all: build
 
 #
 # Generic targets: build, install, clean, build images.
@@ -383,7 +383,7 @@ image-%:
 	    --build-arg GOLICENSES_VERSION=$(GOLICENSES_VERSION) \
 	    -t $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
 
-image-push-%: image-%
+image-push-%:
 	$(Q)bin=$(patsubst image-push-%,%,$@); \
 		if [ -z "$(IMAGE_REPO)" ]; then echo "ERROR: no IMAGE_REPO specified"; exit 1; fi; \
 		$(DOCKER) push $(IMAGE_REPO)$$bin:$(IMAGE_VERSION)
@@ -591,13 +591,14 @@ cross-rpm.%: docker/cross-build/% clean-spec spec dist
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp packaging/rpm/cri-resource-manager.spec $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_RPM_BUILD)' && \
-	rm -fr $$builddir
+	rm -fr $$builddir && \
+	install -D -m644  $$outdir/cri-resource-manager-$(RPM_VERSION)-0.x86_64.rpm $(PACKAGES_DIR)/release-assets/cri-resource-manager-$(RPM_VERSION)-0.$$distro.x86_64.rpm
 
 src.rpm source-rpm: spec dist
 	mkdir -p ~/rpmbuild/{SOURCES,SPECS} && \
@@ -634,13 +635,14 @@ cross-deb.%: docker/cross-build/% \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
 	cp -r debian $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    $$distro-build /bin/bash -c '$(DOCKER_DEB_BUILD)' && \
-	rm -fr $$builddir
+	rm -fr $$builddir && \
+	install -D -m644 $$outdir/cri-resource-manager_$(DEB_VERSION)_amd64.deb $(PACKAGES_DIR)/release-assets/cri-resource-manager_$(DEB_VERSION)_$${distro}_amd64.deb
 
 deb: debian/changelog debian/control debian/rules debian/compat dist
 	dpkg-buildpackage -uc
@@ -653,7 +655,7 @@ cross-bin.%: docker/cross-build/% dist
 	mkdir -p $(BINARIES_DIR)/$$distro && \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
@@ -669,13 +671,14 @@ cross-tar cross-tarball: dist docker/cross-build/fedora
 	mkdir -p $$outdir && \
 	rm -fr $$builddir && mkdir -p $$builddir/{input,build} && \
 	cp cri-resource-manager-$(TAR_VERSION).tar$(GZEXT) $$builddir/input && \
-	$(DOCKER) run --rm -ti $(DOCKER_OPTIONS) --user $$USER \
+	$(DOCKER) run --rm $(DOCKER_OPTIONS) --user $$USER \
 	    --env USER_NAME="$(USER_NAME)" --env USER_EMAIL=$(USER_EMAIL) \
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
 	    centos-7-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
-	rm -fr $$builddir
+	rm -fr $$builddir && \
+	install -D -m644 -t $(PACKAGES_DIR)/release-assets $$outdir/cri-resource-manager-$(TAR_VERSION).x86_64.tar.gz
 
 # Build a docker image (for distro cross-building).
 docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
@@ -683,7 +686,7 @@ docker/cross-build/%: dockerfiles/cross-build/Dockerfile.%
 	echo "Building cross-build docker image for $$distro..." && \
 	img=$${distro}-build && $(DOCKER) rm $$distro-build || : && \
 	scripts/build/docker-build-image $$distro-build \
-	    --container $(DOCKER_PULL) \
+	    $(DOCKER_PULL) \
 	    --build-arg GO_VERSION=$(GO_VERSION) \
 	    --build-arg GOLICENSES_VERSION=$(GOLICENSES_VERSION) \
 	    $(DOCKER_OPTIONS)
@@ -718,12 +721,6 @@ install-protoc-gen-go-grpc:
 	$(Q)$(GO_INSTALL) google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0
 
 install-protoc-tools: install-protoc install-protoc-gen-go install-protoc-gen-go-grpc
-
-# Rules for updating github workflows.
-update-workflows: .github/workflows/verify.yml
-
-.github/workflows/verify.yml: go.mod
-	$(Q)sed -E -i "s/go-version:.*$$/go-version: $(GO_VERSION)/g" $@
 
 #
 # go dependencies for our binaries (careful with that axe, Eugene...)
@@ -816,7 +813,6 @@ pkg/cri/resource-manager/visualizer/bubbles/assets_gendata.go:: \
 .PHONY: all build install clean test images images-push release-tests e2e-tests \
 	format vet cyclomatic-check lint golangci-lint \
 	cross-packages cross-rpm cross-deb \
-        update-workflows
 
 #
 # Rules for documentation

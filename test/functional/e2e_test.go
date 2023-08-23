@@ -18,17 +18,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-
 	resmgr "github.com/intel/cri-resource-manager/pkg/cri/resource-manager"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
+	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	"github.com/intel/cri-resource-manager/pkg/dump"
 	"google.golang.org/grpc"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -64,7 +62,7 @@ func (env *testEnv) Run(name string, testFunction func(context.Context, *testEnv
 
 	t.Helper()
 	t.Run(name, func(t *testing.T) {
-		tmpDir, err := ioutil.TempDir(testDir, "requests-")
+		tmpDir, err := os.MkdirTemp(testDir, "requests-")
 		if err != nil {
 			t.Fatalf("unable to create temp directory: %+v", err)
 		}
@@ -94,7 +92,7 @@ func (env *testEnv) Run(name string, testFunction func(context.Context, *testEnv
 
 		if env.forceConfig != "" {
 			path := filepath.Join(tmpDir, "forcedconfig.cfg")
-			if err := ioutil.WriteFile(path, []byte(env.forceConfig), 0644); err != nil {
+			if err := os.WriteFile(path, []byte(env.forceConfig), 0644); err != nil {
 				t.Fatalf("failed to create configuration file %s: %v", path, err)
 			}
 			if err := flag.Set("force-config", path); err != nil {
@@ -449,7 +447,7 @@ func createPodRequest(name, uid, namespace string,
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[kubetypes.KubernetesPodUIDLabel] = uid
+	labels[kubernetes.PodUIDLabel] = uid
 	return &criv1.RunPodSandboxRequest{
 		Config: &criv1.PodSandboxConfig{
 			Metadata: &criv1.PodSandboxMetadata{

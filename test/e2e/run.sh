@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DEMO_TITLE="Container Runtime End-to-End Testing"
-DEFAULT_DISTRO="ubuntu-20.04"
+DEFAULT_DISTRO="ubuntu-22.04"
 
 PV='pv -qL'
 

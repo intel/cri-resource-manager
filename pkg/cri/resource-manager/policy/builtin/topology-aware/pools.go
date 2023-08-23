@@ -18,11 +18,10 @@ import (
 	"math"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/cache"
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/kubernetes"
 	system "github.com/intel/cri-resource-manager/pkg/sysfs"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 	idset "github.com/intel/goresctrl/pkg/utils"
 )
 
@@ -657,7 +656,7 @@ func (p *policy) applyGrant(grant Grant) {
 		//     processes in the same pool. Also the 'data' process should run fine, since
 		//     it does not need to compete for CPU with any other processes in the system
 		//     as long as that allocation is genuinely system-wide exclusive.
-		container.SetCPUShares(int64(cache.MilliCPUToShares(cpuPortion)))
+		container.SetCPUShares(int64(cache.MilliCPUToShares(int64(cpuPortion))))
 	}
 
 	if mems != "" {

@@ -17,7 +17,6 @@ package policy
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -25,10 +24,10 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 
 	"github.com/intel/cri-resource-manager/pkg/cgroups"
 	"github.com/intel/cri-resource-manager/pkg/config"
+	"github.com/intel/cri-resource-manager/pkg/utils/cpuset"
 )
 
 const (
@@ -187,7 +186,7 @@ func (cs *ConstraintSet) parseCPUFromCgroup(dir string) error {
 		// dir is none of the previous
 		return policyError("failed to find cpuset.cpus for CPU cgroup constraint %q", dir)
 	}
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return policyError("failed read CPU cpuset cgroup constraint %q: %v",
 			path, err)

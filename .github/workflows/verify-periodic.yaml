@@ -1,0 +1,14 @@
+name: Verify branches periodic
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-code:
+    uses: "./.github/workflows/common-verify-code.yaml"
+
