@@ -23,8 +23,8 @@ CRI_RESMGR_OUTPUT="cat cri-resmgr.output.txt"
 PMEM_USED_BEFORE_POD0="$(pmem-used)"
 
 DURATION=10s
-COLD_ALLOC=$((10 * 1024))kB
-WARM_ALLOC=$((20 * 1024))kB
+COLD_ALLOC_KB=$((50 * 1024))
+WARM_ALLOC_KB=$((100 * 1024))
 MEM=1G
 create bb-coldstart
 
@@ -40,14 +40,15 @@ vm-run-until "pgrep -f '^sh -c paused after cold_alloc'" >/dev/null ||
     error "cold memory allocation timed out"
 
 echo "Verify PMEM consumption during cold period."
-PMEM_ERROR_MARGIN=1024 # meminfo MemUsed vs dd bytes error margin
+# meminfo MemUsed vs dd bytes error margin, use 10%
+PMEM_ERROR_MARGIN=$((COLD_ALLOC_KB / 10))
 sleep 1
 PMEM_USED_COLD_POD0="$(pmem-used)"
 PMEM_COLD_CONSUMED=$(( $PMEM_USED_COLD_POD0 - $PMEM_USED_BEFORE_POD0 ))
-if (( $PMEM_COLD_CONSUMED + $PMEM_ERROR_MARGIN < ${COLD_ALLOC%kB} )); then
-    error "pod0 did not allocate $COLD_ALLOC from PMEM. MemUsed PMEM delta: $PMEM_COLD_CONSUMED"
+if (( $PMEM_COLD_CONSUMED + $PMEM_ERROR_MARGIN < $COLD_ALLOC_KB )); then
+    error "pod0 did not allocate ${COLD_ALLOC_KB}kB from PMEM. MemUsed PMEM delta: $PMEM_COLD_CONSUMED"
 else
-    echo "### Verified: PMEM memory consumed during cold period: $PMEM_COLD_CONSUMED kB, pod script allocated: ${COLD_ALLOC%kB} kB"
+    echo "### Verified: PMEM memory consumed during cold period: $PMEM_COLD_CONSUMED kB, pod script allocated: $COLD_ALLOC_KB kB"
 fi
 
 coldstarts=$(vm-command-q "$CRI_RESMGR_OUTPUT | grep 'finishing coldstart period for pod0:pod0c0' | wc -l")
@@ -74,7 +75,7 @@ sleep 1
 PMEM_USED_WARM_POD0="$(pmem-used)"
 PMEM_WARM_CONSUMED=$(( $PMEM_USED_WARM_POD0 - $PMEM_USED_COLD_POD0 ))
 if (( $PMEM_WARM_CONSUMED > 0 )); then
-    echo "### Verify (soft) failed: pod0 allocated $WARM_ALLOC from PMEM. Should have been taken from DRAM."
+    echo "### Verify (soft) failed: pod0 allocated $WARM_ALLOC_KB kB from PMEM. Should have been taken from DRAM."
 else
-    echo "### Verified (soft): PMEM memory consumption delta during warm period: $PMEM_WARM_CONSUMED kB, pod script allocated: ${WARM_ALLOC%kB} kB"
+    echo "### Verified (soft): PMEM memory consumption delta during warm period: $PMEM_WARM_CONSUMED kB, pod script allocated: $WARM_ALLOC_KB kB"
 fi

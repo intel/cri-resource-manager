@@ -7,7 +7,7 @@ metadata:
       ${NAME}c0: dram,pmem
     cri-resource-manager.intel.com/cold-start: |
       ${NAME}c0:
-        duration: ${DURATION}
+        duration: ${DURATION_S}s
 spec:
   containers:
     - name: ${NAME}c0
@@ -16,9 +16,9 @@ spec:
       command:
         - sh
         - -c
-        - 'cold_alloc=\$(dd if=/dev/zero bs=${COLD_ALLOC} count=1 | tr \"\\\0\" \"x\");
+        - 'cold_alloc=\$(dd if=/dev/zero bs=${COLD_ALLOC_KB}kB count=1 | tr \"\\\0\" \"x\");
            sh -c \"paused after cold_alloc \\\$(sleep inf)\";
-           warm_alloc=\$(dd if=/dev/zero bs=${WARM_ALLOC} count=1 | tr \"\\\0\" \"x\");
+           warm_alloc=\$(dd if=/dev/zero bs=${WARM_ALLOC_KB}kB count=1 | tr \"\\\0\" \"x\");
            sh -c \"paused after warm_alloc \\\$(sleep inf)\";
            echo ${NAME}c0 \$(sleep inf); # needed for pod resource discovery'
       resources:
