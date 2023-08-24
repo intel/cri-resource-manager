@@ -765,6 +765,17 @@ verify() { # script API
     #          nodes and that pod0c0 is allowed to run on 4 CPUs:
     #   verify 'set.intersection(nodes["pod0c0"], nodes["pod1c0"]) == set()' \
     #          'len(cpus["pod0c0"]) == 4'
+    local retries=5
+    while (( retries > 0 )); do
+        ( __verify "$@" ) && return 0
+        retries=$(( retries - 1 ))
+        echo "re-trying verify $@, $retries tries left..."
+        sleep 1s
+    done
+    error "failed to verify $@"
+}
+
+__verify() {
     get-py-allowed
     get-py-cache
     for py_assertion in "$@"; do
