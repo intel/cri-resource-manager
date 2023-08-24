@@ -3,8 +3,8 @@
 
 CONTCOUNT=1 CPU=1000m MEM=64M create guaranteed
 report allowed
-verify 'len(cpus["pod0c0"]) == 1'
-pyexec 'assert "pod0c0" in allocations'
+verify 'len(cpus["pod0c0"]) == 1' \
+       '"pod0c0" in allocations'
 
 out '### Crash and restart pod0c0'
 vm-command "kubectl get pods pod0"
@@ -20,8 +20,8 @@ vm-command 'kubectl wait --for=condition=Ready pods/pod0'
 vm-run-until --timeout 30 "pgrep -f pod0c0 > /dev/null 2>&1"
 vm-command "kubectl get pods pod0"
 report allowed
-verify 'len(cpus["pod0c0"]) == 1'
-pyexec 'assert "pod0c0" in allocations'
+verify 'len(cpus["pod0c0"]) == 1' \
+       '"pod0c0" in allocations'
 
 out '### Kill the child process in pod0c0. The root process exits with status 0, the container should get Completed.'
 vm-command "kubectl get pods pod0"
