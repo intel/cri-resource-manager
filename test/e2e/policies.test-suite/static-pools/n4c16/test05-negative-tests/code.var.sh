@@ -15,7 +15,7 @@ vm-run-until "kubectl describe pods/pod0 | grep '$errmsg_non_existing_pool'" ||
     error "cannot find expected error message from pod description"
 out "Failed as expected"
 
-kubectl delete pods --all --now || error "failed to delete pods"
+kubectl delete pods --all --now --wait || error "failed to delete pods"
 
 out ""
 out "### Request cores from non-existing socket"
@@ -25,7 +25,7 @@ vm-run-until "kubectl describe pods/pod0 | grep '$errmsg_not_enough_exclcores'" 
     error "cannot find expected error message from pod description"
 out "Failed as expected"
 
-kubectl delete pods --all --now || error "failed to delete pods"
+kubectl delete pods --all --now --wait || error "failed to delete pods"
 
 out ""
 out "### Request exclusive pool but do not mention exclusive-cores"
@@ -35,7 +35,7 @@ vm-run-until "kubectl describe pods/pod0 | grep '$errmsg_zero_cores'" ||
     error "cannot find expected error message from pod description"
 out "Failed as expected"
 
-kubectl delete pods --all --now || error "failed to delete pods"
+kubectl delete pods --all --now --wait || error "failed to delete pods"
 
 out ""
 out "### Request 0 cores from exclusive pool"
@@ -45,7 +45,7 @@ vm-run-until "kubectl describe pods/pod0 | grep '$errmsg_zero_cores'" ||
     error "cannot find expected error message from pod description"
 out "Failed as expected"
 
-kubectl delete pods --all --now || error "failed to delete pods"
+kubectl delete pods --all --now --wait || error "failed to delete pods"
 
 out ""
 out "### Request more cores from socket 0 than available"
@@ -55,7 +55,7 @@ vm-run-until "kubectl describe pods/pod0 | grep '$errmsg_not_enough_exclcores'" 
     error "cannot find expected error message from pod description"
 out "Failed as expected"
 
-kubectl delete pods --all --now || error "failed to delete pods"
+kubectl delete pods --all --now --wait || error "failed to delete pods"
 
 out ""
 out "### Request more cores from socket 1 than available"
@@ -65,4 +65,4 @@ vm-run-until "kubectl describe pods/pod0 | grep '$errmsg_not_enough_exclcores'" 
     error "cannot find expected error message from pod description"
 out "Failed as expected"
 
-kubectl delete pods --all --now || error "failed to delete pods"
+kubectl delete pods --all --now --wait || error "failed to delete pods"

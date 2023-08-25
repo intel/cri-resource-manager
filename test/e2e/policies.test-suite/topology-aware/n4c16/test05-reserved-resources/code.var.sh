@@ -13,7 +13,7 @@ cri_resmgr_cfg_orig=$cri_resmgr_cfg
 # if exiting with success. Otherwise leave the pod running for
 # debugging in case of a failure.
 cleanup-kube-system() {
-    ( kubectl delete pods pod0 pod1 pod2 pod3 pod4 pod5 -n kube-system --now ) || true
+    ( kubectl delete pods pod0 pod1 pod2 pod3 pod4 pod5 -n kube-system --now --wait --ignore-not-found ) || true
 }
 cleanup-kube-system
 
@@ -43,7 +43,7 @@ launch cri-resmgr
 namespace=kube-system CONTCOUNT=3 create besteffort
 report allowed
 verify "cpus['pod0c0'] == cpus['pod0c1'] == cpus['pod0c2'] == {'cpu10', 'cpu11'}"
-kubectl delete -n kube-system pods pod0
+kubectl delete -n kube-system pods pod0 --now --wait --ignore-not-found
 
 # Test that BestEffort containers are pinned to reserved CPUs.
 terminate cri-resmgr
@@ -74,7 +74,7 @@ verify "cpus['pod2c0'] == cpus['pod2c1'] == cpus['pod2c2'] == cpus['pod2c3']" \
 for pod in pod3 pod4; do
     namespace=kube-system CPU=1 CONTCOUNT=1 create guaranteed
     verify "cpus['${pod}c0'] == {'cpu07', 'cpu11'}"
-    kubectl delete -n kube-system pods/$pod --now
+    kubectl delete -n kube-system pods/$pod --now --wait --ignore-not-found
 done
 
 # Test requesting more reserved CPUs than available in the system.
@@ -95,7 +95,7 @@ launch cri-resmgr
 namespace=kube-system CPU=2 CONTCOUNT=1 create besteffort
 verify "cpus['pod0c0'] == {'cpu04', 'cpu05', 'cpu06'}"
 
-kubectl delete -n kube-system pods/pod0
+kubectl delete -n kube-system pods/pod0 --now --wait --ignore-not-found
 
 terminate cri-resmgr
 cri_resmgr_cfg=$cri_resmgr_cfg_orig

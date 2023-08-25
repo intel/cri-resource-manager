@@ -54,7 +54,7 @@ verify \
     'nodes["pod0c2"] == {"node3"}' \
     'nodes["pod0c3"] == {"node0"}'
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod1
 # 4 containers, affinites [0,1], [2,3] => colocate c0,c1 in node1, c2,c3 in node2
@@ -65,7 +65,7 @@ verify \
     'nodes["pod1c0"] == nodes["pod1c1"] == {"node1"}' \
     'nodes["pod1c2"] == nodes["pod1c3"] == {"node2"}'
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod2
 # 6 containers, anti-affinites 4:[0,1,2], 5:[0,2,3]

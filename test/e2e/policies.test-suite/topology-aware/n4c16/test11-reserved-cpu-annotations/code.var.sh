@@ -4,8 +4,8 @@
 cri_resmgr_cfg_orig=$cri_resmgr_cfg
 
 cleanup-test-pods() {
-    ( kubectl delete pods pod0 --now ) || true
-    ( kubectl delete pods pod1 --now ) || true
+    ( kubectl delete pods pod0 --now --wait --ignore-not-found ) || true
+    ( kubectl delete pods pod1 --now --wait --ignore-not-found ) || true
 }
 cleanup-test-pods
 

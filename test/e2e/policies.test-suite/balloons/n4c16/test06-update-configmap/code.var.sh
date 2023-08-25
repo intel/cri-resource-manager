@@ -4,11 +4,9 @@
 testns=e2e-balloons-test06
 
 cleanup() {
-    vm-command "kubectl delete pods --all --now; \
-        kubectl delete pods -n $testns --all --now; \
-        kubectl delete pods -n btype1ns0 --all --now; \
-        kubectl delete namespace $testns || :; \
-        kubectl delete namespace btype1ns0 || :"
+    vm-command "kubectl delete pods --all --now --wait; \
+        kubectl delete namespace $testns --now --wait --ignore-not-found || :; \
+        kubectl delete namespace btype1ns0 --now --wait --ignore-not-found || :"
     terminate cri-resmgr
     terminate cri-resmgr-agent
     vm-command "cri-resmgr -reset-policy; cri-resmgr -reset-config"

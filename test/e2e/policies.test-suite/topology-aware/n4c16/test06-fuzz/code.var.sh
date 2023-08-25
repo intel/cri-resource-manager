@@ -4,7 +4,7 @@ source $TEST_DIR/codelib.sh || {
 }
 
 # Clean test pods from the kube-system namespace
-( kubectl delete pods -n kube-system $(kubectl get pods -n kube-system | awk '/t[0-9]r[gb][ue]/{print $1}') ) || true
+( kubectl delete pods --now --wait --ignore-not-found -n kube-system $(kubectl get pods -n kube-system | awk '/t[0-9]r[gb][ue]/{print $1}') ) || true
 
 # Run generated*.sh test scripts in this directory.
 genscriptcount=0
