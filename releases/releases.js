@@ -12,5 +12,6 @@ function getReleaseListItems() {
     { name: 'v0.8.1', url: 'v0.8.1' },
     { name: 'v0.8.2', url: 'v0.8.2' },
     { name: 'v0.8.3', url: 'v0.8.3' },
+    { name: 'v0.8.4', url: 'v0.8.4' },
   ];
 }
