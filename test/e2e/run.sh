@@ -222,16 +222,7 @@ get-py-allowed() {
         }
         echo -e "$COMMAND_OUTPUT" > "$topology_dump_file"
     fi
-    # Fetch data and update allowed* variables from the virtual machine
-    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed 'pod[0-9]*c[0-9]*')" >/dev/null || {
-        command-error "error fetching res_allowed from $VM_NAME"
-    }
-    echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
-    # Validate res_allowed_file. Error out if there is same container
-    # name with two different sets of allowed CPUs or memories.
-    awk -F "[ /]" '{if (pod[$1]!=0 && pod[$1]!=""$3""$4){print "error: ambiguous allowed resources for name "$1; exit(1)};pod[$1]=""$3""$4}' "$res_allowed_file" || {
-        error "container/process name collision: test environment needs cleanup."
-    }
+    get-res-allowed "$res_allowed_file"
     py_allowed="
 import re
 allowed=$("$DEMO_LIB_DIR/topology.py" -t "$topology_dump_file" -r "$res_allowed_file" res_allowed -o json)
@@ -295,6 +286,29 @@ core_ids = lambda i: set_ids(i, '[nodecore]')
 thread_ids = lambda i: set_ids(i, '[nodecorethread]')
 cpu_ids = lambda i: set_ids(i, '[cpu]')
 "
+}
+
+get-res-allowed() {
+    local res_allowed_file="$1"
+    local retries=5
+    while (( retries > 0 )); do
+        # Fetch data and update allowed* variables from the virtual machine
+        vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed 'pod[0-9]*c[0-9]*')" >/dev/null || {
+            command-error "error fetching res_allowed from $VM_NAME"
+        }
+        echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
+        # Validate res_allowed_file. Retry if there is same container
+        # name with two different sets of allowed CPUs or
+        # memories. This is possible if cpuset.cpus of the cgroup has
+        # been just changed and different processes in the same
+        # container are just going through the change. Or if there are
+        # several pods/containers running with the same name.
+        awk -F "[ /]" '{if (pod[$1]!=0 && pod[$1]!=""$3""$4){print "error: ambiguous allowed resources for name "$1; exit(1)};pod[$1]=""$3""$4}' "$res_allowed_file" && return 0
+        mv "$res_allowed_file" "$res_allowed_file.retries${retries}"
+        echo "    see $res_allowed_file.retries${retries} for more details"
+        retries=$(( retries - 1 ))
+    done
+    error "error: container/process name collision: test environment may need cleanup."
 }
 
 get-py-cache() {
