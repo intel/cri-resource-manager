@@ -761,13 +761,18 @@ pprint.pprint(cache)
 }
 
 verify() { # script API
-    # Usage: verify [EXPR...]
+    # Usage: verify [--retry N] [EXPR...]
     #
     # Run python3 -c "assert(EXPR)" to test that every EXPR is True.
-    # Stop evaluation on the first EXPR not True and fail the test.
-    # You can allow script execution to continue after failed verification
-    # by running verify in a subshell (in parenthesis):
-    #   (verify 'False') || echo '...but was expected to fail.'
+    # Stop immediately after the first failing assertion and fail the test.
+    #
+    # If a verify is expected to fail, failing the whole test can be
+    # prevented by running the verify in a subshell (in parenthesis):
+    #   (verify 'False') || echo '...this was expected to fail.'
+    #
+    # --retry N reruns all assertions at most N times before failing
+    # the test. All assertions must hold at the same time for a
+    # successful verification. By default N=3.
     #
     # Variables available in EXPRs:
     #   See variables in: help pyexec
@@ -779,6 +784,30 @@ verify() { # script API
     #          nodes and that pod0c0 is allowed to run on 4 CPUs:
     #   verify 'set.intersection(nodes["pod0c0"], nodes["pod1c0"]) == set()' \
     #          'len(cpus["pod0c0"]) == 4'
+    local retries=3
+    local poll_delay=1s
+    if [[ "$1" == "--retry" ]]; then
+        retries="$2"
+        shift; shift
+    fi
+    while ! _verify "$@"; do
+        if (( retries <= 0 )); then
+            if is-hooked on_verify_fail; then
+                run-hook on_verify_fail
+            else
+                command-exit-if-not-interactive
+            fi
+            return 1
+        fi
+        out "### Retrying verify at most $retries time(s) after $poll_delay..."
+        sleep "$poll_delay"
+        retries=$(( retries - 1 ))
+    done
+    is-hooked on_verify && run-hook on_verify
+    return 0
+}
+
+_verify() {
     get-py-allowed
     get-py-cache
     for py_assertion in "$@"; do
@@ -812,15 +841,10 @@ from pyexec_state import *
 $py_assertion
 ### post-mortem debug help end ###"
                 echo "verify: assertion '$py_assertion' failed." >> "$SUMMARY_FILE"
-                if is-hooked on_verify_fail; then
-                    run-hook on_verify_fail
-                else
-                    command-exit-if-not-interactive
-                fi
+                return 1
         }
         speed=1000 out "### The assertion holds."
     done
-    is-hooked on_verify && run-hook on_verify
     return 0
 }
 
