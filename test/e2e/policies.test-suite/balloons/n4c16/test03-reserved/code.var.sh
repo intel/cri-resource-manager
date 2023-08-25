@@ -3,15 +3,15 @@ cri_resmgr_cfg=${TEST_DIR}/balloons-reserved.cfg launch cri-resmgr
 
 cleanup() {
     vm-command \
-        "kubectl delete pod -n kube-system --now pod0
-         kubectl delete pod -n monitor-mypods --now pod1
-         kubectl delete pod -n system-logs --now pod2
-         kubectl delete pod -n kube-system --now pod3
-         kubectl delete pods --now pod4 pod5 pod6
-         kubectl delete pod -n kube-system --now pod7
-         kubectl delete namespace monitor-mypods
-         kubectl delete namespace system-logs
-         kubectl delete namespace my-exact-name"
+        "kubectl delete pod -n kube-system --now --wait --ignore-not-found pod0
+         kubectl delete pod -n monitor-mypods --now --wait --ignore-not-found pod1
+         kubectl delete pod -n system-logs --now --wait --ignore-not-found pod2
+         kubectl delete pod -n kube-system --now --wait --ignore-not-found pod3
+         kubectl delete pods --now --wait --ignore-not-found pod4 pod5 pod6
+         kubectl delete pod -n kube-system --now --wait --ignore-not-found pod7
+         kubectl delete namespace monitor-mypods --wait --ignore-not-found
+         kubectl delete namespace system-logs --wait --ignore-not-found
+         kubectl delete namespace my-exact-name --wait --ignore-not-found"
     return 0
 }
 

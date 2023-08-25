@@ -51,7 +51,7 @@ verify \
     'len(nodes["pod3c0"]) == 2' \
     'disjoint_sets(cpus["pod0c0"], cpus["pod1c0"], cpus["pod2c0"], cpus["pod3c0"])'
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod4, fits in a die/package
 CPU=5 create guaranteed
@@ -76,7 +76,7 @@ verify \
     'len(dies["pod5c0"]) == 1' \
     'disjoint_sets(cpus["pod4c0"], cpus["pod5c0"])'
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod6, doesn't fit in a die/package, needs virtual root
 CPU=9 create guaranteed
@@ -85,7 +85,7 @@ verify \
     'len(cpus["pod6c0"]) == 9' \
     'len(packages["pod6c0"]) == 2'
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 reset counters
 
@@ -110,7 +110,7 @@ verify \
     'len(cpus["pod1c0"]) >= 4' \
     'len(cpus["pod2c0"]) >= 5'
 
-kubectl delete pods pod0 pod1 --now
+kubectl delete pods pod0 pod1 --now --wait --ignore-not-found
 
 # pod3
 CPUREQ=8 CPULIM=$(( CPUREQ + 1 )) create burstable
@@ -119,7 +119,7 @@ verify \
     'len(cpus["pod2c0"]) >= 5' \
     'len(cpus["pod3c0"]) >= 8'
 
-kubectl delete pods pod3 --now
+kubectl delete pods pod3 --now --wait --ignore-not-found
 
 # pod4, pod5 (and existing pod2) take 5 and 4 CPUs. As there are 8
 # CPUs/node, pod2 and pod4 have consumed free node

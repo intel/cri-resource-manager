@@ -616,25 +616,10 @@ vm-reboot() { # script API
     # Reboots the virtual machine and waits that the ssh server starts
     # responding again.
     vm-command "reboot"
-    sleep 5
-    host-wait-vm-ssh-server
-}
-
-vm-force-restart() { # script API
-    # Usage: vm-force-restart
-    #
-    # Give the virtual machine a chance to shut itself down, then
-    # forcibly restart it using govm stop/start. Wait for the ssh
-    # server to start responding again after restarting. If VM_NAME
-    # is not set assume the target machine to not be govm-managed
-    # and fall back to vm-reboot instead.
-    if vm-is-govm; then
-        vm-command "shutdown -h now"
-        sleep 10
+    sleep 10
+    if ! host-wait-vm-ssh-server; then
         vm-monitor system_reset
         host-wait-vm-ssh-server
-    else
-      vm-reboot
     fi
 }
 
@@ -1024,6 +1009,7 @@ vm-create-singlenode-cluster() {
     if ! vm-command "kubectl wait --for=condition=Ready node/\$(hostname) --timeout=240s"; then
         command-error "kubectl waiting for node readiness timed out"
     fi
+    vm-run-until --timeout 30 "kubectl get sa default > /dev/null" || error "serviceaccount 'default' not found"
 }
 
 vm-create-cluster() {
@@ -1044,6 +1030,25 @@ vm-create-cluster() {
 vm-destroy-cluster() {
     user="$(vm-ssh-user)"
     vm-command "yes | kubeadm reset; rm -f ~$user/.kube/config ~root/.kube/config /etc/kubernetes"
+}
+
+vm-install-cni-bridge() {
+    vm-command "rm -rf /etc/cni/net.d/* && mkdir -p /etc/cni/net.d && cat > /etc/cni/net.d/10-bridge.conf <<EOF
+{
+  \"cniVersion\": \"0.4.0\",
+  \"name\": \"demonet\",
+  \"type\": \"bridge\",
+  \"isGateway\": true,
+  \"ipMasq\": true,
+  \"ipam\": {
+    \"type\": \"host-local\",
+    \"subnet\": \"$CNI_SUBNET\",
+    \"routes\": [
+      { \"dst\": \"0.0.0.0/0\" }
+    ]
+  }
+}
+EOF"
 }
 
 vm-install-cni-cilium() {

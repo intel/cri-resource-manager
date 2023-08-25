@@ -472,23 +472,7 @@ e2e-tests: build-static
 	fi
 
 packaging-tests: cross-packages
-	$(Q)for dir in test/e2e/packages.test-suite/*; do \
-	    cleanup=1 omit_agent=1 $(E2E_RUN) $$dir; \
-	    echo "--------------------------------------"; \
-	    for r in $(find $$dir -name summary.txt); do \
-	        t="$${r#*.test-suite/}"; t="$${t%/output/summary.txt}"; \
-	        echo "$$t:"; \
-	        cat $$r | sed 's/^/    /g'; \
-	    done; \
-	    echo "======================================"; \
-	done; \
-	for dir in test/e2e/packages.test-suite/*; do \
-	    for r in $(find $$dir -name summary.txt); do \
-	        t="$${r#*.test-suite/}"; t="$${t%/output/summary.txt}"; \
-	        echo "$$t:"; \
-	        cat $$r | sed 's/^/    /g'; \
-	    done; \
-	done;
+	$(Q)cleanup=1 omit_agent=1 $(E2E_RUN) test/e2e/packages.test-suite
 
 #
 # Rules for building distro packages.

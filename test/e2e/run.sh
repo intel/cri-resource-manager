@@ -101,7 +101,7 @@ usage() {
     echo "    distro:  Linux distribution to be / already installed on vm."
     echo "             Supported values: centos-7, centos-8, debian-10, debian-sid"
     echo "                 fedora, fedora-33, opensuse-tumbleweed,"
-    echo "                 opensuse-15.4 (same as opensuse), sles,"
+    echo "                 opensuse-15.4 (same as opensuse), opensuse-15.5, sles,"
     echo "                 ubuntu-18.04, ubuntu-20.04, ubuntu-22.04"
     echo "             If sles: set VM_SLES_REGCODE=<CODE> to use official packages."
     echo "    cgroups: cgroups version in the VM, v1 or v2. The default is v1."
@@ -222,16 +222,7 @@ get-py-allowed() {
         }
         echo -e "$COMMAND_OUTPUT" > "$topology_dump_file"
     fi
-    # Fetch data and update allowed* variables from the virtual machine
-    vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed 'pod[0-9]*c[0-9]*')" >/dev/null || {
-        command-error "error fetching res_allowed from $VM_NAME"
-    }
-    echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
-    # Validate res_allowed_file. Error out if there is same container
-    # name with two different sets of allowed CPUs or memories.
-    awk -F "[ /]" '{if (pod[$1]!=0 && pod[$1]!=""$3""$4){print "error: ambiguous allowed resources for name "$1; exit(1)};pod[$1]=""$3""$4}' "$res_allowed_file" || {
-        error "container/process name collision: test environment needs cleanup."
-    }
+    get-res-allowed "$res_allowed_file"
     py_allowed="
 import re
 allowed=$("$DEMO_LIB_DIR/topology.py" -t "$topology_dump_file" -r "$res_allowed_file" res_allowed -o json)
@@ -295,6 +286,29 @@ core_ids = lambda i: set_ids(i, '[nodecore]')
 thread_ids = lambda i: set_ids(i, '[nodecorethread]')
 cpu_ids = lambda i: set_ids(i, '[cpu]')
 "
+}
+
+get-res-allowed() {
+    local res_allowed_file="$1"
+    local retries=5
+    while (( retries > 0 )); do
+        # Fetch data and update allowed* variables from the virtual machine
+        vm-command "$("$DEMO_LIB_DIR/topology.py" bash_res_allowed 'pod[0-9]*c[0-9]*')" >/dev/null || {
+            command-error "error fetching res_allowed from $VM_NAME"
+        }
+        echo -e "$COMMAND_OUTPUT" > "$res_allowed_file"
+        # Validate res_allowed_file. Retry if there is same container
+        # name with two different sets of allowed CPUs or
+        # memories. This is possible if cpuset.cpus of the cgroup has
+        # been just changed and different processes in the same
+        # container are just going through the change. Or if there are
+        # several pods/containers running with the same name.
+        awk -F "[ /]" '{if (pod[$1]!=0 && pod[$1]!=""$3""$4){print "error: ambiguous allowed resources for name "$1; exit(1)};pod[$1]=""$3""$4}' "$res_allowed_file" && return 0
+        mv "$res_allowed_file" "$res_allowed_file.retries${retries}"
+        echo "    see $res_allowed_file.retries${retries} for more details"
+        retries=$(( retries - 1 ))
+    done
+    error "error: container/process name collision: test environment may need cleanup."
 }
 
 get-py-cache() {
@@ -747,13 +761,18 @@ pprint.pprint(cache)
 }
 
 verify() { # script API
-    # Usage: verify [EXPR...]
+    # Usage: verify [--retry N] [EXPR...]
     #
     # Run python3 -c "assert(EXPR)" to test that every EXPR is True.
-    # Stop evaluation on the first EXPR not True and fail the test.
-    # You can allow script execution to continue after failed verification
-    # by running verify in a subshell (in parenthesis):
-    #   (verify 'False') || echo '...but was expected to fail.'
+    # Stop immediately after the first failing assertion and fail the test.
+    #
+    # If a verify is expected to fail, failing the whole test can be
+    # prevented by running the verify in a subshell (in parenthesis):
+    #   (verify 'False') || echo '...this was expected to fail.'
+    #
+    # --retry N reruns all assertions at most N times before failing
+    # the test. All assertions must hold at the same time for a
+    # successful verification. By default N=3.
     #
     # Variables available in EXPRs:
     #   See variables in: help pyexec
@@ -765,6 +784,30 @@ verify() { # script API
     #          nodes and that pod0c0 is allowed to run on 4 CPUs:
     #   verify 'set.intersection(nodes["pod0c0"], nodes["pod1c0"]) == set()' \
     #          'len(cpus["pod0c0"]) == 4'
+    local retries=3
+    local poll_delay=1s
+    if [[ "$1" == "--retry" ]]; then
+        retries="$2"
+        shift; shift
+    fi
+    while ! _verify "$@"; do
+        if (( retries <= 0 )); then
+            if is-hooked on_verify_fail; then
+                run-hook on_verify_fail
+            else
+                command-exit-if-not-interactive
+            fi
+            return 1
+        fi
+        out "### Retrying verify at most $retries time(s) after $poll_delay..."
+        sleep "$poll_delay"
+        retries=$(( retries - 1 ))
+    done
+    is-hooked on_verify && run-hook on_verify
+    return 0
+}
+
+_verify() {
     get-py-allowed
     get-py-cache
     for py_assertion in "$@"; do
@@ -798,15 +841,10 @@ from pyexec_state import *
 $py_assertion
 ### post-mortem debug help end ###"
                 echo "verify: assertion '$py_assertion' failed." >> "$SUMMARY_FILE"
-                if is-hooked on_verify_fail; then
-                    run-hook on_verify_fail
-                else
-                    command-exit-if-not-interactive
-                fi
+                return 1
         }
         speed=1000 out "### The assertion holds."
     done
-    is-hooked on_verify && run-hook on_verify
     return 0
 }
 
@@ -1044,7 +1082,7 @@ help() { # script API
 ### End of user code helpers
 
 test-user-code() {
-    vm-command-q "kubectl get pods 2>&1 | grep -q NAME" && vm-command "kubectl delete pods --all --now"
+    vm-command-q "kubectl get pods 2>&1 | grep -q NAME" && vm-command "kubectl delete pods --all --now --wait"
     ( eval "$code" ) || {
         TEST_FAILURES="${TEST_FAILURES} test script failed"
     }

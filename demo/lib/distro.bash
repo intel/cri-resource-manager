@@ -130,7 +130,7 @@ ubuntu-22_04-image-url() {
 }
 
 debian-10-image-url() {
-    echo "https://cloud.debian.org/images/cloud/buster/20200803-347/debian-10-generic-amd64-20200803-347.qcow2"
+    echo "https://cloud.debian.org/images/cloud/buster/latest/debian-10-generic-amd64.qcow2"
 }
 
 debian-11-image-url() {
@@ -381,21 +381,17 @@ centos-8-install-containerd-pre() {
     distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
 }
 
-centos-7-k8s-cni() {
-    echo "weavenet"
-}
-
 centos-install-golang() {
     distro-install-pkg wget tar gzip git-core
     from-tarball-install-golang
 }
 
 fedora-image-url() {
-    fedora-36-image-url
+    fedora-38-image-url
 }
 
-fedora-36-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/36/Cloud/x86_64/images/Fedora-Cloud-Base-36-1.5.x86_64.qcow2"
+fedora-38-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/38/Cloud/x86_64/images/Fedora-Cloud-Base-38-1.6.x86_64.qcow2"
 }
 
 fedora-35-image-url() {
@@ -686,7 +682,11 @@ opensuse-image-url() {
 }
 
 opensuse-15_4-image-url() {
-    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.4/appliances/openSUSE-Leap-15.4-JeOS.x86_64-15.4-OpenStack-Cloud-Current.qcow2"
+    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.4/appliances/openSUSE-Leap-15.4-Minimal-VM.x86_64-OpenStack-Cloud.qcow2"
+}
+
+opensuse-15_5-image-url() {
+    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.5/appliances/openSUSE-Leap-15.5-Minimal-VM.x86_64-Cloud.qcow2"
 }
 
 opensuse-tumbleweed-image-url() {
@@ -781,7 +781,9 @@ opensuse-wait-for-zypper() {
 opensuse-require-repo-virtualization-containers() {
     vm-command "zypper ls"
     if ! grep -q Virtualization_containers <<< "$COMMAND_OUTPUT"; then
-        opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/15.4/Virtualization:containers.repo
+        vm-command 'source /etc/os-release; echo $VERSION'
+        local opensuse_version=$COMMAND_OUTPUT
+        opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/${opensuse_version}/Virtualization:containers.repo
         opensuse-refresh-pkg-db
     fi
 }
@@ -1053,7 +1055,7 @@ default-install-utils() {
 }
 
 default-k8s-cni() {
-    echo ${k8scni:-cilium}
+    echo ${k8scni:-bridge}
 }
 
 default-k8s-cni-subnet() {

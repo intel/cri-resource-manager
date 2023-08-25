@@ -8,19 +8,19 @@ CRI_RESMGR_OUTPUT="cat cri-resmgr.output.txt"
 POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" CPUREQ=2900m CPULIM="" MEMREQ="" MEMLIM="" create podpools-busybox
 report allowed
 vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*overbooked.*(2899|2900)m'" || error "missing overbook warning"
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod1: overbook with single burstable pod with two containers
 POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" CPUREQ=1050m CPULIM="" MEMREQ="" MEMLIM="" CONTCOUNT=2 create podpools-busybox
 report allowed
 vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*overbooked.*2100m'" || error "missing overbook warning"
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod2, pod3: overbook with two guaranteed pods, one container in each pod
 n=2 POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" CPUREQ=1001m MEMREQ=100M CPULIM=1001m MEMLIM=100M create podpools-busybox
 report allowed
 vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*overbooked.*2002m'" || error "missing overbook warning"
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 
 # pod4, pod5: no overbooking with exact CPUs guaranteed + besteffort pod
 terminate cri-resmgr # restart to clear log
@@ -29,7 +29,7 @@ POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" CPUREQ=10
 POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" CPUREQ="" CPULIM="" MEMREQ="" MEMLIM="" create podpools-busybox
 report allowed
 vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*overbooked'" && error "overbook warning with maximum allowed load"
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait
 # podpools logs misaligned CPU requests after pod deletion
 vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*bad CPU requests:.*pod4.* requested 2000 mCPUs.* 666 mCPUs'" || error "bad CPU request from pod4 expected but not found"
 vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*bad CPU requests:.*pod5.* requested 0 mCPUs.* 666 mCPUs'" || error "bad CPU request from pod5 expected but not found"
@@ -38,4 +38,4 @@ vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*bad CPU requests:.*pod5.* requeste
 POD_ANNOTATION="pool.podpools.cri-resource-manager.intel.com: dualcpu" CPUREQ=167m CPULIM="" MEMREQ="" MEMLIM="" CONTCOUNT=4 create podpools-busybox
 vm-command "$CRI_RESMGR_OUTPUT | grep -E '^E.*bad CPU requests:.*pod6'" && error "pod6 CPU request was ok, but 'bad CPU request' error found"
 
-kubectl delete pods --all --now
+kubectl delete pods --all --now --wait

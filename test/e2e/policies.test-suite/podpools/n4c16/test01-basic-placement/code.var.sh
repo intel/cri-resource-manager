@@ -1,7 +1,7 @@
 # Test placing containers with and without annotations to correct pools
 # reserved and shared CPUs.
 
-( kubectl delete pods pod3 -n kube-system --now ) || true
+( kubectl delete pods pod3 -n kube-system --now --wait --ignore-not-found ) || true
 
 # pod0: singlecpu
 out ""
@@ -42,7 +42,7 @@ verify 'cpus["pod3c0"] == cpus["pod3c1"] == cpus["pod3c2"]' \
        'cpus["pod3c0"] == expected.cpus.reserved[0]' \
        'mems["pod3c0"] == expected.mems.reserved[0]'
 
-kubectl delete pods pod3 -n kube-system --now
+kubectl delete pods pod3 -n kube-system --now --wait --ignore-not-found
 
 # pod4: bad pool name
 out ""
@@ -52,4 +52,4 @@ report allowed
 verify 'cpus["pod4c0"] == expected.cpus.default[0]' \
        'mems["pod4c0"] == expected.mems.default[0]'
 
-kubectl delete pods pod0 pod1 pod2 --now
+kubectl delete pods pod0 pod1 pod2 --now --wait --ignore-not-found
