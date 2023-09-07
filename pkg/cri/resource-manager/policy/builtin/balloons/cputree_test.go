@@ -119,7 +119,7 @@ func verifyNotOn(t *testing.T, nameContents string, cpus cpuset.CPUSet, csit cpu
 	}
 }
 
-func verifySame(t *testing.T, topoLevel string, cpus cpuset.CPUSet, csit cpusInTopology) {
+func doVerifySame(t *testing.T, topoLevel string, cpus cpuset.CPUSet, csit cpusInTopology, inversed bool) {
 	seenName := ""
 	seenCpuID := -1
 	for _, cpuID := range cpus.List() {
@@ -132,14 +132,29 @@ func verifySame(t *testing.T, topoLevel string, cpus cpuset.CPUSet, csit cpusInT
 		if seenName == "" {
 			seenName = thisName
 			seenCpuID = cit.cpuID
+			continue
 		}
-		if seenName != thisName {
-			t.Errorf("expected the same %s, got: cpu%d in %s, cpu%d in %s",
+		if (seenName != thisName && !inversed) ||
+			(seenName == thisName && inversed) {
+			msg := "the same"
+			if inversed {
+				msg = "not the same"
+			}
+			t.Errorf("expected %s %s, got: cpu%d in %s, cpu%d in %s",
+				msg,
 				topoLevel,
 				seenCpuID, seenName,
 				thisCpuID, thisName)
 		}
 	}
+}
+
+func verifySame(t *testing.T, topoLevel string, cpus cpuset.CPUSet, csit cpusInTopology) {
+	doVerifySame(t, topoLevel, cpus, csit, false)
+}
+
+func verifyNotSame(t *testing.T, topoLevel string, cpus cpuset.CPUSet, csit cpusInTopology) {
+	doVerifySame(t, topoLevel, cpus, csit, true)
 }
 
 func (csit cpusInTopology) getElements(topoLevel string, cpus cpuset.CPUSet) []string {
@@ -214,19 +229,21 @@ func TestResizeCpus(t *testing.T) {
 		ccids []int
 	}
 	tcases := []struct {
-		name                string
-		topology            [5]int // package, die, numa, core, thread count
-		allocatorTB         bool   // allocator topologyBalancing
-		allocations         []int
-		deltas              []int
-		allocate            bool
-		operateOnCcid       []int // which ccid (currentCpus id) will be used on call
-		expectCurrentOnSame []string
-		expectAllOnSame     []string
-		expectCurrentNotOn  []string
-		expectAddSizes      []int
-		expectDisjoint      []TopoCcids // which ccids should be disjoint
-		expectErrors        []string
+		name                   string
+		topology               [5]int // package, die, numa, core, thread count
+		allocatorTB            bool   // allocator topologyBalancing
+		allocatorPSoPC         bool   // allocator preferSpreadOnPhysicalCores
+		allocations            []int
+		deltas                 []int
+		allocate               bool
+		operateOnCcid          []int // which ccid (currentCpus id) will be used on call
+		expectCurrentOnSame    []string
+		expectCurrentNotOnSame []string
+		expectAllOnSame        []string
+		expectCurrentNotOn     []string
+		expectAddSizes         []int
+		expectDisjoint         []TopoCcids // which ccids should be disjoint
+		expectErrors           []string
 	}{
 		{
 			name:           "first allocations",
@@ -411,12 +428,56 @@ func TestResizeCpus(t *testing.T) {
 				"", "", "", "", "", "", "package", "package",
 			},
 		},
+		{
+			name:           "prefer spread on physical cores",
+			topology:       [5]int{4, 1, 4, 8, 2},
+			allocatorTB:    true,
+			allocatorPSoPC: true,
+			deltas: []int{
+				2, 1, 4, 1, // allocate one thread from each core from the same NUMA
+				3, 9, 16, // allocate three other cpusets, each should be from separate package (due to topology balancing)
+				3, 4, 3, // increase the size of the
+				// original, 3+4 fits to the same
+				// NUMA, in the last 3: first cpu
+				// should fill the NUMA and the rest 2
+				// go to another NUMA on the same package.
+				-2, 2, // release two CPUs that went to another NUMA on the same package, and put them back
+				-10, // release 2+8 CPUs, the rest should be single threads each on their own core
+			},
+			allocate: true,
+			operateOnCcid: []int{
+				1, 1, 1, 1, // allocate one thread from each core from the same NUMA by inflating all the time the same cpuset
+				2, 3, 4, // three new cpusets
+				1, 1, 1, // increase size over one NUMA
+				1, 1,
+				1,
+			},
+			expectCurrentOnSame: []string{
+				"numa", "numa", "numa", "numa",
+				"numa", "numa", "numa",
+				"numa", "numa", "package",
+				"numa", "package",
+				"numa",
+			},
+			expectCurrentNotOnSame: []string{
+				"core", "core", "core", "core",
+				"core", "", "",
+				"", "", "",
+				"", "",
+				"core",
+			},
+			expectDisjoint: []TopoCcids{
+				{}, {}, {}, {},
+				{"package", []int{1, 2}}, {"package", []int{1, 2, 3}}, {"package", []int{1, 2, 3, 4}},
+			},
+		},
 	}
 	for _, tc := range tcases {
 		t.Run(tc.name, func(t *testing.T) {
 			tree, csit := newCpuTreeFromInt5(tc.topology)
 			treeA := tree.NewAllocator(cpuTreeAllocatorOptions{
-				topologyBalancing: tc.allocatorTB,
+				topologyBalancing:           tc.allocatorTB,
+				preferSpreadOnPhysicalCores: tc.allocatorPSoPC,
 			})
 			currentCpus := cpuset.New()
 			freeCpus := tree.Cpus()
@@ -481,6 +542,9 @@ func TestResizeCpus(t *testing.T) {
 					t.Logf("=> current=%s; free=%s", currentCpus, freeCpus)
 					if i < len(tc.expectCurrentOnSame) && tc.expectCurrentOnSame[i] != "" {
 						verifySame(t, tc.expectCurrentOnSame[i], currentCpus, csit)
+					}
+					if i < len(tc.expectCurrentNotOnSame) && tc.expectCurrentNotOnSame[i] != "" {
+						verifyNotSame(t, tc.expectCurrentNotOnSame[i], currentCpus, csit)
 					}
 					if i < len(tc.expectCurrentNotOn) && tc.expectCurrentNotOn[i] != "" {
 						verifyNotOn(t, tc.expectCurrentNotOn[i], currentCpus, csit)
@@ -646,4 +710,36 @@ func TestCPUTopologyLevel(t *testing.T) {
 		}
 	}
 
+}
+
+func TestSplitLevel(t *testing.T) {
+	root, _ := newCpuTreeFromInt5([5]int{2, 2, 2, 4, 2})
+	newRoot := root.SplitLevel(CPUTopologyLevelNuma,
+		func(cpu int) int {
+			leaf := root.FindLeafWithCpu(cpu)
+			if leaf == nil {
+				t.Fatalf("cpu %d not in tree:\n%s\n\n", cpu, root.PrettyPrint())
+			}
+			return leaf.SiblingIndex()
+		})
+
+	oldc62 := root.FindLeafWithCpu(62)
+	oldc63 := root.FindLeafWithCpu(63)
+	if oldc62.parent != oldc63.parent {
+		t.Errorf("expected: 62 and 63 are hyperthreads of the same physical core in the original tree, observed parents %s and %s", oldc62.parent, oldc63.parent)
+	}
+	newc62 := newRoot.FindLeafWithCpu(62)
+	newc63 := newRoot.FindLeafWithCpu(63)
+	if newc62.parent == newc63.parent {
+		t.Errorf("expected: 62 and 63 have different parents (physical cores), but they have the same %s", newc62.parent)
+	}
+	if newc62.parent.parent == newc63.parent.parent {
+		t.Errorf("expected: 62 and 63 have different grand parents (numa subclasses), but they have the same: %s", newc62.parent.parent)
+	}
+	if newc62.parent.parent.parent != newc63.parent.parent.parent {
+		t.Errorf("expected: 62 and 63 have the same great grand parents (numa), but they differ: %s and %s", newc62.parent.parent.parent, newc63.parent.parent.parent)
+	}
+	if t.Failed() {
+		t.Logf("newRoot:\n%s\n", newRoot.PrettyPrint())
+	}
 }
