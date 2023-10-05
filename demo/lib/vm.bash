@@ -821,6 +821,7 @@ vm-install-cri() {
             for f in ctr containerd containerd-stress containerd-shim containerd-shim-runc-v1 containerd-shim-runc-v2; do
                 vm-put-file "$containerd_src/bin/$f" "$vm_cri_dir/$f"
             done
+            vm-command "mkdir -p /etc/containerd; containerd config default | sed -e 's/SystemdCgroup = false/SystemdCgroup = true/g' > /etc/containerd/config.toml"
             vm-command "systemctl enable --now containerd"
         fi
     elif [ "$VM_CRI" == "crio" ]; then
