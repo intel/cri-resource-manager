@@ -5,27 +5,27 @@ go 1.20
 require (
 	contrib.go.opencensus.io/exporter/jaeger v0.2.1
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2
-	github.com/cilium/ebpf v0.7.0
-	github.com/evanphx/json-patch v4.12.0+incompatible
+	github.com/cilium/ebpf v0.12.0
+	github.com/evanphx/json-patch v5.7.0+incompatible
 	github.com/google/go-cmp v0.5.9
 	github.com/intel/cri-resource-manager/pkg/topology v0.0.0
 	github.com/intel/goresctrl v0.5.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.16.0
-	github.com/prometheus/client_model v0.3.0
-	github.com/prometheus/common v0.42.0
-	github.com/shurcooL/vfsgen v0.0.0-20181202132449-6a9ea43bcacd
+	github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_model v0.5.0
+	github.com/prometheus/common v0.44.0
+	github.com/shurcooL/vfsgen v0.0.0-20230704071429-0000e147ea92
 	github.com/stretchr/testify v1.8.1
 	go.opencensus.io v0.24.0
 	golang.org/x/sys v0.13.0
 	golang.org/x/time v0.3.0
-	google.golang.org/grpc v1.50.1
-	google.golang.org/protobuf v1.30.0
-	k8s.io/api v0.25.12
+	google.golang.org/grpc v1.58.3
+	google.golang.org/protobuf v1.31.0
+	k8s.io/api v0.25.14
 	k8s.io/apimachinery v0.27.4
-	k8s.io/client-go v0.25.12
-	k8s.io/cri-api v0.25.12
-	k8s.io/klog/v2 v2.80.1
+	k8s.io/client-go v0.25.14
+	k8s.io/cri-api v0.25.14
+	k8s.io/klog/v2 v2.100.1
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -38,8 +38,8 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
-	github.com/go-logfmt/logfmt v0.5.1 // indirect
-	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/go-logfmt/logfmt v0.6.0 // indirect
+	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
@@ -57,19 +57,20 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/procfs v0.10.1 // indirect
-	github.com/prometheus/statsd_exporter v0.22.8 // indirect
-	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
+	github.com/prometheus/procfs v0.12.0 // indirect
+	github.com/prometheus/statsd_exporter v0.24.0 // indirect
+	github.com/shurcooL/httpfs v0.0.0-20230704072500-f1e31cf0ba5c // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/oauth2 v0.5.0 // indirect
-	golang.org/x/sync v0.2.0 // indirect
+	golang.org/x/oauth2 v0.8.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/api v0.103.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20221027153422-115e99e71e1c // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231009173412-8bfb1ae86b6c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -94,10 +95,10 @@ replace (
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v0.20.0
 	google.golang.org/grpc => google.golang.org/grpc v1.38.0
 
-	k8s.io/api => k8s.io/api v0.25.12
-	k8s.io/apimachinery => k8s.io/apimachinery v0.25.12
-	k8s.io/apiserver => k8s.io/apiserver v0.25.12
-	k8s.io/client-go => k8s.io/client-go v0.25.12
-	k8s.io/component-base => k8s.io/component-base v0.25.12
-	k8s.io/cri-api => k8s.io/cri-api v0.25.12
+	k8s.io/api => k8s.io/api v0.25.14
+	k8s.io/apimachinery => k8s.io/apimachinery v0.25.14
+	k8s.io/apiserver => k8s.io/apiserver v0.25.14
+	k8s.io/client-go => k8s.io/client-go v0.25.14
+	k8s.io/component-base => k8s.io/component-base v0.25.14
+	k8s.io/cri-api => k8s.io/cri-api v0.25.14
 )
