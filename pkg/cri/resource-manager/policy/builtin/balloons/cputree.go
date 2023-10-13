@@ -79,7 +79,8 @@ type cpuTreeAllocatorOptions struct {
 	// topologyBalancing true prefers allocating from branches
 	// with most free CPUs (spread allocations), while false is
 	// the opposite (packed allocations).
-	topologyBalancing bool
+	topologyBalancing           bool
+	preferSpreadOnPhysicalCores bool
 }
 
 // Strings returns topology level as a string
@@ -131,6 +132,19 @@ func (t *cpuTreeNode) String() string {
 	return fmt.Sprintf("%s%v", t.name, t.children)
 }
 
+func (t *cpuTreeNode) PrettyPrint() string {
+	origDepth := t.Depth()
+	lines := []string{}
+	t.DepthFirstWalk(func(tn *cpuTreeNode) error {
+		lines = append(lines,
+			fmt.Sprintf("%s%s: %q cpus: %s",
+				strings.Repeat(" ", (tn.Depth()-origDepth)*4),
+				tn.level, tn.name, tn.cpus))
+		return nil
+	})
+	return strings.Join(lines, "\n")
+}
+
 // String returns cpuTreeNodeAttributes as a string.
 func (tna cpuTreeNodeAttributes) String() string {
 	return fmt.Sprintf("%s{%d,%v,%d,%d}", tna.t.name, tna.depth,
@@ -144,6 +158,34 @@ func NewCpuTree(name string) *cpuTreeNode {
 		name: name,
 		cpus: cpuset.New(),
 	}
+}
+
+func (t *cpuTreeNode) CopyTree() *cpuTreeNode {
+	newNode := t.CopyNode()
+	newNode.children = make([]*cpuTreeNode, 0, len(t.children))
+	for _, child := range t.children {
+		newNode.AddChild(child.CopyTree())
+	}
+	return newNode
+}
+
+func (t *cpuTreeNode) CopyNode() *cpuTreeNode {
+	newNode := cpuTreeNode{
+		name:     t.name,
+		level:    t.level,
+		parent:   t.parent,
+		children: t.children,
+		cpus:     t.cpus,
+	}
+	return &newNode
+}
+
+// Depth returns the distance from the root node.
+func (t *cpuTreeNode) Depth() int {
+	if t.parent == nil {
+		return 0
+	}
+	return t.parent.Depth() + 1
 }
 
 // AddChild adds new child node to a CPU tree node.
@@ -163,6 +205,38 @@ func (t *cpuTreeNode) AddCpus(cpus cpuset.CPUSet) {
 // Cpus returns CPUs of a CPU tree node.
 func (t *cpuTreeNode) Cpus() cpuset.CPUSet {
 	return t.cpus
+}
+
+// SiblingIndex returns the index of this node among its parents
+// children. Returns -1 for the root node, -2 if this node is not
+// listed among the children of its parent.
+func (t *cpuTreeNode) SiblingIndex() int {
+	if t.parent == nil {
+		return -1
+	}
+	for idx, child := range t.parent.children {
+		if child == t {
+			return idx
+		}
+	}
+	return -2
+}
+
+func (t *cpuTreeNode) FindLeafWithCpu(cpu int) *cpuTreeNode {
+	var found *cpuTreeNode
+	t.DepthFirstWalk(func(tn *cpuTreeNode) error {
+		if len(tn.children) > 0 {
+			return nil
+		}
+		for _, cpuHere := range tn.cpus.List() {
+			if cpu == cpuHere {
+				found = tn
+				return WalkStop
+			}
+		}
+		return nil // not found here, no more children to search
+	})
+	return found
 }
 
 // WalkSkipChildren error returned from a DepthFirstWalk handler
@@ -236,13 +310,18 @@ func NewCpuTreeFromSystem() (*cpuTreeNode, error) {
 				nodeTree.level = CPUTopologyLevelNuma
 				dieTree.AddChild(nodeTree)
 				node := sys.Node(nodeID)
+				threadsSeen := map[int]struct{}{}
 				for _, cpuID := range node.CPUSet().List() {
+					if _, alreadySeen := threadsSeen[cpuID]; alreadySeen {
+						continue
+					}
 					cpuTree := NewCpuTree(fmt.Sprintf("p%dd%dn%dcpu%d", packageID, dieID, nodeID, cpuID))
 
 					cpuTree.level = CPUTopologyLevelCore
 					nodeTree.AddChild(cpuTree)
 					cpu := sys.CPU(cpuID)
 					for _, threadID := range cpu.ThreadCPUSet().List() {
+						threadsSeen[threadID] = struct{}{}
 						threadTree := NewCpuTree(fmt.Sprintf("p%dd%dn%dcpu%dt%d", packageID, dieID, nodeID, cpuID, threadID))
 						threadTree.level = CPUTopologyLevelThread
 						cpuTree.AddChild(threadTree)
@@ -312,12 +391,82 @@ func (t *cpuTreeNode) toAttributedSlice(
 	}
 }
 
+// SplitLevel returns the root node of a new CPU tree where all
+// branches of a topology level have been split into new classes.
+func (t *cpuTreeNode) SplitLevel(splitLevel CPUTopologyLevel, cpuClassifier func(int) int) *cpuTreeNode {
+	newRoot := t.CopyTree()
+	newRoot.DepthFirstWalk(func(tn *cpuTreeNode) error {
+		// Dive into the level that will be split.
+		if tn.level != splitLevel {
+			return nil
+		}
+		// Classify CPUs to the map: class -> list of cpus
+		classCpus := map[int][]int{}
+		for _, cpu := range t.cpus.List() {
+			class := cpuClassifier(cpu)
+			classCpus[class] = append(classCpus[class], cpu)
+		}
+		// Clear existing children of this node. New children
+		// will be classes whose children are masked versions
+		// of original children of this node.
+		origChildren := tn.children
+		tn.children = make([]*cpuTreeNode, 0, len(classCpus))
+		// Add new child corresponding each class.
+		for class, cpus := range classCpus {
+			cpuMask := cpuset.New(cpus...)
+			newNode := NewCpuTree(fmt.Sprintf("%sclass%d", tn.name, class))
+			tn.AddChild(newNode)
+			newNode.cpus = tn.cpus.Intersection(cpuMask)
+			newNode.level = tn.level
+			newNode.parent = tn
+			for _, child := range origChildren {
+				newChild := child.CopyTree()
+				newChild.DepthFirstWalk(func(cn *cpuTreeNode) error {
+					cn.cpus = cn.cpus.Intersection(cpuMask)
+					if cn.cpus.Size() == 0 && cn.parent != nil {
+						// all cpus masked
+						// out: cut out this
+						// branch
+						newSiblings := []*cpuTreeNode{}
+						for _, child := range cn.parent.children {
+							if child != cn {
+								newSiblings = append(newSiblings, child)
+							}
+						}
+						cn.parent.children = newSiblings
+						return WalkSkipChildren
+					}
+					return nil
+				})
+				newNode.AddChild(newChild)
+			}
+		}
+		return WalkSkipChildren
+	})
+	return newRoot
+}
+
 // NewAllocator returns new CPU allocator for allocating CPUs from a
 // CPU tree branch.
 func (t *cpuTreeNode) NewAllocator(options cpuTreeAllocatorOptions) *cpuTreeAllocator {
 	ta := &cpuTreeAllocator{
 		root:    t,
 		options: options,
+	}
+	if options.preferSpreadOnPhysicalCores {
+		newTree := t.SplitLevel(CPUTopologyLevelNuma,
+			// CPU classifier: class of the CPU equals to
+			// the index in the child list of its parent
+			// node in the tree. Expect leaf node is a
+			// hyperthread, parent a physical core.
+			func(cpu int) int {
+				leaf := t.FindLeafWithCpu(cpu)
+				if leaf == nil {
+					log.Fatalf("SplitLevel CPU classifier: cpu %d not in tree:\n%s\n\n", cpu, t.PrettyPrint())
+				}
+				return leaf.SiblingIndex()
+			})
+		ta.root = newTree
 	}
 	return ta
 }
@@ -409,7 +558,36 @@ func (ta *cpuTreeAllocator) sorterRelease(tnas []cpuTreeNodeAttributes) func(int
 //     abs(delta) CPUs can be freed.
 func (ta *cpuTreeAllocator) ResizeCpus(currentCpus, freeCpus cpuset.CPUSet, delta int) (cpuset.CPUSet, cpuset.CPUSet, error) {
 	if delta > 0 {
-		return ta.resizeCpus(currentCpus, freeCpus, delta)
+		addFromSuperset, removeFromSuperset, err := ta.resizeCpus(currentCpus, freeCpus, delta)
+		if !ta.options.preferSpreadOnPhysicalCores || addFromSuperset.Size() == delta {
+			return addFromSuperset, removeFromSuperset, err
+		}
+		// addFromSuperset contains more CPUs (equally good
+		// choices) than actually needed. In case of
+		// preferSpreadOnPhysicalCores, however, selecting any
+		// of these does not result in equally good
+		// result. Therefore, in this case, construct addFrom
+		// set by adding one CPU at a time.
+		addFrom := cpuset.New()
+		for n := 0; n < delta; n++ {
+			addSingleFrom, _, err := ta.resizeCpus(currentCpus, freeCpus, 1)
+			if err != nil {
+				return addFromSuperset, removeFromSuperset, err
+			}
+			if addSingleFrom.Size() != 1 {
+				return addFromSuperset, removeFromSuperset, fmt.Errorf("internal error: failed to find single CPU to allocate, "+
+					"currentCpus=%s freeCpus=%s expectedSingle=%s",
+					currentCpus, freeCpus, addSingleFrom)
+			}
+			addFrom = addFrom.Union(addSingleFrom)
+			if addFrom.Size() != n+1 {
+				return addFromSuperset, removeFromSuperset, fmt.Errorf("internal error: double add the same CPU (%s) to cpuset %s on round %d",
+					addSingleFrom, addFrom, n+1)
+			}
+			currentCpus = currentCpus.Union(addSingleFrom)
+			freeCpus = freeCpus.Difference(addSingleFrom)
+		}
+		return addFrom, removeFromSuperset, nil
 	}
 	// In multi-CPU removal, remove CPUs one by one instead of
 	// trying to find a single topology element from which all of
