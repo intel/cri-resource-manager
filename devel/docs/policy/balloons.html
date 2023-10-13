@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Balloons Policy &mdash; CRI Resource Manager 0.8.0-161-g354a4900 documentation</title>
+  <title>Balloons Policy &mdash; CRI Resource Manager 0.8.0-172-gb81663de documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -200,6 +200,16 @@ in balloons when system is not fully loaded. The default is <code class="docutil
 pack new balloons tightly into the same NUMAs/dies/packages. This
 helps keeping large portions of hardware idle and entering into deep
 power saving states.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferSpreadOnPhysicalCores</span></code> prefers allocating logical CPUs
+(possibly hyperthreads) for a balloon from separate physical CPU
+cores. This prevents workloads in the balloon from interfering with
+themselves as they do not compete on the resources of the same CPU
+cores. On the other hand, it allows more interference between
+workloads in different balloons. The default is <code class="docutils literal notranslate"><span class="pre">false</span></code>: balloons
+are packed tightly to a minimum number of physical CPU cores. The
+value set here is the default for all balloon types, but it can be
+overridden with the balloon type specific setting with the same
+name.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">BalloonTypes</span></code> is a list of balloon type definitions. Each type can
 be configured with the following parameters:</p>
 <ul>
@@ -254,6 +264,8 @@ anywhere in the system.</p></li>
 the balloon.</p></li>
 </ul>
 </li>
+<li><p><code class="docutils literal notranslate"><span class="pre">PreferSpreadOnPhysicalCores</span></code> overrides the policy level option
+with the same name in the scope of this balloon type.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">AllocatorPriority</span></code> (0: High, 1: Normal, 2: Low, 3: None). CPU
 allocator parameter, used when creating new or resizing existing
 balloons. If there are balloon types with pre-created balloons

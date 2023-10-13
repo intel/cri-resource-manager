@@ -85,6 +85,16 @@ Balloons policy parameters:
   pack new balloons tightly into the same NUMAs/dies/packages. This
   helps keeping large portions of hardware idle and entering into deep
   power saving states.
+- `PreferSpreadOnPhysicalCores` prefers allocating logical CPUs
+  (possibly hyperthreads) for a balloon from separate physical CPU
+  cores. This prevents workloads in the balloon from interfering with
+  themselves as they do not compete on the resources of the same CPU
+  cores. On the other hand, it allows more interference between
+  workloads in different balloons. The default is `false`: balloons
+  are packed tightly to a minimum number of physical CPU cores. The
+  value set here is the default for all balloon types, but it can be
+  overridden with the balloon type specific setting with the same
+  name.
 - `BalloonTypes` is a list of balloon type definitions. Each type can
   be configured with the following parameters:
   - `Name` of the balloon type. This is used in pod annotations to
@@ -135,6 +145,8 @@ Balloons policy parameters:
     - `numa`: ...in the same numa node(s) as the balloon.
     - `core`: ...allowed to use idle CPU threads in the same cores with
       the balloon.
+  - `PreferSpreadOnPhysicalCores` overrides the policy level option
+    with the same name in the scope of this balloon type.
   - `AllocatorPriority` (0: High, 1: Normal, 2: Low, 3: None). CPU
     allocator parameter, used when creating new or resizing existing
     balloons. If there are balloon types with pre-created balloons
