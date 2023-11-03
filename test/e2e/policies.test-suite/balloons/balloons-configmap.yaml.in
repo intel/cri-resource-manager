@@ -24,7 +24,7 @@ data:
         - Name: btype0
           MinCPUs: ${BTYPE0_MINCPUS:-2}
           MaxCPUs: ${BTYPE0_MAXCPUS:-2}
-          AllocationPriority: ${BTYPE0_ALLOCATIONPRIORITY:-0}
+          AllocatorPriority: ${BTYPE0_ALLOCATORPRIORITY:-0}
           CPUClass: ${BTYPE0_CPUCLASS:-classA}
           PreferNewBalloons: ${BTYPE0_PREFERNEWBALLOONS:-true}
           PreferSpreadingPods: ${BTYPE0_PREFERSPREADINGPODS:-false}
@@ -36,7 +36,7 @@ data:
             - ${BTYPE1_NAMESPACE0:-btype1ns0}
           MinCPUs: ${BTYPE1_MINCPUS:-1}
           MaxCPUs: ${BTYPE1_MAXCPUS:-1}
-          AllocatorPriority: ${BTYPE1_ALLOCATIONPRIORITY:-1}
+          AllocatorPriority: ${BTYPE1_ALLOCATORPRIORITY:-1}
           CPUClass: ${BTYPE1_CPUCLASS:-classB}
           PreferNewBalloons: ${BTYPE1_PREFERNEWBALLOONS:-false}
           PreferSpreadingPods: ${BTYPE1_PREFERSPREADINGPODS:-true}
