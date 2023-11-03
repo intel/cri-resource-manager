@@ -18,7 +18,7 @@ data:
 
         $([ -n "$DYPTYPE0_SKIP" ] || echo "
         - Name: dyptype0
-          AllocationPriority: ${DYPTYPE0_ALLOCATIONPRIORITY:-0}
+          AllocatorPriority: ${DYPTYPE0_ALLOCATORPRIORITY:-0}
           CPUClass: ${DYPTYPE0_CPUCLASS:-classA}
         ")
 
@@ -26,7 +26,7 @@ data:
         - Name: dyptype1
           Namespaces:
             - ${DYPTYPE1_NAMESPACE0:-dyptype1ns0}
-          AllocatorPriority: ${DYPTYPE1_ALLOCATIONPRIORITY:-1}
+          AllocatorPriority: ${DYPTYPE1_ALLOCATORPRIORITY:-1}
           CPUClass: ${DYPTYPE1_CPUCLASS:-classB}
         ")
 
