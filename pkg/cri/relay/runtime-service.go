@@ -191,3 +191,18 @@ func (r *relay) CheckpointContainer(ctx context.Context, req *criv1.CheckpointCo
 func (r *relay) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.RuntimeService_GetContainerEventsServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
 }
+
+func (r *relay) ListMetricDescriptors(ctx context.Context, req *criv1.ListMetricDescriptorsRequest) (*criv1.ListMetricDescriptorsResponse, error) {
+	r.dump("ListMetricDescriptors", req)
+	return r.client.ListMetricDescriptors(ctx, req)
+}
+
+func (r *relay) ListPodSandboxMetrics(ctx context.Context, req *criv1.ListPodSandboxMetricsRequest) (*criv1.ListPodSandboxMetricsResponse, error) {
+	r.dump("ListPodSandboxMetrics", req)
+	return r.client.ListPodSandboxMetrics(ctx, req)
+}
+
+func (r *relay) RuntimeConfig(ctx context.Context, req *criv1.RuntimeConfigRequest) (*criv1.RuntimeConfigResponse, error) {
+	r.dump("RuntimeConfig", req)
+	return r.client.RuntimeConfig(ctx, req)
+}

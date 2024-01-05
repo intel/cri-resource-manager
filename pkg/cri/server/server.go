@@ -27,7 +27,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	v1alpha2 "github.com/intel/cri-resource-manager/pkg/cri/server/v1alpha2"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/cri/resource-manager/sockets"
@@ -86,7 +85,6 @@ type server struct {
 	interceptors map[string]Interceptor      // request intercepting hooks
 	runtime      *criv1.RuntimeServiceServer // CRI runtime service
 	image        *criv1.ImageServiceServer   // CRI image service
-	v1alpha2     *v1alpha2.Server            // CRI v1alpha2 bridging service
 }
 
 // NewServer creates a new server instance.
@@ -117,7 +115,6 @@ func (s *server) RegisterImageService(service criv1.ImageServiceServer) error {
 	is := service
 	s.image = &is
 	criv1.RegisterImageServiceServer(s.server, s)
-	s.v1alpha2.RegisterImageService(s)
 
 	return nil
 }
@@ -135,7 +132,6 @@ func (s *server) RegisterRuntimeService(service criv1.RuntimeServiceServer) erro
 	rs := service
 	s.runtime = &rs
 	criv1.RegisterRuntimeServiceServer(s.server, s)
-	s.v1alpha2.RegisterRuntimeService(s)
 
 	return nil
 }
@@ -224,7 +220,6 @@ func (s *server) createGrpcServer() error {
 	}
 
 	s.server = grpc.NewServer(instrumentation.InjectGrpcServerTrace()...)
-	s.v1alpha2 = v1alpha2.NewServer(s.server)
 
 	return nil
 }

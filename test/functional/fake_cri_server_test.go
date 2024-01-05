@@ -277,6 +277,21 @@ func (s *fakeCriServer) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.Ru
 	return nil
 }
 
+func (s *fakeCriServer) ListMetricDescriptors(ctx context.Context, req *criv1.ListMetricDescriptorsRequest) (*criv1.ListMetricDescriptorsResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*criv1.ListMetricDescriptorsResponse), err
+}
+
+func (s *fakeCriServer) ListPodSandboxMetrics(ctx context.Context, req *criv1.ListPodSandboxMetricsRequest) (*criv1.ListPodSandboxMetricsResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*criv1.ListPodSandboxMetricsResponse), err
+}
+
+func (s *fakeCriServer) RuntimeConfig(ctx context.Context, req *criv1.RuntimeConfigRequest) (*criv1.RuntimeConfigResponse, error) {
+	response, err := s.callHandler(ctx, req, nil)
+	return response.(*criv1.RuntimeConfigResponse), err
+}
+
 // Implementation of criv1.ImageServiceServer
 
 func (s *fakeCriServer) ListImages(ctx context.Context, req *criv1.ListImagesRequest) (*criv1.ListImagesResponse, error) {

@@ -61,6 +61,9 @@ const (
 	updateRuntimeConfig      = "UpdateRuntimeConfig"
 	status                   = "Status"
 	checkpointContainer      = "CheckpointContainer"
+	listMetricDescriptors    = "ListMetricDescriptors"
+	listPodSandboxMetrics    = "ListPodSandboxMetrics"
+	runtimeConfig            = "RuntimeConfig"
 )
 
 func fqmn(service, method string) string {
@@ -500,4 +503,43 @@ func (s *server) CheckpointContainer(ctx context.Context, req *criv1.CheckpointC
 
 func (s *server) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.RuntimeService_GetContainerEventsServer) error {
 	return grpcstatus.Errorf(grpccodes.Unimplemented, "GetContainerEvents not implemented")
+}
+
+func (s *server) ListMetricDescriptors(ctx context.Context, req *criv1.ListMetricDescriptorsRequest) (*criv1.ListMetricDescriptorsResponse, error) {
+	rsp, err := s.interceptRequest(ctx, runtimeService, listMetricDescriptors, req,
+		func(ctx context.Context, req interface{}) (interface{}, error) {
+			return (*s.runtime).ListMetricDescriptors(ctx, req.(*criv1.ListMetricDescriptorsRequest))
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.(*criv1.ListMetricDescriptorsResponse), err
+}
+
+func (s *server) ListPodSandboxMetrics(ctx context.Context, req *criv1.ListPodSandboxMetricsRequest) (*criv1.ListPodSandboxMetricsResponse, error) {
+	rsp, err := s.interceptRequest(ctx, runtimeService, listPodSandboxMetrics, req,
+		func(ctx context.Context, req interface{}) (interface{}, error) {
+			return (*s.runtime).ListPodSandboxMetrics(ctx, req.(*criv1.ListPodSandboxMetricsRequest))
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.(*criv1.ListPodSandboxMetricsResponse), err
+}
+
+func (s *server) RuntimeConfig(ctx context.Context, req *criv1.RuntimeConfigRequest) (*criv1.RuntimeConfigResponse, error) {
+	rsp, err := s.interceptRequest(ctx, runtimeService, runtimeConfig, req,
+		func(ctx context.Context, req interface{}) (interface{}, error) {
+			return (*s.runtime).RuntimeConfig(ctx, req.(*criv1.RuntimeConfigRequest))
+		})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.(*criv1.RuntimeConfigResponse), err
 }
