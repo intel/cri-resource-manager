@@ -32,7 +32,6 @@ import (
 	"github.com/intel/cri-resource-manager/pkg/utils"
 
 	v1 "github.com/intel/cri-resource-manager/pkg/cri/client/v1"
-	v1alpha2 "github.com/intel/cri-resource-manager/pkg/cri/client/v1alpha2"
 )
 
 // DialNotifyFn is a function to call after a successful net.Dial[Timeout]().
@@ -128,9 +127,6 @@ func (c *client) Connect(options ConnectOptions) error {
 	}
 
 	client, err := v1.Connect(c.rcc, c.icc)
-	if err != nil {
-		client, err = v1alpha2.Connect(c.rcc, c.icc)
-	}
 	if err != nil {
 		return err
 	}
@@ -446,23 +442,25 @@ func (c *client) Status(ctx context.Context, in *criv1.StatusRequest, _ ...grpc.
 	return c.client.Status(ctx, in)
 }
 
-/*
 func (c *client) CheckpointContainer(ctx context.Context, in *criv1.CheckpointContainerRequest, _ ...grpc.CallOption) (*criv1.CheckpointContainerResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
+	return c.client.CheckpointContainer(ctx, in)
 }
 
-func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetContainerEventsRequest, _ ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
-	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
+func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetEventsRequest, _ ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
+	return c.client.GetContainerEvents(ctx, in)
 }
 
 func (c *client) ListMetricDescriptors(ctx context.Context, in *criv1.ListMetricDescriptorsRequest, _ ...grpc.CallOption) (*criv1.ListMetricDescriptorsResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
+	return c.client.ListMetricDescriptors(ctx, in)
 }
 
 func (c *client) ListPodSandboxMetrics(ctx context.Context, in *criv1.ListPodSandboxMetricsRequest, _ ...grpc.CallOption) (*criv1.ListPodSandboxMetricsResponse, error) {
-	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
+	return c.client.ListPodSandboxMetrics(ctx, in)
 }
-*/
+
+func (c *client) RuntimeConfig(ctx context.Context, in *criv1.RuntimeConfigRequest, _ ...grpc.CallOption) (*criv1.RuntimeConfigResponse, error) {
+	return c.client.RuntimeConfig(ctx, in)
+}
 
 func (c *client) ListImages(ctx context.Context, in *criv1.ListImagesRequest, _ ...grpc.CallOption) (*criv1.ListImagesResponse, error) {
 	if err := c.checkImageService(); err != nil {

@@ -69,14 +69,14 @@ func Connect(runtime, image *grpc.ClientConn) (Client, error) {
 
 func (c *client) checkRuntimeService() error {
 	if c.rcc == nil {
-		return fmt.Errorf("no CRI v1alpha2 RuntimeService client")
+		return fmt.Errorf("no CRI v1 RuntimeService client")
 	}
 	return nil
 }
 
 func (c *client) checkImageService() error {
 	if c.icc == nil {
-		return fmt.Errorf("no CRI v1alpha2 ImageService client")
+		return fmt.Errorf("no CRI v1 ImageService client")
 	}
 	return nil
 }
@@ -294,10 +294,6 @@ func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetEventsRequ
 	return eventsClient, err
 }
 
-//
-// These are being introduced but they are not defined yet for the
-// CRI API version we are compiling against.
-/*
 func (c *client) ListMetricDescriptors(ctx context.Context, in *criv1.ListMetricDescriptorsRequest, _ ...grpc.CallOption) (*criv1.ListMetricDescriptorsResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
@@ -313,7 +309,14 @@ func (c *client) ListPodSandboxMetrics(ctx context.Context, in *criv1.ListPodSan
 
 	return c.rsc.ListPodSandboxMetrics(ctx, in)
 }
-*/
+
+func (c *client) RuntimeConfig(ctx context.Context, in *criv1.RuntimeConfigRequest, _ ...grpc.CallOption) (*criv1.RuntimeConfigResponse, error) {
+	if err := c.checkRuntimeService(); err != nil {
+		return nil, err
+	}
+
+	return c.rsc.RuntimeConfig(ctx, in)
+}
 
 func (c *client) ListImages(ctx context.Context, in *criv1.ListImagesRequest, _ ...grpc.CallOption) (*criv1.ListImagesResponse, error) {
 	if err := c.checkImageService(); err != nil {
