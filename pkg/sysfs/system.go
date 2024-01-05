@@ -41,26 +41,6 @@ const (
 	sysfsNumaNodePath = "devices/system/node"
 )
 
-// DiscoveryFlag controls what hardware details to discover.
-type DiscoveryFlag uint
-
-const (
-	// DiscoverCPUTopology requests discovering CPU topology details.
-	DiscoverCPUTopology DiscoveryFlag = 1 << iota
-	// DiscoverMemTopology requests discovering memory topology details.
-	DiscoverMemTopology
-	// DiscoverCache requests discovering CPU cache details.
-	DiscoverCache
-	// DiscoverSst requests discovering details of Intel Speed Select Technology
-	DiscoverSst
-	// DiscoverNone is the zero value for discovery flags.
-	DiscoverNone DiscoveryFlag = 0
-	// DiscoverAll requests full supported discovery.
-	DiscoverAll DiscoveryFlag = 0xffffffff
-	// DiscoverDefault is the default set of discovery flags.
-	DiscoverDefault DiscoveryFlag = (DiscoverCPUTopology | DiscoverMemTopology | DiscoverSst)
-)
-
 // MemoryType is an enum for the Node memory
 type MemoryType int
 
@@ -75,7 +55,7 @@ const (
 
 // System devices
 type System interface {
-	Discover(flags DiscoveryFlag) error
+	Discover() error
 	SetCpusOnline(online bool, cpus idset.IDSet) (idset.IDSet, error)
 	SetCPUFrequencyLimits(min, max uint64, cpus idset.IDSet) error
 	PackageIDs() []idset.ID
@@ -98,7 +78,6 @@ type System interface {
 // System devices
 type system struct {
 	logger.Logger                          // our logger instance
-	flags         DiscoveryFlag            // system discovery flags
 	path          string                   // sysfs mount point
 	packages      map[idset.ID]*cpuPackage // physical packages
 	nodes         map[idset.ID]*node       // NUMA nodes
@@ -254,25 +233,14 @@ func DiscoverSystem() (System, error) {
 }
 
 // DiscoverSystemAt performs discovery of the running systems details from sysfs mounted at path.
-func DiscoverSystemAt(path string, args ...DiscoveryFlag) (System, error) {
-	var flags DiscoveryFlag
-
-	if len(args) < 1 {
-		flags = DiscoverDefault
-	} else {
-		flags = DiscoverNone
-		for _, flag := range args {
-			flags |= flag
-		}
-	}
-
+func DiscoverSystemAt(path string) (System, error) {
 	sys := &system{
 		Logger:  logger.NewLogger("sysfs"),
 		path:    path,
 		offline: idset.NewIDSet(),
 	}
 
-	if err := sys.Discover(flags); err != nil {
+	if err := sys.Discover(); err != nil {
 		return nil, err
 	}
 
@@ -280,32 +248,20 @@ func DiscoverSystemAt(path string, args ...DiscoveryFlag) (System, error) {
 }
 
 // Discover performs system/hardware discovery.
-func (sys *system) Discover(flags DiscoveryFlag) error {
-	sys.flags |= (flags &^ DiscoverCache)
-
-	if (sys.flags & (DiscoverCPUTopology | DiscoverCache | DiscoverSst)) != 0 {
-		if err := sys.discoverCPUs(); err != nil {
-			return err
-		}
-		if err := sys.discoverNodes(); err != nil {
-			return err
-		}
-		if err := sys.discoverPackages(); err != nil {
-			return err
-		}
+func (sys *system) Discover() error {
+	if err := sys.discoverCPUs(); err != nil {
+		return err
+	}
+	if err := sys.discoverNodes(); err != nil {
+		return err
+	}
+	if err := sys.discoverPackages(); err != nil {
+		return err
 	}
 
-	if (sys.flags & DiscoverSst) != 0 {
-		if err := sys.discoverSst(); err != nil {
-			// Just consider SST unsupported if our detection fails for some reason
-			sys.Warn("%v", err)
-		}
-	}
-
-	if (sys.flags & DiscoverMemTopology) != 0 {
-		if err := sys.discoverNodes(); err != nil {
-			return err
-		}
+	if err := sys.discoverSst(); err != nil {
+		// Just consider SST unsupported if our detection fails for some reason
+		sys.Warn("%v", err)
 	}
 
 	if len(sys.nodes) > 0 {
@@ -624,15 +580,6 @@ func (sys *system) discoverCPU(path string) error {
 	}
 
 	sys.cpus[cpu.id] = cpu
-
-	if (sys.flags & DiscoverCache) != 0 {
-		entries, _ := filepath.Glob(filepath.Join(path, "cache/index[0-9]*"))
-		for _, entry := range entries {
-			if err := sys.discoverCache(entry); err != nil {
-				return err
-			}
-		}
-	}
 
 	return nil
 }
@@ -1060,76 +1007,6 @@ func (p *cpuPackage) DieCPUSet(id idset.ID) cpuset.CPUSet {
 
 func (p *cpuPackage) SstInfo() *sst.SstPackageInfo {
 	return p.sstInfo
-}
-
-// Discover cache associated with the given CPU.
-//
-// Notes:
-//
-//	I'm not sure how to interpret the cache information under sysfs.
-//	This code is now effectively disabled by forcing the associated
-//	discovery bit off in the discovery flags.
-func (sys *system) discoverCache(path string) error {
-	var id idset.ID
-
-	if _, err := readSysfsEntry(path, "id", &id); err != nil {
-		return sysfsError(path, "can't read cache id: %v", err)
-	}
-
-	if sys.cache == nil {
-		sys.cache = make(map[idset.ID]*Cache)
-	}
-
-	if _, found := sys.cache[id]; found {
-		return nil
-	}
-
-	c := &Cache{id: id}
-
-	if _, err := readSysfsEntry(path, "level", &c.level); err != nil {
-		return sysfsError(path, "can't read cache level: %v", err)
-	}
-	if _, err := readSysfsEntry(path, "shared_cpu_list", &c.cpus, ","); err != nil {
-		return sysfsError(path, "can't read shared CPUs: %v", err)
-	}
-	kind := ""
-	if _, err := readSysfsEntry(path, "type", &kind); err != nil {
-		return sysfsError(path, "can't read cache type: %v", err)
-	}
-	switch kind {
-	case "Data":
-		c.kind = DataCache
-	case "Instruction":
-		c.kind = InstructionCache
-	case "Unified":
-		c.kind = UnifiedCache
-	default:
-		return sysfsError(path, "unknown cache type: %s", kind)
-	}
-
-	size := ""
-	if _, err := readSysfsEntry(path, "size", &size); err != nil {
-		return sysfsError(path, "can't read cache size: %v", err)
-	}
-
-	base := size[0 : len(size)-1]
-	suff := size[len(size)-1]
-	unit := map[byte]uint64{'K': 1 << 10, 'M': 1 << 20, 'G': 1 << 30}
-
-	val, err := strconv.ParseUint(base, 10, 0)
-	if err != nil {
-		return sysfsError(path, "can't parse cache size '%s': %v", size, err)
-	}
-
-	if u, ok := unit[suff]; ok {
-		c.size = val * u
-	} else {
-		c.size = val*1000 + u - '0'
-	}
-
-	sys.cache[c.id] = c
-
-	return nil
 }
 
 // eppStrings initialized this way to better catch changes in the enum
