@@ -502,7 +502,7 @@ func (m *resmgr) StartContainer(ctx context.Context, method string, request inte
 		m.Error("%s: policy failed to handle event %s: %v", method, e.Type, err)
 	}
 
-	if err := m.runPostStartHooks(ctx, method, container); err != nil {
+	if err := m.runPostStartHooks(method, container); err != nil {
 		m.Error("%s: failed to run post-start hooks for %s: %v",
 			method, container.PrettyName(), err)
 	}
@@ -665,8 +665,8 @@ func (m *resmgr) ListContainers(ctx context.Context, method string, request inte
 }
 
 // UpdateContainer intercepts CRI requests for updating Containers.
-func (m *resmgr) UpdateContainer(ctx context.Context, method string, request interface{},
-	handler server.Handler) (interface{}, error) {
+func (m *resmgr) UpdateContainer(_ context.Context, _ string, _ interface{},
+	_ server.Handler) (interface{}, error) {
 
 	m.Lock()
 	defer m.Unlock()
@@ -853,7 +853,7 @@ func (m *resmgr) runPostAllocateHooks(ctx context.Context, method string) error 
 }
 
 // runPostStartHooks runs the necessary hooks after having started a container.
-func (m *resmgr) runPostStartHooks(ctx context.Context, method string, c cache.Container) error {
+func (m *resmgr) runPostStartHooks(method string, c cache.Container) error {
 	if err := m.control.RunPostStartHooks(c); err != nil {
 		m.Error("%s: post-start hook failed for %s: %v", method, c.PrettyName(), err)
 	}

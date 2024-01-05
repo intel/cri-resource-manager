@@ -40,7 +40,7 @@ func TestSamplingIdempotency(t *testing.T) {
 }
 
 func TestPrometheusConfiguration(t *testing.T) {
-	log.EnableDebug(true)
+	log.EnableDebug()
 
 	if opt.HTTPEndpoint == "" {
 		opt.HTTPEndpoint = ":0"

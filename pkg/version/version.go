@@ -69,11 +69,11 @@ func (version) IsBoolFlag() bool {
 
 // Set is our dummy flag.Value setter.
 func (version) Set(value string) error {
-	print, err := strconv.ParseBool(value)
+	printVersion, err := strconv.ParseBool(value)
 	if err != nil {
 		return err
 	}
-	if print {
+	if printVersion {
 		PrintVersionInfo()
 		os.Exit(0)
 	}

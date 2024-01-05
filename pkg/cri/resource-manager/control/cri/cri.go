@@ -98,12 +98,12 @@ func (ctl *crictl) PreCreateHook(c cache.Container) error {
 }
 
 // PreStartHook is the CRI controller pre-start hook.
-func (ctl *crictl) PreStartHook(c cache.Container) error {
+func (ctl *crictl) PreStartHook(_ cache.Container) error {
 	return nil
 }
 
 // PostStartHook is the CRI controller post-start hook.
-func (ctl *crictl) PostStartHook(c cache.Container) error {
+func (ctl *crictl) PostStartHook(_ cache.Container) error {
 	return nil
 }
 
@@ -141,7 +141,7 @@ func (ctl *crictl) PostUpdateHook(c cache.Container) error {
 }
 
 // PostStop is the CRI controller post-stop hook.
-func (ctl *crictl) PostStopHook(c cache.Container) error {
+func (ctl *crictl) PostStopHook(_ cache.Container) error {
 	return nil
 }
 

@@ -462,7 +462,7 @@ func (d *demoter) getPagesForContainer(c *container, sourceNodes idset.IDSet) (p
 	return pool, nil
 }
 
-func pickClosestPMEMNode(currentNode idset.ID, targetNodes idset.IDSet) idset.ID {
+func pickClosestPMEMNode(targetNodes idset.IDSet) idset.ID {
 	// TODO: analyze the topology information (and possibly the amount of free memory) and choose the "best"
 	// PMEM node to demote the page to. The array targetNodes already contains only the subset of PMEM nodes
 	// available in this topology subtree. Right now just pick a random controller.
@@ -509,7 +509,7 @@ func (d *demoter) movePagesForPid(p []page, count uint, pid int, targetNodes ids
 		if !targetNodes.Has(idset.ID(pageStatus)) {
 			// In case of many PMEM controllers choose the one that is the closest.
 			dramPages = append(dramPages, pages[i])
-			nodes = append(nodes, int(pickClosestPMEMNode(idset.ID(pageStatus), targetNodes)))
+			nodes = append(nodes, int(pickClosestPMEMNode(targetNodes)))
 		} // else no need to move.
 	}
 

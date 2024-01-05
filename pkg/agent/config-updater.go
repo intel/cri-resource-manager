@@ -62,7 +62,7 @@ type updater struct {
 	cfgErr        error
 }
 
-func newConfigUpdater(socket string) (configUpdater, error) {
+func newConfigUpdater() (configUpdater, error) {
 	u := &updater{Logger: log.NewLogger("config-updater")}
 
 	c, err := newResmgrCli(opts.resmgrSocket)

@@ -16,6 +16,7 @@ package log
 
 import (
 	"fmt"
+
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -89,6 +90,6 @@ func (g grpclogger) Fatalf(format string, args ...interface{}) {
 	g.Logger.Fatal(format, args...)
 }
 
-func (g grpclogger) V(l int) bool {
+func (g grpclogger) V(_ int) bool {
 	return true
 }

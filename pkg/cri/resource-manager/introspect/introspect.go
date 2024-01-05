@@ -157,7 +157,7 @@ func (s *Server) set(state *State) error {
 }
 
 // serve serves a single HTTP request.
-func (s *Server) serve(w http.ResponseWriter, req *http.Request) {
+func (s *Server) serve(w http.ResponseWriter, _ *http.Request) {
 	if !s.ready {
 		return
 	}

@@ -446,7 +446,7 @@ func (t *testlog) DebugBlock(prefix string, format string, args ...interface{}) 
 	}
 }
 
-func (*testlog) EnableDebug(bool) bool { return true }
-func (*testlog) DebugEnabled() bool    { return true }
-func (*testlog) Stop()                 {}
-func (*testlog) Source() string        { return "" }
+func (*testlog) EnableDebug() bool  { return true }
+func (*testlog) DebugEnabled() bool { return true }
+func (*testlog) Stop()              {}
+func (*testlog) Source() string     { return "" }

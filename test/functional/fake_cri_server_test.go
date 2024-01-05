@@ -273,7 +273,7 @@ func (s *fakeCriServer) CheckpointContainer(ctx context.Context, req *criv1.Chec
 	return response.(*criv1.CheckpointContainerResponse), err
 }
 
-func (s *fakeCriServer) GetContainerEvents(req *criv1.GetEventsRequest, srv criv1.RuntimeService_GetContainerEventsServer) error {
+func (s *fakeCriServer) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.RuntimeService_GetContainerEventsServer) error {
 	return nil
 }
 

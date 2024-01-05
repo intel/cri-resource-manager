@@ -37,7 +37,7 @@ func GetPath() string {
 
 // SetPath sets the pidfile path to the given one.
 func SetPath(path string) {
-	close()
+	closePIDFile()
 	pidFilePath = path
 }
 
@@ -61,7 +61,7 @@ func Write() error {
 
 	_, err = pidFile.Write([]byte(fmt.Sprintf("%d\n", os.Getpid())))
 	if err != nil {
-		close()
+		closePIDFile()
 		return errors.Wrap(err, "failed to write PID file")
 	}
 
@@ -92,8 +92,8 @@ func Read() (int, error) {
 	return pid, nil
 }
 
-// close closes the PID file and truncates it to zero length.
-func close() {
+// closePIDFile closes the PID file and truncates it to zero length.
+func closePIDFile() {
 	if pidFile != nil {
 		pidFile.Truncate(0)
 		pidFile.Close()
@@ -104,7 +104,7 @@ func close() {
 // Remove removes the PID file for the process unconditionally, regardless if
 // the current process had created the PID file or not.
 func Remove() error {
-	close()
+	closePIDFile()
 	err := os.Remove(pidFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -289,7 +289,7 @@ func (t *cpuTreeNode) CpuLocations(cpus cpuset.CPUSet) [][]string {
 // NewCpuTreeFromSystem returns the root node of the topology tree
 // constructed from the underlying system.
 func NewCpuTreeFromSystem() (*cpuTreeNode, error) {
-	sys, err := system.DiscoverSystem(system.DiscoverCPUTopology)
+	sys, err := system.DiscoverSystem()
 	if err != nil {
 		return nil, err
 	}

@@ -1224,7 +1224,7 @@ func (cch *cache) GetPolicyEntry(key string, ptr interface{}) bool {
 		}
 	} else {
 		// subsequent accesses to key
-		if err := cch.setEntry(key, ptr, obj); err != nil {
+		if err := cch.setEntry(ptr, obj); err != nil {
 			cch.Fatal("failed use cached entry for key '%s' of policy '%s': %v",
 				key, cch.PolicyName, err)
 		}
@@ -1327,7 +1327,7 @@ func (cch *cache) cacheEntry(key string, ptr interface{}) error {
 }
 
 // Serve an unmarshaled opaque policy entry, special-casing some simple/common types.
-func (cch *cache) setEntry(key string, ptr, obj interface{}) error {
+func (cch *cache) setEntry(ptr, obj interface{}) error {
 	if cachable, ok := ptr.(Cachable); ok {
 		cachable.Set(obj)
 		return nil

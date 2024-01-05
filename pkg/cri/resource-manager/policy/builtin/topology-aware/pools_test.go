@@ -381,9 +381,8 @@ func TestPoolCreation(t *testing.T) {
 				},
 			}
 
-			log.EnableDebug(true)
+			log.EnableDebug()
 			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
-			log.EnableDebug(false)
 
 			if policy.root.GetSupply().SharableCPUs().Size()+policy.root.GetSupply().IsolatedCPUs().Size()+policy.root.GetSupply().ReservedCPUs().Size() != tc.expectedRootNodeCPUs {
 				t.Errorf("Expected %d CPUs, got %d", tc.expectedRootNodeCPUs,
@@ -516,9 +515,8 @@ func TestWorkloadPlacement(t *testing.T) {
 				},
 			}
 
-			log.EnableDebug(true)
+			log.EnableDebug()
 			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
-			log.EnableDebug(false)
 
 			scores, filteredPools := policy.sortPoolsByScore(tc.req, tc.affinities)
 			fmt.Printf("scores: %v, remaining pools: %v\n", scores, filteredPools)
@@ -668,9 +666,8 @@ func TestContainerMove(t *testing.T) {
 				},
 			}
 
-			log.EnableDebug(true)
+			log.EnableDebug()
 			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
-			log.EnableDebug(false)
 
 			grant1, err := policy.allocatePool(tc.container1, "")
 			if err != nil {
@@ -939,19 +936,17 @@ func TestAffinities(t *testing.T) {
 				},
 			}
 
-			log.EnableDebug(true)
+			log.EnableDebug()
 			policy := CreateTopologyAwarePolicy(policyOptions).(*policy)
-			log.EnableDebug(false)
 
 			affinities := map[int]int32{}
 			for name, weight := range tc.affinities {
 				affinities[findNodeWithName(name, policy.pools).NodeID()] = weight
 			}
 
-			log.EnableDebug(true)
+			log.EnableDebug()
 			scores, filteredPools := policy.sortPoolsByScore(tc.req, affinities)
 			fmt.Printf("scores: %v, remaining pools: %v\n", scores, filteredPools)
-			log.EnableDebug(false)
 
 			if len(filteredPools) < 1 {
 				t.Errorf("pool scoring failed to find any pools")

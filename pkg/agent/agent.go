@@ -79,7 +79,7 @@ func NewResourceManagerAgent() (ResourceManagerAgent, error) {
 		return nil, agentError("failed to initialize gRPC server")
 	}
 
-	if a.updater, err = newConfigUpdater(opts.resmgrSocket); err != nil {
+	if a.updater, err = newConfigUpdater(); err != nil {
 		return nil, agentError("failed to initialize config updater instance: %v", err)
 	}
 

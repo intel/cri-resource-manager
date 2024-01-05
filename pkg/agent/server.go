@@ -111,7 +111,7 @@ type grpcServer struct {
 }
 
 // GetNode gets K8s node object.
-func (g *grpcServer) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.GetNodeReply, error) {
+func (g *grpcServer) GetNode(_ context.Context, req *v1.GetNodeRequest) (*v1.GetNodeReply, error) {
 	g.Debug("received GetNodeRequest: %v", req)
 	rpl := &v1.GetNodeReply{}
 
@@ -129,7 +129,7 @@ func (g *grpcServer) GetNode(ctx context.Context, req *v1.GetNodeRequest) (*v1.G
 }
 
 // PatchNode patches the K8s node object.
-func (g *grpcServer) PatchNode(ctx context.Context, req *v1.PatchNodeRequest) (*v1.PatchNodeReply, error) {
+func (g *grpcServer) PatchNode(_ context.Context, req *v1.PatchNodeRequest) (*v1.PatchNodeReply, error) {
 	g.Debug("received PatchNodeRequest: %v", req)
 	rpl := &v1.PatchNodeReply{}
 
@@ -145,7 +145,7 @@ func (g *grpcServer) PatchNode(ctx context.Context, req *v1.PatchNodeRequest) (*
 }
 
 // UpdateNodeCapacity updates capacity in Node status
-func (g *grpcServer) UpdateNodeCapacity(ctx context.Context, req *v1.UpdateNodeCapacityRequest) (*v1.UpdateNodeCapacityReply, error) {
+func (g *grpcServer) UpdateNodeCapacity(_ context.Context, req *v1.UpdateNodeCapacityRequest) (*v1.UpdateNodeCapacityReply, error) {
 	g.Debug("received UpdateNodeCapacityRequest: %v", req)
 
 	rpl := &v1.UpdateNodeCapacityReply{}
@@ -172,7 +172,7 @@ func (g *grpcServer) UpdateNodeCapacity(ctx context.Context, req *v1.UpdateNodeC
 }
 
 // HealthCheck checks if the agent is in healthy state
-func (g *grpcServer) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) (*v1.HealthCheckReply, error) {
+func (g *grpcServer) HealthCheck(_ context.Context, req *v1.HealthCheckRequest) (*v1.HealthCheckReply, error) {
 	g.Debug("received HealthCheckRequest: %v", req)
 
 	reply := &v1.HealthCheckReply{}

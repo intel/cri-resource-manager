@@ -71,8 +71,7 @@ func (cgid *CgroupID) Find(id uint64) (string, error) {
 		return "", err
 	} else if !found {
 		return "", fmt.Errorf("cgroupid %v not found", id)
-	} else {
-		cgid.cache[id] = p
-		return p, nil
 	}
+	cgid.cache[id] = p
+	return p, nil
 }

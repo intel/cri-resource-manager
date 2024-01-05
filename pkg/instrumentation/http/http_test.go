@@ -80,7 +80,7 @@ type testHandler struct {
 	response string
 }
 
-func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *testHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprintf(w, h.response)
 }
 

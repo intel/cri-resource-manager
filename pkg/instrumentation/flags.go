@@ -219,7 +219,7 @@ func defaultOptions() interface{} {
 }
 
 // configNotify is our configuration udpate notification handler.
-func configNotify(event config.Event, source config.Source) error {
+func configNotify(_ config.Event, _ config.Source) error {
 	log.Info("instrumentation configuration is now %v", opt)
 
 	log.Info("reconfiguring...")

@@ -254,7 +254,7 @@ func (c *client) dialNotify(socket string) {
 	c.options.DialNotify(socket, uid, gid, mode, nil)
 }
 
-func (c *client) Version(ctx context.Context, in *criv1.VersionRequest, opts ...grpc.CallOption) (*criv1.VersionResponse, error) {
+func (c *client) Version(ctx context.Context, in *criv1.VersionRequest, _ ...grpc.CallOption) (*criv1.VersionResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -262,7 +262,7 @@ func (c *client) Version(ctx context.Context, in *criv1.VersionRequest, opts ...
 	return c.client.Version(ctx, in)
 }
 
-func (c *client) RunPodSandbox(ctx context.Context, in *criv1.RunPodSandboxRequest, opts ...grpc.CallOption) (*criv1.RunPodSandboxResponse, error) {
+func (c *client) RunPodSandbox(ctx context.Context, in *criv1.RunPodSandboxRequest, _ ...grpc.CallOption) (*criv1.RunPodSandboxResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func (c *client) RunPodSandbox(ctx context.Context, in *criv1.RunPodSandboxReque
 	return c.client.RunPodSandbox(ctx, in)
 }
 
-func (c *client) StopPodSandbox(ctx context.Context, in *criv1.StopPodSandboxRequest, opts ...grpc.CallOption) (*criv1.StopPodSandboxResponse, error) {
+func (c *client) StopPodSandbox(ctx context.Context, in *criv1.StopPodSandboxRequest, _ ...grpc.CallOption) (*criv1.StopPodSandboxResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -278,7 +278,7 @@ func (c *client) StopPodSandbox(ctx context.Context, in *criv1.StopPodSandboxReq
 	return c.client.StopPodSandbox(ctx, in)
 }
 
-func (c *client) RemovePodSandbox(ctx context.Context, in *criv1.RemovePodSandboxRequest, opts ...grpc.CallOption) (*criv1.RemovePodSandboxResponse, error) {
+func (c *client) RemovePodSandbox(ctx context.Context, in *criv1.RemovePodSandboxRequest, _ ...grpc.CallOption) (*criv1.RemovePodSandboxResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (c *client) RemovePodSandbox(ctx context.Context, in *criv1.RemovePodSandbo
 	return c.client.RemovePodSandbox(ctx, in)
 }
 
-func (c *client) PodSandboxStatus(ctx context.Context, in *criv1.PodSandboxStatusRequest, opts ...grpc.CallOption) (*criv1.PodSandboxStatusResponse, error) {
+func (c *client) PodSandboxStatus(ctx context.Context, in *criv1.PodSandboxStatusRequest, _ ...grpc.CallOption) (*criv1.PodSandboxStatusResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (c *client) PodSandboxStatus(ctx context.Context, in *criv1.PodSandboxStatu
 	return c.client.PodSandboxStatus(ctx, in)
 }
 
-func (c *client) ListPodSandbox(ctx context.Context, in *criv1.ListPodSandboxRequest, opts ...grpc.CallOption) (*criv1.ListPodSandboxResponse, error) {
+func (c *client) ListPodSandbox(ctx context.Context, in *criv1.ListPodSandboxRequest, _ ...grpc.CallOption) (*criv1.ListPodSandboxResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -302,7 +302,7 @@ func (c *client) ListPodSandbox(ctx context.Context, in *criv1.ListPodSandboxReq
 	return c.client.ListPodSandbox(ctx, in)
 }
 
-func (c *client) CreateContainer(ctx context.Context, in *criv1.CreateContainerRequest, opts ...grpc.CallOption) (*criv1.CreateContainerResponse, error) {
+func (c *client) CreateContainer(ctx context.Context, in *criv1.CreateContainerRequest, _ ...grpc.CallOption) (*criv1.CreateContainerResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func (c *client) CreateContainer(ctx context.Context, in *criv1.CreateContainerR
 	return c.client.CreateContainer(ctx, in)
 }
 
-func (c *client) StartContainer(ctx context.Context, in *criv1.StartContainerRequest, opts ...grpc.CallOption) (*criv1.StartContainerResponse, error) {
+func (c *client) StartContainer(ctx context.Context, in *criv1.StartContainerRequest, _ ...grpc.CallOption) (*criv1.StartContainerResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -318,7 +318,7 @@ func (c *client) StartContainer(ctx context.Context, in *criv1.StartContainerReq
 	return c.client.StartContainer(ctx, in)
 }
 
-func (c *client) StopContainer(ctx context.Context, in *criv1.StopContainerRequest, opts ...grpc.CallOption) (*criv1.StopContainerResponse, error) {
+func (c *client) StopContainer(ctx context.Context, in *criv1.StopContainerRequest, _ ...grpc.CallOption) (*criv1.StopContainerResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func (c *client) StopContainer(ctx context.Context, in *criv1.StopContainerReque
 	return c.client.StopContainer(ctx, in)
 }
 
-func (c *client) RemoveContainer(ctx context.Context, in *criv1.RemoveContainerRequest, opts ...grpc.CallOption) (*criv1.RemoveContainerResponse, error) {
+func (c *client) RemoveContainer(ctx context.Context, in *criv1.RemoveContainerRequest, _ ...grpc.CallOption) (*criv1.RemoveContainerResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func (c *client) RemoveContainer(ctx context.Context, in *criv1.RemoveContainerR
 	return c.client.RemoveContainer(ctx, in)
 }
 
-func (c *client) ListContainers(ctx context.Context, in *criv1.ListContainersRequest, opts ...grpc.CallOption) (*criv1.ListContainersResponse, error) {
+func (c *client) ListContainers(ctx context.Context, in *criv1.ListContainersRequest, _ ...grpc.CallOption) (*criv1.ListContainersResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func (c *client) ListContainers(ctx context.Context, in *criv1.ListContainersReq
 	return c.client.ListContainers(ctx, in)
 }
 
-func (c *client) ContainerStatus(ctx context.Context, in *criv1.ContainerStatusRequest, opts ...grpc.CallOption) (*criv1.ContainerStatusResponse, error) {
+func (c *client) ContainerStatus(ctx context.Context, in *criv1.ContainerStatusRequest, _ ...grpc.CallOption) (*criv1.ContainerStatusResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -350,7 +350,7 @@ func (c *client) ContainerStatus(ctx context.Context, in *criv1.ContainerStatusR
 	return c.client.ContainerStatus(ctx, in)
 }
 
-func (c *client) UpdateContainerResources(ctx context.Context, in *criv1.UpdateContainerResourcesRequest, opts ...grpc.CallOption) (*criv1.UpdateContainerResourcesResponse, error) {
+func (c *client) UpdateContainerResources(ctx context.Context, in *criv1.UpdateContainerResourcesRequest, _ ...grpc.CallOption) (*criv1.UpdateContainerResourcesResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func (c *client) UpdateContainerResources(ctx context.Context, in *criv1.UpdateC
 	return c.client.UpdateContainerResources(ctx, in)
 }
 
-func (c *client) ReopenContainerLog(ctx context.Context, in *criv1.ReopenContainerLogRequest, opts ...grpc.CallOption) (*criv1.ReopenContainerLogResponse, error) {
+func (c *client) ReopenContainerLog(ctx context.Context, in *criv1.ReopenContainerLogRequest, _ ...grpc.CallOption) (*criv1.ReopenContainerLogResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -366,7 +366,7 @@ func (c *client) ReopenContainerLog(ctx context.Context, in *criv1.ReopenContain
 	return c.client.ReopenContainerLog(ctx, in)
 }
 
-func (c *client) ExecSync(ctx context.Context, in *criv1.ExecSyncRequest, opts ...grpc.CallOption) (*criv1.ExecSyncResponse, error) {
+func (c *client) ExecSync(ctx context.Context, in *criv1.ExecSyncRequest, _ ...grpc.CallOption) (*criv1.ExecSyncResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -374,7 +374,7 @@ func (c *client) ExecSync(ctx context.Context, in *criv1.ExecSyncRequest, opts .
 	return c.client.ExecSync(ctx, in)
 }
 
-func (c *client) Exec(ctx context.Context, in *criv1.ExecRequest, opts ...grpc.CallOption) (*criv1.ExecResponse, error) {
+func (c *client) Exec(ctx context.Context, in *criv1.ExecRequest, _ ...grpc.CallOption) (*criv1.ExecResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -382,7 +382,7 @@ func (c *client) Exec(ctx context.Context, in *criv1.ExecRequest, opts ...grpc.C
 	return c.client.Exec(ctx, in)
 }
 
-func (c *client) Attach(ctx context.Context, in *criv1.AttachRequest, opts ...grpc.CallOption) (*criv1.AttachResponse, error) {
+func (c *client) Attach(ctx context.Context, in *criv1.AttachRequest, _ ...grpc.CallOption) (*criv1.AttachResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -390,7 +390,7 @@ func (c *client) Attach(ctx context.Context, in *criv1.AttachRequest, opts ...gr
 	return c.client.Attach(ctx, in)
 }
 
-func (c *client) PortForward(ctx context.Context, in *criv1.PortForwardRequest, opts ...grpc.CallOption) (*criv1.PortForwardResponse, error) {
+func (c *client) PortForward(ctx context.Context, in *criv1.PortForwardRequest, _ ...grpc.CallOption) (*criv1.PortForwardResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -398,7 +398,7 @@ func (c *client) PortForward(ctx context.Context, in *criv1.PortForwardRequest, 
 	return c.client.PortForward(ctx, in)
 }
 
-func (c *client) ContainerStats(ctx context.Context, in *criv1.ContainerStatsRequest, opts ...grpc.CallOption) (*criv1.ContainerStatsResponse, error) {
+func (c *client) ContainerStats(ctx context.Context, in *criv1.ContainerStatsRequest, _ ...grpc.CallOption) (*criv1.ContainerStatsResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -406,7 +406,7 @@ func (c *client) ContainerStats(ctx context.Context, in *criv1.ContainerStatsReq
 	return c.client.ContainerStats(ctx, in)
 }
 
-func (c *client) ListContainerStats(ctx context.Context, in *criv1.ListContainerStatsRequest, opts ...grpc.CallOption) (*criv1.ListContainerStatsResponse, error) {
+func (c *client) ListContainerStats(ctx context.Context, in *criv1.ListContainerStatsRequest, _ ...grpc.CallOption) (*criv1.ListContainerStatsResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (c *client) ListContainerStats(ctx context.Context, in *criv1.ListContainer
 	return c.client.ListContainerStats(ctx, in)
 }
 
-func (c *client) PodSandboxStats(ctx context.Context, in *criv1.PodSandboxStatsRequest, opts ...grpc.CallOption) (*criv1.PodSandboxStatsResponse, error) {
+func (c *client) PodSandboxStats(ctx context.Context, in *criv1.PodSandboxStatsRequest, _ ...grpc.CallOption) (*criv1.PodSandboxStatsResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -422,7 +422,7 @@ func (c *client) PodSandboxStats(ctx context.Context, in *criv1.PodSandboxStatsR
 	return c.client.PodSandboxStats(ctx, in)
 }
 
-func (c *client) ListPodSandboxStats(ctx context.Context, in *criv1.ListPodSandboxStatsRequest, opts ...grpc.CallOption) (*criv1.ListPodSandboxStatsResponse, error) {
+func (c *client) ListPodSandboxStats(ctx context.Context, in *criv1.ListPodSandboxStatsRequest, _ ...grpc.CallOption) (*criv1.ListPodSandboxStatsResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -430,7 +430,7 @@ func (c *client) ListPodSandboxStats(ctx context.Context, in *criv1.ListPodSandb
 	return c.client.ListPodSandboxStats(ctx, in)
 }
 
-func (c *client) UpdateRuntimeConfig(ctx context.Context, in *criv1.UpdateRuntimeConfigRequest, opts ...grpc.CallOption) (*criv1.UpdateRuntimeConfigResponse, error) {
+func (c *client) UpdateRuntimeConfig(ctx context.Context, in *criv1.UpdateRuntimeConfigRequest, _ ...grpc.CallOption) (*criv1.UpdateRuntimeConfigResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -438,7 +438,7 @@ func (c *client) UpdateRuntimeConfig(ctx context.Context, in *criv1.UpdateRuntim
 	return c.client.UpdateRuntimeConfig(ctx, in)
 }
 
-func (c *client) Status(ctx context.Context, in *criv1.StatusRequest, opts ...grpc.CallOption) (*criv1.StatusResponse, error) {
+func (c *client) Status(ctx context.Context, in *criv1.StatusRequest, _ ...grpc.CallOption) (*criv1.StatusResponse, error) {
 	if err := c.checkRuntimeService(); err != nil {
 		return nil, err
 	}
@@ -447,24 +447,24 @@ func (c *client) Status(ctx context.Context, in *criv1.StatusRequest, opts ...gr
 }
 
 /*
-func (c *client) CheckpointContainer(ctx context.Context, in *criv1.CheckpointContainerRequest, opts ...grpc.CallOption) (*criv1.CheckpointContainerResponse, error) {
+func (c *client) CheckpointContainer(ctx context.Context, in *criv1.CheckpointContainerRequest, _ ...grpc.CallOption) (*criv1.CheckpointContainerResponse, error) {
 	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
 }
 
-func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetContainerEventsRequest, opts ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
+func (c *client) GetContainerEvents(ctx context.Context, in *criv1.GetContainerEventsRequest, _ ...grpc.CallOption) (criv1.RuntimeService_GetContainerEventsClient, error) {
 	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
 }
 
-func (c *client) ListMetricDescriptors(ctx context.Context, in *criv1.ListMetricDescriptorsRequest, opts ...grpc.CallOption) (*criv1.ListMetricDescriptorsResponse, error) {
+func (c *client) ListMetricDescriptors(ctx context.Context, in *criv1.ListMetricDescriptorsRequest, _ ...grpc.CallOption) (*criv1.ListMetricDescriptorsResponse, error) {
 	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
 }
 
-func (c *client) ListPodSandboxMetrics(ctx context.Context, in *criv1.ListPodSandboxMetricsRequest, opts ...grpc.CallOption) (*criv1.ListPodSandboxMetricsResponse, error) {
+func (c *client) ListPodSandboxMetrics(ctx context.Context, in *criv1.ListPodSandboxMetricsRequest, _ ...grpc.CallOption) (*criv1.ListPodSandboxMetricsResponse, error) {
 	return nil, fmt.Errorf("unimplemented by CRI RuntimeService")
 }
 */
 
-func (c *client) ListImages(ctx context.Context, in *criv1.ListImagesRequest, opts ...grpc.CallOption) (*criv1.ListImagesResponse, error) {
+func (c *client) ListImages(ctx context.Context, in *criv1.ListImagesRequest, _ ...grpc.CallOption) (*criv1.ListImagesResponse, error) {
 	if err := c.checkImageService(); err != nil {
 		return nil, err
 	}
@@ -472,7 +472,7 @@ func (c *client) ListImages(ctx context.Context, in *criv1.ListImagesRequest, op
 	return c.client.ListImages(ctx, in)
 }
 
-func (c *client) ImageStatus(ctx context.Context, in *criv1.ImageStatusRequest, opts ...grpc.CallOption) (*criv1.ImageStatusResponse, error) {
+func (c *client) ImageStatus(ctx context.Context, in *criv1.ImageStatusRequest, _ ...grpc.CallOption) (*criv1.ImageStatusResponse, error) {
 	if err := c.checkImageService(); err != nil {
 		return nil, err
 	}
@@ -480,7 +480,7 @@ func (c *client) ImageStatus(ctx context.Context, in *criv1.ImageStatusRequest, 
 	return c.client.ImageStatus(ctx, in)
 }
 
-func (c *client) PullImage(ctx context.Context, in *criv1.PullImageRequest, opts ...grpc.CallOption) (*criv1.PullImageResponse, error) {
+func (c *client) PullImage(ctx context.Context, in *criv1.PullImageRequest, _ ...grpc.CallOption) (*criv1.PullImageResponse, error) {
 	if err := c.checkImageService(); err != nil {
 		return nil, err
 	}
@@ -488,7 +488,7 @@ func (c *client) PullImage(ctx context.Context, in *criv1.PullImageRequest, opts
 	return c.client.PullImage(ctx, in)
 }
 
-func (c *client) RemoveImage(ctx context.Context, in *criv1.RemoveImageRequest, opts ...grpc.CallOption) (*criv1.RemoveImageResponse, error) {
+func (c *client) RemoveImage(ctx context.Context, in *criv1.RemoveImageRequest, _ ...grpc.CallOption) (*criv1.RemoveImageResponse, error) {
 	if err := c.checkImageService(); err != nil {
 		return nil, err
 	}
@@ -496,7 +496,7 @@ func (c *client) RemoveImage(ctx context.Context, in *criv1.RemoveImageRequest, 
 	return c.client.RemoveImage(ctx, in)
 }
 
-func (c *client) ImageFsInfo(ctx context.Context, in *criv1.ImageFsInfoRequest, opts ...grpc.CallOption) (*criv1.ImageFsInfoResponse, error) {
+func (c *client) ImageFsInfo(ctx context.Context, in *criv1.ImageFsInfoRequest, _ ...grpc.CallOption) (*criv1.ImageFsInfoResponse, error) {
 	if err := c.checkImageService(); err != nil {
 		return nil, err
 	}

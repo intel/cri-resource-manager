@@ -185,18 +185,18 @@ func ResetBlkioParameters(cgroupsDir string, blockIO OciBlockIOParameters) error
 
 // resetDevRates adds wanted rate parameters to new and resets unwated rates
 func resetDevRates(old, wanted []OciDeviceRate) []OciDeviceRate {
-	new := []OciDeviceRate{}
+	rates := []OciDeviceRate{}
 	seenDev := map[devMajMin]bool{}
 	for _, rdp := range wanted {
-		new = append(new, rdp)
+		rates = append(rates, rdp)
 		seenDev[devMajMin{rdp.Major, rdp.Minor}] = true
 	}
 	for _, rdp := range old {
 		if !seenDev[devMajMin{rdp.Major, rdp.Minor}] {
-			new = append(new, OciDeviceRate{rdp.Major, rdp.Minor, 0})
+			rates = append(rates, OciDeviceRate{rdp.Major, rdp.Minor, 0})
 		}
 	}
-	return new
+	return rates
 }
 
 // GetBlkioParameters returns OCI BlockIO parameters from files in cgroups blkio controller directory.
