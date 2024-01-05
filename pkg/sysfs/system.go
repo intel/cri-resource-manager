@@ -249,7 +249,7 @@ func SysRoot() string {
 }
 
 // DiscoverSystem performs discovery of the running systems details.
-func DiscoverSystem(args ...DiscoveryFlag) (System, error) {
+func DiscoverSystem() (System, error) {
 	return DiscoverSystemAt(filepath.Join("/", sysRoot, "sys"))
 }
 

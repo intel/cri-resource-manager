@@ -188,6 +188,6 @@ func (r *relay) CheckpointContainer(ctx context.Context, req *criv1.CheckpointCo
 	return r.client.CheckpointContainer(ctx, req)
 }
 
-func (r *relay) GetContainerEvents(req *criv1.GetEventsRequest, src criv1.RuntimeService_GetContainerEventsServer) error {
+func (r *relay) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.RuntimeService_GetContainerEventsServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
 }

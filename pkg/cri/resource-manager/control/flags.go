@@ -17,8 +17,9 @@ package control
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/intel/cri-resource-manager/pkg/config"
 	"strings"
+
+	"github.com/intel/cri-resource-manager/pkg/config"
 )
 
 // Options captures our runtime configuration.
@@ -55,7 +56,7 @@ func (o *options) ControllerMode(name string) mode {
 }
 
 // configNotify is our configuration update notification callback.
-func (o *options) configNotify(event config.Event, source config.Source) error {
+func (o *options) configNotify(_ config.Event, _ config.Source) error {
 	log.Info("configuration updated")
 	for name, controller := range controllers {
 		controller.mode = o.ControllerMode(name)

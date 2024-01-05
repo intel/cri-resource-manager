@@ -96,7 +96,7 @@ func getMigrationController() *migration {
 }
 
 // Start prepares the controller for resource control/decision enforcement.
-func (m *migration) Start(cache cache.Cache, client client.Client) error {
+func (m *migration) Start(cache cache.Cache, _ client.Client) error {
 	m.cache = cache
 	m.syncWithCache()
 	m.demoter.Reconfigure()

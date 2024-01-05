@@ -498,6 +498,6 @@ func (s *server) CheckpointContainer(ctx context.Context, req *criv1.CheckpointC
 	return rsp.(*criv1.CheckpointContainerResponse), err
 }
 
-func (s *server) GetContainerEvents(req *criv1.GetEventsRequest, src criv1.RuntimeService_GetContainerEventsServer) error {
+func (s *server) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.RuntimeService_GetContainerEventsServer) error {
 	return grpcstatus.Errorf(grpccodes.Unimplemented, "GetContainerEvents not implemented")
 }

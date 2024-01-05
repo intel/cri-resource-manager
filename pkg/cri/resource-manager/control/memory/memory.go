@@ -57,7 +57,7 @@ func getMemoryController() *memctl {
 }
 
 // Start initializes the controller for enforcing decisions.
-func (ctl *memctl) Start(cache cache.Cache, client client.Client) error {
+func (ctl *memctl) Start(cache cache.Cache, _ client.Client) error {
 	// Let's keep this off for now so we can exercise this without a patched kernel...
 	if !ctl.checkToptierLimitSupport() {
 		return memctlError("cgroup top tier memory limit control not available")
@@ -71,12 +71,12 @@ func (ctl *memctl) Stop() {
 }
 
 // PreCreateHook is the memory controller pre-create hook.
-func (ctl *memctl) PreCreateHook(c cache.Container) error {
+func (ctl *memctl) PreCreateHook(_ cache.Container) error {
 	return nil
 }
 
 // PreStartHook is the memory controller pre-start hook.
-func (ctl *memctl) PreStartHook(c cache.Container) error {
+func (ctl *memctl) PreStartHook(_ cache.Container) error {
 	return nil
 }
 
@@ -111,7 +111,7 @@ func (ctl *memctl) PostUpdateHook(c cache.Container) error {
 }
 
 // PostStop is the memory controller post-stop hook.
-func (ctl *memctl) PostStopHook(c cache.Container) error {
+func (ctl *memctl) PostStopHook(_ cache.Container) error {
 	return nil
 }
 

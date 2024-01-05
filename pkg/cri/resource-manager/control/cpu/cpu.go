@@ -73,7 +73,7 @@ func getCPUController() *cpuctl {
 }
 
 // Start initializes the controller for enforcing decisions.
-func (ctl *cpuctl) Start(cache cache.Cache, client client.Client) error {
+func (ctl *cpuctl) Start(cache cache.Cache, _ client.Client) error {
 	sys, err := sysfs.DiscoverSystem()
 	if err != nil {
 		return fmt.Errorf("failed to discover system topology: %w", err)
@@ -103,27 +103,27 @@ func (ctl *cpuctl) Stop() {
 }
 
 // PreCreateHook handler for the CPU controller.
-func (ctl *cpuctl) PreCreateHook(c cache.Container) error {
+func (ctl *cpuctl) PreCreateHook(_ cache.Container) error {
 	return nil
 }
 
 // PreStartHook handler for the CPU controller.
-func (ctl *cpuctl) PreStartHook(c cache.Container) error {
+func (ctl *cpuctl) PreStartHook(_ cache.Container) error {
 	return nil
 }
 
 // PostStartHook handler for the CPU controller.
-func (ctl *cpuctl) PostStartHook(c cache.Container) error {
+func (ctl *cpuctl) PostStartHook(_ cache.Container) error {
 	return nil
 }
 
 // PostUpdateHook handler for the CPU controller.
-func (ctl *cpuctl) PostUpdateHook(c cache.Container) error {
+func (ctl *cpuctl) PostUpdateHook(_ cache.Container) error {
 	return nil
 }
 
 // PostStopHook handler for the CPU controller.
-func (ctl *cpuctl) PostStopHook(c cache.Container) error {
+func (ctl *cpuctl) PostStopHook(_ cache.Container) error {
 	return nil
 }
 
@@ -275,7 +275,7 @@ func (ctl *cpuctl) configure() error {
 }
 
 // Callback for runtime configuration notifications.
-func (ctl *cpuctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+func (ctl *cpuctl) configNotify(_ pkgcfg.Event, _ pkgcfg.Source) error {
 	if !ctl.started {
 		// We don't want to configure until the controller has been fully
 		// started and initialized. We will configure on Start(), anyway.

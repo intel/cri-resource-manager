@@ -61,7 +61,7 @@ func TestDefaults(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, pid, os.Getpid())
 
-		close()
+		closePIDFile()
 		err = Write()
 		require.NotNil(t, err)
 
@@ -160,7 +160,7 @@ func TestReadClosed(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, pid, os.Getpid())
 
-		close()
+		closePIDFile()
 		pid, err = Read()
 		require.NotNil(t, err)
 		require.Equal(t, pid, -1)
@@ -183,7 +183,7 @@ func TestFailToOverwrite(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, pid, os.Getpid())
 
-		close()
+		closePIDFile()
 		err = Write()
 		require.NotNil(t, err)
 	})

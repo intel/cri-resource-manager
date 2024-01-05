@@ -172,7 +172,7 @@ func (m srcmap) clone() srcmap {
 }
 
 // configNotify is the configuration change notification callback for options.
-func (o *options) configNotify(event pkgcfg.Event, src pkgcfg.Source) error {
+func (o *options) configNotify(event pkgcfg.Event, _ pkgcfg.Source) error {
 	deflog.Info("logger configuration %v", event)
 	deflog.Info(" * debugging: %s", o.Debug.String())
 	deflog.Info(" * log source: %v", o.LogSource)

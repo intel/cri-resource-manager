@@ -233,7 +233,7 @@ func NewPolicy(cache cache.Cache, o *Options) (Policy, error) {
 	}
 
 	if log.DebugEnabled() {
-		logger.Get(opt.Policy).EnableDebug(true)
+		logger.Get(opt.Policy).EnableDebug()
 	}
 
 	backendOpts.Cache = p.cache
@@ -445,7 +445,7 @@ func ConstraintToString(value Constraint) string {
 }
 
 // configNotify is the configuration change notification callback for the genric policy layer.
-func configNotify(event config.Event, src config.Source) error {
+func configNotify(_ config.Event, _ config.Source) error {
 	// let the active policy know of changes
 	backendOpts.Available = opt.Available
 	backendOpts.Reserved = opt.Reserved

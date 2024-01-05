@@ -52,7 +52,7 @@ func getBlockIOController() *blockioctl {
 }
 
 // Start initializes the controller for enforcing decisions.
-func (ctl *blockioctl) Start(cache cache.Cache, client client.Client) error {
+func (ctl *blockioctl) Start(cache cache.Cache, _ client.Client) error {
 	ctl.cache = cache
 	ctl.reconfigureRunningContainers()
 	return nil
@@ -63,12 +63,12 @@ func (ctl *blockioctl) Stop() {
 }
 
 // PreCreateHook is the block I/O controller pre-create hook.
-func (ctl *blockioctl) PreCreateHook(c cache.Container) error {
+func (ctl *blockioctl) PreCreateHook(_ cache.Container) error {
 	return nil
 }
 
 // PreStartHook is the block I/O controller pre-start hook.
-func (ctl *blockioctl) PreStartHook(c cache.Container) error {
+func (ctl *blockioctl) PreStartHook(_ cache.Container) error {
 	return nil
 }
 
@@ -103,7 +103,7 @@ func (ctl *blockioctl) PostUpdateHook(c cache.Container) error {
 }
 
 // PostStop is the block I/O controller post-stop hook.
-func (ctl *blockioctl) PostStopHook(c cache.Container) error {
+func (ctl *blockioctl) PostStopHook(_ cache.Container) error {
 	return nil
 }
 
@@ -143,7 +143,7 @@ func (ctl *blockioctl) assign(c cache.Container) error {
 }
 
 // configNotify is blockio class mapping and class definition configuration callback
-func (ctl *blockioctl) configNotify(event config.Event, source config.Source) error {
+func (ctl *blockioctl) configNotify(event config.Event, _ config.Source) error {
 	ignoreErrors := (event == config.RevertEvent)
 	err := blockio.UpdateOciConfig(ignoreErrors)
 	if err != nil {

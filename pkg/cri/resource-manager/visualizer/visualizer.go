@@ -123,7 +123,7 @@ const (
 )
 
 // generateIndexHTML generates a HTML page to access all known visualization UIs.
-func (v *visualizer) generateIndexHTML(w http.ResponseWriter, req *http.Request) {
+func (v *visualizer) generateIndexHTML(w http.ResponseWriter, _ *http.Request) {
 	builtinUIs := []string{}
 	for name := range v.builtin {
 		builtinUIs = append(builtinUIs, name)

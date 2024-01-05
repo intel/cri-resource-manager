@@ -87,7 +87,7 @@ type Logger interface {
 	ErrorBlock(prefix string, format string, args ...interface{})
 
 	// EnableDebug enables debug messages for this Logger.
-	EnableDebug(bool) bool
+	EnableDebug() bool
 	// DebugEnabled checks if debug messages are enabled for this Logger.
 	DebugEnabled() bool
 
@@ -304,7 +304,7 @@ func (log *logging) get(source string) logger {
 	return l
 }
 
-func (l logger) EnableDebug(state bool) bool {
+func (l logger) EnableDebug() bool {
 	log.Lock()
 	defer log.Unlock()
 	if _, ok := log.sources[l]; !ok {

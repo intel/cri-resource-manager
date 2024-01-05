@@ -216,7 +216,7 @@ func resourcesToQOS(podResources *PodResourceRequirements) corev1.PodQOSClass {
 }
 
 // findContainerDir brute-force searches for a container cgroup dir.
-func findContainerDir(podCgroupDir, podID, ID string) string {
+func findContainerDir(podCgroupDir, ID string) string {
 	var dirs []string
 
 	if podCgroupDir == "" {

@@ -111,7 +111,7 @@ func patchNodeStatus(cli *k8sclient.Clientset, fields map[string]string) error {
 }
 
 // patchAdjustmentStatus is a helper for patching the status of a Adjustment CRD.
-func patchAdjustmentStatus(cli *resmgr.CriresmgrV1alpha1Client, status *resmgrStatus, names ...string) error {
+func patchAdjustmentStatus(_ *resmgr.CriresmgrV1alpha1Client, _ *resmgrStatus, _ ...string) error {
 	return nil
 }
 

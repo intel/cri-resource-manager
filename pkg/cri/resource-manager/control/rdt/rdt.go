@@ -81,7 +81,7 @@ func getRDTController() *rdtctl {
 }
 
 // Start initializes the controller for enforcing decisions.
-func (ctl *rdtctl) Start(cache cache.Cache, client client.Client) error {
+func (ctl *rdtctl) Start(cache cache.Cache, _ client.Client) error {
 	if err := rdt.Initialize(resctrlGroupPrefix); err != nil {
 		return rdtError("failed to initialize RDT controls: %v", err)
 	}
@@ -109,12 +109,12 @@ func (ctl *rdtctl) Stop() {
 }
 
 // PreCreateHook is the RDT controller pre-create hook.
-func (ctl *rdtctl) PreCreateHook(c cache.Container) error {
+func (ctl *rdtctl) PreCreateHook(_ cache.Container) error {
 	return nil
 }
 
 // PreStartHook is the RDT controller pre-start hook.
-func (ctl *rdtctl) PreStartHook(c cache.Container) error {
+func (ctl *rdtctl) PreStartHook(_ cache.Container) error {
 	return nil
 }
 
@@ -350,7 +350,7 @@ func (ctl *rdtctl) configure() error {
 }
 
 // configNotify is our runtime configuration notification callback.
-func (ctl *rdtctl) configNotify(event pkgcfg.Event, source pkgcfg.Source) error {
+func (ctl *rdtctl) configNotify(_ pkgcfg.Event, _ pkgcfg.Source) error {
 	log.Info("configuration update, applying new config")
 	return ctl.configure()
 }

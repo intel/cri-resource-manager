@@ -187,7 +187,7 @@ func defaultOptions() interface{} {
 }
 
 // configNotify updates our runtime configuration.
-func (o *options) configNotify(event config.Event, source config.Source) error {
+func (o *options) configNotify(event config.Event, _ config.Source) error {
 	log.Info("message dumper configuration %v", event)
 	log.Info(" * config: %s", o.Config)
 

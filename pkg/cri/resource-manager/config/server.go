@@ -120,7 +120,7 @@ func (s *server) Stop() {
 }
 
 // SetConfig pushes a configuration update to the server.
-func (s *server) SetConfig(ctx context.Context, req *v1.SetConfigRequest) (*v1.SetConfigReply, error) {
+func (s *server) SetConfig(_ context.Context, req *v1.SetConfigRequest) (*v1.SetConfigReply, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -136,7 +136,7 @@ func (s *server) SetConfig(ctx context.Context, req *v1.SetConfigRequest) (*v1.S
 }
 
 // SetAdjustment pushes updated external policies to the server.
-func (s *server) SetAdjustment(ctx context.Context, req *v1.SetAdjustmentRequest) (*v1.SetAdjustmentReply, error) {
+func (s *server) SetAdjustment(_ context.Context, req *v1.SetAdjustmentRequest) (*v1.SetAdjustmentReply, error) {
 	s.Lock()
 	defer s.Unlock()
 

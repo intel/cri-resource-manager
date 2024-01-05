@@ -774,9 +774,9 @@ func (c *container) GetCgroupDir() string {
 		return c.CgroupDir
 	}
 	if pod, ok := c.GetPod(); ok {
-		parent, podID := pod.GetCgroupParentDir(), pod.GetID()
+		parent, _ := pod.GetCgroupParentDir(), pod.GetID()
 		ID := c.GetID()
-		c.CgroupDir = findContainerDir(parent, podID, ID)
+		c.CgroupDir = findContainerDir(parent, ID)
 	}
 	return c.CgroupDir
 }
