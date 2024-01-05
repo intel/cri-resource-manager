@@ -19,8 +19,6 @@ import (
 
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
-	grpccodes "google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
 
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -61,6 +59,7 @@ const (
 	updateRuntimeConfig      = "UpdateRuntimeConfig"
 	status                   = "Status"
 	checkpointContainer      = "CheckpointContainer"
+	getContainerEvents       = "GetContainerEvents"
 	listMetricDescriptors    = "ListMetricDescriptors"
 	listPodSandboxMetrics    = "ListPodSandboxMetrics"
 	runtimeConfig            = "RuntimeConfig"
@@ -501,8 +500,10 @@ func (s *server) CheckpointContainer(ctx context.Context, req *criv1.CheckpointC
 	return rsp.(*criv1.CheckpointContainerResponse), err
 }
 
-func (s *server) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.RuntimeService_GetContainerEventsServer) error {
-	return grpcstatus.Errorf(grpccodes.Unimplemented, "GetContainerEvents not implemented")
+func (s *server) GetContainerEvents(req *criv1.GetEventsRequest, srv criv1.RuntimeService_GetContainerEventsServer) error {
+	// TODO(klihub): interceptRequest is a unary interceptor. It can't handle streaming
+	// requests so for now we short-circuit the call to the server here.
+	return (*s.runtime).GetContainerEvents(req, srv)
 }
 
 func (s *server) ListMetricDescriptors(ctx context.Context, req *criv1.ListMetricDescriptorsRequest) (*criv1.ListMetricDescriptorsResponse, error) {

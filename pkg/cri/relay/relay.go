@@ -19,6 +19,8 @@ import (
 	"os"
 	"sync"
 
+	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/intel/cri-resource-manager/pkg/cri/client"
 	"github.com/intel/cri-resource-manager/pkg/cri/server"
 	logger "github.com/intel/cri-resource-manager/pkg/log"
@@ -60,10 +62,13 @@ type Relay interface {
 // relay is the implementation of Relay.
 type relay struct {
 	logger.Logger
-	sync.Mutex               // hmm... do *we* need to be lockable, or the upper layer(s) ?
-	options    Options       // relay options
-	client     client.Client // relay CRI client
-	server     server.Server // relay CRI server
+	sync.Mutex
+	options Options       // relay options
+	client  client.Client // relay CRI client
+	server  server.Server // relay CRI server
+
+	evtClient criv1.RuntimeService_GetContainerEventsClient
+	evtChans  map[*criv1.GetEventsRequest]chan *criv1.ContainerEventResponse
 }
 
 // NewRelay creates a new relay instance.
@@ -71,8 +76,9 @@ func NewRelay(options Options) (Relay, error) {
 	var err error
 
 	r := &relay{
-		Logger:  logger.NewLogger("cri/relay"),
-		options: options,
+		Logger:   logger.NewLogger("cri/relay"),
+		options:  options,
+		evtChans: map[*criv1.GetEventsRequest]chan *criv1.ContainerEventResponse{},
 	}
 
 	imageSocket := r.options.ImageSocket

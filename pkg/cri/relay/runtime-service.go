@@ -16,9 +16,9 @@ package relay
 
 import (
 	"context"
+	"fmt"
+	"time"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	criv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/intel/cri-resource-manager/pkg/dump"
@@ -188,8 +188,23 @@ func (r *relay) CheckpointContainer(ctx context.Context, req *criv1.CheckpointCo
 	return r.client.CheckpointContainer(ctx, req)
 }
 
-func (r *relay) GetContainerEvents(_ *criv1.GetEventsRequest, _ criv1.RuntimeService_GetContainerEventsServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
+func (r *relay) GetContainerEvents(req *criv1.GetEventsRequest, srv criv1.RuntimeService_GetContainerEventsServer) error {
+	evtC := r.addEventServer(req)
+
+	if err := r.startEventRelay(req); err != nil {
+		r.delEventServer(req)
+		return err
+	}
+
+	for evt := range evtC {
+		if err := srv.Send(evt); err != nil {
+			r.Errorf("failed to relay/send container event: %v", err)
+			r.delEventServer(req)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *relay) ListMetricDescriptors(ctx context.Context, req *criv1.ListMetricDescriptorsRequest) (*criv1.ListMetricDescriptorsResponse, error) {
@@ -205,4 +220,81 @@ func (r *relay) ListPodSandboxMetrics(ctx context.Context, req *criv1.ListPodSan
 func (r *relay) RuntimeConfig(ctx context.Context, req *criv1.RuntimeConfigRequest) (*criv1.RuntimeConfigResponse, error) {
 	r.dump("RuntimeConfig", req)
 	return r.client.RuntimeConfig(ctx, req)
+}
+
+const (
+	eventRelayTimeout = 1 * time.Second
+)
+
+func (r *relay) addEventServer(req *criv1.GetEventsRequest) chan *criv1.ContainerEventResponse {
+	r.Lock()
+	defer r.Unlock()
+
+	evtC := make(chan *criv1.ContainerEventResponse, 128)
+	r.evtChans[req] = evtC
+
+	return evtC
+}
+
+func (r *relay) delEventServer(req *criv1.GetEventsRequest) chan *criv1.ContainerEventResponse {
+	r.Lock()
+	defer r.Unlock()
+
+	evtC := r.evtChans[req]
+	delete(r.evtChans, req)
+
+	return evtC
+}
+
+func (r *relay) startEventRelay(req *criv1.GetEventsRequest) error {
+	r.Lock()
+	defer r.Unlock()
+
+	if r.evtClient != nil {
+		return nil
+	}
+
+	c, err := r.client.GetContainerEvents(context.Background(), req)
+	if err != nil {
+		return fmt.Errorf("failed to create container event client: %w", err)
+	}
+
+	r.evtClient = c
+	go r.relayEvents()
+
+	return nil
+}
+
+func (r *relay) relayEvents() {
+	for {
+		evt, err := r.evtClient.Recv()
+		if err != nil {
+			r.Errorf("failed to relay/receive container event: %v", err)
+		}
+
+		r.Lock()
+
+		if err != nil {
+			for req, evtC := range r.evtChans {
+				delete(r.evtChans, req)
+				close(evtC)
+			}
+			r.evtClient = nil
+		} else {
+			for req, evtC := range r.evtChans {
+				select {
+				case evtC <- evt:
+				case _ = <-time.After(eventRelayTimeout):
+					delete(r.evtChans, req)
+					close(evtC)
+				}
+			}
+		}
+
+		r.Unlock()
+
+		if err != nil {
+			return
+		}
+	}
 }
