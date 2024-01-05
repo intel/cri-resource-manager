@@ -183,7 +183,7 @@ func (fake *mockSystem) CPUCount() int {
 	}
 	return fake.cpuCount
 }
-func (fake *mockSystem) Discover(flags system.DiscoveryFlag) error {
+func (fake *mockSystem) Discover() error {
 	return nil
 }
 func (fake *mockSystem) Package(idset.ID) system.CPUPackage {
