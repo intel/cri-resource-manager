@@ -1,6 +1,11 @@
 name: CodeQL scanning
 on:
   workflow_call:
+    inputs:
+      export-report:
+        default: false
+        required: false
+        type: boolean
 
 jobs:
   codeql-scan:
@@ -17,3 +22,17 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
+
+    - name: Generate CodeQL Security Report
+      if: ${{ inputs.export-report }}
+      uses: rsdmike/github-security-report-action@v3.0.4
+      with:
+        template: report
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload PDF report as an artifact
+      if: ${{ inputs.export-report }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: codeql-report
+        path: report.pdf
