@@ -7,5 +7,6 @@ function getVersionsMenuItems() {
     { name: 'v0.6', url: '/cri-resource-manager/v0.6' },
     { name: 'v0.7', url: '/cri-resource-manager/v0.7' },
     { name: 'v0.8', url: '/cri-resource-manager/v0.8' },
+    { name: 'v0.9', url: '/cri-resource-manager/v0.9' },
   ];
 }

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Testing &mdash; CRI Resource Manager 0.9.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Unit tests" href="unit-test.html" />
+    <link rel="prev" title="Policy Writer’s Guide" href="policy-writers-guide.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            CRI Resource Manager
+          </a>
+              <div class="version">
+                v0.9.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setup.html">Setup and Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../policy/index.html">Policies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../node-agent.html">Node Agent</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../webhook.html">Webhook</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Developer’s Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="architecture.html">Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="policy-writers-guide.html">Policy Writer’s Guide</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Testing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="unit-test.html">Unit tests</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cri-test.html">CRI Validation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="e2e-test.html">End-to-End tests</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../migration-to-NRI.html">Migrating from CRI-RM to NRI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">CRI Resource Manager</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Developer’s Guide</a></li>
+      <li class="breadcrumb-item active">Testing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/docs/developers-guide/testing.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="testing">
+<h1>Testing<a class="headerlink" href="#testing" title="Permalink to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="unit-test.html">Unit tests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cri-test.html">CRI Validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="e2e-test.html">End-to-End tests</a></li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="policy-writers-guide.html" class="btn btn-neutral float-left" title="Policy Writer’s Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="unit-test.html" class="btn btn-neutral float-right" title="Unit tests" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, various.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.9
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>

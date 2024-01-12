@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Node Agent &mdash; CRI Resource Manager 0.9.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Webhook" href="webhook.html" />
+    <link rel="prev" title="Dynamic-Pools Policy" href="policy/dynamic-pools.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            CRI Resource Manager
+          </a>
+              <div class="version">
+                v0.9.0
+              </div>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick-start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="setup.html">Setup and Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="policy/index.html">Policies</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Node Agent</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#running-as-a-daemonset">Running as a DaemonSet</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-as-a-host-service">Running as a Host Service</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configmap-to-node-mapping-conventions">ConfigMap to Node Mapping Conventions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="webhook.html">Webhook</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers-guide/index.html">Developer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="migration-to-NRI.html">Migrating from CRI-RM to NRI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demos/index.html">Demos</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference/index.html">Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="contributing.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Reporting a Potential Security Vulnerability</a></li>
+<li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">CRI Resource Manager</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Node Agent</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/docs/node-agent.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="node-agent">
+<h1>Node Agent<a class="headerlink" href="#node-agent" title="Permalink to this heading"></a></h1>
+<p>CRI Resource Manager can be configured dynamically using the CRI Resource
+Manager Node Agent and Kubernetes* ConfigMaps.</p>
+<section id="running-as-a-daemonset">
+<h2>Running as a DaemonSet<a class="headerlink" href="#running-as-a-daemonset" title="Permalink to this heading"></a></h2>
+<p>The agent can be build using the
+<span class="xref myst">provided Dockerfile</span>. It can be
+deployed as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the
+<span class="xref myst">provided deployment file</span>.</p>
+<p>When using the provided or a similar deployment, the agent uses a
+readiness probe to propagate the status of the last configuration
+update back to the control plane. If the configuration could not
+be taken into use for any reason, the agent’s probe will fail which
+eventually marks the agent as not being <code class="docutils literal notranslate"><span class="pre">Ready</span></code>. In this case, more
+details about the failure should be present among the latest messages
+logged by the agent or the probe itself. if the reason for failure is
+a configuration error, once the error is fixed, the agent should become
+eventually <code class="docutils literal notranslate"><span class="pre">Ready</span></code> again.</p>
+</section>
+<section id="running-as-a-host-service">
+<h2>Running as a Host Service<a class="headerlink" href="#running-as-a-host-service" title="Permalink to this heading"></a></h2>
+<p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment
+variable <code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running
+on. If necessary pass it the credentials for accessing the cluster using
+the <code class="docutils literal notranslate"><span class="pre">-kubeconfig</span> <span class="pre">&lt;file&gt;</span></code> command line option.</p>
+</section>
+<section id="configmap-to-node-mapping-conventions">
+<h2>ConfigMap to Node Mapping Conventions<a class="headerlink" href="#configmap-to-node-mapping-conventions" title="Permalink to this heading"></a></h2>
+<p>The agent monitors two ConfigMaps for the node, a primary node-specific one
+and a secondary group-specific or default one, depending on whether the node
+belongs to a configuration group. The node-specific ConfigMap always takes
+precedence over the others.</p>
+<p>The names of these ConfigMaps are</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.node.$NODE_NAME</span></code>: primary, node-specific configuration</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.group.$GROUP_NAME</span></code>: secondary group-specific node
+configuration</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cri-resmgr-config.default</span></code>: secondary: secondary default node
+configuration</p></li>
+</ol>
+<p>You can assign a node to a configuration group by setting the
+<code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/group</span></code> label on the node to the name of
+the configuration group. You can remove a node from its group by deleting
+the node group label.</p>
+<p>There is a
+<span class="xref myst">sample ConfigMap spec</span>
+that contains a node-specific, a group-specific, and a default ConfigMap
+example. See <a class="reference internal" href="policy/index.html"><span class="doc std std-doc">any available policy-specific documentation</span></a>
+for more information on the policy configurations.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="policy/dynamic-pools.html" class="btn btn-neutral float-left" title="Dynamic-Pools Policy" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="webhook.html" class="btn btn-neutral float-right" title="Webhook" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2020, various.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+    <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
+      <span class="rst-current-version" data-toggle="rst-current-version">
+        <span class="fa fa-book"> GitHub Pages</span>
+        v0.9
+        <span class="fa fa-caret-down"></span>
+      </span>
+      <div class="rst-other-versions">
+        <dl id="versions">
+          <dt>Versions</dt>
+        </dl>
+        <dl>
+          <dt>
+          <a href="/cri-resource-manager/releases">all releases</a>
+          </dt>
+        </dl>
+      </div>
+    </div>
+  
+  <script src="../../versions.js"></script>
+  <script>
+      var list = document.getElementById('versions')
+      var menuItems = getVersionsMenuItems();
+      for (var i=0; i < menuItems.length; i++) {
+        var item = document.createElement('dd');
+        var anchor = item.appendChild(document.createElement('a'));
+        anchor.appendChild(document.createTextNode(menuItems[i].name));
+        anchor.href = menuItems[i].url;
+        list.appendChild(item);
+      }
+  </script>
+
+
+</body>
+</html>
