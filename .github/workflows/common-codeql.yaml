@@ -7,10 +7,14 @@ on:
         required: false
         type: boolean
 
+permissions:
+  contents: read
+
 jobs:
   codeql-scan:
     runs-on: ubuntu-22.04
-
+    permissions:
+      security-events: write
     steps:
     - name: Checkout
       uses: actions/checkout@v3
