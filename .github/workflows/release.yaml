@@ -4,6 +4,9 @@ on:
   push:
     tags: [ 'v*' ]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
@@ -11,11 +14,17 @@ concurrency:
 jobs:
   trivy-scan:
     uses: "./.github/workflows/common-trivy.yaml"
+    permissions:
+      contents: read
+      security-events: write
     with:
       export-csv: true
 
   codeql:
     uses: "./.github/workflows/common-codeql.yaml"
+    permissions:
+      contents: read
+      security-events: write
     with:
       export-report: true
 
@@ -30,6 +39,8 @@ jobs:
 
   build-packages:
     needs: [trivy-scan]
+    permissions:
+      contents: write
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout
