@@ -3,6 +3,9 @@ name: Verify code
 on:
   - workflow_call
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-22.04
@@ -38,8 +41,14 @@ jobs:
 
   trivy-scan:
     uses: "./.github/workflows/common-trivy.yaml"
+    permissions:
+      contents: read
+      security-events: write
     with:
       upload-to-github-security-tab: true
 
   codeql-scan:
     uses: "./.github/workflows/common-codeql.yaml"
+    permissions:
+      contents: read
+      security-events: write
