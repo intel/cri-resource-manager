@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
 
     - name: Fetch gh-pages
       run: git fetch --no-tags --prune --depth=1 origin refs/heads/gh-pages:refs/heads/gh-pages
