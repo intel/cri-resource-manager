@@ -71,7 +71,7 @@ jobs:
 
     - name: Upload sarif report to GitHub Security tab
       if: ${{ inputs.upload-to-github-security-tab }}
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
        sarif_file: trivy-report.sarif
 
