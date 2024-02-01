@@ -19,6 +19,11 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: go.mod
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
