@@ -11,6 +11,10 @@ on:
       - "Makefile"
     tags:
         - v*
+
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
@@ -18,5 +22,7 @@ concurrency:
 jobs:
   update-gh-pages:
     uses: "./.github/workflows/common-build-docs.yaml"
+    permissions:
+      contents: write
     with:
       publish: true

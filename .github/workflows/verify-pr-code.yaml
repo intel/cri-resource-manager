@@ -6,6 +6,9 @@ on:
       - "docs/**"
       - "**.md"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -13,3 +16,6 @@ concurrency:
 jobs:
   verify:
     uses: "./.github/workflows/common-verify-code.yaml"
+    permissions:
+      contents: read
+      security-events: write

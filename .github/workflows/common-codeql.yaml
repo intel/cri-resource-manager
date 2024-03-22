@@ -7,21 +7,30 @@ on:
         required: false
         type: boolean
 
+permissions:
+  contents: read
+
 jobs:
   codeql-scan:
     runs-on: ubuntu-22.04
-
+    permissions:
+      security-events: write
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: go
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
 
     - name: Generate CodeQL Security Report
       if: ${{ inputs.export-report }}

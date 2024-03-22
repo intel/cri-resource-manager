@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '30 2 * * *'
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -11,4 +14,6 @@ concurrency:
 jobs:
   verify-code:
     uses: "./.github/workflows/common-verify-code.yaml"
-
+    permissions:
+      contents: read
+      security-events: write

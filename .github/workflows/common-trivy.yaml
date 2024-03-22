@@ -11,12 +11,15 @@ on:
         required: false
         type: boolean
 
+permissions:
+  contents: read
+
 jobs:
   trivy-scan-licenses:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Run Trivy in fs mode
       uses: aquasecurity/trivy-action@master
@@ -29,9 +32,11 @@ jobs:
 
   trivy-scan-vulns:
     runs-on: ubuntu-22.04
+    permissions:
+      security-events: write
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Run Trivy in fs mode
       continue-on-error: true
@@ -66,7 +71,7 @@ jobs:
 
     - name: Upload sarif report to GitHub Security tab
       if: ${{ inputs.upload-to-github-security-tab }}
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
        sarif_file: trivy-report.sarif
 
