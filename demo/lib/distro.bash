@@ -87,7 +87,6 @@ distro-resolve-fn() {
     candidates="${VM_DISTRO/./_}-$apifn ${VM_DISTRO%%-*}-$apifn"
     case $VM_DISTRO in
         ubuntu*) candidates="$candidates debian-$apifn";;
-        centos*) candidates="$candidates fedora-$apifn rpm-$apifn";;
         fedora*) candidates="$candidates rpm-$apifn";;
         *suse*)  candidates="$candidates rpm-$apifn";;
         sles*)   candidates="$candidates opensuse-$apifn rpm-$apifn";;
@@ -307,84 +306,11 @@ debian-env-file-dir() {
 ###########################################################################
 
 #
-# Centos 7, 8, generic Fedora
+# Generic Fedora
 #
 
 YUM_INSTALL="yum install --disableplugin=fastestmirror -y"
 YUM_REMOVE="yum remove --disableplugin=fastestmirror -y"
-
-centos-7-image-url() {
-    echo "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-2003.qcow2.xz"
-}
-
-centos-8-image-url() {
-    echo "https://cloud.centos.org/centos/8/x86_64/images/CentOS-8-GenericCloud-8.2.2004-20200611.2.x86_64.qcow2"
-}
-
-centos-ssh-user() {
-    echo centos
-}
-
-centos-7-install-utils() {
-    distro-install-pkg /usr/bin/killall
-}
-
-centos-7-install-repo() {
-    vm-command-q "type -t yum-config-manager >&/dev/null" || {
-        distro-install-pkg yum-utils
-    }
-    vm-command "yum-config-manager --add-repo $*" ||
-        command-error "failed to add YUM repository $*"
-}
-
-centos-7-install-pkg() {
-    vm-command "$YUM_INSTALL $*" ||
-        command-error "failed to install $*"
-}
-
-centos-7-remove-pkg() {
-    vm-command "$YUM_REMOVE $*" ||
-        command-error "failed to remove package(s) $*"
-}
-
-centos-7-install-containerd-pre() {
-    create-ext4-var-lib-containerd
-    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
-}
-
-centos-8-install-pkg-pre() {
-    vm-command "[ -f /etc/yum.repos.d/.fixup ]" && return 0
-    vm-command 'sed -i "s/mirrorlist/#mirrorlist/g" /etc/yum.repos.d/CentOS-*' && \
-    vm-command 'sed -i "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*' && \
-    vm-command 'touch /etc/yum.repos.d/.fixup'
-}
-
-centos-8-install-crio-pre() {
-    if [ -z "$crio_src" ]; then
-        local os=CentOS_8
-        local version=${crio_version:-1.20}
-        vm-command "curl -L -o /etc/yum.repos.d/libcontainers-stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$os/devel:kubic:libcontainers:stable.repo"
-        vm-command "curl -L -o /etc/yum.repos.d/crio.repo https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$version/$os/devel:kubic:libcontainers:stable:cri-o:$version.repo"
-    fi
-}
-
-centos-8-install-crio() {
-    if [ -n "$crio_src" ]; then
-	default-install-crio
-    else
-	distro-install-pkg cri-o
-	vm-command "systemctl enable crio"
-    fi
-}
-
-centos-8-install-containerd-pre() {
-    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
-}
-
-centos-install-golang() {
-    distro-install-pkg wget tar gzip git-core
-    from-tarball-install-golang
-}
 
 fedora-image-url() {
     fedora-38-image-url
@@ -551,9 +477,6 @@ EOF
     else
         k8sverparam=""
     fi
-
-    vm-command 'grep -iq centos-[78] /etc/os-release' && \
-        vm-command "sed -i 's/gpgcheck=1/gpgcheck=0/g' $repo"
 
     distro-install-pkg iproute-tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
     vm-command "systemctl enable --now kubelet" ||

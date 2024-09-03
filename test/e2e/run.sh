@@ -99,7 +99,7 @@ usage() {
     echo "    topology: JSON to override NUMA node list used in tests."
     echo "             See: python3 ${DEMO_LIB_DIR}/topology2qemuopts.py --help"
     echo "    distro:  Linux distribution to be / already installed on vm."
-    echo "             Supported values: centos-7, centos-8, debian-10, debian-sid"
+    echo "             Supported values: debian-10, debian-sid"
     echo "                 fedora, fedora-33, opensuse-tumbleweed,"
     echo "                 opensuse-15.4 (same as opensuse), opensuse-15.5, sles,"
     echo "                 ubuntu-18.04, ubuntu-20.04, ubuntu-22.04"
