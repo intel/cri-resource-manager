@@ -17,5 +17,5 @@ jobs:
   verify-docs:
     uses: "./.github/workflows/common-build-docs.yaml"
     permissions:
-      contents: read
+      contents: write
       security-events: write
