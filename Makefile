@@ -684,7 +684,7 @@ cross-tar cross-tarball: dist docker/cross-build/fedora
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
-	    centos-7-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
+	    fedora-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
 	rm -fr $$builddir && \
 	install -D -m644 -t $(PACKAGES_DIR)/release-assets $$outdir/cri-resource-manager-$(TAR_VERSION).x86_64.tar.gz
 
