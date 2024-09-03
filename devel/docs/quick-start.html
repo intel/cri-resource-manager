@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quick-start &mdash; CRI Resource Manager 0.8.0-182-g84bd7737 documentation</title>
+  <title>Quick-start &mdash; CRI Resource Manager 0.0.0-1-g7227ea4 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css" />
 
@@ -55,7 +55,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#pre-requisites">Pre-requisites</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#setup-cri-resmgr">Setup CRI-Resmgr</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#install-package">Install package</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#centos-fedora-and-suse">CentOS*, Fedora*, and SUSE*</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#fedora-and-suse">Fedora*, and SUSE*</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#ubuntu-and-debian">Ubuntu* and Debian*</a></li>
 </ul>
 </li>
@@ -64,7 +64,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#kubelet-setup">Kubelet setup</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#existing-cluster">Existing cluster</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#id1">CentOS, Fedora, and SUSE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id1">Fedora, and SUSE</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#id2">Ubuntu and Debian</a></li>
 </ul>
 </li>
@@ -128,8 +128,8 @@ Resource Manager.</p>
 <p>First, install and setup cri-resource-manager.</p>
 <section id="install-package">
 <h3>Install package<a class="headerlink" href="#install-package" title="Permalink to this heading"></a></h3>
-<section id="centos-fedora-and-suse">
-<h4>CentOS*, Fedora*, and SUSE*<a class="headerlink" href="#centos-fedora-and-suse" title="Permalink to this heading"></a></h4>
+<section id="fedora-and-suse">
+<h4>Fedora*, and SUSE*<a class="headerlink" href="#fedora-and-suse" title="Permalink to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>CRIRM_VERSION=`curl -s &quot;https://api.github.com/repos/intel/cri-resource-manager/releases/latest&quot; | \
                jq .tag_name | tr -d &#39;&quot;v&#39;`
 source /etc/os-release
@@ -171,7 +171,7 @@ container runtime endpoint.</p>
 cri-resmgr instead of the existing container runtime (expecting containerd
 here).</p>
 <section id="id1">
-<h4>CentOS, Fedora, and SUSE<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h4>
+<h4>Fedora, and SUSE<a class="headerlink" href="#id1" title="Permalink to this heading"></a></h4>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sudo</span> <span class="n">sed</span> <span class="s1">&#39;/KUBELET_EXTRA_ARGS/ s!$! --container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock!&#39;</span> <span class="o">-</span><span class="n">i</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">sysconfig</span><span class="o">/</span><span class="n">kubelet</span>
 <span class="n">sudo</span> <span class="n">systemctl</span> <span class="n">restart</span> <span class="n">kubelet</span>
 </pre></div>
