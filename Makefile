@@ -240,7 +240,7 @@ DIST_TRANSFORM := \
 DISTRO_ID      := $(shell . /etc/os-release; echo "$${ID:-unknown}")
 DISTRO_VERSION := $(shell . /etc/os-release; echo "$${VERSION_ID:-unknown}")
 DISTRO_PACKAGE := $(shell echo $(DISTRO_ID) | tr -d ' \t' | \
-    sed -E 's/.*((centos)|(fedora)|(suse)).*/rpm/;s/.*((ubuntu)|(debian)).*/deb/')
+    sed -E 's/.*((fedora)|(suse)).*/rpm/;s/.*((ubuntu)|(debian)).*/deb/')
 
 # Be quiet by default but let folks override it with Q= or V=1 on the command line.
 ifneq ($(V),1)
