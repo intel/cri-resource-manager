@@ -100,7 +100,7 @@ usage() {
     echo "             See: python3 ${DEMO_LIB_DIR}/topology2qemuopts.py --help"
     echo "    distro:  Linux distribution to be / already installed on vm."
     echo "             Supported values: debian-10, debian-sid"
-    echo "                 fedora, fedora-33, opensuse-tumbleweed,"
+    echo "                 fedora, opensuse-tumbleweed,"
     echo "                 opensuse-15.5 (same as opensuse), sles,"
     echo "                 ubuntu-18.04, ubuntu-20.04, ubuntu-22.04"
     echo "             If sles: set VM_SLES_REGCODE=<CODE> to use official packages."
