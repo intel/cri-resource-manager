@@ -4,7 +4,7 @@ FROM fedora:latest as fedora-build
 ARG GO_VERSION=x.yz
 ARG GOLICENSES_VERSION
 ARG CREATE_USER="build"
-ARG USER_OPTIONS=""
+ARG USER_UID=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
 RUN dnf install -y rpm-build systemd-rpm-macros \
@@ -19,4 +19,4 @@ RUN tar xf /go${GO_VERSION}.linux-amd64.tar.gz -C "/usr/local" && \
 RUN GOBIN=/go/bin go install github.com/google/go-licenses@${GOLICENSES_VERSION}
 
 RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
-    useradd -m -s /bin/bash $CREATE_USER $USER_OPTIONS
+    useradd -m -s /bin/bash $CREATE_USER -u $USER_UID

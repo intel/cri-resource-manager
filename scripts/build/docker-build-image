@@ -12,5 +12,5 @@ echo "  - options   : $@"
 docker build . \
        -f "$DOCKERFILE" -t "$IMAGE" \
        --build-arg "CREATE_USER=$USER" \
-       --build-arg USER_OPTIONS="-u $(id -u)" \
+       --build-arg USER_UID="$(id -u)" \
        "$@" || exit 1
