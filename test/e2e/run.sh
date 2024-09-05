@@ -101,7 +101,7 @@ usage() {
     echo "    distro:  Linux distribution to be / already installed on vm."
     echo "             Supported values: debian-10, debian-sid"
     echo "                 fedora, fedora-33, opensuse-tumbleweed,"
-    echo "                 opensuse-15.4 (same as opensuse), opensuse-15.5, sles,"
+    echo "                 opensuse-15.5 (same as opensuse), sles,"
     echo "                 ubuntu-18.04, ubuntu-20.04, ubuntu-22.04"
     echo "             If sles: set VM_SLES_REGCODE=<CODE> to use official packages."
     echo "    cgroups: cgroups version in the VM, v1 or v2. The default is v1."
