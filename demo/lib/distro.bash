@@ -601,11 +601,11 @@ sles-install-utils() {
 }
 
 opensuse-image-url() {
-    opensuse-15_4-image-url
+    opensuse-15_5-image-url
 }
 
-opensuse-15_4-image-url() {
-    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.4/appliances/openSUSE-Leap-15.4-Minimal-VM.x86_64-OpenStack-Cloud.qcow2"
+opensuse-15_5-image-url() {
+    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.5/appliances/openSUSE-Leap-15.5-Minimal-VM.x86_64-Cloud.qcow2"
 }
 
 opensuse-15_5-image-url() {
@@ -763,7 +763,7 @@ opensuse-install-k8s() {
     vm-command "echo 1 > /proc/sys/net/ipv4/ip_forward"
     vm-command "zypper ls"
     if ! grep -q snappy <<< "$COMMAND_OUTPUT"; then
-        distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.4 snappy"
+        distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.5 snappy"
         distro-refresh-pkg-db
     fi
     distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
