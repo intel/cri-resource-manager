@@ -276,17 +276,20 @@ debian-install-crio-pre() {
 }
 
 debian-install-k8s() {
-    local k8sverparam
+    local _k8s=$k8s
     debian-refresh-pkg-db
     debian-install-pkg apt-transport-https curl
-    debian-install-repo-key "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
-    debian-install-repo "deb https://apt.kubernetes.io/ kubernetes-xenial main"
-    if [ -n "$k8s" ]; then
-        k8sverparam="=${k8s}-00"
-    else
-        k8sverparam=""
+
+    if [[ -z "$k8s" ]] || [[ "$k8s" == "latest" ]]; then
+        vm-command "curl -s https://api.github.com/repos/kubernetes/kubernetes/releases/latest | grep tag_name | sed -e 's/.*v\([0-9]\+\.[0-9]\+\).*/\1/g'"
+        _k8s=$COMMAND_OUTPUT
     fi
-    debian-install-pkg "kubeadm$k8sverparam" "kubelet$k8sverparam" "kubectl$k8sverparam"
+    echo "installing Kubernetes v${_k8s}"
+    vm-command "curl -fsSL https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/Release.key | sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg" || \
+        command-error "failed to download Kubernetes v${_k8s} key"
+    vm-command "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && apt update" || \
+        command-error "failed to add Kubernetes v${_k8s} repo"
+    debian-install-pkg "kubeadm" "kubelet" "kubectl"
 }
 
 debian-set-kernel-cmdline() {

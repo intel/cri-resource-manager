@@ -108,7 +108,7 @@ usage() {
     echo "             cgroups=v2 is supported only on distro=fedora"
     echo "    k8s:     Kubernetes version to be installed on VM creation"
     echo "             The default is the latest available on selected distro."
-    echo "             Example: k8s=1.18.10"
+    echo "             Example: k8s=1.31"
     echo "    k8scri:  The container runtime pipe where kubelet connects to."
     echo "             Options are:"
     echo "             \"cri-resmgr|containerd\" cri-resmgr is a proxy to containerd."
@@ -153,8 +153,8 @@ usage() {
     echo ""
     echo "Default test input VARs: ./run.sh help defaults"
     echo ""
-    echo "Create VM 'foo' that runs k8s 1.20.2 on Debian Sid:"
-    echo "vm=foo distro=debian-sid k8s=1.20.2 ./run.sh interactive"
+    echo "Create VM 'foo' that runs k8s 1.28 on Debian Sid:"
+    echo "vm=foo distro=debian-sid k8s=1.28 ./run.sh interactive"
 }
 
 error() {
