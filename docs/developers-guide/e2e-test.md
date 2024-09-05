@@ -4,10 +4,10 @@
 
 Install:
 - `docker`
-- `govm`
+- `govm` v0.95
   In case of errors in building `govm` with `go get`, or creating a virtual machine (`Error when creating the new VM: repository name must be canonical`), these are the workarounds:
   ```
-  GO111MODULE=off go get -d github.com/govm-project/govm && cd $GOPATH/src/github.com/govm-project/govm && go mod tidy && go mod download && go install && cd .. && docker build govm -f govm/Dockerfile -t govm/govm:latest
+  git clone https://github.com/govm-project/govm -b 0.95 && cd govm && go install && docker build . -t govm/govm:latest
   ```
 
 ## Usage
