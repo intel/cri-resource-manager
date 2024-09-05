@@ -316,23 +316,11 @@ YUM_INSTALL="yum install --disableplugin=fastestmirror -y"
 YUM_REMOVE="yum remove --disableplugin=fastestmirror -y"
 
 fedora-image-url() {
-    fedora-38-image-url
+    fedora-40-image-url
 }
 
-fedora-38-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/38/Cloud/x86_64/images/Fedora-Cloud-Base-38-1.6.x86_64.qcow2"
-}
-
-fedora-35-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/35/Cloud/x86_64/images/Fedora-Cloud-Base-35-1.2.x86_64.qcow2"
-}
-
-fedora-34-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/34/Cloud/x86_64/images/Fedora-Cloud-Base-34-1.2.x86_64.qcow2"
-}
-
-fedora-33-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
+fedora-40-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/40/Cloud/x86_64/images/Fedora-Cloud-Base-Generic.x86_64-40-1.14.qcow2"
 }
 
 fedora-ssh-user() {
@@ -397,7 +385,7 @@ fedora-install-kernel-dev() {
       fedpkg clone -a kernel
       cd kernel
       git fetch
-      git switch ${VM_DISTRO/edora-/} # example: git switch f35 in fedora-35
+      git switch ${VM_DISTRO/edora-/} # example: git switch f40 in fedora-40
       sed -i 's/# define buildid .local/%define buildid .e2e/g' kernel.spec
     )" || {
         echo "installing kernel development environment failed"
@@ -536,10 +524,6 @@ fedora-set-kernel-cmdline() {
     vm-command "grub2-mkconfig -o /boot/grub2/grub.cfg" || {
         command-error "updating grub failed"
     }
-}
-
-fedora-33-install-crio-pre() {
-    fedora-install-crio-version 1.20
 }
 
 ###########################################################################
