@@ -113,7 +113,7 @@ distro-unresolved() {
 ###########################################################################
 
 #
-# Ubuntu 18.04, 20.04, Debian 10, generic debian
+# Ubuntu, Debian
 #
 
 ubuntu-18_04-image-url() {
@@ -126,6 +126,10 @@ ubuntu-20_04-image-url() {
 
 ubuntu-22_04-image-url() {
     echo "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img"
+}
+
+ubuntu-24_04-image-url() {
+    echo "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
 }
 
 debian-10-image-url() {

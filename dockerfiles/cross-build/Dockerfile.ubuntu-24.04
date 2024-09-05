@@ -1,0 +1,30 @@
+# pull in base + a minimal set of useful packages
+FROM ubuntu:24.04 as ubuntu-24.04-build
+
+ARG GO_VERSION=x.yz
+ARG GOLICENSES_VERSION
+ARG CREATE_USER="test"
+ARG USER_UID=""
+ENV PATH /go/bin:/usr/local/go/bin:$PATH
+ENV DEBIAN_FRONTEND noninteractive
+
+# pull in stuff for building
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        tzdata build-essential fakeroot devscripts \
+        bash git make sed debhelper ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+ADD http://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz /
+
+RUN tar xf /go${GO_VERSION}.linux-amd64.tar.gz -C "/usr/local" && \
+    rm /go${GO_VERSION}.linux-amd64.tar.gz
+
+RUN GOBIN=/go/bin go install github.com/google/go-licenses@${GOLICENSES_VERSION}
+
+RUN if [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ]; then \
+        if getent passwd $USER_UID; then \
+             userdel `id -un $USER_UID`; \
+        fi; \
+        useradd -m -s /bin/bash $CREATE_USER -u $USER_UID; \
+    fi
