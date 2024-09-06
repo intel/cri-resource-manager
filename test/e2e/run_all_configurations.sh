@@ -4,7 +4,7 @@ RUN_SH="${0%/*}/run.sh"
 PAIRWISE="${0%/*}/../../scripts/testing/pairwise"
 
 "${PAIRWISE}" \
-    distro={debian-sid,fedora-35,fedora-34,opensuse-tumbleweed} \
+    distro={debian-sid,fedora-40,opensuse-tumbleweed} \
     k8scri={containerd,crio,cri-resmgr\|containerd,cri-resmgr\|crio} \
     k8scni={cilium,flannel,weavenet} | while read -r env_vars; do
 
