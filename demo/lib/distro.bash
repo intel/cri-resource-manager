@@ -455,19 +455,21 @@ fedora-install-containerd-post() {
 }
 
 fedora-install-k8s() {
+    _k8s=$k8s
+    if [[ -z "$_k8s" ]] || [[ "$_k8s" == "latest" ]]; then
+        vm-command "curl -s https://api.github.com/repos/kubernetes/kubernetes/releases/latest | grep tag_name | sed -e 's/.*v\([0-9]\+\.[0-9]\+\).*/\1/g'"
+        _k8s=$COMMAND_OUTPUT
+    fi
+
     local repo="/etc/yum.repos.d/kubernetes.repo"
-    local base="https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch"
-    local yumkey="https://packages.cloud.google.com/yum/doc/yum-key.gpg"
-    local rpmkey="https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
 
     cat <<EOF |
 [kubernetes]
 name=Kubernetes
-baseurl=$base
+baseurl=https://pkgs.k8s.io/core:/stable:/v$_k8s/rpm/
 enabled=1
 gpgcheck=1
-repo_gpgcheck=1
-gpgkey=$yumkey $rpmkey
+gpgkey=https://pkgs.k8s.io/core:/stable:/v$_k8s/rpm/repodata/repomd.xml.key
 EOF
       vm-pipe-to-file $repo
 
