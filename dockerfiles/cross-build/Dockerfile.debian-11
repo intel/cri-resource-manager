@@ -1,0 +1,25 @@
+# pull in base + a minimal set of useful packages
+FROM debian:bullseye as debian-11-build
+
+ARG GO_VERSION=x.yz
+ARG GOLICENSES_VERSION
+ARG CREATE_USER="test"
+ARG USER_UID=""
+ENV PATH /go/bin:/usr/local/go/bin:$PATH
+
+# pull in stuff for cgo
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        build-essential fakeroot devscripts \
+        bash git make sed debhelper ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+ADD http://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz /
+
+RUN tar xf /go${GO_VERSION}.linux-amd64.tar.gz -C "/usr/local" && \
+    rm /go${GO_VERSION}.linux-amd64.tar.gz
+
+RUN GOBIN=/go/bin go install github.com/google/go-licenses@${GOLICENSES_VERSION}
+
+RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
+    useradd -m -s /bin/bash $CREATE_USER -u $USER_UID
