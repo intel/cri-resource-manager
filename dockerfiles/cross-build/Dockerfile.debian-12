@@ -1,5 +1,5 @@
 # pull in base + a minimal set of useful packages
-FROM debian:buster as debian-10-build
+FROM debian:bookworm as debian-11-build
 
 ARG GO_VERSION=x.yz
 ARG GOLICENSES_VERSION
