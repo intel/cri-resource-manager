@@ -278,7 +278,7 @@ debian-install-crio-pre() {
 debian-install-k8s() {
     local _k8s=$k8s
     debian-refresh-pkg-db
-    debian-install-pkg apt-transport-https curl
+    debian-install-pkg gpg apt-transport-https curl
 
     if [[ -z "$k8s" ]] || [[ "$k8s" == "latest" ]]; then
         vm-command "curl -s https://api.github.com/repos/kubernetes/kubernetes/releases/latest | grep tag_name | sed -e 's/.*v\([0-9]\+\.[0-9]\+\).*/\1/g'"
@@ -304,6 +304,10 @@ debian-set-kernel-cmdline() {
 
 debian-env-file-dir() {
     echo "/etc/default"
+}
+
+debian-sid-govm-env() {
+    echo "DISABLE_VGA=N"
 }
 
 ###########################################################################
