@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Installation &mdash; CRI Resource Manager 0.9.1 documentation</title>
+  <title>Installation &mdash; CRI Resource Manager 0.0.0-1-gbaad21a documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css" />
 
@@ -38,7 +38,7 @@
             CRI Resource Manager
           </a>
               <div class="version">
-                v0.9.1
+                0.0.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -121,7 +121,7 @@ packages</p></li>
 <li><p>get the sources: <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">clone</span> <span class="pre">https://github.com/intel/cri-resource-manager</span></code></p></li>
 <li><p>build and install: <code class="docutils literal notranslate"><span class="pre">cd</span> <span class="pre">cri-resource-manager;</span> <span class="pre">make</span> <span class="pre">build</span> <span class="pre">&amp;&amp;</span> <span class="pre">sudo</span> <span class="pre">make</span> <span class="pre">install</span></code></p></li>
 </ul>
-<p>You will need at least <code class="docutils literal notranslate"><span class="pre">git</span></code>, <code class="docutils literal notranslate"><span class="pre">golang</span> <span class="pre">1.21</span></code> or newer,
+<p>You will need at least <code class="docutils literal notranslate"><span class="pre">git</span></code>, <code class="docutils literal notranslate"><span class="pre">golang</span> <span class="pre">1.22.0</span></code> or newer,
 <code class="docutils literal notranslate"><span class="pre">GNU</span> <span class="pre">make</span></code>, <code class="docutils literal notranslate"><span class="pre">bash</span></code>, <code class="docutils literal notranslate"><span class="pre">find</span></code>, <code class="docutils literal notranslate"><span class="pre">sed</span></code>, <code class="docutils literal notranslate"><span class="pre">head</span></code>, <code class="docutils literal notranslate"><span class="pre">date</span></code>, and <code class="docutils literal notranslate"><span class="pre">install</span></code> to be able to build and install
 from sources.</p>
 </section>
@@ -157,8 +157,7 @@ distro is supported.</p>
 <p>Similarly to <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">packages</span></code>, this will build packages using a <code class="docutils literal notranslate"><span class="pre">Docker\*</span></code>
 container. However, instead of building for your host, it will build them
 for the specified distro. For instance <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">cross-deb.ubuntu-18.04</span></code> will
-build <code class="docutils literal notranslate"><span class="pre">deb</span></code> packages for <code class="docutils literal notranslate"><span class="pre">Ubuntu\*</span> <span class="pre">18.04</span></code> and <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">cross-rpm.centos-8</span></code> will
-build <code class="docutils literal notranslate"><span class="pre">rpm</span></code> packages for <code class="docutils literal notranslate"><span class="pre">CentOS\*</span> <span class="pre">8</span></code></p>
+build <code class="docutils literal notranslate"><span class="pre">deb</span></code> packages for <code class="docutils literal notranslate"><span class="pre">Ubuntu\*</span> <span class="pre">18.04</span></code>.</p>
 </section>
 <section id="post-install-configuration">
 <h2>Post-install configuration<a class="headerlink" href="#post-install-configuration" title="Permalink to this heading"></a></h2>
