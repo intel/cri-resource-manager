@@ -132,12 +132,12 @@ ubuntu-24_04-image-url() {
     echo "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
 }
 
-debian-10-image-url() {
-    echo "https://cloud.debian.org/images/cloud/buster/latest/debian-10-generic-amd64.qcow2"
+debian-11-image-url() {
+    echo "https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2"
 }
 
-debian-11-image-url() {
-    echo "https://cloud.debian.org/images/cloud/bullseye/daily/latest/debian-11-generic-amd64-daily.qcow2"
+debian-12-image-url() {
+    echo "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
 }
 
 debian-sid-image-url() {
@@ -257,10 +257,15 @@ debian-install-kernel-dev() {
     echo "install: dpkg -i linux-*.deb"
 }
 
-debian-10-install-containerd-pre() {
+debian-11-install-containerd-pre() {
     debian-install-repo-key https://download.docker.com/linux/debian/gpg
-    debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
+    debian-install-repo "deb https://download.docker.com/linux/debian bullseye stable"
+}
 
+debian-11-install-containerd() {
+    vm-command-q "[ -f /usr/bin/containerd ]" || {
+        distro-install-pkg containerd.io
+    }
 }
 
 debian-sid-install-containerd-post() {
