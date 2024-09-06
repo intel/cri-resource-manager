@@ -704,63 +704,6 @@ opensuse-wait-for-zypper() {
         error "Failed to stop zypper running in the background"
 }
 
-opensuse-require-repo-virtualization-containers() {
-    vm-command "zypper ls"
-    if ! grep -q Virtualization_containers <<< "$COMMAND_OUTPUT"; then
-        vm-command 'source /etc/os-release; echo $VERSION'
-        local opensuse_version=$COMMAND_OUTPUT
-        opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/${opensuse_version}/Virtualization:containers.repo
-        opensuse-refresh-pkg-db
-    fi
-}
-
-opensuse-install-crio-pre() {
-    opensuse-require-repo-virtualization-containers
-    distro-install-pkg --from Virtualization_containers runc conmon
-    vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
-}
-
-opensuse-install-runc() {
-    opensuse-require-repo-virtualization-containers
-    distro-install-pkg --from Virtualization_containers runc
-}
-
-opensuse-install-containerd() {
-    opensuse-require-repo-virtualization-containers
-    distro-install-pkg --from Virtualization_containers containerd containerd-ctr
-    vm-command "ln -sf /usr/sbin/containerd-ctr /usr/sbin/ctr"
-
-cat <<EOF |
-[Unit]
-Description=containerd container runtime
-Documentation=https://containerd.io
-After=network.target
-
-[Service]
-ExecStartPre=-/sbin/modprobe overlay
-ExecStart=/usr/sbin/containerd
-
-Delegate=yes
-KillMode=process
-Restart=always
-LimitNPROC=infinity
-LimitCORE=infinity
-LimitNOFILE=1048576
-TasksMax=infinity
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    vm-pipe-to-file /etc/systemd/system/containerd.service
-
-    cat <<EOF |
-disabled_plugins = []
-EOF
-    vm-pipe-to-file /etc/containerd/config.toml
-    vm-command "systemctl daemon-reload" ||
-        command-error "failed to reload systemd daemon"
-}
-
 opensuse-install-k8s() {
     vm-command "( lsmod | grep -q br_netfilter ) || { echo br_netfilter > /etc/modules-load.d/50-br_netfilter.conf; modprobe br_netfilter; }"
     vm-command "echo 1 > /proc/sys/net/ipv4/ip_forward"
@@ -769,15 +712,9 @@ opensuse-install-k8s() {
         distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.5 snappy"
         distro-refresh-pkg-db
     fi
-    distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
-    vm-install-containernetworking
-    # In some snap packages snap-seccomp launching fails on bad path:
-    # cannot obtain snap-seccomp version information: fork/exec /usr/libexec/snapd/snap-seccomp: no such file or directory
-    # But snap-seccomp may be installed to /usr/lib/snapd/snap-seccomp.
-    # (Found in opensuse-tumbleweed/20210921.)
-    # Workaround this problem by making sure that /usr/libexec/snapd/snap-seccomp is found.
-    vm-command-q "[ ! -d /usr/libexec/snapd ] && [ -f /usr/lib/snapd/snap-seccomp ]" &&
-        vm-command "ln -s /usr/lib/snapd /usr/libexec/snapd"
+    distro-install-pkg "snapd apparmor-profiles socat ebtables conntrackd iptables ethtool cni-plugins"
+    distro-install-crictl
+    vm-command "mkdir -p /opt/cni && ln -fs /usr/lib/cni/ -T /opt/cni/bin"
 
     vm-command "systemctl enable --now snapd"
     vm-command "snap wait system seed.loaded"
