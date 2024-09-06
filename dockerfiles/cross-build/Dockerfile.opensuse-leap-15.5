@@ -1,18 +1,15 @@
 # pull in base + a minimal set of useful packages
-FROM centos:8 as centos-8-build
+FROM opensuse/leap:15.5 as suse-15.5-build
 
 ARG GO_VERSION=x.yz
 ARG GOLICENSES_VERSION
 ARG CREATE_USER="build"
-ARG USER_OPTIONS=""
+ARG USER_UID=""
 ENV PATH /go/bin:/usr/local/go/bin:$PATH
 
-RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* && \
-    sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
-
-RUN dnf install -y rpm-build \
+RUN zypper install -y rpm-build \
     kernel-devel gcc \
-    git-core make
+    git make
 
 ADD http://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz /
 
@@ -22,4 +19,4 @@ RUN tar xf /go${GO_VERSION}.linux-amd64.tar.gz -C "/usr/local" && \
 RUN GOBIN=/go/bin go install github.com/google/go-licenses@${GOLICENSES_VERSION}
 
 RUN [ -n "$CREATE_USER" -a "$CREATE_USER" != "root" ] && \
-    useradd -m -s /bin/bash $CREATE_USER $USER_OPTIONS
+    useradd -m -s /bin/bash $CREATE_USER -u $USER_UID

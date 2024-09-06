@@ -62,8 +62,7 @@ make cross-$type.$distro-$version
 Similarly to `make packages`, this will build packages using a `Docker\*`
 container. However, instead of building for your host, it will build them
 for the specified distro. For instance `make cross-deb.ubuntu-18.04` will
-build `deb` packages for `Ubuntu\* 18.04` and `make cross-rpm.centos-8` will
-build `rpm` packages for `CentOS\* 8`
+build `deb` packages for `Ubuntu\* 18.04`.
 
 ## Post-install configuration
 
