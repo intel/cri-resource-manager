@@ -655,6 +655,7 @@ vm-install-cri-resmgr() {
         elif [[ "$pkg_count" -gt 1 ]]; then
             error "installing from $binsrc failed: expected exactly one cri-resource-manager*.$suf in $HOST_PROJECT_DIR/$binsrc, found $pkg_count alternatives."
         fi
+        vm-command "mkdir -p /etc/cri-resmgr && touch /etc/cri-resmgr/fallback.cfg"
         host-command "$SCP $HOST_PROJECT_DIR/$binsrc/*.$suf $VM_SSH_USER@$VM_IP:/tmp" || {
             command-error "copying *.$suf to vm failed, run \"make cross-$suf\" first"
         }
