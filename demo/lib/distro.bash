@@ -285,10 +285,18 @@ debian-install-k8s() {
         _k8s=$COMMAND_OUTPUT
     fi
     echo "installing Kubernetes v${_k8s}"
-    vm-command "curl -fsSL https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/Release.key | sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg" || \
+    vm-command "curl -fsSL https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/Release.key -o /tmp/Release.key" || \
         command-error "failed to download Kubernetes v${_k8s} key"
-    vm-command "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && apt update" || \
-        command-error "failed to add Kubernetes v${_k8s} repo"
+
+    if vm-command "command -v apt-key >/dev/null"; then
+        vm-command "sudo apt-key add /tmp/Release.key"
+        vm-command "echo 'deb https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && apt update" || \
+            command-error "failed to add Kubernetes v${_k8s} repo"
+    else
+        vm-command "sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/Release.key"
+        vm-command "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && apt update" || \
+            command-error "failed to add Kubernetes v${_k8s} repo"
+    fi
     debian-install-pkg "kubeadm" "kubelet" "kubectl"
 }
 
