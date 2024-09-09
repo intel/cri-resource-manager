@@ -176,6 +176,21 @@ debian-ssh-user() {
     echo debian
 }
 
+ubuntu-apparmor-disable-runc() {
+    vm-command "[ -f /etc/apparmor.d/runc ] && ln -s /etc/apparmor.d/runc /etc/apparmor.d/disable/ && apparmor_parser -R /etc/apparmor.d/runc"
+}
+
+ubuntu-config-containerd() {
+    ubuntu-apparmor-disable-runc
+    default-config-containerd
+}
+
+ubuntu-config-crio() {
+    ubuntu-apparmor-disable-runc
+    default-config-crio
+}
+
+
 debian-pkg-type() {
     echo deb
 }
