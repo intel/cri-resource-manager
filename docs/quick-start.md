@@ -14,7 +14,7 @@ First, install and setup cri-resource-manager.
 
 ### Install package
 
-#### CentOS\*, Fedora\*, and SUSE\*
+#### Fedora\*, and SUSE\*
 
 ```
 CRIRM_VERSION=`curl -s "https://api.github.com/repos/intel/cri-resource-manager/releases/latest" | \
@@ -57,7 +57,7 @@ When integrating into an existing cluster you need to change kubelet to use
 cri-resmgr instead of the existing container runtime (expecting containerd
 here).
 
-#### CentOS, Fedora, and SUSE
+#### Fedora, and SUSE
 ```
 sudo sed '/KUBELET_EXTRA_ARGS/ s!$! --container-runtime-endpoint=/var/run/cri-resmgr/cri-resmgr.sock!' -i /etc/sysconfig/kubelet
 sudo systemctl restart kubelet

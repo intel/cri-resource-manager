@@ -1,6 +1,6 @@
 # shellcheck disable=SC2120
 GO_URLDIR=https://golang.org/dl
-GO_VERSION=1.19.1
+GO_VERSION=1.22.6
 GOLANG_URL=$GO_URLDIR/go$GO_VERSION.linux-amd64.tar.gz
 CRICTL_VERSION=${CRICTL_VERSION:-"v1.25.0"}
 MINIKUBE_VERSION=${MINIKUBE_VERSION:-v1.27.0}
@@ -87,7 +87,6 @@ distro-resolve-fn() {
     candidates="${VM_DISTRO/./_}-$apifn ${VM_DISTRO%%-*}-$apifn"
     case $VM_DISTRO in
         ubuntu*) candidates="$candidates debian-$apifn";;
-        centos*) candidates="$candidates fedora-$apifn rpm-$apifn";;
         fedora*) candidates="$candidates rpm-$apifn";;
         *suse*)  candidates="$candidates rpm-$apifn";;
         sles*)   candidates="$candidates opensuse-$apifn rpm-$apifn";;
@@ -114,7 +113,7 @@ distro-unresolved() {
 ###########################################################################
 
 #
-# Ubuntu 18.04, 20.04, Debian 10, generic debian
+# Ubuntu, Debian
 #
 
 ubuntu-18_04-image-url() {
@@ -129,12 +128,16 @@ ubuntu-22_04-image-url() {
     echo "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-amd64.img"
 }
 
-debian-10-image-url() {
-    echo "https://cloud.debian.org/images/cloud/buster/latest/debian-10-generic-amd64.qcow2"
+ubuntu-24_04-image-url() {
+    echo "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
 }
 
 debian-11-image-url() {
-    echo "https://cloud.debian.org/images/cloud/bullseye/daily/latest/debian-11-generic-amd64-daily.qcow2"
+    echo "https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2"
+}
+
+debian-12-image-url() {
+    echo "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
 }
 
 debian-sid-image-url() {
@@ -172,6 +175,21 @@ ubuntu-ssh-user() {
 debian-ssh-user() {
     echo debian
 }
+
+ubuntu-apparmor-disable-runc() {
+    vm-command "[ -f /etc/apparmor.d/runc ] && ln -s /etc/apparmor.d/runc /etc/apparmor.d/disable/ && apparmor_parser -R /etc/apparmor.d/runc"
+}
+
+ubuntu-config-containerd() {
+    ubuntu-apparmor-disable-runc
+    default-config-containerd
+}
+
+ubuntu-config-crio() {
+    ubuntu-apparmor-disable-runc
+    default-config-crio
+}
+
 
 debian-pkg-type() {
     echo deb
@@ -254,10 +272,15 @@ debian-install-kernel-dev() {
     echo "install: dpkg -i linux-*.deb"
 }
 
-debian-10-install-containerd-pre() {
+debian-11-install-containerd-pre() {
     debian-install-repo-key https://download.docker.com/linux/debian/gpg
-    debian-install-repo "deb https://download.docker.com/linux/debian buster stable"
+    debian-install-repo "deb https://download.docker.com/linux/debian bullseye stable"
+}
 
+debian-11-install-containerd() {
+    vm-command-q "[ -f /usr/bin/containerd ]" || {
+        distro-install-pkg containerd.io
+    }
 }
 
 debian-sid-install-containerd-post() {
@@ -277,17 +300,28 @@ debian-install-crio-pre() {
 }
 
 debian-install-k8s() {
-    local k8sverparam
+    local _k8s=$k8s
     debian-refresh-pkg-db
-    debian-install-pkg apt-transport-https curl
-    debian-install-repo-key "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
-    debian-install-repo "deb https://apt.kubernetes.io/ kubernetes-xenial main"
-    if [ -n "$k8s" ]; then
-        k8sverparam="=${k8s}-00"
-    else
-        k8sverparam=""
+    debian-install-pkg gpg apt-transport-https curl
+
+    if [[ -z "$k8s" ]] || [[ "$k8s" == "latest" ]]; then
+        vm-command "curl -s https://api.github.com/repos/kubernetes/kubernetes/releases/latest | grep tag_name | sed -e 's/.*v\([0-9]\+\.[0-9]\+\).*/\1/g'"
+        _k8s=$COMMAND_OUTPUT
     fi
-    debian-install-pkg "kubeadm$k8sverparam" "kubelet$k8sverparam" "kubectl$k8sverparam"
+    echo "installing Kubernetes v${_k8s}"
+    vm-command "curl -fsSL https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/Release.key -o /tmp/Release.key" || \
+        command-error "failed to download Kubernetes v${_k8s} key"
+
+    if vm-command "command -v apt-key >/dev/null"; then
+        vm-command "sudo apt-key add /tmp/Release.key"
+        vm-command "echo 'deb https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && apt update" || \
+            command-error "failed to add Kubernetes v${_k8s} repo"
+    else
+        vm-command "sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/Release.key"
+        vm-command "echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${_k8s}/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && apt update" || \
+            command-error "failed to add Kubernetes v${_k8s} repo"
+    fi
+    debian-install-pkg "kubeadm" "kubelet" "kubectl"
 }
 
 debian-set-kernel-cmdline() {
@@ -304,106 +338,25 @@ debian-env-file-dir() {
     echo "/etc/default"
 }
 
+debian-sid-govm-env() {
+    echo "DISABLE_VGA=N"
+}
+
 ###########################################################################
 
 #
-# Centos 7, 8, generic Fedora
+# Generic Fedora
 #
 
 YUM_INSTALL="yum install --disableplugin=fastestmirror -y"
 YUM_REMOVE="yum remove --disableplugin=fastestmirror -y"
 
-centos-7-image-url() {
-    echo "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud-2003.qcow2.xz"
-}
-
-centos-8-image-url() {
-    echo "https://cloud.centos.org/centos/8/x86_64/images/CentOS-8-GenericCloud-8.2.2004-20200611.2.x86_64.qcow2"
-}
-
-centos-ssh-user() {
-    echo centos
-}
-
-centos-7-install-utils() {
-    distro-install-pkg /usr/bin/killall
-}
-
-centos-7-install-repo() {
-    vm-command-q "type -t yum-config-manager >&/dev/null" || {
-        distro-install-pkg yum-utils
-    }
-    vm-command "yum-config-manager --add-repo $*" ||
-        command-error "failed to add YUM repository $*"
-}
-
-centos-7-install-pkg() {
-    vm-command "$YUM_INSTALL $*" ||
-        command-error "failed to install $*"
-}
-
-centos-7-remove-pkg() {
-    vm-command "$YUM_REMOVE $*" ||
-        command-error "failed to remove package(s) $*"
-}
-
-centos-7-install-containerd-pre() {
-    create-ext4-var-lib-containerd
-    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
-}
-
-centos-8-install-pkg-pre() {
-    vm-command "[ -f /etc/yum.repos.d/.fixup ]" && return 0
-    vm-command 'sed -i "s/mirrorlist/#mirrorlist/g" /etc/yum.repos.d/CentOS-*' && \
-    vm-command 'sed -i "s|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g" /etc/yum.repos.d/CentOS-*' && \
-    vm-command 'touch /etc/yum.repos.d/.fixup'
-}
-
-centos-8-install-crio-pre() {
-    if [ -z "$crio_src" ]; then
-        local os=CentOS_8
-        local version=${crio_version:-1.20}
-        vm-command "curl -L -o /etc/yum.repos.d/libcontainers-stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$os/devel:kubic:libcontainers:stable.repo"
-        vm-command "curl -L -o /etc/yum.repos.d/crio.repo https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$version/$os/devel:kubic:libcontainers:stable:cri-o:$version.repo"
-    fi
-}
-
-centos-8-install-crio() {
-    if [ -n "$crio_src" ]; then
-	default-install-crio
-    else
-	distro-install-pkg cri-o
-	vm-command "systemctl enable crio"
-    fi
-}
-
-centos-8-install-containerd-pre() {
-    distro-install-repo https://download.docker.com/linux/centos/docker-ce.repo
-}
-
-centos-install-golang() {
-    distro-install-pkg wget tar gzip git-core
-    from-tarball-install-golang
-}
-
 fedora-image-url() {
-    fedora-38-image-url
+    fedora-40-image-url
 }
 
-fedora-38-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/38/Cloud/x86_64/images/Fedora-Cloud-Base-38-1.6.x86_64.qcow2"
-}
-
-fedora-35-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/35/Cloud/x86_64/images/Fedora-Cloud-Base-35-1.2.x86_64.qcow2"
-}
-
-fedora-34-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/34/Cloud/x86_64/images/Fedora-Cloud-Base-34-1.2.x86_64.qcow2"
-}
-
-fedora-33-image-url() {
-    echo "https://mirrors.xtom.de/fedora/releases/33/Cloud/x86_64/images/Fedora-Cloud-Base-33-1.2.x86_64.qcow2"
+fedora-40-image-url() {
+    echo "https://mirrors.xtom.de/fedora/releases/40/Cloud/x86_64/images/Fedora-Cloud-Base-Generic.x86_64-40-1.14.qcow2"
 }
 
 fedora-ssh-user() {
@@ -468,7 +421,7 @@ fedora-install-kernel-dev() {
       fedpkg clone -a kernel
       cd kernel
       git fetch
-      git switch ${VM_DISTRO/edora-/} # example: git switch f35 in fedora-35
+      git switch ${VM_DISTRO/edora-/} # example: git switch f40 in fedora-40
       sed -i 's/# define buildid .local/%define buildid .e2e/g' kernel.spec
     )" || {
         echo "installing kernel development environment failed"
@@ -530,19 +483,21 @@ fedora-install-containerd-post() {
 }
 
 fedora-install-k8s() {
+    _k8s=$k8s
+    if [[ -z "$_k8s" ]] || [[ "$_k8s" == "latest" ]]; then
+        vm-command "curl -s https://api.github.com/repos/kubernetes/kubernetes/releases/latest | grep tag_name | sed -e 's/.*v\([0-9]\+\.[0-9]\+\).*/\1/g'"
+        _k8s=$COMMAND_OUTPUT
+    fi
+
     local repo="/etc/yum.repos.d/kubernetes.repo"
-    local base="https://packages.cloud.google.com/yum/repos/kubernetes-el7-\$basearch"
-    local yumkey="https://packages.cloud.google.com/yum/doc/yum-key.gpg"
-    local rpmkey="https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
 
     cat <<EOF |
 [kubernetes]
 name=Kubernetes
-baseurl=$base
+baseurl=https://pkgs.k8s.io/core:/stable:/v$_k8s/rpm/
 enabled=1
 gpgcheck=1
-repo_gpgcheck=1
-gpgkey=$yumkey $rpmkey
+gpgkey=https://pkgs.k8s.io/core:/stable:/v$_k8s/rpm/repodata/repomd.xml.key
 EOF
       vm-pipe-to-file $repo
 
@@ -551,9 +506,6 @@ EOF
     else
         k8sverparam=""
     fi
-
-    vm-command 'grep -iq centos-[78] /etc/os-release' && \
-        vm-command "sed -i 's/gpgcheck=1/gpgcheck=0/g' $repo"
 
     distro-install-pkg iproute-tc kubelet$k8sverparam kubeadm$k8sverparam kubectl$k8sverparam
     vm-command "systemctl enable --now kubelet" ||
@@ -610,10 +562,6 @@ fedora-set-kernel-cmdline() {
     vm-command "grub2-mkconfig -o /boot/grub2/grub.cfg" || {
         command-error "updating grub failed"
     }
-}
-
-fedora-33-install-crio-pre() {
-    fedora-install-crio-version 1.20
 }
 
 ###########################################################################
@@ -678,11 +626,11 @@ sles-install-utils() {
 }
 
 opensuse-image-url() {
-    opensuse-15_4-image-url
+    opensuse-15_5-image-url
 }
 
-opensuse-15_4-image-url() {
-    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.4/appliances/openSUSE-Leap-15.4-Minimal-VM.x86_64-OpenStack-Cloud.qcow2"
+opensuse-15_5-image-url() {
+    echo "https://download.opensuse.org/pub/opensuse/distribution/leap/15.5/appliances/openSUSE-Leap-15.5-Minimal-VM.x86_64-Cloud.qcow2"
 }
 
 opensuse-15_5-image-url() {
@@ -778,80 +726,17 @@ opensuse-wait-for-zypper() {
         error "Failed to stop zypper running in the background"
 }
 
-opensuse-require-repo-virtualization-containers() {
-    vm-command "zypper ls"
-    if ! grep -q Virtualization_containers <<< "$COMMAND_OUTPUT"; then
-        vm-command 'source /etc/os-release; echo $VERSION'
-        local opensuse_version=$COMMAND_OUTPUT
-        opensuse-install-repo https://download.opensuse.org/repositories/Virtualization:containers/${opensuse_version}/Virtualization:containers.repo
-        opensuse-refresh-pkg-db
-    fi
-}
-
-opensuse-install-crio-pre() {
-    opensuse-require-repo-virtualization-containers
-    distro-install-pkg --from Virtualization_containers runc conmon
-    vm-command "ln -sf /usr/lib64/libdevmapper.so.1.02 /usr/lib64/libdevmapper.so.1.02.1" || true
-}
-
-opensuse-install-runc() {
-    opensuse-require-repo-virtualization-containers
-    distro-install-pkg --from Virtualization_containers runc
-}
-
-opensuse-install-containerd() {
-    opensuse-require-repo-virtualization-containers
-    distro-install-pkg --from Virtualization_containers containerd containerd-ctr
-    vm-command "ln -sf /usr/sbin/containerd-ctr /usr/sbin/ctr"
-
-cat <<EOF |
-[Unit]
-Description=containerd container runtime
-Documentation=https://containerd.io
-After=network.target
-
-[Service]
-ExecStartPre=-/sbin/modprobe overlay
-ExecStart=/usr/sbin/containerd
-
-Delegate=yes
-KillMode=process
-Restart=always
-LimitNPROC=infinity
-LimitCORE=infinity
-LimitNOFILE=1048576
-TasksMax=infinity
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    vm-pipe-to-file /etc/systemd/system/containerd.service
-
-    cat <<EOF |
-disabled_plugins = []
-EOF
-    vm-pipe-to-file /etc/containerd/config.toml
-    vm-command "systemctl daemon-reload" ||
-        command-error "failed to reload systemd daemon"
-}
-
 opensuse-install-k8s() {
     vm-command "( lsmod | grep -q br_netfilter ) || { echo br_netfilter > /etc/modules-load.d/50-br_netfilter.conf; modprobe br_netfilter; }"
     vm-command "echo 1 > /proc/sys/net/ipv4/ip_forward"
     vm-command "zypper ls"
     if ! grep -q snappy <<< "$COMMAND_OUTPUT"; then
-        distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.4 snappy"
+        distro-install-repo "http://download.opensuse.org/repositories/system:/snappy/openSUSE_Leap_15.5 snappy"
         distro-refresh-pkg-db
     fi
-    distro-install-pkg "snapd apparmor-profiles socat ebtables cri-tools conntrackd iptables ethtool"
-    vm-install-containernetworking
-    # In some snap packages snap-seccomp launching fails on bad path:
-    # cannot obtain snap-seccomp version information: fork/exec /usr/libexec/snapd/snap-seccomp: no such file or directory
-    # But snap-seccomp may be installed to /usr/lib/snapd/snap-seccomp.
-    # (Found in opensuse-tumbleweed/20210921.)
-    # Workaround this problem by making sure that /usr/libexec/snapd/snap-seccomp is found.
-    vm-command-q "[ ! -d /usr/libexec/snapd ] && [ -f /usr/lib/snapd/snap-seccomp ]" &&
-        vm-command "ln -s /usr/lib/snapd /usr/libexec/snapd"
+    distro-install-pkg "snapd apparmor-profiles socat ebtables conntrackd iptables ethtool cni-plugins"
+    distro-install-crictl
+    vm-command "mkdir -p /opt/cni && ln -fs /usr/lib/cni/ -T /opt/cni/bin"
 
     vm-command "systemctl enable --now snapd"
     vm-command "snap wait system seed.loaded"

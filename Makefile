@@ -11,7 +11,7 @@ GO_FMT      := gofmt
 GO_CYCLO    := gocyclo
 GO_LINT     := golint
 GO_CILINT   := golangci-lint
-GO_VERSION  ?= 1.21.5
+GO_VERSION  ?= 1.22.6
 GOLICENSES_VERSION  ?= v1.5.0
 
 # TEST_TAGS is the set of extra build tags passed for tests.
@@ -240,7 +240,7 @@ DIST_TRANSFORM := \
 DISTRO_ID      := $(shell . /etc/os-release; echo "$${ID:-unknown}")
 DISTRO_VERSION := $(shell . /etc/os-release; echo "$${VERSION_ID:-unknown}")
 DISTRO_PACKAGE := $(shell echo $(DISTRO_ID) | tr -d ' \t' | \
-    sed -E 's/.*((centos)|(fedora)|(suse)).*/rpm/;s/.*((ubuntu)|(debian)).*/deb/')
+    sed -E 's/.*((fedora)|(suse)).*/rpm/;s/.*((ubuntu)|(debian)).*/deb/')
 
 # Be quiet by default but let folks override it with Q= or V=1 on the command line.
 ifneq ($(V),1)
@@ -684,7 +684,7 @@ cross-tar cross-tarball: dist docker/cross-build/fedora
 	    -v $$(pwd)/$$builddir:/build \
 	    -v $$(pwd)/$$outdir:/output \
 	    -v "`go env GOMODCACHE`:/home/$$USER/go/pkg/mod" \
-	    centos-7-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
+	    fedora-build /bin/bash -c '$(DOCKER_TAR_BUILD)' && \
 	rm -fr $$builddir && \
 	install -D -m644 -t $(PACKAGES_DIR)/release-assets $$outdir/cri-resource-manager-$(TAR_VERSION).x86_64.tar.gz
 
