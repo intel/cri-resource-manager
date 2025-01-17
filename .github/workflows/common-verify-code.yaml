@@ -36,10 +36,13 @@ jobs:
     - name: Codecov report
       run: bash <(curl -s https://codecov.io/bash)
 
-  trivy-scan:
-    uses: "./.github/workflows/common-trivy.yaml"
-    with:
-      upload-to-github-security-tab: true
+#
+# Disabled for unmaintained release-0.8 branch
+#
+#  trivy-scan:
+#    uses: "./.github/workflows/common-trivy.yaml"
+#    with:
+#      upload-to-github-security-tab: true
 
   codeql-scan:
     uses: "./.github/workflows/common-codeql.yaml"
