@@ -1,39 +1,19 @@
-
-
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <title>Node Agent &mdash; CRI Resource Manager 0.4.1-7-g7a4fe71 documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-
-  
-  
-  
-  
-
-  
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Node Agent &mdash; CRI Resource Manager 0.4.1-8-gf358f92c documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
-  
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+  <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
         <script src="../_static/doctools.js"></script>
         <script src="../_static/language_data.js"></script>
-    
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-
-    
+    <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Webhook" href="webhook.html" />
@@ -41,51 +21,41 @@
 </head>
 
 <body class="wy-body-for-nav">
+<style>
+.eol-banner {
+    background-color: #ffcccb;
+    color: #000;
+    text-align: center;
+    font-size: 1.2em;
+    padding: 10px 0;
+    border-bottom: 1px solid #ccc;
+}
+</style>
+<div class="eol-banner">
+    ⚠️ This documentation is for a deprecated version and is no longer maintained. ⚠️
+</div>
 
-   
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home" alt="Documentation Home"> CRI Resource Manager
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            CRI Resource Manager
           </a>
-
-          
-            
-            
               <div class="version">
                 0.4.1
               </div>
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
@@ -103,75 +73,36 @@
 <li class="toctree-l1"><a class="reference external" href="https://github.com/intel/cri-resource-manager">Project GitHub repository</a></li>
 </ul>
 
-            
-          
         </div>
-        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">CRI Resource Manager</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-        
-      <li>Node Agent</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Node Agent</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="../_sources/docs/node-agent.md.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
+             
   <div class="section" id="node-agent">
 <h1>Node Agent<a class="headerlink" href="#node-agent" title="Permalink to this headline">¶</a></h1>
 <p>CRI Resource Manager can be configured dynamically using the CRI Resource
 Manager Node Agent and Kubernetes ConfigMaps. The agent can be build using
-the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/7a4fe7153b6935c698ad3495524c6aa7a97d2ae5/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be deployed
-as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/7a4fe7153b6935c698ad3495524c6aa7a97d2ae5/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
+the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/master/cmd/cri-resmgr-agent/Dockerfile">provided Dockerfile</a>. It can be deployed
+as a <code class="docutils literal notranslate"><span class="pre">DaemonSet</span></code> in the cluster using the <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/master/cmd/cri-resmgr-agent/agent-deployment.yaml">provided deployment file</a>.</p>
 <p>To run the agent manually or as a <code class="docutils literal notranslate"><span class="pre">systemd</span></code> service, set the environment variable
 <code class="docutils literal notranslate"><span class="pre">NODE_NAME</span></code> to the name of the cluster node the agent is running on. If necessary
 pass it the credentials for accessing the cluster using the the <code class="docutils literal notranslate"><span class="pre">-kubeconfig</span> <span class="pre">&lt;file&gt;</span></code>
@@ -190,7 +121,7 @@ the others.</p>
 <code class="docutils literal notranslate"><span class="pre">cri-resource-manager.intel.com/group</span></code> label on the node to the name of
 the configuration group. You can remove a node from its group by deleting the node
 group label.</p>
-<p>There is a <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/7a4fe7153b6935c698ad3495524c6aa7a97d2ae5/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
+<p>There is a <a class="reference external" href="https://github.com/intel/cri-resource-manager/blob/master/sample-configs/cri-resmgr-configmap.example.yaml">sample ConfigMap spec</a>
 that contains anode-specific, a group-specific, and a default ConfigMap examples.
 See <a class="reference internal" href="policy/index.html">any available policy-specific documentation</a> for more information on the
 policy configurations.</p>
@@ -198,58 +129,33 @@ policy configurations.</p>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="webhook.html" class="btn btn-neutral float-right" title="Webhook" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="policy/rdt.html" class="btn btn-neutral float-left" title="RDT (Intel® Resource Director Technology)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="policy/rdt.html" class="btn btn-neutral float-left" title="RDT (Intel® Resource Director Technology)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="webhook.html" class="btn btn-neutral float-right" title="Webhook" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        
-        &copy; Copyright 2020, various
-
-    </p>
+    <p>&#169; Copyright 2020, various.</p>
   </div>
-    
-    
-    
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
   </script>
-
-  
-  
-    
-  
   
     <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
       <span class="rst-current-version" data-toggle="rst-current-version">
