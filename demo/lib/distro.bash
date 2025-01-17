@@ -283,7 +283,7 @@ debian-11-install-containerd() {
     }
 }
 
-debian-sid-install-containerd-post() {
+debian-sid-config-containerd-post() {
     vm-command "sed -e 's|bin_dir = \"/usr/lib/cni\"|bin_dir = \"/opt/cni/bin\"|g' -i /etc/containerd/config.toml"
 }
 
