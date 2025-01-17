@@ -1,5 +1,21 @@
 {%- extends "!layout.html" %}
 
+{% block extrabody %}
+<style>
+.eol-banner {
+    background-color: #ffcccb;
+    color: #000;
+    text-align: center;
+    font-size: 1.2em;
+    padding: 10px 0;
+    border-bottom: 1px solid #ccc;
+}
+</style>
+<div class="eol-banner">
+    ⚠️ This documentation is for a deprecated version and is no longer maintained. ⚠️
+</div>
+{% endblock %}
+
 {% block footer %}
   {% if versions_menu %}
     <div class="rst-versions" data-toggle="rst-versions" role="note" aria-label="versions">
