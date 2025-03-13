@@ -1,6 +1,6 @@
 module github.com/intel/cri-resource-manager
 
-go 1.22.0
+go 1.24
 
 require (
 	contrib.go.opencensus.io/exporter/jaeger v0.2.1
