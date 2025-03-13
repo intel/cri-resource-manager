@@ -351,6 +351,6 @@ func (dpm defaultPlatform) writeToFile(filename string, content string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = fmt.Fprintf(f, content)
+	_, err = f.Write([]byte(content))
 	return err
 }
