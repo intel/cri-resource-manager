@@ -137,7 +137,7 @@ func (ctl *memctl) setToptierLimit(c cache.Container) error {
 	group := cgroups.Memory.Group(dir)
 	entry := toptierSoftLimitControl
 
-	if err := group.Write(entry, limit+"\n"); err != nil {
+	if err := group.Write(entry, "%s\n", limit); err != nil {
 		return err
 	}
 

@@ -15,7 +15,6 @@
 package http
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -81,7 +80,7 @@ type testHandler struct {
 }
 
 func (h *testHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
-	fmt.Fprintf(w, h.response)
+	_, _ = w.Write([]byte(h.response))
 }
 
 func TestPatternsp(t *testing.T) {
