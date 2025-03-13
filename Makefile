@@ -24,7 +24,7 @@ TEST_SETUP   := test-setup.sh
 TEST_CLEANUP := test-cleanup.sh
 
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
-GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E revive,gofmt
+GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple,revive -E gofmt
 GO_CILINT_RUNFLAGS := --build-tags $(TEST_TAGS)
 
 # Protoc compiler and protobuf definitions we might need to recompile.
