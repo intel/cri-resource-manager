@@ -11,7 +11,7 @@ GO_FMT      := gofmt
 GO_CYCLO    := gocyclo
 GO_LINT     := golint
 GO_CILINT   := golangci-lint
-GO_VERSION  ?= 1.22.11
+GO_VERSION  ?= 1.24.1
 GOLICENSES_VERSION  ?= v1.5.0
 
 # TEST_TAGS is the set of extra build tags passed for tests.
@@ -24,7 +24,7 @@ TEST_SETUP   := test-setup.sh
 TEST_CLEANUP := test-cleanup.sh
 
 # Disable some golangci_lint checkers for now until we have an more acceptable baseline...
-GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple -E revive,gofmt
+GO_CILINT_CHECKERS := -D unused,staticcheck,errcheck,deadcode,structcheck,gosimple,revive -E gofmt
 GO_CILINT_RUNFLAGS := --build-tags $(TEST_TAGS)
 
 # Protoc compiler and protobuf definitions we might need to recompile.
