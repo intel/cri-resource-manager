@@ -89,7 +89,7 @@ jobs:
 
     - name: Upload CSV report as an artifact
       if: ${{ inputs.export-csv }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: trivy-report
         path: trivy-report.csv

@@ -998,7 +998,7 @@ func (cr *request) String() string {
 	isolated := map[bool]string{false: "", true: "isolated "}[cr.isolate]
 	switch {
 	case cr.full == 0 && cr.fraction == 0:
-		return fmt.Sprintf("<CPU request "+cr.container.PrettyName()+": ->") + mem
+		return "<CPU request " + cr.container.PrettyName() + ": ->" + mem
 
 	case cr.full > 0 && cr.fraction > 0:
 		return fmt.Sprintf("<CPU request "+cr.container.PrettyName()+": "+
